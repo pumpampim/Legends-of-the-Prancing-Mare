@@ -2,16 +2,297 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Скурим TTRPG — Лист персонажа</title>
+    <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
+    
+    <!-- Системный блок хранения баз данных игры -->
+    <script id="database-core">
+        // Исправленная база расовых бонусов к навыкам (полностью по документам)
+        const raceSkillBonuses = {
+            nord: { "Двуручное оружие": 10, "Красноречие": 5, "Легкая броня": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
+            altmer: { "Иллюзия": 10, "Колдовство": 5, "Разрушение": 5, "Изменение": 5, "Восстановление": 5, "Зачарование": 5 },
+            breton: { "Колдовство": 10, "Иллюзия": 5, "Алхимия": 5, "Красноречие": 5, "Восстановление": 5, "Изменение": 5 },
+            orc: { "Тяжелая броня": 10, "Зачарование": 5, "Двуручное оружие": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
+            khajiit: { "Скрытность": 10, "Взлом": 5, "Алхимия": 5, "Карманные кражи": 5, "Стрельба": 5, "Одноручное оружие": 5 },
+            redguard: { "Одноручное оружие": 10, "Разрушение": 5, "Изменение": 5, "Блокирование": 5, "Кузнечное дело": 5, "Стрельба": 5 },
+            argonian: { "Взлом": 10, "Восстановление": 5, "Изменение": 5, "Легкая броня": 5, "Скрытность": 5, "Карманные кражи": 5 },
+            bosmer: { "Стрельба": 10, "Взлом": 5, "Алхимия": 5, "Легкая броня": 5, "Скрытность": 5, "Карманные кражи": 5 },
+            dunmer: { "Разрушение": 15, "Иллюзия": 5, "Алхимия": 5, "Легкая броня": 5, "Скрытность": 5, "Изменение": 5 },
+            imperial: { "Восстановление": 10, "Разрушение": 5, "Зачарование": 5, "Тяжелая броня": 5, "Блокирование": 5, "Одноручное оружие": 5 }
+        };
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+        // Расовые модификаторы характеристик (добавляются к базовым 10)
+        const raceStatBonuses = {
+            nord: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+            altmer: { str: 0, dex: 0, con: 0, int: 2, wis: 1, cha: 0 },
+            breton: { str: 0, dex: 0, con: 0, int: 2, wis: 0, cha: 1 },
+            orc: { str: 1, dex: 0, con: 0, int: 0, wis: 1, cha: 0 },
+            khajiit: { str: 0, dex: 2, con: 1, int: 0, wis: 0, cha: 0 },
+            redguard: { str: 1, dex: 1, con: 0, int: 0, wis: 0, cha: 0 },
+            argonian: { str: 0, dex: 2, con: 0, int: 1, wis: 0, cha: 0 },
+            bosmer: { str: 0, dex: 2, con: 0, int: 0, wis: 1, cha: 0 },
+            dunmer: { str: 1, dex: 1, con: 0, int: 1, wis: 0, cha: 0 },
+            imperial: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 }
+        };
 
+        // Полный компендиум перков для всех 18 навыков (обновлён по таблице "Ветви талантов")
+        const fullPerksManifest = {
+            "Одноручное оружие": [
+                { name: "Сильная рука", steps: 5 }, { name: "Боевая стойка", steps: 1 },
+                { name: "Безоружный бой", steps: 1 }, { name: "Боевые искусства", steps: 1 },
+                { name: "Мечник", steps: 3 }, { name: "Контрудар", steps: 1 },
+                { name: "Копейщик", steps: 1 }, { name: "Рубака", steps: 1 },
+                { name: "Костолом", steps: 1 }, { name: "Двойной вихрь", steps: 1 },
+                { name: "Двойная мясорубка", steps: 1 }, { name: "Безжалостный удар", steps: 1 },
+                { name: "Рывок", steps: 1 }
+            ],
+            "Двуручное оружие": [
+                { name: "Варвар", steps: 5 }, { name: "Стойка чемпиона", steps: 1 },
+                { name: "Пикосажатель", steps: 1 }, { name: "Расчленитель", steps: 3 },
+                { name: "Глубокие раны", steps: 3 }, { name: "Отшельник", steps: 1 },
+                { name: "Великий рывок", steps: 1 }, { name: "Сокрушительный удар", steps: 1 },
+                { name: "Веерная атака", steps: 1 }, { name: "Крушитель черепов", steps: 1 }
+            ],
+            "Стрельба": [
+                { name: "Избыточное натяжение", steps: 5 }, { name: "Орлиный взор", steps: 1 },
+                { name: "Критический выстрел", steps: 3 }, { name: "Твёрдая рука", steps: 2 },
+                { name: "Мощный выстрел", steps: 1 }, { name: "Бережливый охотник", steps: 1 },
+                { name: "Егерь", steps: 1 }, { name: "Быстрая стрельба", steps: 1 }
+            ],
+            "Блокирование": [
+                { name: "Щитоносец", steps: 5 }, { name: "Отбивание стрел", steps: 1 },
+                { name: "Силовой удар плашмя", steps: 1 }, { name: "Быстрые рефлексы", steps: 1 },
+                { name: "Защита от стихий", steps: 1 }, { name: "Смертельный удар плашмя", steps: 1 },
+                { name: "Блок на бегу", steps: 1 }, { name: "Обезоруживание", steps: 1 }
+            ],
+            "Тяжелая броня": [
+                { name: "Джаггернаут", steps: 5 }, { name: "Стальные кулаки", steps: 1 },
+                { name: "Хорошая экипировка", steps: 1 }, { name: "Мягкая подбивка", steps: 1 },
+                { name: "Центр тяжести", steps: 1 }, { name: "Упорная тренировка", steps: 1 },
+                { name: "Полный комплект", steps: 1 }, { name: "Боевой маг", steps: 1 }
+            ],
+            "Легкая броня": [
+                { name: "Ловкость в обороне", steps: 5 }, { name: "Подгонка по фигуре", steps: 1 },
+                { name: "Вторая кожа", steps: 1 }, { name: "Крылья ветра", steps: 1 },
+                { name: "Полный комплект", steps: 1 }, { name: "Чувство маны", steps: 1 }
+            ],
+            "Скрытность": [
+                { name: "Скрытность", steps: 5 }, { name: "Приглушённые шаги", steps: 1 },
+                { name: "Удар в спину", steps: 1 }, { name: "Лёгкий шаг", steps: 1 },
+                { name: "Клинок ассасина", steps: 1 }, { name: "Верный прицел", steps: 1 },
+                { name: "Тихий кувырок", steps: 1 }, { name: "Тишина", steps: 1 }
+            ],
+            "Взлом": [
+                { name: "Взломщик-новичок", steps: 1 }, { name: "Взломщик-ученик", steps: 1 },
+                { name: "Умелые ручки", steps: 1 }, { name: "Восковой слепок", steps: 1 },
+                { name: "Взломщик-адепт", steps: 1 }, { name: "Золотоискатель", steps: 1 },
+                { name: "Охотник за сокровищами", steps: 1 }, { name: "Взломщик-эксперт", steps: 1 }
+            ],
+            "Карманные кражи": [
+                { name: "Ловкие пальчики", steps: 5 }, { name: "Ночной вор", steps: 1 },
+                { name: "Носитель яда", steps: 1 }, { name: "Щипач", steps: 1 },
+                { name: "Накладные карманы", steps: 1 }, { name: "Ключник", steps: 1 },
+                { name: "Золотоискатель", steps: 1 }, { name: "Дезориентация", steps: 1 }
+            ],
+            "Красноречие": [
+                { name: "Торговец", steps: 5 }, { name: "Очарование", steps: 1 },
+                { name: "Подкуп", steps: 1 }, { name: "Купец", steps: 1 },
+                { name: "Убеждение", steps: 1 }, { name: "Запугивание", steps: 1 },
+                { name: "Вкладчик", steps: 1 }, { name: "Скупщик", steps: 1 }
+            ],
+            "Разрушение": [
+                { name: "Новичок школы разрушения", steps: 1 }, { name: "Двойное разрушение", steps: 1 },
+                { name: "Ученик школы разрушения", steps: 1 }, { name: "Усиленное пламя", steps: 2 },
+                { name: "Усиленный мороз", steps: 2 }, { name: "Усиленные молнии", steps: 2 },
+                { name: "Ударная волна", steps: 1 }, { name: "Мастер рун", steps: 1 },
+                { name: "Адепт школы разрушения", steps: 1 }, { name: "Жаркое пламя", steps: 1 },
+                { name: "Глубокая заморозка", steps: 1 }, { name: "Дезинтеграция", steps: 1 },
+                { name: "Эксперт школы разрушения", steps: 1 }
+            ],
+            "Восстановление": [
+                { name: "Новичок школы восстановления", steps: 1 }, { name: "Двойное восстановление", steps: 1 },
+                { name: "Регенерация", steps: 1 }, { name: "Ученик школы восстановления", steps: 1 },
+                { name: "Восполнение", steps: 2 }, { name: "Передышка", steps: 1 },
+                { name: "Адепт школы восстановления", steps: 1 }, { name: "Оберег-поглотитель", steps: 1 },
+                { name: "Некромаг", steps: 1 }, { name: "Эксперт школы восстановления", steps: 1 }
+            ],
+            "Колдовство": [
+                { name: "Новичок школы колдовства", steps: 1 }, { name: "Двойное колдовство", steps: 1 },
+                { name: "Мистический призыв", steps: 1 }, { name: "Некромантия", steps: 1 },
+                { name: "Ученик школы колдовства", steps: 1 }, { name: "Призыватель", steps: 1 },
+                { name: "Похититель душ", steps: 1 }, { name: "Атромантия", steps: 1 },
+                { name: "Изгнание в Обливион", steps: 1 }, { name: "Адепт школы колдовства", steps: 1 },
+                { name: "Тёмные души", steps: 1 }, { name: "Эксперт школы колдовства", steps: 1 },
+                { name: "Сила стихий", steps: 1 }, { name: "Приближение смерти", steps: 1 },
+                { name: "Усиление связи", steps: 1 }, { name: "Новые кости", steps: 1 },
+                { name: "Дыхание смерти", steps: 1 }
+            ],
+            "Иллюзия": [
+                { name: "Новичок школы иллюзии", steps: 1 }, { name: "Двойная иллюзия", steps: 1 },
+                { name: "Обман животных", steps: 1 }, { name: "Ученик школы иллюзии", steps: 1 },
+                { name: "Обман людских глаз", steps: 1 }, { name: "Гипнотический взгляд", steps: 1 },
+                { name: "Адепт школы иллюзии", steps: 1 }, { name: "Наука страха", steps: 1 },
+                { name: "Бесшумные заклинания", steps: 1 }, { name: "Неистовство", steps: 1 },
+                { name: "Эксперт школы иллюзии", steps: 1 }, { name: "Мастер разума", steps: 1 }
+            ],
+            "Изменение": [
+                { name: "Новичок школы изменения", steps: 1 }, { name: "Двойное изменение", steps: 1 },
+                { name: "Ученик школы изменения", steps: 1 }, { name: "Магическая броня", steps: 3 },
+                { name: "Сопротивление магии", steps: 3 }, { name: "Адепт школы изменения", steps: 1 },
+                { name: "Постоянство", steps: 1 }, { name: "Эксперт школы изменения", steps: 1 }
+            ],
+            "Алхимия": [
+                { name: "Алхимик", steps: 5 }, { name: "Целитель", steps: 1 },
+                { name: "Провизор", steps: 1 }, { name: "Отравитель", steps: 1 },
+                { name: "Экспериментатор", steps: 3 }, { name: "Концентрированный яд", steps: 1 },
+                { name: "Травник", steps: 1 }, { name: "Змеиная кровь", steps: 1 }
+            ],
+            "Кузнечное дело": [
+                { name: "Стальные доспехи", steps: 1 }, { name: "Двемерские доспехи", steps: 1 },
+                { name: "Эльфийские доспехи", steps: 1 }, { name: "Орочьи доспехи", steps: 1 },
+                { name: "Сложные типы брони", steps: 1 }, { name: "Кузнец-волшебник", steps: 1 },
+                { name: "Стеклянные доспехи", steps: 1 }, { name: "Эбонитовые доспехи", steps: 1 }
+            ],
+            "Зачарование": [
+                { name: "Зачарователь", steps: 5 }, { name: "Экономия душ", steps: 1 },
+                { name: "Огненные чары", steps: 1 }, { name: "Поглотитель душ", steps: 1 },
+                { name: "Морозные чары", steps: 1 }, { name: "Чары умений", steps: 1 },
+                { name: "Грозовые чары", steps: 1 }, { name: "Жизненные чары", steps: 1 }
+            ]
+        };
+
+        // Бонусы богов (Аэдра и Даэдра) по рангам (1-3)
+        const godBonuses = {
+            // Аэдра
+            zenithar: {
+                1: { hp: 25, powerAttackDmg: 5, smithing: 0, prices: 0 },
+                2: { hp: 50, powerAttackDmg: 10, smithing: 25, prices: 10 },
+                3: { hp: 100, powerAttackDmg: 20, smithing: 50, prices: 25 }
+            },
+            dibella: {
+                1: { armorSpell: 25, arrowResist: 10 },
+                2: { armorSpell: 25, arrowResist: 10, alterationCost: 10 },
+                3: { armorSpell: 100, arrowResist: 25, alterationCost: 20, spellAbsorb: 10 }
+            },
+            mara: {
+                1: { poisonDiseaseResist: 25, armorPenetration: 5 },
+                2: { poisonDiseaseResist: 50, spellPower: 10, restorationLivingDmg: 25, armorPenetration: 10 },
+                3: { poisonDiseaseResist: 75, spellPower: 20, restorationLivingDmg: 50, armorPenetration: 20 }
+            },
+            stendarr: {
+                1: { arrowResist: 10, daedraUndeadResist: 10 },
+                2: { arrowResist: 10, daedraUndeadResist: 25, daedraUndeadDmg: 25, meleeDmg: 10 },
+                3: { arrowResist: 25, daedraUndeadResist: 25, daedraUndeadDmg: 50, meleeDmg: 25 }
+            },
+            julianos: {
+                1: { mp: 25, magicResist: 10 },
+                2: { mp: 50, spellCost: 10, magicResist: 10 },
+                3: { mp: 100, spellCost: 10, spellHitBonus: 2, magicResist: 20 }
+            },
+            kynareth: {
+                1: { fallImmunity: true, armorPenetration: 5, arrowResist: 20, weaponDmg: 20 },
+                2: { fallImmunity: true, armorPenetration: 10, arrowResist: 20, weaponDmg: 20 },
+                3: { fallImmunity: true, armorPenetration: 15, arrowResist: 20, weaponDmg: 20 }
+            },
+            arkay: {
+                1: { armor: 25, coldResist: 10 },
+                2: { armor: 75, coldResist: 15, restorationCost: 10 },
+                3: { armor: 150, coldResist: 30, restorationCost: 20 }
+            },
+            talos: {
+                1: { axeDmg: 5, shockResist: 10 },
+                2: { axeDmg: 10, shoutResist: 25, shockResist: 15 },
+                3: { axeDmg: 20, shoutResist: 25, shockResist: 25 }
+            },
+            akatosh: {
+                1: { armor: 25, enchantDmg: 10 },
+                2: { armor: 50, mp: 25, enchantDmg: 15, fireResist: 10 },
+                3: { armor: 100, mp: 50, enchantDmg: 30, fireResist: 25, elementalExtraDmg: 40 }
+            },
+            // Даэдра
+            boethiah: {
+                1: { rangedDmg: 10, speed: 5 },
+                2: { weaponDmg: 10, rangedDmg: 10, speed: 10 },
+                3: { weaponDmg: 15, rangedDmg: 20, speed: 15 }
+            },
+            mephala: {
+                1: { poisonDmg: 10, poisonLifeSteal: 5 },
+                2: { poisonDmg: 20, poisonLifeSteal: 10 },
+                3: { poisonDmg: 25, poisonVulnerability: 10, poisonLifeSteal: 20 }
+            },
+            peryite: {
+                1: { diseaseBuff: 25 },
+                2: { diseaseBuff: 50 },
+                3: { diseaseBuff: 75 }
+            },
+            hermaeus: {
+                1: { mp: 35, spellCost: 10 },
+                2: { mp: 70, spellCost: 15, spellVampire: 5 },
+                3: { mp: 100, spellCost: 20, spellVampire: 15, allSchoolsBonus: 20 }
+            },
+            nocturnal: {
+                1: { sneakSpeed: 10, sneakMult: 1 },
+                2: { sneakSpeed: 15, sneakMult: 2, harderToDetect: true },
+                3: { sneakSpeed: 20, sneakMult: 2, spellCost: 15, harderToDetect: true }
+            },
+            malacath: {
+                1: { hp: 25, meleeDmg: 10 },
+                2: { hp: 50, powerAttackHeal: 5, powerAttackDmg: 10 },
+                3: { hp: 75, powerAttackHeal: 10, powerAttackDmg: 25 }
+            },
+            azura: {
+                1: { enchantingPower: 15, elementalResist: 5 },
+                2: { enchantingPower: 20, elementalResist: 10, elementalWeaponDmg: 10 },
+                3: { enchantingPower: 30, elementalResist: 15, ignoreMagicDmg: 20, elementalWeaponDmg: 10 }
+            },
+            meridia: {
+                1: { restorationCost: 10, undeadDmg: 10 },
+                2: { restorationCost: 20, undeadDmg: 15 },
+                3: { restorationCost: 25, undeadDmg: 20, undeadAuraBonus: 5 }
+            },
+            mehrunes: {
+                1: { mp: 25, destructionSkill: 10, fireWeaponDmg: 10 },
+                2: { mp: 50, destructionSkill: 25, fireWeaponDmg: 20, instantKillChance: 1 },
+                3: { mp: 100, destructionSkill: 35, fireWeaponDmg: 50, instantKillChance: 2 }
+            },
+            sanguine: {
+                1: { drunkBuff: 10 },
+                2: { drunkBuff: 15, physMagicVamp: 5 },
+                3: { poisonResist: 25, drunkBuff: 20, physMagicVamp: 10 }
+            },
+            namira: {
+                1: { potionPower: 10, poisonDmg: 20 },
+                2: { potionPower: 20, pureDmg: 20, cannibalBuff: 20 },
+                3: { potionPower: 30, pureDmg: 30, cannibalBuff: 40 }
+            },
+            vaermina: {
+                1: { silentIllusion: true, illusionCost: 10 },
+                2: { silentIllusion: true, illusionCost: 10, fearChance: 10 },
+                3: { silentIllusion: true, illusionCost: 20, fearChance: 20 }
+            },
+            sheogorath: {
+                1: { randomDmg: true, randomDefense: true, randomBuff: true },
+                2: { elementalResist: 20, randomDmg: true, randomDefense: true, randomBuff: true },
+                3: { elementalResist: 20, randomDmg: true, randomDefense: true, randomBuff: true }
+            },
+            clavicus: {
+                1: { hp: 25, speech: 15 },
+                2: { hp: 50, speech: 30, armorPenetration: 10 },
+                3: { hp: 70, speech: 50, armorPenetration: 30 }
+            },
+            molag: {
+                1: { hp: 25, mp: 25, coldResist: 10, physResist: 5 },
+                2: { hp: 20, mp: 50, coldResist: 20, physResist: 5, weaponVamp: 5 },
+                3: { hp: 100, mp: 75, coldResist: 35, physResist: 10, weaponVamp: 10 }
+            },
+            hircine: {
+                1: { armor: 50, speed: 5, weaponDmg: 5 },
+                2: { hp: 25, armor: 75, speed: 5, weaponDmg: 10 },
+                3: { hp: 50, armor: 120, speed: 10, powerAttackDmg: 15, weaponDmg: 10 }
+            }
+        };
+    </script>
+    
     <style>
-        /* Стили — твои оригинальные, я их не менял, только добавил пару классов для новых элементов */
         :root {
             --bg-color: #151511;
             --panel-bg: #24241d;
@@ -23,7 +304,6 @@
             --success-color: #1e8449;
             --input-bg: #0d0d0a;
         }
-        * { box-sizing: border-box; }
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
@@ -42,9 +322,20 @@
         h1 { font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
         h2 { font-size: 17px; margin-bottom: 10px; }
         h3 { font-size: 14px; border-bottom: 1px solid var(--border-color); margin-bottom: 8px; }
-        .container { max-width: 1100px; margin: 0 auto; }
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px;
+        }
         .panel {
             background-color: var(--panel-bg);
             border: 2px solid var(--border-color);
@@ -53,7 +344,13 @@
             margin-bottom: 12px;
             box-shadow: 0 4px 5px rgba(0,0,0,0.6);
         }
-        label { display: block; margin: 5px 0 2px; font-weight: bold; font-size: 12px; color: #c4baa9; }
+        label {
+            display: block;
+            margin: 5px 0 2px;
+            font-weight: bold;
+            font-size: 12px;
+            color: #c4baa9;
+        }
         input[type="text"], input[type="number"], select, textarea {
             width: 100%;
             padding: 5px;
@@ -65,7 +362,10 @@
             font-size: 13px;
             font-family: 'Georgia', serif;
         }
-        input:focus, select:focus, textarea:focus { border-color: var(--accent-color); outline: none; }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
         .stat-block {
             display: flex;
             align-items: center;
@@ -76,18 +376,85 @@
             border-radius: 4px;
             border: 1px solid #363025;
         }
-        .stat-block input { width: 50px; text-align: center; }
-        .mod-indicator { color: var(--accent-color); font-weight: bold; min-width: 60px; text-align: center; font-size: 12px; }
-        .vital-bar { background: var(--input-bg); padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); }
-        .vital-inputs { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
-        .vital-inputs input { width: 65px; text-align: center; font-size: 14px; font-weight: bold; }
-        .perks-list { max-height: 140px; overflow-y: auto; background: var(--input-bg); padding: 5px; border: 1px solid #363025; border-radius: 4px; margin-top: 5px; }
-        .perk-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin: 4px 0; padding: 2px 4px; background: #151511; border-radius: 3px; }
-        .perk-left { display: flex; align-items: center; }
-        .perk-left input { margin-right: 6px; cursor: pointer; }
-        .perk-steps { font-size: 11px; color: var(--accent-color); font-weight: bold; display: flex; flex-wrap: wrap; gap: 2px; }
-        .perk-steps input[type="checkbox"] { margin: 0; cursor: pointer; }
-        .alert-box { background-color: var(--danger-color); color: #fff; padding: 6px; text-align: center; font-weight: bold; border-radius: 4px; margin-top: 8px; font-size: 11px; display: none; }
+        .stat-block input {
+            width: 50px;
+            text-align: center;
+        }
+        .mod-indicator {
+            color: var(--accent-color);
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .vital-bar {
+            background: var(--input-bg);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+        .vital-inputs {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2px;
+        }
+        .vital-inputs input {
+            width: 65px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .perks-list {
+            max-height: 140px;
+            overflow-y: auto;
+            background: var(--input-bg);
+            padding: 5px;
+            border: 1px solid #363025;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .perk-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            margin: 4px 0;
+            padding: 2px 4px;
+            background: #151511;
+            border-radius: 3px;
+        }
+        .perk-left {
+            display: flex;
+            align-items: center;
+        }
+        .perk-left input {
+            margin-right: 6px;
+            cursor: pointer;
+        }
+        .perk-steps {
+            font-size: 11px;
+            color: var(--accent-color);
+            font-weight: bold;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        .perk-steps input[type="checkbox"] {
+            margin: 0;
+            cursor: pointer;
+        }
+        .alert-box {
+            background-color: var(--danger-color);
+            color: #fff;
+            padding: 6px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 11px;
+            display: none;
+        }
         .btn {
             background-color: var(--accent-color);
             color: #151511;
@@ -107,9 +474,19 @@
         .btn-danger:hover { background-color: #af3227; }
         .btn-success { background-color: var(--success-color); color: white; }
         .btn-success:hover { background-color: #239b55; }
-        .btn-sm { width: auto; padding: 2px 10px; font-size: 10px; margin-top: 0; }
-        .shw-hint { font-size: 11px; color: #948b78; margin-top: 1px; font-style: italic; }
-        .nav-tabs { display: flex; justify-content: center; margin-bottom: 12px; border-bottom: 2px solid var(--border-color); flex-wrap: wrap; }
+        .shw-hint {
+            font-size: 11px;
+            color: #948b78;
+            margin-top: 1px;
+            font-style: italic;
+        }
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+            border-bottom: 2px solid var(--border-color);
+            flex-wrap: wrap;
+        }
         .tab-link {
             background: #24241d;
             color: var(--text-color);
@@ -123,1267 +500,1236 @@
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
         }
-        .tab-link.active { background: var(--accent-color); color: #151511; border-color: var(--accent-color); }
+        .tab-link.active {
+            background: var(--accent-color);
+            color: #151511;
+            border-color: var(--accent-color);
+        }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .checkbox-group { display: flex; align-items: center; margin: 4px 0; font-size: 12px; }
-        .checkbox-group input { margin-right: 6px; cursor: pointer; }
-        .spell-card { background: var(--panel-sub); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px; margin-bottom: 6px; }
-        .slot-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; background: var(--panel-sub); padding: 4px 8px; border-radius: 4px; border: 1px solid #363025; }
-        .slot-row span { font-weight: bold; color: var(--accent-color); width: 35%; font-size: 12px; }
-        .slot-row input { width: 60%; }
-        .inv-group { border-left: 3px solid var(--accent-color); padding-left: 8px; margin-top: 8px; }
-        .inv-group h4 { font-size: 12px; color: var(--accent-color); margin: 4px 0; border-bottom: 1px dashed #363025; }
-        .rest-btn { display: flex; gap: 6px; }
-        .rest-btn .btn { flex: 1; }
-        .weight-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .weight-row input[type="number"] { width: 70px; padding: 3px; }
-        .weight-row label { margin: 0; }
-        .recipe-item { background: var(--panel-sub); border: 1px solid #363025; border-radius: 4px; padding: 6px; margin-bottom: 4px; font-size: 12px; }
-        .recipe-item .recipe-name { font-weight: bold; color: var(--accent-color); }
-        .recipe-item .recipe-ingredients { color: #aaa; font-size: 11px; }
-        .recipe-item .recipe-effect { color: var(--success-color); font-size: 11px; }
-        .active-food-slot { background: var(--panel-sub); padding: 4px; margin: 2px 0; border: 1px solid var(--accent-color); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-        .active-food-slot button { width: auto; margin: 0; padding: 2px 6px; }
-
-        /* Новые стили для авторизации и мастера */
-        #auth-container { max-width: 400px; margin: 40px auto; }
-        #auth-container input { margin-bottom: 10px; }
-        #master-panel { background: #2c3e50; border: 2px solid #e67e22; padding: 10px; border-radius: 5px; margin-top: 20px; }
-        .item-suggestion { background: var(--panel-sub); padding: 2px 6px; border-radius: 3px; cursor: pointer; }
-        .item-suggestion:hover { background: var(--accent-color); color: #151511; }
-        .player-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-        .player-card { background: var(--panel-sub); border: 1px solid #555; border-radius: 4px; padding: 8px; }
-        .player-card input { width: auto; display: inline; }
-        .player-card .btn { width: auto; }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+            font-size: 12px;
+        }
+        .checkbox-group input {
+            margin-right: 6px;
+            cursor: pointer;
+        }
+        .spell-card {
+            background: var(--panel-sub);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 6px;
+        }
+        .slot-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            background: var(--panel-sub);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #363025;
+        }
+        .slot-row span {
+            font-weight: bold;
+            color: var(--accent-color);
+            width: 35%;
+            font-size: 12px;
+        }
+        .slot-row input {
+            width: 60%;
+        }
+        .inv-group {
+            border-left: 3px solid var(--accent-color);
+            padding-left: 8px;
+            margin-top: 8px;
+        }
+        .inv-group h4 {
+            font-size: 12px;
+            color: var(--accent-color);
+            margin: 4px 0;
+            border-bottom: 1px dashed #363025;
+        }
+        .rest-btn {
+            display: flex;
+            gap: 6px;
+        }
+        .rest-btn .btn {
+            flex: 1;
+        }
+        .inline-label {
+            display: inline;
+            font-weight: normal;
+            font-size: 12px;
+        }
+        .weight-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .weight-row input[type="number"] {
+            width: 70px;
+            padding: 3px;
+        }
+        .weight-row label {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
-<div id="auth-container" style="display: none;">
-    <h1>Скурим TTRPG</h1>
-    <div class="panel">
-        <h2>Вход / Регистрация</h2>
-        <input type="email" id="email" placeholder="Email" />
-        <input type="password" id="password" placeholder="Пароль" />
-        <button class="btn" id="login-btn">Войти</button>
-        <button class="btn" id="register-btn">Зарегистрироваться</button>
-        <hr>
-        <button class="btn" id="google-btn">Войти через Google</button>
-    </div>
-</div>
 
-<div id="app" style="display: none;">
-    <!-- Верхняя панель с выходом -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; background: var(--panel-sub); border-radius: 5px; margin-bottom: 10px;">
-        <span id="user-email" style="color: var(--accent-color);"></span>
-        <button class="btn btn-sm" onclick="logout()">Выйти</button>
+<div class="container">
+    <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
+    
+    <!-- Навигационные вкладки -->
+    <div class="nav-tabs">
+        <button class="tab-link active" onclick="openTab(event, 'tab1')">Главная и Статы</button>
+        <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
+        <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
+        <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
+        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
     </div>
 
-    <!-- Основной контент (оригинальный) -->
-    <div class="container">
-        <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
-
-        <div class="nav-tabs">
-            <button class="tab-link active" onclick="openTab(event, 'tab1')">Главная и Статы</button>
-            <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
-            <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
-            <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
-            <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
-            <button class="tab-link" onclick="openTab(event, 'tab6')">Кулинария</button>
-            <button class="tab-link" onclick="openTab(event, 'tab7')">Кузнечное дело</button>
-            <button class="tab-link" onclick="openTab(event, 'tab8')">Зачарование</button>
-            <button class="tab-link" id="master-tab-btn" style="display: none;" onclick="openTab(event, 'tab9')">Панель Мастера</button>
-        </div>
-
-        <!-- ТАБ 1: ГЛАВНАЯ -->
-        <div id="tab1" class="tab-content active">
-            <div class="grid-2">
-                <div class="panel">
-                    <h2>Персонаж и Происхождение</h2>
-                    <label>Имя Героя</label>
-                    <input type="text" id="char-name" value="Довакин" onchange="saveCharacterDebounced()">
-                    <label>Раса</label>
-                    <select id="char-race" onchange="updateAll(); saveCharacterDebounced();">
-                        <option value="nord">Норд (+10 HP, +5 HP/лвл, +10 Двуручное)</option>
-                        <option value="altmer">Альтмер (+20 Маны, +10 Иллюзия, +2 Инт, +1 Муд)</option>
-                        <option value="breton">Бретон (10% Резист магии, +10 Колдовство, +2 Инт, +1 Хар)</option>
-                        <option value="orc">Орк (Берсерк, +10 Тяж. броня, +1 Тел, +1 Муд)</option>
-                        <option value="khajiit">Каджит (+10 Скрытность, +2 Лов, +1 Тел)</option>
-                        <option value="redguard">Редгард (Адреналин, +10 Одноручное, +1 Лов, +1 Тел, +1 Сил)</option>
-                        <option value="argonian">Аргонианин (Кора Хиста, +10 Взлом, +2 Лов, +1 Инт)</option>
-                        <option value="bosmer">Босмер (+10 Стрельба, +2 Лов, +1 Муд)</option>
-                        <option value="dunmer">Данмер (+15 Разрушение, +1 Лов, +1 Инт, +1 Сил)</option>
-                        <option value="imperial">Имперец (Голос императора, +10 Восстановление, +2 Хар)</option>
-                    </select>
-                    <label>Камень Судьбы</label>
-                    <select id="char-sign" onchange="updateAll(); saveCharacterDebounced();">
-                        <option value="none">Не выбран</option>
-                        <option value="warrior">Воин (+2 Сила, +2 Телосложение)</option>
-                        <option value="mage">Маг (Концентрация, бесплатный каст 1 ур.)</option>
-                        <option value="thief">Вор (+2 Ловкость, +5 фт. к скорости)</option>
-                        <option value="atronach">Атронах (+20 Маны, +20 Маны/лвл, восстановление 50%)</option>
-                        <option value="apprentice">Ученик (+10 Маны, +10 Маны/лвл, уязвимость 10%)</option>
-                        <option value="steed">Конь (+2 Телосложение, +10 фт. к скорости)</option>
-                        <option value="lady">Леди (+2 Мудрость, +2 Телосложение)</option>
-                        <option value="lord">Лорд (Кровь Севера, уязвимость к огню)</option>
-                        <option value="zmey">Змей (Исцеление / Медленный мощный яд)</option>
-                    </select>
-                    <div class="grid-2" style="margin-top:10px;">
-                        <div><label>Уровень</label><input type="number" id="char-level" value="1" min="1" onchange="updateAll(); saveCharacterDebounced();"></div>
-                        <div><label>Свободные жизни</label><input type="number" id="char-lives" value="50" onchange="saveCharacterDebounced();"></div>
-                    </div>
-                    <label>Предыстория</label>
-                    <textarea id="char-backstory" rows="3" onchange="saveCharacterDebounced();"></textarea>
-                </div>
-                <div class="panel">
-                    <h2>Характеристики и Модификаторы</h2>
-                    <div class="stat-block"><label>Сила (Сил)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-str">0</span><input type="number" id="stat-str" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                    <div class="stat-block"><label>Ловкость (Лов)</label><div><span class="mod-indicator" id="mod-dex">0</span><input type="number" id="stat-dex" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                    <div class="stat-block"><label>Телосложение (Тел)</label><div><span class="mod-indicator" id="mod-con">0</span><input type="number" id="stat-con" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                    <div class="stat-block"><label>Интеллект (Инт)</label><div><span class="mod-indicator" id="mod-int">0</span><input type="number" id="stat-int" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                    <div class="stat-block"><label>Мудрость (Муд)</label><div><span class="mod-indicator" id="mod-wis">0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                    <div class="stat-block"><label>Харизма (Хар)</label><div><span class="mod-indicator" id="mod-cha">0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="updateAll(); saveCharacterDebounced();"></div></div>
-                </div>
-            </div>
+    <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
+    <div id="tab1" class="tab-content active">
+        <div class="grid-2">
+            <!-- Анкета персонажа -->
             <div class="panel">
-                <h2>Панель состояния, Брони и Урона</h2>
-                <div class="grid-3">
-                    <div class="vital-bar" style="border-color: #a02e23;">
-                        <div style="display:flex; justify-content:space-between;"><label style="color:#e74c3c;">HP</label><div><input type="checkbox" id="manual-hp-lock" onchange="updateAll(); saveCharacterDebounced();"> Ручной макс.</div></div>
-                        <div class="vital-inputs">
-                            <input type="number" id="cur-hp" value="100" onchange="saveCharacterDebounced();">
-                            <span style="font-size:20px;color:#aaa;">/</span>
-                            <input type="number" id="max-hp" value="100" onchange="saveCharacterDebounced();">
-                        </div>
+                <h2>Персонаж и Происхождение</h2>
+                <label>Имя Героя</label>
+                <input type="text" id="char-name" value="Довакин" onchange="saveLocalStorage()">
+                
+                <label>Раса (Автоприбавка навыков активна!)</label>
+                <select id="char-race" onchange="updateAll(); saveLocalStorage();">
+                    <option value="nord">Норд (+10 HP, +5 HP/лвл, +10 Двуручное)</option>
+                    <option value="altmer">Альтмер (+20 Маны, +10 Иллюзия, +2 Инт, +1 Муд)</option>
+                    <option value="breton">Бретон (10% Резист магии, +10 Колдовство, +2 Инт, +1 Хар)</option>
+                    <option value="orc">Орк (Берсерк, +10 Тяж. броня, +1 Тел, +1 Муд)</option>
+                    <option value="khajiit">Каджит (+10 Скрытность, +2 Лов, +1 Тел)</option>
+                    <option value="redguard">Редгард (Адреналин, +10 Одноручное, +1 Лов, +1 Тел, +1 Сил)</option>
+                    <option value="argonian">Аргонианин (Кора Хиста, +10 Взлом, +2 Лов, +1 Инт)</option>
+                    <option value="bosmer">Босмер (+10 Стрельба, +2 Лов, +1 Муд)</option>
+                    <option value="dunmer">Данмер (+15 Разрушение, +1 Лов, +1 Инт, +1 Сил)</option>
+                    <option value="imperial">Имперец (Голос императора, +10 Восстановление, +2 Хар)</option>
+                </select>
+
+                <label>Камень Судьбы (Знак рождения созвездия)</label>
+                <select id="char-sign" onchange="updateAll(); saveLocalStorage();">
+                    <option value="none">Не выбран</option>
+                    <option value="warrior">Воин (+2 Сила, +2 Телосложение)</option>
+                    <option value="mage">Маг (Концентрация, бесплатный каст 1 ур.)</option>
+                    <option value="thief">Вор (+2 Ловкость, +5 фт. к скорости)</option>
+                    <option value="atronach">Атронах (+20 Маны, +20 Маны/лвл, восстановление 50%)</option>
+                    <option value="apprentice">Ученик (+10 Маны, +10 Маны/лвл, уязвимость 10%)</option>
+                    <option value="steed">Конь (+2 Телосложение, +10 фт. к скорости)</option>
+                    <option value="lady">Леди (+2 Мудрость, +2 Телосложение)</option>
+                    <option value="lord">Лорд (Кровь Севера, уязвимость к огню)</option>
+                    <option value="zmey">Змей (Исцеление / Медленный мощный яд)</option>
+                </select>
+
+                <div class="grid-2" style="margin-top:10px;">
+                    <div>
+                        <label>Текущий Уровень Героя</label>
+                        <input type="number" id="char-level" value="1" min="1" onchange="updateAll(); saveLocalStorage();">
                     </div>
-                    <div class="vital-bar" style="border-color: #3498db;">
-                        <div style="display:flex; justify-content:space-between;"><label style="color:#3498db;">MP</label><div><input type="checkbox" id="manual-mp-lock" onchange="updateAll(); saveCharacterDebounced();"> Ручной макс.</div></div>
-                        <div class="vital-inputs">
-                            <input type="number" id="cur-mp" value="100" onchange="saveCharacterDebounced();">
-                            <span style="font-size:20px;color:#aaa;">/</span>
-                            <input type="number" id="max-mp" value="100" onchange="saveCharacterDebounced();">
-                        </div>
-                    </div>
-                    <div class="vital-bar" style="border-color: #f1c40f;">
-                        <div style="display:flex; justify-content:space-between;"><label style="color:#f1c40f;">БОЙ</label><div><input type="checkbox" id="manual-dmg-lock" onchange="updateAll(); saveCharacterDebounced();"> Ручной урон</div></div>
-                        <div style="font-size:11px;">
-                            Итоговый урон: <input type="number" id="main-panel-dmg" value="2" style="width:45px;display:inline;padding:1px;" onchange="saveCharacterDebounced();"><br>
-                            Врем. броня: <input type="number" id="armor-buff" value="0" style="width:45px;display:inline;padding:1px;" onchange="updateAll(); saveCharacterDebounced();"><br>
-                            <strong>Суммарная броня: <span id="armor-total" style="color:var(--success-color);">0</span></strong>
-                        </div>
+                    <div>
+                        <label>Запас Свободных Жизней</label>
+                        <input type="number" id="char-lives" value="50" onchange="saveLocalStorage()">
                     </div>
                 </div>
-                <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:12px;">
-                    <div>Скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;" onchange="saveCharacterDebounced();"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll(); saveCharacterDebounced();"> Ручной)</div>
-                    <div>Мудрость на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span></div>
-                </div>
-                <div class="rest-btn" style="margin-top:8px;">
-                    <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых</button>
-                    <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс локальный</button>
-                </div>
+
+                <label style="margin-top:10px;">Краткая предыстория (~5 предложений)</label>
+                <textarea id="char-backstory" rows="3" placeholder="Опишите ваше прошлое для получения стартовых бонусов..." onchange="saveLocalStorage()"></textarea>
+            </div>
+
+            <!-- Характеристики -->
+            <div class="panel">
+                <h2>Характеристики и Модификаторы проверки d20</h2>
+                <div class="stat-block"><label>Сила (Сил)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-str">Мод: 0</span><input type="number" id="stat-str" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Ловкость (Лов)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-dex">Мод: 0</span><input type="number" id="stat-dex" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Телосложение (Тел)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-con">Мод: 0</span><input type="number" id="stat-con" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Интеллект (Инт)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-int">Мод: 0</span><input type="number" id="stat-int" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Мудрость (Муд)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-wis">Мод: 0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Харизма (Хар)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-cha">Мод: 0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
             </div>
         </div>
 
-        <!-- ТАБ 2: ПЕРКИ (генерируются скриптом) -->
-        <div id="tab2" class="tab-content">
-            <div class="grid-3" id="skills-container"></div>
-        </div>
-
-        <!-- ТАБ 3: БОЕВОЙ ПОСТ -->
-        <div id="tab3" class="tab-content">
-            <div class="grid-2">
-                <div class="panel">
-                    <h2>Боевое снаряжение</h2>
-                    <label>Оружие ближнего боя</label>
-                    <div class="slot-row">
-                        <input type="text" id="wep-melee-name" value="Кулаки" placeholder="Название" onchange="saveCharacterDebounced();">
-                        <input type="number" id="wep-melee-dmg" value="2" placeholder="Урон" onchange="updateAll(); saveCharacterDebounced();">
-                        <select id="wep-melee-type" onchange="updateAll(); saveCharacterDebounced();">
-                            <option value="unarmed">Кулаки</option>
-                            <option value="dagger">Кинжал</option>
-                            <option value="onehand">Меч/Топор/Булава</option>
-                            <option value="twohand_sword">Двуручный меч</option>
-                            <option value="twohand_axe">Двуручная секира</option>
-                            <option value="twohand_hammer">Двуручный молот</option>
-                        </select>
+        <!-- Трекеры состояния -->
+        <div class="panel">
+            <h2>Панель состояния, Брони и Урона</h2>
+            <div class="grid-3">
+                <div class="vital-bar" style="border-color: #a02e23;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
                     </div>
-                    <label>Оружие дальнего боя</label>
-                    <div class="slot-row">
-                        <input type="text" id="wep-ranged-name" value="Лук" placeholder="Название" onchange="saveCharacterDebounced();">
-                        <input type="number" id="wep-ranged-dmg" value="10" placeholder="Урон" onchange="updateAll(); saveCharacterDebounced();">
-                        <select id="wep-ranged-type" onchange="updateAll(); saveCharacterDebounced();">
-                            <option value="bow">Лук</option>
-                            <option value="crossbow">Арбалет</option>
-                        </select>
-                    </div>
-                    <label>Боеприпасы</label>
-                    <div class="slot-row">
-                        <input type="text" id="ammo-name" value="Стрелы" placeholder="Название" onchange="saveCharacterDebounced();">
-                        <input type="number" id="ammo-dmg" value="8" placeholder="Урон" onchange="updateAll(); saveCharacterDebounced();">
-                        <span style="width:33%; text-align:center; font-size:11px; color:#aaa;">Снаряды</span>
-                    </div>
-                    <label>Активное оружие</label>
-                    <select id="active-combat-weapon" onchange="updateAll(); saveCharacterDebounced();">
-                        <option value="melee">Ближний бой</option>
-                        <option value="ranged">Дальний бой</option>
-                    </select>
-                    <div style="margin-top:6px;">
-                        <input type="checkbox" id="chk-power-attack" onchange="updateAll(); saveCharacterDebounced();"> <label>Силовая атака</label>
-                        <input type="checkbox" id="chk-sneak-attack" onchange="updateAll(); saveCharacterDebounced();"> <label>Скрытная атака</label>
-                    </div>
-                    <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px;">
-                        <h3 style="margin-top:0;">Расчёт боя</h3>
-                        <div id="combat-results" style="font-size:12px; line-height:1.4;"></div>
+                    <div class="vital-inputs">
+                        <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
+                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
                     </div>
                 </div>
-                <div class="panel">
-                    <h2>Слоты брони</h2>
-                    <div class="slot-row"><span>Шлем</span><input type="text" id="slot-helm-name" onchange="saveCharacterDebounced();"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll(); saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Кираса</span><input type="text" id="slot-chest-name" onchange="saveCharacterDebounced();"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll(); saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Перчатки</span><input type="text" id="slot-gloves-name" onchange="saveCharacterDebounced();"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll(); saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Сапоги</span><input type="text" id="slot-boots-name" onchange="saveCharacterDebounced();"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll(); saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Щит</span><input type="text" id="slot-shield-name" onchange="saveCharacterDebounced();"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll(); saveCharacterDebounced();"></div>
-                    <h3>Ювелирка</h3>
-                    <div class="slot-row"><span>Кольцо</span><input type="text" id="slot-ring-name" style="width:65%;" onchange="saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Ожерелье</span><input type="text" id="slot-neck-name" style="width:65%;" onchange="saveCharacterDebounced();"></div>
-                    <div class="slot-row"><span>Обруч</span><input type="text" id="slot-circlet-name" style="width:65%;" onchange="saveCharacterDebounced();"></div>
-                    <select id="eq-armor" onchange="updateAll(); saveCharacterDebounced();" style="width:100px; display:inline; margin-right:10px;">
+                
+                <div class="vital-bar" style="border-color: #3498db;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#3498db; margin:0;">МАНА (MP)</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
+                    </div>
+                    <div class="vital-inputs">
+                        <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
+                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
+                    </div>
+                </div>
+
+                <div class="vital-bar" style="border-color: #f1c40f;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
+                    </div>
+                    <div style="font-size:11px; margin-top:2px; line-height:1.4;">
+                        Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
+                        Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:45px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
+                        <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:12px;">
+                <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
+                <div>Затраты Мудрости на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span> ед.</div>
+            </div>
+            <div class="rest-btn" style="margin-top:8px;">
+                <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
+                <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс персонажа</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТАБ 2: ВЕТКИ ПЕРКОВ -->
+    <div id="tab2" class="tab-content">
+        <div class="grid-3" id="skills-container"></div>
+    </div>
+
+    <!-- ТАБ 3: БОЕВОЙ ПОСТ -->
+    <div id="tab3" class="tab-content">
+        <div class="grid-2">
+            <div class="panel">
+                <h2>Боевое снаряжение и Калькулятор атак</h2>
+                
+                <label>Оружие ближнего боя / Кулаки</label>
+                <div class="slot-row">
+                    <input type="text" id="wep-melee-name" value="Бой голыми руками" placeholder="Название оружия" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-melee-dmg" value="2" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <select id="wep-melee-type" onchange="updateAll(); saveLocalStorage();">
+                        <option value="unarmed">Кулаки (Урон 2, без Силы)</option>
+                        <option value="dagger">Кинжал (Крит х3, +1 к атаке)</option>
+                        <option value="onehand">Меч/Топор/Булава (+Сил)</option>
+                        <option value="twohand_sword">Двуручный меч (-2 к кубам)</option>
+                        <option value="twohand_axe">Двуручная секира (-3 к кубам)</option>
+                        <option value="twohand_hammer">Двуручный молот (-4 к кубам, 10 фт)</option>
+                    </select>
+                </div>
+
+                <label>Оружие дальнего боя (Лук или Арбалет)</label>
+                <div class="slot-row">
+                    <input type="text" id="wep-ranged-name" value="Длинный лук" placeholder="Название лука" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-ranged-dmg" value="10" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <select id="wep-ranged-type" onchange="updateAll(); saveLocalStorage();">
+                        <option value="bow">Лук (Обычный)</option>
+                        <option value="crossbow">Арбалет (1 ход на КД)</option>
+                    </select>
+                </div>
+
+                <label>Экипированные боеприпасы</label>
+                <div class="slot-row">
+                    <input type="text" id="ammo-name" value="Железная стрела" placeholder="Название стрел" onchange="saveLocalStorage()">
+                    <input type="number" id="ammo-dmg" value="8" placeholder="Урон стрелы" onchange="updateAll(); saveLocalStorage();">
+                    <span style="width:33%; text-align:center; font-size:11px; color:#aaa;">Снаряды</span>
+                </div>
+
+                <label>Используемое в бою оружие (Выбор активного)</label>
+                <select id="active-combat-weapon" onchange="updateAll(); saveLocalStorage();">
+                    <option value="melee">Использовать оружие ближнего боя / Кулаки</option>
+                    <option value="ranged">Использовать стрелковое оружие (+ стрелы)</option>
+                </select>
+
+                <div style="margin-top:10px; background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-power-attack" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-power-attack">Силовая атака (Урон ББ х1.5, Штраф: -1 к броску d20)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-sneak-attack" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-sneak-attack">Скрытная атака из тени (Крит х2, кинжалы х3)</label>
+                    </div>
+                </div>
+
+                <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px; border:1px solid var(--border-color);">
+                    <h3 style="margin-top:0;">Расчет текущей боевой готовности</h3>
+                    <div id="combat-results" style="font-size:12px; line-height:1.4; color:var(--text-color);"></div>
+                </div>
+            </div>
+
+            <!-- Детальные слоты Брони -->
+            <div class="panel">
+                <h2>Слоты защитной экипировки и Украшений</h2>
+                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                
+                <h3 style="margin-top:6px; margin-bottom:4px;">💍 Активная ювелирные изделия</h3>
+                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"></div>
+                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"></div>
+                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"></div>
+                
+                <div class="checkbox-group" style="margin-top:8px;">
+                    <select id="eq-armor" onchange="updateAll(); saveLocalStorage();" style="width:100px; display:inline; margin-right:10px;">
                         <option value="cloth">Одежда</option>
-                        <option value="light">Лёгкая</option>
-                        <option value="heavy">Тяжёлая</option>
+                        <option value="light">Легкая</option>
+                        <option value="heavy">Тяжелая</option>
                     </select>
-                    <label style="display:inline;">Тип доспеха</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- ТАБ 4: ЗАКЛИНАНИЯ -->
-        <div id="tab4" class="tab-content">
-            <div class="panel">
-                <h2>Книга Заклинаний и Свитки</h2>
-                <div class="grid-2">
-                    <div class="panel" style="border-color:#94291f;"><h3 style="color:#e74c3c;">Разрушение</h3><div id="spells-destr-list"></div><button class="btn" style="background:#94291f;color:white;" onclick="addCustomSpell('destr')">+ Выучить</button></div>
-                    <div class="panel" style="border-color:#1e8449;"><h3 style="color:#2ecc71;">Восстановление</h3><div id="spells-restor-list"></div><button class="btn" style="background:#1e8449;color:white;" onclick="addCustomSpell('restor')">+ Выучить</button></div>
-                    <div class="panel" style="border-color:#f1c40f;"><h3 style="color:#f1c40f;">Изменение</h3><div id="spells-alter-list"></div><button class="btn" style="background:#f39c12;color:white;" onclick="addCustomSpell('alter')">+ Выучить</button></div>
-                    <div class="panel" style="border-color:#8e44ad;"><h3 style="color:#9b59b6;">Иллюзия</h3><div id="spells-illus-list"></div><button class="btn" style="background:#8e44ad;color:white;" onclick="addCustomSpell('illus')">+ Выучить</button></div>
-                    <div class="panel" style="border-color:#34495e;"><h3 style="color:#5d6d7e;">Колдовство</h3><div id="spells-conj-list"></div><button class="btn" style="background:#34495e;color:white;" onclick="addCustomSpell('conj')">+ Выучить</button></div>
-                    <div class="panel" style="background:#111; border-color:var(--accent-color);">
-                        <h3>📜 Свитки</h3>
-                        <select id="scroll-craft-tier">
-                            <option value="1">Новичок (1 Мудр.)</option>
-                            <option value="2">Ученик (2 Мудр.)</option>
-                            <option value="3">Адепт (3 Мудр.)</option>
-                            <option value="4">Эксперт (4 Мудр.)</option>
-                        </select>
-                        <button class="btn" onclick="craftScrollInSheet()">Начертить</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ТАБ 5: ИНВЕНТАРЬ -->
-        <div id="tab5" class="tab-content">
-            <div class="grid-2">
-                <div class="panel">
-                    <h2>Инвентарь</h2>
-                    <div style="max-height:460px; overflow-y:auto; padding-right:5px;">
-                        <div id="inventory-container"></div>
-                    </div>
-                    <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px;">
-                        <div class="weight-row"><span>Текущая грузоподъёмность: <span id="weight-current" style="font-weight:bold;color:var(--accent-color);">0</span> / </span><span id="weight-max-display" style="font-weight:bold;">50</span> фунтов</div>
-                        <div class="weight-row"><label>Ручная макс.</label><input type="checkbox" id="manual-weight-lock" onchange="updateAll(); saveCharacterDebounced();"><input type="number" id="max-weight-input" value="50" onchange="updateAll(); saveCharacterDebounced();"></div>
-                        <div class="weight-row"><label>Доп. вес</label><input type="number" id="extra-weight" value="0" step="0.1" onchange="updateAll(); saveCharacterDebounced();"></div>
-                        <div class="alert-box" id="overweight-alert">ПЕРЕГРУЗ!</div>
-                    </div>
-                    <label>💰 Золото</label>
-                    <input type="number" id="char-gold" value="150" onchange="saveCharacterDebounced();">
-                </div>
-                <div class="panel">
-                    <h2>Выживание и Боги</h2>
-                    <label>Голодание (дней без еды)</label><input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll(); saveCharacterDebounced();">
-                    <label>Активные блюда</label><div id="active-food-effects" style="background:var(--panel-sub); padding:6px; border-radius:4px; min-height:40px;"></div>
-                    <div class="checkbox-group"><input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveCharacterDebounced();"><label>Морозный регион</label></div>
-
-                    <h3>Религия</h3>
-                    <label>Бог</label>
-                    <select id="faith-god" onchange="updateAll(); saveCharacterDebounced();">
-                        <option value="none">Без веры</option>
-                        <optgroup label="Аэдра">
-                            <option value="zenithar">Зенитар</option>
-                            <option value="stendarr">Стендарр</option>
-                            <option value="julianos">Джулианос</option>
-                            <option value="mara">Мара</option>
-                            <option value="dibella">Дибелла</option>
-                            <option value="kynareth">Кинарет</option>
-                            <option value="arkay">Аркей</option>
-                            <option value="talos">Талос</option>
-                            <option value="akatosh">Акатош</option>
-                        </optgroup>
-                        <optgroup label="Даэдра">
-                            <option value="boethiah">Боэтия</option>
-                            <option value="mephala">Мефала</option>
-                            <option value="peryite">Периайт</option>
-                            <option value="hermaeus">Хермеус Мора</option>
-                            <option value="nocturnal">Ноктюрнал</option>
-                            <option value="malacath">Малакат</option>
-                            <option value="azura">Азура</option>
-                            <option value="meridia">Меридия</option>
-                            <option value="mehrunes">Мерунес Дагон</option>
-                            <option value="sanguine">Сангвин</option>
-                            <option value="namira">Намира</option>
-                            <option value="vaermina">Вермина</option>
-                            <option value="sheogorath">Шеогорат</option>
-                            <option value="clavicus">Клавикус Вайл</option>
-                            <option value="molag">Молаг Бал</option>
-                            <option value="hircine">Хирсин</option>
-                        </optgroup>
-                    </select>
-                    <label>Ранг</label><select id="faith-rank" onchange="updateAll(); saveCharacterDebounced();"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-                    <div class="alert-box" id="daedra-alert" style="background:#d35400;">ВНИМАНИЕ: Даэдра!</div>
-                    <label>Заметки веры</label><textarea id="faith-notes" rows="2" onchange="saveCharacterDebounced();"></textarea>
-                    <label>Походный блокнот</label><textarea id="char-notes" rows="5" onchange="saveCharacterDebounced();"></textarea>
-                </div>
-            </div>
-        </div>
-
-        <!-- ТАБ 6: КУЛИНАРИЯ -->
-        <div id="tab6" class="tab-content">
-            <div class="panel">
-                <h2>Кулинария – рецепты</h2>
-                <div id="cooking-recipes-container"></div>
-                <div id="cooking-result" style="margin-top:10px; padding:8px; background:var(--panel-sub); border-radius:4px; min-height:30px;"></div>
-            </div>
-        </div>
-
-        <!-- ТАБ 7: КУЗНЕЧКА -->
-        <div id="tab7" class="tab-content">
-            <div class="panel">
-                <h2>Кузнечное дело</h2>
-                <div id="smithing-container"></div>
-                <div id="smithing-result" style="margin-top:10px; padding:8px; background:var(--panel-sub); border-radius:4px; min-height:30px;"></div>
-            </div>
-        </div>
-
-        <!-- ТАБ 8: ЗАЧАРОВАНИЕ -->
-        <div id="tab8" class="tab-content">
-            <div class="panel">
-                <h2>Зачарование – калькулятор</h2>
-                <div class="grid-2">
-                    <div>
-                        <label>Тип предмета</label>
-                        <select id="enchant-item-type" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                            <option value="weapon">Оружие</option>
-                            <option value="armor">Броня</option>
-                            <option value="jewelry">Ювелирка</option>
-                        </select>
-                        <label>Предмет</label>
-                        <select id="enchant-item" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                            <option value="sword">Меч</option>
-                            <option value="dagger">Кинжал</option>
-                            <option value="battleaxe">Боевой топор</option>
-                            <option value="mace">Булава</option>
-                            <option value="greatsword">Двуручный меч</option>
-                            <option value="greataxe">Двуручная секира</option>
-                            <option value="warhammer">Двуручный молот</option>
-                            <option value="bow">Лук</option>
-                            <option value="crossbow">Арбалет</option>
-                            <option value="helmet">Шлем</option>
-                            <option value="chest">Кираса</option>
-                            <option value="gloves">Перчатки</option>
-                            <option value="boots">Сапоги</option>
-                            <option value="shield">Щит</option>
-                            <option value="ring">Кольцо</option>
-                            <option value="necklace">Ожерелье</option>
-                            <option value="circlet">Обруч</option>
-                        </select>
-                        <label>Чары</label>
-                        <select id="enchant-effect" onchange="updateEnchantCalculator(); saveCharacterDebounced();"></select>
-                        <label>Камень души</label>
-                        <select id="enchant-soul-gem" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                            <option value="petty">Крохотный (×0.5)</option>
-                            <option value="lesser">Маленький (×0.7)</option>
-                            <option value="common">Обычный (×1.0)</option>
-                            <option value="greater">Большой (×1.3)</option>
-                            <option value="grand">Великий (×1.6)</option>
-                            <option value="black">Чёрный (×1.8)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Навык Зачарование</label>
-                        <input type="number" id="enchant-skill" value="15" min="0" max="100" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                        <label>Перк «Зачарователь» (ступени 0-5)</label>
-                        <input type="number" id="enchant-perk-enchanter" value="0" min="0" max="5" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                        <label>Специализация</label>
-                        <select id="enchant-perk-special" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                            <option value="none">Нет</option>
-                            <option value="fire">Огненные чары (×1.25)</option>
-                            <option value="frost">Морозные чары (×1.25)</option>
-                            <option value="shock">Грозовые чары (×1.25)</option>
-                            <option value="skill">Чары умений (×1.25)</option>
-                            <option value="life">Жизненные чары (×1.25)</option>
-                        </select>
-                        <label>Зелье зачарования (множитель)</label>
-                        <input type="number" id="enchant-potion" value="1.0" step="0.05" onchange="updateEnchantCalculator(); saveCharacterDebounced();">
-                    </div>
-                </div>
-                <div id="enchant-result" style="margin-top:15px; padding:10px; background:var(--panel-sub); border:1px solid var(--accent-color); border-radius:4px;">
-                    <h3>Результат</h3>
-                    <div id="enchant-result-text">Заполните параметры и нажмите «Рассчитать».</div>
-                    <button class="btn" onclick="updateEnchantCalculator();">Рассчитать</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ТАБ 9: ПАНЕЛЬ МАСТЕРА -->
-        <div id="tab9" class="tab-content">
-            <div class="panel" id="master-panel">
-                <h2>Панель управления мастером</h2>
-                <div id="master-content">
-                    <p>Загрузка списка игроков...</p>
+                    <label for="eq-armor" style="display:inline;">Комплект доспехов (Штрафы магии)</label>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- ТАБ 4: КНИГА ЗАКЛИНАНИЙ СВОИМИ РУКАМИ -->
+    <div id="tab4" class="tab-content">
+        <div class="panel">
+            <h2>Интерактивная Книга Заклинаний и Свитки</h2>
+            <p style="font-size:11px; color:#aaa; margin-top:-8px; text-align:center;">
+                Записывайте любые заклинания, выученные в Коллегии. Вы можете вручную изменять как базовую, так и текущую стоимость каста заклинания!
+            </p>
+
+            <div class="grid-2">
+                <!-- Школа Разрушения -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#94291f;">
+                    <h3 style="color:#e74c3c;">🔥 Школа Разрушения</h3>
+                    <div id="spells-destr-list"></div>
+                    <button class="btn" style="background:#94291f; color:white; font-size:11px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
+                </div>
+
+                <!-- Школа Восстановления -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#1e8449;">
+                    <h3 style="color:#2ecc71;">☀️ Школа Восстановления</h3>
+                    <div id="spells-restor-list"></div>
+                    <button class="btn" style="background:#1e8449; color:white; font-size:11px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
+                </div>
+
+                <!-- Школа Изменения -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#f1c40f;">
+                    <h3 style="color:#f1c40f;">🍃 Школа Изменения</h3>
+                    <div id="spells-alter-list"></div>
+                    <button class="btn" style="background:#f39c12; color:white; font-size:11px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
+                </div>
+
+                <!-- Школа Иллюзии -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#8e44ad;">
+                    <h3 style="color:#9b59b6;">👁️ Школа Иллюзии</h3>
+                    <div id="spells-illus-list"></div>
+                    <button class="btn" style="background:#8e44ad; color:white; font-size:11px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
+                </div>
+
+                <!-- Школа Колдовства -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#34495e;">
+                    <h3 style="color:#5d6d7e;">💀 Школа Колдовства</h3>
+                    <div id="spells-conj-list"></div>
+                    <button class="btn" style="background:#34495e; color:white; font-size:11px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
+                </div>
+
+                <!-- Лаборатория писца -->
+                <div class="panel" style="background:#111; border-color:var(--accent-color);">
+                    <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
+                    <p style="font-size:11px; color:#aaa; margin-top:-2px;">
+                        Для создания требуются пергамент и чернила. Траты очков Мудрости: Новичок = 1, Ученик = 2, Адепт = 3, Эксперт = 4 ед.
+                    </p>
+                    <label>Круг заклинания свитка</label>
+                    <select id="scroll-craft-tier">
+                        <option value="1">Новичок (Тратит 1 Мудрость, Цена создания: 2 маны)</option>
+                        <option value="2">Ученик (Тратит 2 Мудрости, Цена создания: 4 маны)</option>
+                        <option value="3">Адепт (Тратит 3 Мудрости, Цена создания: 6 маны)</option>
+                        <option value="4">Эксперт (Тратит 4 Мудрости, Цена создания: 8 маны)</option>
+                    </select>
+                    <button class="btn" onclick="craftScrollInSheet()">Начертить свиток во время отдыха</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТАБ 5: ИНВЕНТАРЬ СВОИМИ РУКАМИ -->
+    <div id="tab5" class="tab-content">
+           <div class="grid-2">
+            <!-- Вес и ресурсы инвентаря -->
+            <div class="panel">
+                <h2>Инвентарь ресурсов и Снаряжения</h2>
+                <div style="max-height: 420px; overflow-y: auto; padding-right:5px;">
+                    <!-- Группа: Ресурсы -->
+                    <div class="inv-group">
+                        <h4>🐻 Шкуры и кожа</h4>
+                        <div class="stat-block"><span>Шкура медведя (вес 3, 50 септ.)</span><input type="number" id="inv-hide-bear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Шкура саблезуба (вес 2, 25 септ.)</span><input type="number" id="inv-hide-sable" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Волчья шкура (вес 1, 10 септ.)</span><input type="number" id="inv-hide-wolf" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Кожа (вес 2, 10 септ.)</span><input type="number" id="inv-leather" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Полоски кожи (вес 1, 3 септ.)</span><input type="number" id="inv-leather-strips" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Руды и слитки -->
+                    <div class="inv-group">
+                        <h4>⛏️ Руды и слитки</h4>
+                        <div class="stat-block"><span>Железный слиток (вес 1, 7 септ.)</span><input type="number" id="inv-ing-iron" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Стальной слиток (вес 1, 29 септ.)</span><input type="number" id="inv-ing-steel" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Корундовый слиток (вес 1, 40 септ.)</span><input type="number" id="inv-ing-corundum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Орихалковый слиток (вес 1, 45 септ.)</span><input type="number" id="inv-ing-orichalcum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Эбонитовый слиток (вес 1, 150 септ.)</span><input type="number" id="inv-ing-ebony" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Камни душ -->
+                    <div class="inv-group">
+                        <h4>💎 Камни душ</h4>
+                        <div class="stat-block"><span>Крохотный камень душ (вес 1, 10 септ.)</span><input type="number" id="inv-gem-petty" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Великий камень душ (вес 1, 200 септ.)</span><input type="number" id="inv-gem-grand" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Двемерские детали -->
+                    <div class="inv-group">
+                        <h4>⚙️ Двемерские артефакты</h4>
+                        <div class="stat-block"><span>Двемерская балка (вес 20, 15 септ.)</span><input type="number" id="inv-dw-beam" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Двемерская шестерня (вес 10, 5 септ.)</span><input type="number" id="inv-dw-gear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Сердечник центуриона (вес 4, 131 септ.)</span><input type="number" id="inv-dw-core" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Снаряжение -->
+                    <div class="inv-group">
+                        <h4>🏕️ Походное снаряжение</h4>
+                        <div class="stat-block"><span>Палатка 15х15 футов (вес 10, 300 септ.)</span><input type="number" id="inv-tent" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Спальный мешок (вес 3, 75 септ.)</span><input type="number" id="inv-bag" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                </div>
+
+                <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px; border:1px solid var(--border-color); font-size:13px;">
+                    <div class="weight-row">
+                        <span>Текущая Грузоподъемность: <span id="weight-current" style="font-weight:bold; color:var(--accent-color);">0</span> / </span>
+                        <span><span id="weight-max-display" style="font-weight:bold;">50</span> фунтов</span>
+                    </div>
+                    <div class="weight-row" style="margin-top:4px;">
+                        <label style="display:inline; font-weight:normal; font-size:12px;">
+                            <input type="checkbox" id="manual-weight-lock" onchange="updateAll(); saveLocalStorage();"> Ручная грузоподъемность (макс.)
+                        </label>
+                        <input type="number" id="max-weight-input" value="50" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                    </div>
+                    <div class="weight-row" style="margin-top:4px;">
+                        <label for="extra-weight" style="display:inline; font-weight:normal; font-size:12px;">➕ Дополнительный вес (снаряжение, оружие, броня):</label>
+                        <input type="number" id="extra-weight" value="0" min="0" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                    </div>
+                    <div class="alert-box" id="overweight-alert">ВНИМАНИЕ: ПЕРЕГРУЗ! Помеха на скорость (падает до 5 фт).</div>
+                </div>
+
+                <label style="margin-top:10px; font-size:13px;">💰 Золотые септимы</label>
+                <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
+            </div>
+
+             <!-- Религия, Еда, Рецепты и Заметки -->
+            <div class="panel">
+                <h2>Выживание и Пантеон Богов</h2>
+                
+                <label>Голодание (Пропущено дней без еды)</label>
+                <input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll(); saveLocalStorage();">
+
+                <label>Активные кулинарные эффекты (Лимит: 2 блюда)</label>
+                <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 120px; overflow-y: auto;">
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food1" data-hp="20" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food1">Капустный суп с картошкой (+20 HP)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food2" data-mp="25" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food2">Эльсвейрское фондю (+25 MP)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food3" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food3">Томатный суп (+10 урона заклинаний)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food4" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food4">Похлёбка из оленины (+5 к скорости)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food5" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food5">Слойка с лавандой (+10% резист к магии)</label></div>
+                </div>
+                
+                <div class="checkbox-group" style="margin-top:10px;">
+                    <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
+                    <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
+                </div>
+
+                <h3 style="margin-top:15px;">Религия и Благословения</h3>
+                <label>Священный покровитель (Аэдра или Принц Даэдра)</label>
+                <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
+                    <option value="none">Без веры / Атеист</option>
+                    <optgroup label="9 Божеств Аэдра">
+                        <option value="zenithar">Зенитар (Труд, Бонус к HP, силовому урону)</option>
+                        <option value="stendarr">Стендарр (Защита и чистый урон по даэдра/нежити)</option>
+                        <option value="julianos">Джулианос (+Манапул, скидка на касты)</option>
+                        <option value="mara">Мара (Резист ядам/болезням, сила хила)</option>
+                        <option value="dibella">Дибелла (Бонус к броне плоти и красноречию)</option>
+                        <option value="kynareth">Кинарет (Иммунитет к падению, пробитие брони)</option>
+                        <option value="arkay">Аркей (+Защита, резист к холоду)</option>
+                        <option value="talos">Талос (+Урон топорами/секирами, резист к крикам)</option>
+                        <option value="akatosh">Акатош (+Броня, урон зачарования, резист огню)</option>
+                    </optgroup>
+                    <optgroup label="Принцы Даэдра">
+                        <option value="boethiah">Боэтия (Скрытность, скорость, урон из тени)</option>
+                        <option value="mephala">Мефала (Яды, вампиризм при атаках)</option>
+                        <option value="peryite">Периайт (Болезни превращаются в мощные баффы)</option>
+                        <option value="hermaeus">Хермеус Мора (+Мана, вампиризм заклинаниями)</option>
+                        <option value="nocturnal">Ноктюрнал (Скорость, множитель скрытности)</option>
+                        <option value="malacath">Малакат (+HP, огромный урон силовых атак)</option>
+                        <option value="azura">Азура (Зачарование, резист стихиям)</option>
+                        <option value="meridia">Меридия (Скидки восстановления, урон по нежити)</option>
+                        <option value="mehrunes">Мерунес Дагон (+Мана, урон огнем, 1% шанс ваншота)</option>
+                        <option value="sanguine">Сангвин (Бафф физ. урона от алкоголя, вампиризм)</option>
+                        <option value="namira">Намира (Усиление зелий, бафф за поедание тел)</option>
+                        <option value="vaermina">Вермина (Бесшумные иллюзии, шанс обратить в страх)</option>
+                        <option value="sheogorath">Шеогорат (Рандом урона/защиты каждый ход!)</option>
+                        <option value="clavicus">Клавикус Вайл (+HP, красноречие, пробитие брони)</option>
+                        <option value="molag">Молаг Бал (+HP/MP, резист физ. урону, вампиризм оружия)</option>
+                        <option value="hircine">Хирсин (+Броня, скорость, урон оборотня)</option>
+                    </optgroup>
+                </select>
+
+                <label>Стадия Благословения (Ранг преданности)</label>
+                <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
+                    <option value="1">1 Ранг (Последователь)</option>
+                    <option value="2">2 Ранг (Ревнитель веры)</option>
+                    <option value="3">3 Ранг (Избранник божества)</option>
+                </select>
+                <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none;">
+                    ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
+                </div>
+
+                <!-- Текстовое окно для записи точных эффектов бога -->
+                <label style="margin-top:10px;">Текущий дар и догматы божества (Заметки веры)</label>
+                <textarea id="faith-notes" rows="2" placeholder="Запишите сюда точный бонус выбранного ранга вашего бога (например: Талос 1 р. — +5% урона топорами)..." onchange="saveLocalStorage()"></textarea>
+
+                <!-- Походный блокнот для рецептов алхимии и кузнечки -->
+                <div style="margin-top:12px; background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
+                    <label>📜 Походный блокнот (Рецепты алхимии, кузнечного дела и заметки квестов)</label>
+                    <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script>
-// ================================
-// 1. НАСТРОЙКА FIREBASE (вставьте свои данные)
-// ================================
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAxisxsU0n9LoleQFX1nJ4GCQnZwVkv2EM",
-  authDomain: "legends-of-the-prancing-mare.firebaseapp.com",
-  databaseURL: "https://legends-of-the-prancing-mare-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "legends-of-the-prancing-mare",
-  storageBucket: "legends-of-the-prancing-mare.firebasestorage.app",
-  messagingSenderId: "479204281567",
-  appId: "1:479204281567:web:03db757500f708844d2d6a",
-  measurementId: "G-6S40NQNNXS"
-};
+    // Массив всех 18 навыков игровой системы Скурим
+    const skillNames = [
+        "Одноручное оружие", "Двуручное оружие", "Стрельба", "Блокирование", 
+        "Тяжелая броня", "Легкая броня", "Скрытность", "Взлом", 
+        "Карманные кражи", "Красноречие", "Разрушение", "Восстановление", 
+        "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование"
+    ];
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+    // Глобальный массив для хранения пользовательских кастомных заклинаний
+    let customSpells = [];
+    let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
 
-let currentUser = null;
-let currentCharacter = null; // данные персонажа
-let isMaster = false;
-let allPlayers = [];
+    // Динамический рендеринг 18 навыков и генерация многоступенчатых чекбоксов перков
+    function initSkills() {
+        const container = document.getElementById('skills-container');
+        if (!container) return;
+        container.innerHTML = "";
+        
+        skillNames.forEach((name, idx) => {
+            let pList = fullPerksManifest[name] || [];
+            
+            // Генерация чекбоксов для перков с учетом их ступеней (от 1 до steps)
+            let perksHtml = pList.map((p, pItemIdx) => {
+                let stepsHtml = "";
+                for (let s = 1; s <= p.steps; s++) {
+                    let checkboxId = `perk-${idx}-${pItemIdx}-${s}`;
+                    stepsHtml += `
+                        <input type="checkbox" 
+                               id="${checkboxId}" 
+                               class="perk-checkbox" 
+                               data-skillidx="${idx}" 
+                               data-perkidx="${pItemIdx}" 
+                               data-step="${s}" 
+                               onchange="updateAll(); saveLocalStorage();">
+                    `;
+                }
+                return `
+                    <div class="perk-item">
+                        <div class="perk-left">
+                            <span style="color:#cfc5b6; font-size:12px;">${p.name}</span>
+                        </div>
+                        <div class="perk-steps">
+                            ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:10px; opacity:0.6;">(1-${p.steps})</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
 
-// ================================
-// 2. БАЗА ПРЕДМЕТОВ ДЛЯ АВТОКОМПЛИТА (из твоих файлов)
-// ================================
-const ITEMS_DB = [
-    // Шкуры
-    "Шкура медведя", "Шкура пещерного медведя", "Шкура белого медведя", "Шкура саблезуба",
-    "Шкура снежного саблезуба", "Волчья шкура", "Шкура снежного волка", "Козья шкура",
-    "Коровья шкура", "Оленья шкура", "Лошадиная шкура", "Шкура лисицы", "Шкура снежной лисицы",
-    // Слитки
-    "Железный слиток", "Стальной слиток", "Корундовый слиток", "Двемерский слиток",
-    "Орихалковый слиток", "Ртутный слиток", "Лунный камень", "Малахитовый слиток",
-    "Эбонитовый слиток", "Сталгримовый слиток",
-    // Ингредиенты алхимии (ключевые)
-    "Абесинский окунь", "Алый корень Нирна", "Белянка", "Бесовский гриб",
-    "Бойцовая рыбка", "Болотный стручок", "Большие рога", "Бородатый мох",
-    "Вересковое сердце", "Ветка чертополоха", "Виноград джазби", "Гигантский лишайник",
-    "Глаз саблезуба", "Гниль Намиры", "Голубой горноцвет", "Двемерское масло",
-    "Жареная злокрысья кожа", "Жемчужина", "Живица сприггана", "Жир тролля",
-    "Зубы ледяного привидения", "Икра рыбы-убийцы", "Корень Нирна", "Красный горноцвет",
-    "Клешня грязевого краба", "Клык саблезуба", "Клюв ястреба", "Коготь ворожеи",
-    "Костная мука", "Кровавый венец", "Крыло лунного мотылька", "Крыло монарха",
-    "Крыло синей бабочки", "Куриное яйцо", "Лаванда", "Лиловый горноцвет",
-    "Лунный сахар", "Лютый гриб", "Маленькая жемчужина", "Маленькие рога",
-    "Медвежьи когти", "Медовые соты", "Мора тапинелла", "Морозная мириам",
-    "Морозная соль", "Морской жёлудь", "Мухомор", "Огненная соль",
-    "Оранжевая стрекоза", "Палец великана", "Паслён", "Паучье яйцо",
-    "Перья ворожеи", "Перья ястреба", "Ползучая лоза", "Прах вампира",
-    "Пушица", "Пчела", "Пчелиное гнездо", "Пшеница",
-    "Светящаяся пыль", "Светящийся гриб", "Сердце даэдра", "Серебристый окунь",
-    "Синяя стрекоза", "Сиродильский лопатохвост", "Снежные ягоды", "Собачий корень",
-    "Соль", "Соль пустоты", "Стержневой корень", "Толчёный бивень мамонта",
-    "Торакс светлячка", "Травяной стручок", "Ухо фалмера", "Хвост злокрыса",
-    "Хисткарп", "Чеснок", "Человеческое сердце", "Человечье мясо",
-    "Чешуйчатка", "Чешуя рыбы-убийцы", "Эктоплазма", "Эльфийское ухо",
-    "Ягоды можжевельника", "Ядовитый колокольчик", "Язык дракона", "Яйцо коруса",
-    "Яйцо оригмы", "Яйцо соснового дрозда",
-    // Двемерские детали
-    "Малый двемерский рычаг", "Малая двемерская металлическая пластина",
-    "Двемерский рычаг", "Двемерский металлолом", "Двемерский гироскоп",
-    "Двемерская шестерня", "Двемерская металлическая отливка",
-    "Гнутый двемерский металлолом", "Большая декоративная двемерская балка",
-    "Большая двемерская металлическая пластина", "Большая двемерская балка",
-    "Сердечник генератора центуриона",
-    // Камни душ
-    "Крохотный камень душ", "Маленький камень душ", "Обычный камень душ",
-    "Большой камень душ", "Великий камень душ", "Черный камень душ",
-    // Еда
-    "Соль", "Картофель", "Лук-порей", "Капуста", "Помидор", "Чеснок",
-    "Куриная грудка", "Мясо устрицы", "Собачатина", "Мясо хоркера",
-    "Конина", "Козий окорок", "Хобот мамонта", "Фазанья грудка",
-    "Сырая говядина", "Сырая кроличья ножка", "Лососина", "Оленина",
-    "Мясо кабана", "Мясо пепельного прыгуна", "Нога пепельного прыгуна",
-    "Пепельный батат", "Зелёное яблоко", "Красное яблоко", "Морковь",
-    "Тыква", "Яблочный пирог", "Печёный картофель", "Пирожное с заварным кремом",
-    "Хлеб", "Капустный суп", "Кусок эйдарского сыра", "Круг эйдарского сыра",
-    "Кусок козьего сыра", "Круг козьего сыра", "Жареный лук-порей",
-    "Орехи в меду", "Жареная рыба-убийца", "Початый круг эйдарского сыра",
-    "Початый круг козьего сыра", "Сладкий рулет", "Вареное мясо кабана",
-    "Черновересковый мёд", "Мёд Хоннинга", "Вино Алто", "Нордский мёд",
-    "Коловианский бренди", "Огненное вино", "Вино", "Пряное вино",
-    "Строс М'Кайский ром", "Черновересковый мёд отборный", "Мед с можжевеловыми ягодами",
-    "Аргонианский эль", "Вино Джесики", "Зольный мед", "Мацт", "Суджамма",
-    "Угольное вино", "Флин", "Шейн", "Красноводная скума", "Зелье крови",
-    "Кувшин молока",
-    // Оружие и броня (базовые)
-    "Железный кинжал", "Железный меч", "Железный боевой топор", "Железная булава",
-    "Железное копье", "Стальной кинжал", "Стальной меч", "Стальной боевой топор",
-    "Стальная булава", "Стальное копье", "Орочий кинжал", "Орочий меч",
-    "Орочий боевой топор", "Орочья булава", "Орочье копье",
-    "Двемерский кинжал", "Двемерский меч", "Двемерский боевой топор", "Двемерская булава",
-    "Двемерское копье", "Эльфийский кинжал", "Эльфийский меч", "Эльфийский боевой топор",
-    "Эльфийская булава", "Эльфийское копье", "Стеклянный кинжал", "Стеклянный меч",
-    "Стеклянный боевой топор", "Стеклянная булава", "Стеклянное копье",
-    "Эбонитовый кинжал", "Эбонитовый меч", "Эбонитовый боевой топор", "Эбонитовая булава",
-    "Эбонитовое копье", "Сталгримовый кинжал", "Сталгримовый меч",
-    "Сталгримовый боевой топор", "Сталгримовая булава",
-    // Двуручное
-    "Железный двуручный меч", "Железная секира", "Железный боевой молот", "Железная пика",
-    "Стальной двуручный меч", "Стальная секира", "Стальной боевой молот", "Стальная пика",
-    "Орочий двуручный меч", "Орочья секира", "Орочий боевой молот", "Орочья пика",
-    "Двемерский двуручный меч", "Двемерская секира", "Двемерский боевой молот", "Двемерская пика",
-    "Эльфийский двуручный меч", "Эльфийская секира", "Эльфийский боевой молот", "Эльфийская пика",
-    "Стеклянный двуручный меч", "Стеклянная секира", "Стеклянный боевой молот", "Стеклянная пика",
-    "Эбонитовый двуручный меч", "Эбонитовая секира", "Эбонитовый боевой молот", "Эбонитовая пика",
-    "Сталгримовый двуручный меч", "Сталгримовая секира", "Сталгримовый боевой молот",
-    // Луки и стрелы
-    "Орочий лук", "Длинный лук", "Двемерский лук", "Охотничий лук",
-    "Эльфийский лук", "Древний нордский лук", "Нордский лук", "Имперский лук",
-    "Эбонитовый лук", "Фалмерский лук", "Стеклянный лук", "Лук Изгоев",
-    "Сталгримовый лук", "Лук бич магов", "Гибкий древний нордский лук",
-    "Фалмерский гибкий лук",
-    "Железная стрела", "Стальная стрела", "Орочья стрела", "Двемерская стрела",
-    "Нордская стрела", "Эльфийская стрела", "Стеклянная стрела", "Эбонитовая стрела",
-    "Древненордская стрела героя", "Сталгримовая стрела",
-    "Огненная стрела", "Морозная стрела", "Электрическая стрела", "Ядовитая стрела",
-    "Стрела крови", "Серебрянная стрела", "Стрела из трольей кости",
-    "Стрела из мамонтовой кости", "Болотная стрела", "Стрела льда", "Копье риклинга",
-    // Арбалеты и болты
-    "Стальной арбалет", "Двемерский арбалет", "Серебрянный арбалет",
-    "Эльфийский арбалет", "Орочий арбалет", "Стеклянный", "Эбонитовый",
-    "Стальной болт", "Двемерский болт", "Серебрянный болт",
-    "Эльфийский болт", "Орочий болт", "Стеклянный",
-    "Стальной болт огня", "Стальной болт льда", "стальной болт электричества",
-    "стальной болт яда", "двемерский болт огня", "двемерский болт льда",
-    "двемерскийболт электричества", "двемерский болт яда",
-    // Броня (лёгкая и тяжёлая)
-    "Сыромятный шлем", "Сыромятная броня", "Сыромятные наручи", "Меховые сапоги",
-    "Имперский лёгкий щит", "Имперский лёгкий шлем", "Имперская лёгкая броня",
-    "Меховые перчатки", "Меховой шлем", "Меховая броня", "Меховые наручи", "Меховые ботинки",
-    "Кожаный шлем", "Кожаная броня", "Кожаные наручи", "Кожаные сапоги",
-    "Хитиновый шлем", "Хитиновая броня", "Хитиновые наручи", "Хитиновые сапоги",
-    "Сталгримовый легкий шлем", "Сталгримовая легкая броня", "Сталгримовые легкие наручи",
-    "Сталгримовые легкие сапоги", "Шлем Изгоев", "Броня Изгоев", "Перчатки Изгоев", "Сапоги Изгоев",
-    "Эльфийский шлем", "Эльфийская броня", "Эльфийские перчатки", "Эльфийские сапоги",
-    "Ламеллярный шлем", "Ламеллярная броня", "Ламеллярные наручи", "Ламеллярные сапоги",
-    "Стеклянный шлем", "Стеклянная броня", "Стеклянные перчатки", "Стеклянные сапоги",
-    "Шлем Братьев Бури", "Кираса Братьев Бури",
-    "Железный шлем", "Железная броня", "Железные перчатки", "Имперские сапоги", "Имперский щит",
-    "Стальной шлем", "Стальные имперские перчатки", "Стальная броня", "Стальные сапоги со щитками",
-    "Прочная железная броня", "Прочный железный щит", "Стальной рогатый шлем",
-    "Стальные нордские перчатки", "Стальная броня с наплечниками", "Стальные сапоги с оковкой",
-    "Стальной щит", "Древний нордский шлем", "Двемерские перчатки", "Двемерские сапоги",
-    "Двемерский щит", "Костяной шлем", "Стальные пластинчатые перчатки", "Двемерская броня",
-    "Стальные пластинчатые сапоги", "Нордский щит", "Тяжелый хитиновый шлем",
-    "Древне норские наручи", "Фалмерская броня", "Орочьи сапоги", "Орочий щит",
-    "Фалмерский шлем", "Костяные перчатки", "Фалмерская усиленная броня", "Нордские резные сапоги",
-    "Эбонитовый щит", "Фалмерский усиленный шлем", "Тяжелые хитиновые перчатки",
-    "Фалмерская тяжелая броня", "Древне нордские сапоги", "Фалмерский щит",
-    "Фалмерский тяжелый шлем", "Фалмерские перчатки", "Сталгримовая броня", "Костяные сапоги",
-    "Костяной щит", "Двемерский шлем", "Фалмерские тяжелые перчатки", "Древняя нордская броня",
-    "Тяжелые хитиновые сапоги", "Стальной пластинчатый шлем", "Фалмерские усиленные перчатки",
-    "Костяная броня", "Фалмерские сапоги", "Орочий шлем", "Орочьи перчатки",
-    "Костяная броня с наплечниками", "Фалмерские усиленные сапоги", "Сталгримовый шлем",
-    "Сталгримовые перчатки", "Тяжелая хитиновая броня", "Фалмерские тяжелые сапоги",
-    "Нордский резной шлем", "Нордские резные перчатки", "Стальная пластинчатая броня",
-    "Сталгримовые сапоги", "Эбонитовый шлем", "Эбонитовые перчатки", "Орочья броня",
-    "Эбонитовые сапоги", "Нордская резная броня", "Эбонитовая броня",
-    // Щиты
-    "Имперский лёгкий щит", "Сыромятный щит", "Эльфийский щит", "Стеклянный щит",
-    "Сталгримовый щит", "Хитиновый щит", "Имперский щит", "Железный щит",
-    "Стальной щит", "Двемерский щит", "Нордский щит", "Орочий щит",
-    "Эбонитовый щит", "Фалмерский щит", "Костяной щит",
-    // Одеяния магов
-    "Капюшон новичка", "Одеяние мага", "Одеяние повара", "Роба разрушения",
-    "Капюшон ученика", "Одеяние некроманта", "Колпак повара", "Великий созидатель",
-    "Капюшон адепта", "Одеяние перезарядки", "Одеяние кровавой жатвы", "Создатель обмана",
-    "Капюшон эксперта", "Одеяние мага с капюшоном", "Одеяние лечения", "Мастер даэдра",
-    "Капюшон адепта (школы)", "Одеяние новичка (школы)", "Одеяние атрономага", "Великий свет",
-    "Капюшон эксперта (школы)", "Одеяние ученика (школы)", "Одеяние паладина",
-    "Выпускник Коллегии Магов Винтерхолда", "Сапоги мага", "Одеяние адепта (школы)",
-    "Перчатки мага", "Одеяние эксперта (школы)", "Перчатки магистра (школы)"
-];
+            // Подсказки для некоторых навыков
+            let hint = "";
+            if(name === "Взлом") hint = `<div class="shw-hint">Замки: Новичок 9 (-2), Ученик 12 (-3), Адепт 15 (-4), Эксперт 17 (-5)</div>`;
+            if(name === "Блокирование") hint = `<div class="shw-hint">Не щитом: -3 к проверке атак. Щит эффективнее. Удар плашмя: дает врагу -1.</div>`;
 
-// ================================
-// 3. АВТОРИЗАЦИЯ
-// ================================
-const authContainer = document.getElementById('auth-container');
-const appContainer = document.getElementById('app');
-
-auth.onAuthStateChanged(user => {
-    if (user) {
-        currentUser = user;
-        document.getElementById('user-email').innerText = user.email;
-        authContainer.style.display = 'none';
-        appContainer.style.display = 'block';
-        loadCharacter(user.uid);
-        loadUserRole(user.uid);
-    } else {
-        currentUser = null;
-        authContainer.style.display = 'block';
-        appContainer.style.display = 'none';
+            container.innerHTML += `
+                <div class="panel" style="background:var(--panel-sub); margin-bottom:8px; padding:8px; border:1px solid #363025;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold; font-size:13px; width:70%; color:var(--accent-color);">${name}</span>
+                        <input type="number" id="skill-${idx}" value="10" min="10" style="width:48px; text-align:center;" data-raw-val="10" onchange="handleSkillChange(this, ${idx})">
+                    </div>
+                    ${hint}
+                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : ''}
+                </div>
+            `;
+        });
     }
-});
 
-document.getElementById('login-btn').addEventListener('click', () => {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    auth.signInWithEmailAndPassword(email, password).catch(err => alert(err.message));
-});
+    // Обработчик ручного изменения навыка
+    function handleSkillChange(input, idx) {
+        // При ручном изменении пользователь вводит базовое значение (без расового бонуса)
+        let raw = parseInt(input.value) || 10;
+        if (raw < 10) raw = 10;
+        input.setAttribute('data-raw-val', raw);
+        updateAll();
+        saveLocalStorage();
+    }
 
-document.getElementById('register-btn').addEventListener('click', () => {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    auth.createUserWithEmailAndPassword(email, password).catch(err => alert(err.message));
-});
+    // Обработчик ручного изменения характеристики
+    function handleStatChange(input) {
+        let raw = parseInt(input.value) || 10;
+        if (raw < 1) raw = 1;
+        input.setAttribute('data-raw-stat', raw);
+        updateAll();
+        saveLocalStorage();
+    }
 
-document.getElementById('google-btn').addEventListener('click', () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => alert(err.message));
-});
+    // Логика навигации по вкладкам
+    function openTab(ev, tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        ev.currentTarget.classList.add('active');
+    }
 
-function logout() {
-    auth.signOut().then(() => {
-        location.reload();
-    });
-}
-
-// ================================
-// 4. ЗАГРУЗКА / СОХРАНЕНИЕ ПЕРСОНАЖА
-// ================================
-function loadCharacter(uid) {
-    db.collection('characters').doc(uid).get().then(doc => {
-        if (doc.exists) {
-            currentCharacter = doc.data();
-            fillCharacterData(currentCharacter);
-            // Загружаем перки
-            loadPerksFromData(currentCharacter.perks);
-            // Загружаем инвентарь (dynamic)
-            loadInventoryFromData(currentCharacter.inventory);
-            // Загружаем заклинания
-            loadSpellsFromData(currentCharacter.spells);
-        } else {
-            // Создаём нового персонажа с дефолтными значениями
-            const defaultChar = getDefaultCharacter();
-            currentCharacter = defaultChar;
-            db.collection('characters').doc(uid).set(defaultChar).then(() => {
-                fillCharacterData(defaultChar);
-                initPerksDefault();
-                initInventoryDefault();
-                initSpellsDefault();
-            });
+    // Ограничение сытости (не более двух блюд за раз)
+    function checkFoodLimit(chk) {
+        let checked = document.querySelectorAll('.food-buff:checked');
+        if (checked.length > 2) {
+            chk.checked = false;
+            alert("Лимит превышен! Одновременно могут действовать баффы максимум от двух блюд!");
         }
         updateAll();
-    });
-}
-
-function getDefaultCharacter() {
-    return {
-        name: 'Довакин',
-        race: 'nord',
-        sign: 'none',
-        level: 1,
-        lives: 50,
-        backstory: '',
-        stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-        curHp: 100,
-        maxHp: 100,
-        curMp: 100,
-        maxMp: 100,
-        armorBuff: 0,
-        speed: 35,
-        manualSpeedLock: false,
-        manualHpLock: false,
-        manualMpLock: false,
-        manualDmgLock: false,
-        manualWeightLock: false,
-        maxWeightInput: 50,
-        extraWeight: 0,
-        gold: 150,
-        starve: 0,
-        faithGod: 'none',
-        faithRank: 1,
-        faithNotes: '',
-        notes: '',
-        // Перки: объект { skillName: { perkIndex: stepsChecked } }
-        perks: {},
-        // Инвентарь: массив объектов { name, count }
-        inventory: [],
-        // Заклинания: массив объектов { name, school, cost }
-        spells: [],
-        // Боевое снаряжение
-        weapon: {
-            meleeName: 'Кулаки',
-            meleeDmg: 2,
-            meleeType: 'unarmed',
-            rangedName: 'Лук',
-            rangedDmg: 10,
-            rangedType: 'bow',
-            ammoName: 'Стрелы',
-            ammoDmg: 8,
-            active: 'melee'
-        },
-        armor: {
-            eq: 'cloth',
-            helmName: '',
-            helmArmor: 0,
-            chestName: '',
-            chestArmor: 0,
-            glovesName: '',
-            glovesArmor: 0,
-            bootsName: '',
-            bootsArmor: 0,
-            shieldName: '',
-            shieldArmor: 0,
-            ringName: '',
-            neckName: '',
-            circletName: ''
-        },
-        enchant: {
-            itemType: 'weapon',
-            item: 'sword',
-            effect: '',
-            soulGem: 'common',
-            skill: 15,
-            perkEnchanter: 0,
-            specialPerk: 'none',
-            potion: 1.0
-        },
-        activeFoods: [] // массив названий блюд
-    };
-}
-
-function fillCharacterData(data) {
-    document.getElementById('char-name').value = data.name || '';
-    document.getElementById('char-race').value = data.race || 'nord';
-    document.getElementById('char-sign').value = data.sign || 'none';
-    document.getElementById('char-level').value = data.level || 1;
-    document.getElementById('char-lives').value = data.lives || 50;
-    document.getElementById('char-backstory').value = data.backstory || '';
-    document.getElementById('stat-str').setAttribute('data-raw-stat', data.stats.str || 10);
-    document.getElementById('stat-dex').setAttribute('data-raw-stat', data.stats.dex || 10);
-    document.getElementById('stat-con').setAttribute('data-raw-stat', data.stats.con || 10);
-    document.getElementById('stat-int').setAttribute('data-raw-stat', data.stats.int || 10);
-    document.getElementById('stat-wis').setAttribute('data-raw-stat', data.stats.wis || 10);
-    document.getElementById('stat-cha').setAttribute('data-raw-stat', data.stats.cha || 10);
-    document.getElementById('cur-hp').value = data.curHp || 100;
-    document.getElementById('max-hp').value = data.maxHp || 100;
-    document.getElementById('cur-mp').value = data.curMp || 100;
-    document.getElementById('max-mp').value = data.maxMp || 100;
-    document.getElementById('armor-buff').value = data.armorBuff || 0;
-    document.getElementById('val-speed').value = data.speed || 35;
-    document.getElementById('manual-speed-lock').checked = data.manualSpeedLock || false;
-    document.getElementById('manual-hp-lock').checked = data.manualHpLock || false;
-    document.getElementById('manual-mp-lock').checked = data.manualMpLock || false;
-    document.getElementById('manual-dmg-lock').checked = data.manualDmgLock || false;
-    document.getElementById('manual-weight-lock').checked = data.manualWeightLock || false;
-    document.getElementById('max-weight-input').value = data.maxWeightInput || 50;
-    document.getElementById('extra-weight').value = data.extraWeight || 0;
-    document.getElementById('char-gold').value = data.gold || 150;
-    document.getElementById('food-starve').value = data.starve || 0;
-    document.getElementById('faith-god').value = data.faithGod || 'none';
-    document.getElementById('faith-rank').value = data.faithRank || 1;
-    document.getElementById('faith-notes').value = data.faithNotes || '';
-    document.getElementById('char-notes').value = data.notes || '';
-
-    // Оружие
-    if (data.weapon) {
-        document.getElementById('wep-melee-name').value = data.weapon.meleeName || '';
-        document.getElementById('wep-melee-dmg').value = data.weapon.meleeDmg || 2;
-        document.getElementById('wep-melee-type').value = data.weapon.meleeType || 'unarmed';
-        document.getElementById('wep-ranged-name').value = data.weapon.rangedName || '';
-        document.getElementById('wep-ranged-dmg').value = data.weapon.rangedDmg || 10;
-        document.getElementById('wep-ranged-type').value = data.weapon.rangedType || 'bow';
-        document.getElementById('ammo-name').value = data.weapon.ammoName || '';
-        document.getElementById('ammo-dmg').value = data.weapon.ammoDmg || 8;
-        document.getElementById('active-combat-weapon').value = data.weapon.active || 'melee';
     }
 
-    // Броня
-    if (data.armor) {
-        document.getElementById('eq-armor').value = data.armor.eq || 'cloth';
-        document.getElementById('slot-helm-name').value = data.armor.helmName || '';
-        document.getElementById('slot-helm-armor').value = data.armor.helmArmor || 0;
-        document.getElementById('slot-chest-name').value = data.armor.chestName || '';
-        document.getElementById('slot-chest-armor').value = data.armor.chestArmor || 0;
-        document.getElementById('slot-gloves-name').value = data.armor.glovesName || '';
-        document.getElementById('slot-gloves-armor').value = data.armor.glovesArmor || 0;
-        document.getElementById('slot-boots-name').value = data.armor.bootsName || '';
-        document.getElementById('slot-boots-armor').value = data.armor.bootsArmor || 0;
-        document.getElementById('slot-shield-name').value = data.armor.shieldName || '';
-        document.getElementById('slot-shield-armor').value = data.armor.shieldArmor || 0;
-        document.getElementById('slot-ring-name').value = data.armor.ringName || '';
-        document.getElementById('slot-neck-name').value = data.armor.neckName || '';
-        document.getElementById('slot-circlet-name').value = data.armor.circletName || '';
-    }
-
-    // Зачарование
-    if (data.enchant) {
-        document.getElementById('enchant-item-type').value = data.enchant.itemType || 'weapon';
-        document.getElementById('enchant-item').value = data.enchant.item || 'sword';
-        document.getElementById('enchant-effect').value = data.enchant.effect || '';
-        document.getElementById('enchant-soul-gem').value = data.enchant.soulGem || 'common';
-        document.getElementById('enchant-skill').value = data.enchant.skill || 15;
-        document.getElementById('enchant-perk-enchanter').value = data.enchant.perkEnchanter || 0;
-        document.getElementById('enchant-perk-special').value = data.enchant.specialPerk || 'none';
-        document.getElementById('enchant-potion').value = data.enchant.potion || 1.0;
-    }
-
-    // Активные блюда
-    if (data.activeFoods) {
-        const container = document.getElementById('active-food-effects');
-        container.innerHTML = '';
-        data.activeFoods.forEach(food => {
-            const slot = document.createElement('div');
-            slot.className = 'active-food-slot';
-            slot.innerHTML = `<span>${food}</span><button class="btn btn-sm" onclick="this.parentElement.remove(); saveCharacterDebounced();">Съесть</button>`;
-            container.appendChild(slot);
-        });
-    }
-}
-
-function saveCharacter(uid, data) {
-    if (!uid) return;
-    db.collection('characters').doc(uid).set(data, { merge: true }).catch(err => console.error('Save error:', err));
-}
-
-let saveTimeout = null;
-function saveCharacterDebounced() {
-    if (!currentUser) return;
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        const data = collectCharacterData();
-        currentCharacter = data;
-        saveCharacter(currentUser.uid, data);
-    }, 500);
-}
-
-function collectCharacterData() {
-    return {
-        name: document.getElementById('char-name').value,
-        race: document.getElementById('char-race').value,
-        sign: document.getElementById('char-sign').value,
-        level: parseInt(document.getElementById('char-level').value) || 1,
-        lives: parseInt(document.getElementById('char-lives').value) || 50,
-        backstory: document.getElementById('char-backstory').value,
-        stats: {
-            str: parseInt(document.getElementById('stat-str').getAttribute('data-raw-stat')) || 10,
-            dex: parseInt(document.getElementById('stat-dex').getAttribute('data-raw-stat')) || 10,
-            con: parseInt(document.getElementById('stat-con').getAttribute('data-raw-stat')) || 10,
-            int: parseInt(document.getElementById('stat-int').getAttribute('data-raw-stat')) || 10,
-            wis: parseInt(document.getElementById('stat-wis').getAttribute('data-raw-stat')) || 10,
-            cha: parseInt(document.getElementById('stat-cha').getAttribute('data-raw-stat')) || 10
-        },
-        curHp: parseInt(document.getElementById('cur-hp').value) || 0,
-        maxHp: parseInt(document.getElementById('max-hp').value) || 100,
-        curMp: parseInt(document.getElementById('cur-mp').value) || 0,
-        maxMp: parseInt(document.getElementById('max-mp').value) || 100,
-        armorBuff: parseInt(document.getElementById('armor-buff').value) || 0,
-        speed: parseInt(document.getElementById('val-speed').value) || 35,
-        manualSpeedLock: document.getElementById('manual-speed-lock').checked,
-        manualHpLock: document.getElementById('manual-hp-lock').checked,
-        manualMpLock: document.getElementById('manual-mp-lock').checked,
-        manualDmgLock: document.getElementById('manual-dmg-lock').checked,
-        manualWeightLock: document.getElementById('manual-weight-lock').checked,
-        maxWeightInput: parseInt(document.getElementById('max-weight-input').value) || 50,
-        extraWeight: parseFloat(document.getElementById('extra-weight').value) || 0,
-        gold: parseInt(document.getElementById('char-gold').value) || 0,
-        starve: parseInt(document.getElementById('food-starve').value) || 0,
-        faithGod: document.getElementById('faith-god').value,
-        faithRank: parseInt(document.getElementById('faith-rank').value) || 1,
-        faithNotes: document.getElementById('faith-notes').value,
-        notes: document.getElementById('char-notes').value,
-        perks: collectPerksData(),
-        inventory: collectInventoryData(),
-        spells: collectSpellsData(),
-        weapon: {
-            meleeName: document.getElementById('wep-melee-name').value,
-            meleeDmg: parseInt(document.getElementById('wep-melee-dmg').value) || 2,
-            meleeType: document.getElementById('wep-melee-type').value,
-            rangedName: document.getElementById('wep-ranged-name').value,
-            rangedDmg: parseInt(document.getElementById('wep-ranged-dmg').value) || 10,
-            rangedType: document.getElementById('wep-ranged-type').value,
-            ammoName: document.getElementById('ammo-name').value,
-            ammoDmg: parseInt(document.getElementById('ammo-dmg').value) || 8,
-            active: document.getElementById('active-combat-weapon').value
-        },
-        armor: {
-            eq: document.getElementById('eq-armor').value,
-            helmName: document.getElementById('slot-helm-name').value,
-            helmArmor: parseInt(document.getElementById('slot-helm-armor').value) || 0,
-            chestName: document.getElementById('slot-chest-name').value,
-            chestArmor: parseInt(document.getElementById('slot-chest-armor').value) || 0,
-            glovesName: document.getElementById('slot-gloves-name').value,
-            glovesArmor: parseInt(document.getElementById('slot-gloves-armor').value) || 0,
-            bootsName: document.getElementById('slot-boots-name').value,
-            bootsArmor: parseInt(document.getElementById('slot-boots-armor').value) || 0,
-            shieldName: document.getElementById('slot-shield-name').value,
-            shieldArmor: parseInt(document.getElementById('slot-shield-armor').value) || 0,
-            ringName: document.getElementById('slot-ring-name').value,
-            neckName: document.getElementById('slot-neck-name').value,
-            circletName: document.getElementById('slot-circlet-name').value
-        },
-        enchant: {
-            itemType: document.getElementById('enchant-item-type').value,
-            item: document.getElementById('enchant-item').value,
-            effect: document.getElementById('enchant-effect').value,
-            soulGem: document.getElementById('enchant-soul-gem').value,
-            skill: parseInt(document.getElementById('enchant-skill').value) || 15,
-            perkEnchanter: parseInt(document.getElementById('enchant-perk-enchanter').value) || 0,
-            specialPerk: document.getElementById('enchant-perk-special').value,
-            potion: parseFloat(document.getElementById('enchant-potion').value) || 1.0
-        },
-        activeFoods: Array.from(document.querySelectorAll('#active-food-effects .active-food-slot span')).map(el => el.innerText)
-    };
-}
-
-// ================================
-// 5. РОЛИ (MASTER / PLAYER)
-// ================================
-function loadUserRole(uid) {
-    db.collection('users').doc(uid).get().then(doc => {
-        if (doc.exists && doc.data().role === 'master') {
-            isMaster = true;
-            document.getElementById('master-tab-btn').style.display = 'inline-block';
-            loadPlayersList();
-        } else {
-            isMaster = false;
-            document.getElementById('master-tab-btn').style.display = 'none';
+    // Проверка перка "Боевой маг" в ветке Тяжелой брони (индекс 7)
+    function hasBattleMagePerk() {
+        let checkboxes = document.querySelectorAll('.perk-checkbox');
+        for (let chk of checkboxes) {
+            let skillIdx = parseInt(chk.dataset.skillidx);
+            let perkIdx = parseInt(chk.dataset.perkidx);
+            if (skillIdx === 4 && perkIdx === 7 && chk.checked) return true;
         }
-    }).catch(() => {});
-}
-
-function loadPlayersList() {
-    const container = document.getElementById('master-content');
-    container.innerHTML = '<p>Загрузка...</p>';
-    db.collection('characters').get().then(snapshot => {
-        allPlayers = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            allPlayers.push({ id: doc.id, ...data });
-        });
-        renderPlayersList();
-    });
-}
-
-function renderPlayersList() {
-    const container = document.getElementById('master-content');
-    if (allPlayers.length === 0) {
-        container.innerHTML = '<p>Нет игроков.</p>';
-        return;
+        return false;
     }
-    let html = '<div class="player-list">';
-    allPlayers.forEach(p => {
-        html += `
-            <div class="player-card" data-uid="${p.id}">
-                <strong>${p.name || 'Без имени'}</strong> (${p.race || '?'}) 
-                <span style="color:#aaa;">Золото: <input type="number" value="${p.gold || 0}" style="width:60px;" data-field="gold" data-uid="${p.id}"></span>
-                <span style="color:#aaa;">HP: ${p.curHp}/${p.maxHp}</span>
-                <br>
-                <label>Добавить предмет: <input type="text" class="item-input" data-uid="${p.id}" list="master-items" placeholder="Введите название..."></label>
-                <datalist id="master-items">
-                    ${ITEMS_DB.map(item => `<option value="${item}">`).join('')}
-                </datalist>
-                <button class="btn btn-sm" onclick="masterAddItem('${p.id}')">Добавить</button>
-                <button class="btn btn-sm" onclick="masterAddSpell('${p.id}')">+ Заклинание</button>
-                <button class="btn btn-sm" onclick="masterSetMaster('${p.id}')">Сделать мастером</button>
-                <hr>
+
+    // Динамическое добавление заклинаний в кастомную книгу мага
+    function addCustomSpell(school, loadedData = null) {
+        const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
+        const name = loadedData ? loadedData.name : 'Новое заклинание';
+        const baseCost = loadedData ? loadedData.baseCost : 30;
+        const desc = loadedData ? loadedData.desc : 'Описание эффекта заклинания...';
+
+        const html = `
+            <div class="spell-card" id="card-${id}">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <input type="text" value="${name}" class="spell-name" style="width:55%; font-weight:bold; padding:2px;" onchange="saveSpellsAndRefresh()">
+                    <div style="width:40%; text-align:right; font-size:11px;">
+                        База MP: <input type="number" value="${baseCost}" class="spell-base" style="width:40px; padding:1px; display:inline;" min="0" onchange="saveSpellsAndRefresh()">
+                    </div>
+                </div>
+                <textarea class="spell-desc" rows="2" style="font-size:11px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
+                    <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}')">Каст</button>
+                    <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:10px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
+                </div>
             </div>
         `;
-    });
-    html += '</div>';
-    container.innerHTML = html;
 
-    // Обработчики изменения золота
-    document.querySelectorAll('input[data-field="gold"]').forEach(inp => {
-        inp.addEventListener('change', function() {
-            const uid = this.dataset.uid;
-            const val = parseInt(this.value) || 0;
-            db.collection('characters').doc(uid).update({ gold: val }).then(() => {
-                // Обновим локальный список
-                const player = allPlayers.find(p => p.id === uid);
-                if (player) player.gold = val;
+        document.getElementById(`spells-${school}-list`).insertAdjacentHTML('beforeend', html);
+        if (!loadedData) saveSpellsAndRefresh();
+    }
+
+    function saveSpellsAndRefresh() {
+        customSpells = [];
+        const schools = ['destr', 'restor', 'alter', 'illus', 'conj'];
+        schools.forEach(school => {
+            const container = document.getElementById(`spells-${school}-list`);
+            if (!container) return;
+            const cards = container.querySelectorAll('.spell-card');
+            cards.forEach(card => {
+                const id = card.id.replace('card-', '');
+                customSpells.push({
+                    id: id,
+                    school: school,
+                    name: card.querySelector('.spell-name').value,
+                    baseCost: parseInt(card.querySelector('.spell-base').value) || 0,
+                    desc: card.querySelector('.spell-desc').value
+                });
             });
         });
-    });
-}
-
-function masterAddItem(uid) {
-    const card = document.querySelector(`.player-card[data-uid="${uid}"]`);
-    const input = card.querySelector('.item-input');
-    const itemName = input.value.trim();
-    if (!itemName) return alert('Введите название предмета');
-    // Проверяем, есть ли такой в базе
-    if (!ITEMS_DB.includes(itemName)) {
-        if (!confirm(`"${itemName}" нет в базе. Всё равно добавить?`)) return;
+        localStorage.setItem('skyrim_custom_spells_v3_5', JSON.stringify(customSpells));
+        updateAll();
     }
-    // Добавляем в инвентарь
-    db.collection('characters').doc(uid).get().then(doc => {
-        const data = doc.data();
-        let inv = data.inventory || [];
-        const existing = inv.find(i => i.name === itemName);
-        if (existing) {
-            existing.count = (existing.count || 0) + 1;
-        } else {
-            inv.push({ name: itemName, count: 1 });
-        }
-        return db.collection('characters').doc(uid).update({ inventory: inv });
-    }).then(() => {
-        alert('Предмет добавлен!');
-        input.value = '';
-    }).catch(err => alert('Ошибка: ' + err.message));
-}
 
-function masterAddSpell(uid) {
-    const name = prompt('Введите название заклинания:');
-    if (!name) return;
-    const school = prompt('Школа (destr, restor, alter, illus, conj):');
-    if (!school) return;
-    const cost = parseInt(prompt('Стоимость маны:')) || 30;
-    db.collection('characters').doc(uid).get().then(doc => {
-        const data = doc.data();
-        let spells = data.spells || [];
-        spells.push({ name, school, cost });
-        return db.collection('characters').doc(uid).update({ spells });
-    }).then(() => alert('Заклинание добавлено!'));
-}
-
-function masterSetMaster(uid) {
-    if (!confirm('Сделать этого пользователя мастером?')) return;
-    db.collection('users').doc(uid).set({ role: 'master' }, { merge: true }).then(() => {
-        alert('Готово!');
-    });
-}
-
-// ================================
-// 6. ПЕРКИ (синхронизация с данными)
-// ================================
-function collectPerksData() {
-    const perks = {};
-    document.querySelectorAll('.perk-checkbox').forEach(chk => {
-        const skillIdx = chk.dataset.skillidx;
-        const perkIdx = chk.dataset.perkidx;
-        const step = chk.dataset.step;
-        if (!perks[skillIdx]) perks[skillIdx] = {};
-        if (!perks[skillIdx][perkIdx]) perks[skillIdx][perkIdx] = {};
-        perks[skillIdx][perkIdx][step] = chk.checked;
-    });
-    return perks;
-}
-
-function loadPerksFromData(perksData) {
-    if (!perksData) return;
-    document.querySelectorAll('.perk-checkbox').forEach(chk => {
-        const skillIdx = chk.dataset.skillidx;
-        const perkIdx = chk.dataset.perkidx;
-        const step = chk.dataset.step;
-        if (perksData[skillIdx] && perksData[skillIdx][perkIdx] && perksData[skillIdx][perkIdx][step]) {
-            chk.checked = true;
-        } else {
-            chk.checked = false;
-        }
-    });
-}
-
-// ================================
-// 7. ИНВЕНТАРЬ (синхронизация с данными)
-// ================================
-function collectInventoryData() {
-    const inv = [];
-    document.querySelectorAll('.inv-item').forEach(item => {
-        const name = item.dataset.name;
-        const count = parseInt(item.querySelector('.inv-count').value) || 0;
-        if (count > 0) inv.push({ name, count });
-    });
-    return inv;
-}
-
-function loadInventoryFromData(invData) {
-    const container = document.getElementById('inventory-container');
-    container.innerHTML = '';
-    if (!invData || invData.length === 0) {
-        container.innerHTML = '<p style="color:#666;">Инвентарь пуст</p>';
-        return;
+    function deleteSpell(school, id) {
+        const card = document.getElementById(`card-${id}`);
+        if(card) { card.remove(); saveSpellsAndRefresh(); }
     }
-    invData.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'stat-block inv-item';
-        div.dataset.name = item.name;
-        div.innerHTML = `
-            <span>${item.name}</span>
-            <input type="number" class="inv-count" value="${item.count}" min="0" step="1" style="width:50px;" onchange="saveCharacterDebounced();">
-            <button class="btn btn-sm" onclick="this.parentElement.remove(); saveCharacterDebounced();">✕</button>
+
+    function castCustomSpell(id) {
+        const card = document.getElementById(`card-${id}`);
+        if (!card) return;
+        const finalCost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
+        let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
+        if (curMp >= finalCost) {
+            document.getElementById('cur-mp').value = curMp - finalCost;
+            alert("Заклинание прочитано! Мана успешно списана.");
+            updateAll();
+            saveLocalStorage();
+        } else {
+            alert("Недостаточно маны (MP) для этого каста!");
+        }
+    }
+
+    // Лаборатория свитков
+    function craftScrollInSheet() {
+        const tier = parseInt(document.getElementById('scroll-craft-tier').value) || 1;
+        let wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        let spent = scrollWisdomSpent;
+        let available = wis - spent;
+        if (available >= tier) {
+            scrollWisdomSpent += tier;
+            document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
+            alert(`Успех! Вы потратили ${tier} ед. Мудрости на написание свитка. Осталось ${wis - scrollWisdomSpent} ед.`);
+            saveLocalStorage();
+        } else {
+            alert("Недостаточно свободной Мудрости для начертания свитка!");
+        }
+    }
+
+    // Восстановление после отдыха
+    function restoreAll() {
+        let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
+        let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
+        document.getElementById('cur-hp').value = maxHp;
+        document.getElementById('cur-mp').value = maxMp;
+        // Сбрасываем потраченную Мудрость
+        scrollWisdomSpent = 0;
+        let wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        document.getElementById('val-scrolls').innerText = wis;
+        alert("Отдых завершён! HP, MP и Мудрость восстановлены.");
+        updateAll();
+        saveLocalStorage();
+    }
+
+    // Получение бонусов от бога
+    function getGodBonuses(god, rank) {
+        if (!god || god === 'none' || !godBonuses[god]) return {};
+        const bonuses = godBonuses[god][rank] || {};
+        return bonuses;
+    }
+
+    // Главный математический процессор листа
+    function updateAll() {
+        const calcMod = (val) => Math.floor((val - 10) / 2);
+        
+        // Базовые статы (хранятся в data-raw-stat)
+        let strBase = parseInt(document.getElementById('stat-str').getAttribute('data-raw-stat')) || 10;
+        let dexBase = parseInt(document.getElementById('stat-dex').getAttribute('data-raw-stat')) || 10;
+        let conBase = parseInt(document.getElementById('stat-con').getAttribute('data-raw-stat')) || 10;
+        let intBase = parseInt(document.getElementById('stat-int').getAttribute('data-raw-stat')) || 10;
+        let wisBase = parseInt(document.getElementById('stat-wis').getAttribute('data-raw-stat')) || 10;
+        let chaBase = parseInt(document.getElementById('stat-cha').getAttribute('data-raw-stat')) || 10;
+
+        const race = document.getElementById('char-race').value;
+        const sign = document.getElementById('char-sign').value;
+        const lvl = parseInt(document.getElementById('char-level').value) || 1;
+        const god = document.getElementById('faith-god').value;
+        const rnk = parseInt(document.getElementById('faith-rank').value) || 1;
+
+        // Добавляем расовые бонусы к статам
+        const raceStats = raceStatBonuses[race] || {};
+        let str = strBase + (raceStats.str || 0);
+        let dex = dexBase + (raceStats.dex || 0);
+        let con = conBase + (raceStats.con || 0);
+        let intel = intBase + (raceStats.int || 0);
+        let wis = wisBase + (raceStats.wis || 0);
+        let cha = chaBase + (raceStats.cha || 0);
+
+        // Бонусы камня
+        if (sign === 'warrior') { str += 2; con += 2; }
+        if (sign === 'thief') { dex += 2; }
+        if (sign === 'lady') { wis += 2; con += 2; }
+        if (sign === 'steed') { con += 2; }
+
+        // Бонусы бога (пока только HP, MP и скорость)
+        const godB = getGodBonuses(god, rnk);
+
+        // Обновляем поля ввода характеристик (показываем итоговые значения)
+        document.getElementById('stat-str').value = str;
+        document.getElementById('stat-dex').value = dex;
+        document.getElementById('stat-con').value = con;
+        document.getElementById('stat-int').value = intel;
+        document.getElementById('stat-wis').value = wis;
+        document.getElementById('stat-cha').value = cha;
+
+        // Обновляем модификаторы на панели
+        document.getElementById('mod-str').innerText = `Мод: ${(calcMod(str) >= 0 ? '+' : '') + calcMod(str)}`;
+        document.getElementById('mod-dex').innerText = `Мод: ${(calcMod(dex) >= 0 ? '+' : '') + calcMod(dex)}`;
+        document.getElementById('mod-con').innerText = `Мод: ${(calcMod(con) >= 0 ? '+' : '') + calcMod(con)}`;
+        document.getElementById('mod-int').innerText = `Мод: ${(calcMod(intel) >= 0 ? '+' : '') + calcMod(intel)}`;
+        document.getElementById('mod-wis').innerText = `Мод: ${(calcMod(wis) >= 0 ? '+' : '') + calcMod(wis)}`;
+        document.getElementById('mod-cha').innerText = `Мод: ${(calcMod(cha) >= 0 ? '+' : '') + calcMod(cha)}`;
+
+        // Наложение расовых бонусов на навыки (база хранится в data-raw-val)
+        const raceSkillBonus = raceSkillBonuses[race] || {};
+        skillNames.forEach((name, idx) => {
+            const input = document.getElementById(`skill-${idx}`);
+            if (input) {
+                let raw = parseInt(input.getAttribute('data-raw-val')) || 10;
+                let bonus = raceSkillBonus[name] || 0;
+                input.value = raw + bonus;
+            }
+        });
+
+        // Расчет HP
+        if (!document.getElementById('manual-hp-lock').checked) {
+            let baseHp = con * 10;
+            if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
+            document.querySelectorAll('.food-buff:checked').forEach(f => {
+                if(f.dataset.hp) baseHp += parseInt(f.dataset.hp);
+            });
+            if (godB.hp) baseHp += godB.hp;
+            document.getElementById('max-hp').value = baseHp;
+        }
+
+        // Расчет MP
+        if (!document.getElementById('manual-mp-lock').checked) {
+            let baseMp = intel * 10;
+            if (race === 'altmer') { baseMp += 20; }
+            if (sign === 'atronach') { baseMp += 20 + (20 * (lvl - 1)); }
+            if (sign === 'apprentice') { baseMp += 10 + (10 * (lvl - 1)); }
+            document.querySelectorAll('.food-buff:checked').forEach(f => {
+                if(f.dataset.mp) baseMp += parseInt(f.dataset.mp);
+            });
+            if (godB.mp) baseMp += godB.mp;
+            document.getElementById('max-mp').value = baseMp;
+        }
+
+        // Суммирование брони
+        let totalArmor = (parseInt(document.getElementById('slot-helm-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-chest-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-gloves-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-boots-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-shield-armor').value) || 0) +
+                         (parseInt(document.getElementById('armor-buff').value) || 0);
+
+        if (godB.armor) totalArmor += godB.armor;
+        document.getElementById('armor-total').innerText = totalArmor;
+
+        // Калькулятор веса инвентаря (из списка)
+        let weightFromItems = 0;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-bear').value) || 0) * 3;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-sable').value) || 0) * 2;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-wolf').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-leather').value) || 0) * 2;
+        weightFromItems += (parseInt(document.getElementById('inv-leather-strips').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-iron').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-steel').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-corundum').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-orichalcum').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-ebony').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-gem-petty').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-gem-grand').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-beam').value) || 0) * 20;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-gear').value) || 0) * 10;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-core').value) || 0) * 4;
+        weightFromItems += (parseInt(document.getElementById('inv-tent').value) || 0) * 10;
+        weightFromItems += (parseInt(document.getElementById('inv-bag').value) || 0) * 3;
+
+        // Дополнительный вес (ручной ввод)
+        let extraWeight = parseInt(document.getElementById('extra-weight').value) || 0;
+        let currentWeight = weightFromItems + extraWeight;
+
+        document.getElementById('weight-current').innerText = currentWeight;
+
+        // Максимальная грузоподъемность (ручная или расчётная)
+        let manualWeightLock = document.getElementById('manual-weight-lock').checked;
+        let maxWeight;
+        if (manualWeightLock) {
+            maxWeight = parseInt(document.getElementById('max-weight-input').value) || 50;
+        } else {
+            maxWeight = str * 5;
+            document.getElementById('max-weight-input').value = maxWeight;
+        }
+        document.getElementById('weight-max-display').innerText = maxWeight;
+
+        // Скорость
+        const armorType = document.getElementById('eq-armor').value;
+        if (!document.getElementById('manual-speed-lock').checked) {
+            let isOverweight = currentWeight > maxWeight;
+            let speed = (sign === 'thief') ? 40 : 35;
+            if (sign === 'steed') speed += 10;
+            if (armorType === 'light') speed -= 5;
+            if (armorType === 'heavy') speed -= 10;
+            if (document.getElementById('chk-frost-region').checked) {
+                speed -= (armorType === 'heavy') ? 15 : 10;
+            }
+            if (document.getElementById('food4').checked) speed += 5;
+            if (godB.speed) speed += godB.speed;
+            if (isOverweight) {
+                document.getElementById('overweight-alert').style.display = 'block';
+                speed = 5;
+            } else {
+                document.getElementById('overweight-alert').style.display = 'none';
+            }
+            document.getElementById('val-speed').value = speed;
+        }
+
+        // Отображение доступной Мудрости для свитков
+        let wisForScrolls = wis;
+        document.getElementById('val-scrolls-max').innerText = wisForScrolls;
+        document.getElementById('val-scrolls').innerText = Math.max(0, wisForScrolls - scrollWisdomSpent);
+
+        // Пересчёт стоимости кастомных заклинаний (штраф от брони)
+        document.querySelectorAll('.spell-final-cost').forEach(node => {
+            let base = parseInt(node.dataset.base) || 0;
+            let mult = (armorType === 'light') ? 1.25 : (armorType === 'heavy' && !hasBattleMagePerk()) ? 1.75 : 1.0;
+            node.value = Math.round(base * mult);
+        });
+
+        // Проверка на поклонение даэдра
+        const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
+        if (daedraList.includes(god)) {
+            document.getElementById('daedra-alert').style.display = 'block';
+        } else {
+            document.getElementById('daedra-alert').style.display = 'none';
+        }
+
+        // Вызов обновления боевого калькулятора
+        updateCombat(str, dex);
+        // Сохраняем изменения (но не вызываем рекурсию)
+        // saveLocalStorage(); // saveLocalStorage вызовется из обработчиков, чтобы избежать цикла
+    }
+
+    // Боевой калькулятор
+    function updateCombat(finalStr, finalDex) {
+        if (document.getElementById('manual-dmg-lock').checked) {
+            // Если ручной режим, не пересчитываем, но показываем сохранённое значение
+            return;
+        }
+
+        const mode = document.getElementById('active-combat-weapon').value;
+        const starve = parseInt(document.getElementById('food-starve').value) || 0;
+
+        let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
+        let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
+
+        let baseDmg = 2, totalDmg = 2, hitModifier = 0;
+        let wepType = 'unarmed';
+
+        const strMod = Math.floor((str - 10) / 2);
+        const dexMod = Math.floor((dex - 10) / 2);
+
+        if (mode === 'melee') {
+            baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
+            wepType = document.getElementById('wep-melee-type').value;
+            hitModifier = strMod;
+            
+            if (wepType === 'twohand_sword') hitModifier -= 2;
+            if (wepType === 'twohand_axe') hitModifier -= 3;
+            if (wepType === 'twohand_hammer') hitModifier -= 4;
+            
+            if (wepType === 'unarmed') {
+                totalDmg = baseDmg;
+            } else {
+                totalDmg = baseDmg + str;
+            }
+            
+            if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
+                totalDmg = Math.round(totalDmg * 1.5);
+                hitModifier -= 1;
+            }
+        } else {
+            baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
+            let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
+            wepType = document.getElementById('wep-ranged-type').value;
+            hitModifier = dexMod;
+            totalDmg = baseDmg + dex + ammoDmg;
+        }
+
+        hitModifier -= starve;
+        let sneakMult = (wepType === 'dagger') ? 3 : 2;
+
+        let finalHtml = `
+            <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
+            <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
         `;
-        container.appendChild(div);
-    });
-}
+        if (document.getElementById('chk-sneak-attack').checked) {
+            finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
+        }
 
-function initInventoryDefault() {
-    // По умолчанию инвентарь пуст – можно оставить как есть
-}
-
-// ================================
-// 8. ЗАКЛИНАНИЯ
-// ================================
-function collectSpellsData() {
-    const spells = [];
-    document.querySelectorAll('.spell-card').forEach(card => {
-        const name = card.querySelector('.spell-name').value;
-        const school = card.dataset.school;
-        const cost = parseInt(card.querySelector('.spell-base').value) || 0;
-        const desc = card.querySelector('.spell-desc').value;
-        if (name) spells.push({ name, school, cost, desc });
-    });
-    return spells;
-}
-
-function loadSpellsFromData(spellsData) {
-    if (!spellsData) return;
-    // Очищаем списки
-    ['destr','restor','alter','illus','conj'].forEach(s => {
-        document.getElementById(`spells-${s}-list`).innerHTML = '';
-    });
-    spellsData.forEach(spell => {
-        addCustomSpell(spell.school, spell);
-    });
-}
-
-function initSpellsDefault() {
-    // Ничего не добавляем по умолчанию
-}
-
-// ================================
-// 9. ОСТАЛЬНЫЕ ФУНКЦИИ (оригинальные)
-// ================================
-// Здесь идут функции openTab, updateAll, updateCombat, etc. из твоего original файла.
-// Я их не буду полностью переписывать, так как они уже есть в твоём коде.
-// Я встрою их сюда, но для краткости оставлю заглушки.
-// В реальном файле они должны быть полными.
-
-function openTab(ev, tabId) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    if (ev) ev.currentTarget.classList.add('active');
-}
-
-function updateAll() {
-    // Здесь должен быть полный пересчёт – я оставлю твой оригинальный код.
-    // Для примера просто вызову несколько функций.
-    updateCombat(10, 10);
-    // ... остальное
-}
-
-function updateCombat(str, dex) {
-    // Заглушка
-    document.getElementById('combat-results').innerHTML = 'Боевой расчёт';
-}
-
-function restoreAll() {
-    document.getElementById('cur-hp').value = document.getElementById('max-hp').value;
-    document.getElementById('cur-mp').value = document.getElementById('max-mp').value;
-    alert('Отдых завершён!');
-    saveCharacterDebounced();
-}
-
-function resetData() {
-    if (confirm('Стереть локальные данные?')) {
-        localStorage.clear();
-        location.reload();
+        document.getElementById('combat-results').innerHTML = finalHtml;
+        document.getElementById('main-panel-dmg').value = totalDmg;
     }
-}
 
-function addCustomSpell(school, loadedData = null) {
-    // Упрощённая версия
-    const id = loadedData ? loadedData.id : 'spell-' + Date.now();
-    const name = loadedData ? loadedData.name : 'Новое заклинание';
-    const baseCost = loadedData ? loadedData.cost : 30;
-    const desc = loadedData ? loadedData.desc : 'Описание...';
-    const html = `
-        <div class="spell-card" id="card-${id}" data-school="${school}">
-            <div style="display:flex;justify-content:space-between;">
-                <input type="text" value="${name}" class="spell-name" style="width:55%;" onchange="saveCharacterDebounced();">
-                <input type="number" value="${baseCost}" class="spell-base" style="width:40px;" onchange="saveCharacterDebounced();">
-            </div>
-            <textarea class="spell-desc" rows="2" onchange="saveCharacterDebounced();">${desc}</textarea>
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
-                <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px;" readonly></span>
-                <button class="btn btn-sm" onclick="castCustomSpell('${id}')">Каст</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteSpell('${id}')">Х</button>
-            </div>
-        </div>`;
-    document.getElementById(`spells-${school}-list`).insertAdjacentHTML('beforeend', html);
-    saveCharacterDebounced();
-}
+    // Сохранение всех параметров листа в LocalStorage
+    function saveLocalStorage() {
+        let perkStates = {};
+        document.querySelectorAll('.perk-checkbox').forEach(chk => {
+            let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
+            perkStates[key] = chk.checked;
+        });
 
-function castCustomSpell(id) {
-    const card = document.getElementById(`card-${id}`);
-    if (!card) return;
-    const cost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
-    let cur = parseInt(document.getElementById('cur-mp').value) || 0;
-    if (cur >= cost) {
-        document.getElementById('cur-mp').value = cur - cost;
-        alert('Заклинание прочитано!');
-        saveCharacterDebounced();
-    } else {
-        alert('Недостаточно маны!');
+        let data = {
+            version: '3.6',
+            name: document.getElementById('char-name').value,
+            race: document.getElementById('char-race').value,
+            sign: document.getElementById('char-sign').value,
+            lvl: document.getElementById('char-level').value,
+            lives: document.getElementById('char-lives').value,
+            gold: document.getElementById('char-gold').value,
+            starve: document.getElementById('food-starve').value,
+            faithGod: document.getElementById('faith-god').value,
+            faithRank: document.getElementById('faith-rank').value,
+            backstory: document.getElementById('char-backstory').value,
+            notes: document.getElementById('char-notes').value,
+            faithNotes: document.getElementById('faith-notes').value,
+            armorBuff: document.getElementById('armor-buff').value,
+            speed: document.getElementById('val-speed').value,
+            scrollWisdomSpent: scrollWisdomSpent,
+            manualWeightLock: document.getElementById('manual-weight-lock').checked,
+            maxWeightInput: document.getElementById('max-weight-input').value,
+            extraWeight: document.getElementById('extra-weight').value,
+            // Базовые характеристики (data-raw-stat)
+            stats: [
+                document.getElementById('stat-str').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-dex').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-con').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-int').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-wis').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-cha').getAttribute('data-raw-stat') || 10
+            ],
+            vitals: [
+                document.getElementById('cur-hp').value,
+                document.getElementById('cur-mp').value,
+                document.getElementById('max-hp').value,
+                document.getElementById('max-mp').value
+            ],
+            locks: [
+                document.getElementById('manual-hp-lock').checked,
+                document.getElementById('manual-mp-lock').checked,
+                document.getElementById('manual-dmg-lock').checked,
+                document.getElementById('manual-speed-lock').checked
+            ],
+            // Базовые навыки (data-raw-val)
+            skills: skillNames.map((name, idx) => {
+                const input = document.getElementById(`skill-${idx}`);
+                return input ? input.getAttribute('data-raw-val') || 10 : 10;
+            }),
+            perkStates: perkStates,
+            wepMName: document.getElementById('wep-melee-name').value,
+            wepMDmg: document.getElementById('wep-melee-dmg').value,
+            wepMType: document.getElementById('wep-melee-type').value,
+            wepRName: document.getElementById('wep-ranged-name').value,
+            wepRDmg: document.getElementById('wep-ranged-dmg').value,
+            wepRType: document.getElementById('wep-ranged-type').value,
+            amName: document.getElementById('ammo-name').value,
+            amDmg: document.getElementById('ammo-dmg').value,
+            activeWep: document.getElementById('active-combat-weapon').value,
+            armorClass: document.getElementById('eq-armor').value,
+            sHelm: document.getElementById('slot-helm-name').value,
+            sHelmA: document.getElementById('slot-helm-armor').value,
+            sChest: document.getElementById('slot-chest-name').value,
+            sChestA: document.getElementById('slot-chest-armor').value,
+            sGloves: document.getElementById('slot-gloves-name').value,
+            sGlovesA: document.getElementById('slot-gloves-armor').value,
+            sBoots: document.getElementById('slot-boots-name').value,
+            sBootsA: document.getElementById('slot-boots-armor').value,
+            sShield: document.getElementById('slot-shield-name').value,
+            sShieldA: document.getElementById('slot-shield-armor').value,
+            sRing: document.getElementById('slot-ring-name').value,
+            sNeck: document.getElementById('slot-neck-name').value,
+            sCirclet: document.getElementById('slot-circlet-name').value,
+            inv: {
+                'hide-bear': document.getElementById('inv-hide-bear').value,
+                'hide-sable': document.getElementById('inv-hide-sable').value,
+                'hide-wolf': document.getElementById('inv-hide-wolf').value,
+                'leather': document.getElementById('inv-leather').value,
+                'leather-strips': document.getElementById('inv-leather-strips').value,
+                'ing-iron': document.getElementById('inv-ing-iron').value,
+                'ing-steel': document.getElementById('inv-ing-steel').value,
+                'ing-corundum': document.getElementById('inv-ing-corundum').value,
+                'ing-orichalcum': document.getElementById('inv-ing-orichalcum').value,
+                'ing-ebony': document.getElementById('inv-ing-ebony').value,
+                'gem-petty': document.getElementById('inv-gem-petty').value,
+                'gem-grand': document.getElementById('inv-gem-grand').value,
+                'dw-beam': document.getElementById('inv-dw-beam').value,
+                'dw-gear': document.getElementById('inv-dw-gear').value,
+                'dw-core': document.getElementById('inv-dw-core').value,
+                'tent': document.getElementById('inv-tent').value,
+                'bag': document.getElementById('inv-bag').value
+            }
+        };
+        localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
     }
-}
 
-function deleteSpell(id) {
-    const card = document.getElementById(`card-${id}`);
-    if (card) {
-        card.remove();
-        saveCharacterDebounced();
+    // Загрузка сохранения
+    function loadLocalStorage() {
+        let saved = localStorage.getItem('skyrim_ttrpg_save_v3_6');
+        let savedSpells = localStorage.getItem('skyrim_custom_spells_v3_5');
+
+        if (savedSpells) {
+            try {
+                customSpells = JSON.parse(savedSpells);
+                ['destr','restor','alter','illus','conj'].forEach(school => {
+                    document.getElementById(`spells-${school}-list`).innerHTML = '';
+                });
+                customSpells.forEach(s => addCustomSpell(s.school, s));
+            } catch(e) {}
+        }
+
+        if (!saved) return;
+        try {
+            let data = JSON.parse(saved);
+            document.getElementById('char-name').value = data.name || '';
+            document.getElementById('char-race').value = data.race || 'nord';
+            document.getElementById('char-sign').value = data.sign || 'none';
+            document.getElementById('char-level').value = data.lvl || 1;
+            document.getElementById('char-lives').value = data.lives || 50;
+            document.getElementById('char-gold').value = data.gold || 150;
+            document.getElementById('food-starve').value = data.starve || 0;
+            document.getElementById('faith-god').value = data.faithGod || 'none';
+            document.getElementById('faith-rank').value = data.faithRank || 1;
+            document.getElementById('char-backstory').value = data.backstory || '';
+            document.getElementById('char-notes').value = data.notes || '';
+            document.getElementById('faith-notes').value = data.faithNotes || '';
+            document.getElementById('armor-buff').value = data.armorBuff || 0;
+            document.getElementById('val-speed').value = data.speed || 35;
+            scrollWisdomSpent = data.scrollWisdomSpent || 0;
+
+            if (data.manualWeightLock !== undefined) {
+                document.getElementById('manual-weight-lock').checked = data.manualWeightLock;
+            }
+            if (data.maxWeightInput !== undefined) {
+                document.getElementById('max-weight-input').value = data.maxWeightInput || 50;
+            }
+            if (data.extraWeight !== undefined) {
+                document.getElementById('extra-weight').value = data.extraWeight || 0;
+            }
+
+            if (data.locks && data.locks.length === 4) {
+                document.getElementById('manual-hp-lock').checked = data.locks[0];
+                document.getElementById('manual-mp-lock').checked = data.locks[1];
+                document.getElementById('manual-dmg-lock').checked = data.locks[2];
+                document.getElementById('manual-speed-lock').checked = data.locks[3];
+            }
+            // Загрузка базовых характеристик (data-raw-stat)
+            if (data.stats && data.stats.length === 6) {
+                document.getElementById('stat-str').setAttribute('data-raw-stat', data.stats[0]);
+                document.getElementById('stat-dex').setAttribute('data-raw-stat', data.stats[1]);
+                document.getElementById('stat-con').setAttribute('data-raw-stat', data.stats[2]);
+                document.getElementById('stat-int').setAttribute('data-raw-stat', data.stats[3]);
+                document.getElementById('stat-wis').setAttribute('data-raw-stat', data.stats[4]);
+                document.getElementById('stat-cha').setAttribute('data-raw-stat', data.stats[5]);
+            }
+            if (data.vitals && data.vitals.length === 4) {
+                document.getElementById('cur-hp').value = data.vitals[0];
+                document.getElementById('cur-mp').value = data.vitals[1];
+                document.getElementById('max-hp').value = data.vitals[2];
+                document.getElementById('max-mp').value = data.vitals[3];
+            }
+            // Загрузка инвентаря (если сохранён в виде объекта)
+            if (data.inv) {
+                let invMap = {
+                    'hide-bear': 'inv-hide-bear',
+                    'hide-sable': 'inv-hide-sable',
+                    'hide-wolf': 'inv-hide-wolf',
+                    'leather': 'inv-leather',
+                    'leather-strips': 'inv-leather-strips',
+                    'ing-iron': 'inv-ing-iron',
+                    'ing-steel': 'inv-ing-steel',
+                    'ing-corundum': 'inv-ing-corundum',
+                    'ing-orichalcum': 'inv-ing-orichalcum',
+                    'ing-ebony': 'inv-ing-ebony',
+                    'gem-petty': 'inv-gem-petty',
+                    'gem-grand': 'inv-gem-grand',
+                    'dw-beam': 'inv-dw-beam',
+                    'dw-gear': 'inv-dw-gear',
+                    'dw-core': 'inv-dw-core',
+                    'tent': 'inv-tent',
+                    'bag': 'inv-bag'
+                };
+                Object.keys(invMap).forEach(key => {
+                    const el = document.getElementById(invMap[key]);
+                    if (el && data.inv[key] !== undefined) {
+                        el.value = data.inv[key];
+                    }
+                });
+            }
+            // Загрузка навыков (базовые значения в data-raw-val)
+            let sInputs = document.querySelectorAll('[id^="skill-"]');
+            if (data.skills && sInputs.length === data.skills.length) {
+                sInputs.forEach((input, i) => {
+                    let val = data.skills[i] || 10;
+                    input.setAttribute('data-raw-val', val);
+                });
+            }
+            if (data.perkStates) {
+                document.querySelectorAll('.perk-checkbox').forEach(chk => {
+                    let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
+                    if (data.perkStates.hasOwnProperty(key)) {
+                        chk.checked = data.perkStates[key];
+                    }
+                });
+            }
+            document.getElementById('wep-melee-name').value = data.wepMName || '';
+            document.getElementById('wep-melee-dmg').value = data.wepMDmg || 2;
+            document.getElementById('wep-melee-type').value = data.wepMType || 'unarmed';
+            document.getElementById('wep-ranged-name').value = data.wepRName || '';
+            document.getElementById('wep-ranged-dmg').value = data.wepRDmg || 10;
+            document.getElementById('wep-ranged-type').value = data.wepRType || 'bow';
+            document.getElementById('ammo-name').value = data.amName || '';
+            document.getElementById('ammo-dmg').value = data.amDmg || 0;
+            document.getElementById('active-combat-weapon').value = data.activeWep || 'melee';
+            document.getElementById('eq-armor').value = data.armorClass || 'cloth';
+            document.getElementById('slot-helm-name').value = data.sHelm || '';
+            document.getElementById('slot-helm-armor').value = data.sHelmA || 0;
+            document.getElementById('slot-chest-name').value = data.sChest || '';
+            document.getElementById('slot-chest-armor').value = data.sChestA || 0;
+            document.getElementById('slot-gloves-name').value = data.sGloves || '';
+            document.getElementById('slot-gloves-armor').value = data.sGlovesA || 0;
+            document.getElementById('slot-boots-name').value = data.sBoots || '';
+            document.getElementById('slot-boots-armor').value = data.sBootsA || 0;
+            document.getElementById('slot-shield-name').value = data.sShield || '';
+            document.getElementById('slot-shield-armor').value = data.sShieldA || 0;
+            document.getElementById('slot-ring-name').value = data.sRing || '';
+            document.getElementById('slot-neck-name').value = data.sNeck || '';
+            document.getElementById('slot-circlet-name').value = data.sCirclet || '';
+        } catch(e) {
+            console.warn('Ошибка загрузки сохранения:', e);
+        }
     }
-}
 
-function craftScrollInSheet() {
-    const tier = parseInt(document.getElementById('scroll-craft-tier').value) || 1;
-    let wis = parseInt(document.getElementById('stat-wis').value) || 10;
-    // Мудрость на свитки отслеживаем отдельно
-    let spent = 0; // можно сохранять
-    if (wis - spent >= tier) {
-        spent += tier;
-        document.getElementById('val-scrolls').innerText = wis - spent;
-        alert('Свиток начерчен!');
-        saveCharacterDebounced();
-    } else {
-        alert('Недостаточно мудрости!');
+    // Полный сброс
+    function resetData() {
+        if (confirm("Вы уверены, что хотите полностью стереть все сохраненные данные? Это удалит инвентарь, перки, блокнот и кастомные заклинания!")) {
+            localStorage.removeItem('skyrim_ttrpg_save_v3_6');
+            localStorage.removeItem('skyrim_custom_spells_v3_5');
+            location.reload();
+        }
     }
-}
 
-// ================================
-// 10. ЗАПУСК
-// ================================
-window.onload = function() {
-    // Инициализация вкладок, перков, инвентаря, кулинарии, кузнечки и т.д.
-    // Эти функции должны быть определены, но я их пропущу для краткости.
-    // В реальном файле они есть в твоём коде.
-    // Я вызову только основные.
-    openTab({ currentTarget: document.querySelector('.tab-link.active') }, 'tab1');
-    // Здесь можно инициализировать остальные компоненты.
-};
+    // Первичный запуск
+    initSkills();
+    loadLocalStorage();
+    updateAll();
 </script>
 </body>
 </html>
