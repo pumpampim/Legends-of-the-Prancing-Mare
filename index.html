@@ -292,298 +292,41 @@
         };
     </script>
     
-    <style>
-        :root {
-            --bg-color: #151511;
-            --panel-bg: #24241d;
-            --panel-sub: #1b1b16;
-            --border-color: #4e4537;
-            --text-color: #decfae;
-            --accent-color: #bf944b;
-            --danger-color: #94291f;
-            --success-color: #1e8449;
-            --input-bg: #0d0d0a;
-        }
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Georgia', serif;
-            margin: 0;
-            padding: 12px;
-            line-height: 1.35;
-        }
-        h1, h2, h3 {
-            color: var(--accent-color);
-            text-align: center;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 3px;
-            margin-top: 8px;
-        }
-        h1 { font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
-        h2 { font-size: 17px; margin-bottom: 10px; }
-        h3 { font-size: 14px; border-bottom: 1px solid var(--border-color); margin-bottom: 8px; }
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-        .grid-3 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 12px;
-        }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 12px;
-        }
-        .panel {
-            background-color: var(--panel-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 5px rgba(0,0,0,0.6);
-        }
-        label {
-            display: block;
-            margin: 5px 0 2px;
-            font-weight: bold;
-            font-size: 12px;
-            color: #c4baa9;
-        }
-        input[type="text"], input[type="number"], select, textarea {
-            width: 100%;
-            padding: 5px;
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 13px;
-            font-family: 'Georgia', serif;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--accent-color);
-            outline: none;
-        }
-        .stat-block {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            background: var(--panel-sub);
-            padding: 3px 8px;
-            border-radius: 4px;
-            border: 1px solid #363025;
-        }
-        .stat-block input {
-            width: 50px;
-            text-align: center;
-        }
-        .mod-indicator {
-            color: var(--accent-color);
-            font-weight: bold;
-            min-width: 60px;
-            text-align: center;
-            font-size: 12px;
-        }
-        .vital-bar {
-            background: var(--input-bg);
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color);
-        }
-        .vital-inputs {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 2px;
-        }
-        .vital-inputs input {
-            width: 65px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .perks-list {
-            max-height: 140px;
-            overflow-y: auto;
-            background: var(--input-bg);
-            padding: 5px;
-            border: 1px solid #363025;
-            border-radius: 4px;
-            margin-top: 5px;
-        }
-        .perk-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 12px;
-            margin: 4px 0;
-            padding: 2px 4px;
-            background: #151511;
-            border-radius: 3px;
-        }
-        .perk-left {
-            display: flex;
-            align-items: center;
-        }
-        .perk-left input {
-            margin-right: 6px;
-            cursor: pointer;
-        }
-        .perk-steps {
-            font-size: 11px;
-            color: var(--accent-color);
-            font-weight: bold;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px;
-        }
-        .perk-steps input[type="checkbox"] {
-            margin: 0;
-            cursor: pointer;
-        }
-        .alert-box {
-            background-color: var(--danger-color);
-            color: #fff;
-            padding: 6px;
-            text-align: center;
-            font-weight: bold;
-            border-radius: 4px;
-            margin-top: 8px;
-            font-size: 11px;
-            display: none;
-        }
-        .btn {
-            background-color: var(--accent-color);
-            color: #151511;
-            border: none;
-            padding: 6px 10px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 6px;
-            font-family: 'Georgia', serif;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        .btn:hover { background-color: #cca454; }
-        .btn-danger { background-color: var(--danger-color); color: white; }
-        .btn-danger:hover { background-color: #af3227; }
-        .btn-success { background-color: var(--success-color); color: white; }
-        .btn-success:hover { background-color: #239b55; }
-        .shw-hint {
-            font-size: 11px;
-            color: #948b78;
-            margin-top: 1px;
-            font-style: italic;
-        }
-        .nav-tabs {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 12px;
-            border-bottom: 2px solid var(--border-color);
-            flex-wrap: wrap;
-        }
-        .tab-link {
-            background: #24241d;
-            color: var(--text-color);
-            border: 2px solid var(--border-color);
-            border-bottom: none;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 1px;
-            font-size: 12px;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-        }
-        .tab-link.active {
-            background: var(--accent-color);
-            color: #151511;
-            border-color: var(--accent-color);
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin: 4px 0;
-            font-size: 12px;
-        }
-        .checkbox-group input {
-            margin-right: 6px;
-            cursor: pointer;
-        }
-        .spell-card {
-            background: var(--panel-sub);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 6px;
-            margin-bottom: 6px;
-        }
-        .slot-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 4px;
-            background: var(--panel-sub);
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #363025;
-        }
-        .slot-row span {
-            font-weight: bold;
-            color: var(--accent-color);
-            width: 35%;
-            font-size: 12px;
-        }
-        .slot-row input {
-            width: 60%;
-        }
-        .inv-group {
-            border-left: 3px solid var(--accent-color);
-            padding-left: 8px;
-            margin-top: 8px;
-        }
-        .inv-group h4 {
-            font-size: 12px;
-            color: var(--accent-color);
-            margin: 4px 0;
-            border-bottom: 1px dashed #363025;
-        }
-        .rest-btn {
-            display: flex;
-            gap: 6px;
-        }
-        .rest-btn .btn {
-            flex: 1;
-        }
-        .inline-label {
-            display: inline;
-            font-weight: normal;
-            font-size: 12px;
-        }
-        .weight-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .weight-row input[type="number"] {
-            width: 70px;
-            padding: 3px;
-        }
-        .weight-row label {
-            margin: 0;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
+<!-- Оверлей авторизации: показывается, пока пользователь не вошёл и не выбрал офлайн-режим -->
+<div id="auth-overlay" class="auth-overlay">
+    <div class="auth-box">
+        <h2 style="margin-top:0;">«Скурим» — вход в аккаунт</h2>
+        <p style="font-size:13px; opacity:.85;">Аккаунт нужен, чтобы твой персонаж сохранялся в облаке и синхронизировался с сессией мастера. Можно и без него — но тогда только локальное сохранение в этом браузере.</p>
+
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com">
+        <label>Пароль</label>
+        <input type="password" id="auth-password" placeholder="Минимум 6 символов">
+
+        <div id="auth-error" class="auth-error" style="display:none;"></div>
+
+        <div class="grid-2" style="margin-top:10px;">
+            <button class="btn-success" onclick="cloudLogin()">Войти</button>
+            <button onclick="cloudRegister()">Зарегистрироваться</button>
+        </div>
+        <button style="margin-top:10px; width:100%;" onclick="cloudContinueOffline()">Продолжить без аккаунта (офлайн)</button>
+    </div>
+</div>
+
 <div class="container">
+    <div id="cloud-status-bar" class="cloud-status-bar">
+        <span id="cloud-user-info">⚠ Офлайн-режим (данные только в этом браузере)</span>
+        <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти из аккаунта</button>
+    </div>
     <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
     
     <!-- Навигационные вкладки -->
@@ -593,6 +336,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
         <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
+        <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -1007,6 +751,45 @@
                 <div style="margin-top:12px; background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
                     <label>📜 Походный блокнот (Рецепты алхимии, кузнечного дела и заметки квестов)</label>
                     <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
+    <div id="tab6" class="tab-content">
+        <div class="panel">
+            <h2>🎲 Сессия</h2>
+
+            <div id="session-join-block">
+                <p style="font-size:13px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
+                <label>Код сессии</label>
+                <input type="text" id="session-code-input" placeholder="Например: A1B2C3" maxlength="8" style="text-transform:uppercase;">
+                <button class="btn-success" style="margin-top:8px;" onclick="joinSession()">Присоединиться</button>
+                <p style="font-size:12px; opacity:.75; margin-top:12px;">Ты мастер? Открой <a href="gm.html" target="_blank" style="color:var(--accent-color);">gm.html</a> — там создаётся сессия и код для игроков.</p>
+                <div id="session-join-error" class="auth-error" style="display:none;"></div>
+            </div>
+
+            <div id="session-active-block" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>Сессия: <span class="session-code-badge" id="session-code-display">-</span></div>
+                    <button class="btn-danger" onclick="leaveSession()">Покинуть сессию</button>
+                </div>
+
+                <h3 style="margin-top:16px;">⚔️ Отряд</h3>
+                <div id="party-list"></div>
+
+                <h3>👹 Противники</h3>
+                <div id="enemies-list"></div>
+
+                <h3>🎯 Инициатива</h3>
+                <div id="initiative-list"></div>
+
+                <h3>📖 Боевой журнал</h3>
+                <div id="combat-log" class="combat-log"></div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <input type="text" id="log-input" placeholder="Написать в журнал (например: Атакую волка на 12 урона)..." style="flex:1;">
+                    <button onclick="postLogEntry()">Отправить</button>
                 </div>
             </div>
         </div>
@@ -1578,26 +1361,13 @@
             }
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
+        if (window.CloudSync) window.CloudSync.saveCharacter(data);
     }
 
-    // Загрузка сохранения
-    function loadLocalStorage() {
-        let saved = localStorage.getItem('skyrim_ttrpg_save_v3_6');
-        let savedSpells = localStorage.getItem('skyrim_custom_spells_v3_5');
-
-        if (savedSpells) {
-            try {
-                customSpells = JSON.parse(savedSpells);
-                ['destr','restor','alter','illus','conj'].forEach(school => {
-                    document.getElementById(`spells-${school}-list`).innerHTML = '';
-                });
-                customSpells.forEach(s => addCustomSpell(s.school, s));
-            } catch(e) {}
-        }
-
-        if (!saved) return;
+    // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
+    function applyCharacterData(data) {
+        if (!data) return;
         try {
-            let data = JSON.parse(saved);
             document.getElementById('char-name').value = data.name || '';
             document.getElementById('char-race').value = data.race || 'nord';
             document.getElementById('char-sign').value = data.sign || 'none';
@@ -1713,6 +1483,31 @@
             document.getElementById('slot-neck-name').value = data.sNeck || '';
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
         } catch(e) {
+            console.warn('Ошибка применения данных персонажа:', e);
+        }
+    }
+    window.applyCharacterData = applyCharacterData;
+
+    // Загрузка сохранения
+    function loadLocalStorage() {
+        let saved = localStorage.getItem('skyrim_ttrpg_save_v3_6');
+        let savedSpells = localStorage.getItem('skyrim_custom_spells_v3_5');
+
+        if (savedSpells) {
+            try {
+                customSpells = JSON.parse(savedSpells);
+                ['destr','restor','alter','illus','conj'].forEach(school => {
+                    document.getElementById(`spells-${school}-list`).innerHTML = '';
+                });
+                customSpells.forEach(s => addCustomSpell(s.school, s));
+            } catch(e) {}
+        }
+
+        if (!saved) return;
+        try {
+            let data = JSON.parse(saved);
+            applyCharacterData(data);
+        } catch(e) {
             console.warn('Ошибка загрузки сохранения:', e);
         }
     }
@@ -1731,5 +1526,9 @@
     loadLocalStorage();
     updateAll();
 </script>
+
+<!-- Firebase: конфиг проекта + логика облачной синхронизации -->
+<script src="firebase-config.js"></script>
+<script src="cloud.js"></script>
 </body>
 </html>

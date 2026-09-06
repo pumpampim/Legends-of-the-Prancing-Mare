@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Экран Мастера — «Скурим» TTRPG</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDK (см. README-FIREBASE.md для настройки) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div id="auth-overlay" class="auth-overlay">
+    <div class="auth-box">
+        <h2 style="margin-top:0;">Вход мастера</h2>
+        <p style="font-size:13px; opacity:.85;">Экран мастера требует аккаунт — с него создаются сессии и ведётся бой. Используй тот же аккаунт, что и в основном листе персонажа, либо отдельный, только для мастера.</p>
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com">
+        <label>Пароль</label>
+        <input type="password" id="auth-password" placeholder="Минимум 6 символов">
+        <div id="auth-error" class="auth-error" style="display:none;"></div>
+        <div class="grid-2" style="margin-top:10px;">
+            <button class="btn-success" onclick="cloudLogin()">Войти</button>
+            <button onclick="cloudRegister()">Зарегистрироваться</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div id="cloud-status-bar" class="cloud-status-bar">
+        <span id="cloud-user-info">Не авторизован</span>
+        <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти</button>
+    </div>
+
+    <h1>🎲 ЭКРАН МАСТЕРА — «СКУРИМ»</h1>
+
+    <div id="no-session-block" class="panel" style="display:none;">
+        <h2>Начать сессию</h2>
+        <p style="font-size:13px; opacity:.85;">Создай сессию и передай код игрокам — они введут его на вкладке «Сессия» своего листа персонажа.</p>
+        <button class="btn-success" onclick="createSession()">Создать новую сессию</button>
+    </div>
+
+    <div id="session-block" style="display:none;">
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>Код для игроков: <span class="session-code-badge" id="gm-session-code">-</span></div>
+                <button class="btn-danger" onclick="closeSession()">Закрыть сессию</button>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <h2>⚔️ Отряд</h2>
+                <div id="gm-party-list"></div>
+            </div>
+
+            <div class="panel">
+                <h2>👹 Противники</h2>
+                <div id="gm-enemies-list"></div>
+                <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
+                    <label>Имя противника</label>
+                    <input type="text" id="enemy-name-input" placeholder="Например: Волк">
+                    <div class="grid-2">
+                        <div><label>Макс. HP</label><input type="number" id="enemy-hp-input" value="10" min="0"></div>
+                        <div><label>Макс. MP</label><input type="number" id="enemy-mp-input" value="0" min="0"></div>
+                    </div>
+                    <button class="btn-success" style="margin-top:8px; width:100%;" onclick="addEnemy()">Добавить противника</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <h2>🎯 Инициатива</h2>
+                <div id="gm-initiative-list"></div>
+                <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px; display:flex; gap:6px;">
+                    <input type="text" id="init-name-input" placeholder="Имя" style="flex:1;">
+                    <input type="number" id="init-roll-input" placeholder="Бросок" style="width:80px;">
+                    <button onclick="addInitiative()">+</button>
+                </div>
+                <button style="margin-top:6px; width:100%;" onclick="clearInitiative()">Очистить инициативу</button>
+            </div>
+
+            <div class="panel">
+                <h2>📖 Боевой журнал</h2>
+                <div id="gm-combat-log" class="combat-log"></div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <input type="text" id="gm-log-input" placeholder="Записать событие...">
+                    <button onclick="gmPostLogEntry()">Отправить</button>
+                </div>
+                <button style="margin-top:6px; width:100%;" onclick="clearLog()">Очистить журнал</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="gm.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Персонажи: читать может любой вошедший в аккаунт участник группы
+    // (это нужно мастеру, чтобы при желании видеть полные листы), а
+    // редактировать — только владелец персонажа.
+    match /characters/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Сессии: упрощённые правила, рассчитанные на закрытую группу друзей,
+    // а не на публичный сервис. Любой вошедший в аккаунт может читать
+    // сессию (нужно игрокам) и обновлять её (нужно и игрокам — HP/MP/лог,
+    // и мастеру — противники/инициатива). Создать новую сессию может
+    // только тот, кто указывает себя её мастером (gmUid).
+    match /sessions/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.gmUid == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+  }
+}
