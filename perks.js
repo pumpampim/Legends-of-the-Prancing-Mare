@@ -36,6 +36,11 @@
     };
 
     window.applyPerks = function() {
+        console.log('Checked perks:');
+document.querySelectorAll('.perk-checkbox:checked').forEach(chk => {
+    console.log(`skillIdx=${chk.dataset.skillidx}, perkIdx=${chk.dataset.perkidx}, step=${chk.dataset.step}`);
+});
+console.log('maxSteps:', maxSteps);
         const bonuses = {
             oneHandedDamage: 0,
             twoHandedDamage: 0,
