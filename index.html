@@ -1187,90 +1187,138 @@
     } // ← ЭТА СКОБКА ЗАКРЫВАЕТ updateAll()
 
     // ===== ОТДЕЛЬНАЯ ФУНКЦИЯ updateCombat (исправленная) =====
-    function updateCombat(finalStr, finalDex) {
-        if (document.getElementById('manual-dmg-lock').checked) {
-            return;
-        }
-
-        const mode = document.getElementById('active-combat-weapon').value;
-        const starve = parseInt(document.getElementById('food-starve').value) || 0;
-
-        let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
-        let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
-
-         const perks = window.perkBonuses || {}; 
-
-        let baseDmg = 2, totalDmg = 2, hitModifier = 0;
-        let wepType = 'unarmed';
-
-        const strMod = Math.floor((str - 10) / 2);
-        const dexMod = Math.floor((dex - 10) / 2);
-
-        if (mode === 'melee') {
-            baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
-            wepType = document.getElementById('wep-melee-type').value;
-            hitModifier = strMod;
-
-            if (wepType === 'twohand_sword') hitModifier -= 2;
-            if (wepType === 'twohand_axe') hitModifier -= 3;
-            if (wepType === 'twohand_hammer') hitModifier -= 4;
-
-            if (wepType === 'unarmed') {
-                totalDmg = baseDmg;
-            } else {
-                totalDmg = baseDmg + str;
-            }
-
-            // Бонусы перков (закомментированы, пока нет perks.js)
-             let damageMult = 1;
-             if (wepType !== 'twohand_sword' && wepType !== 'twohand_axe' && wepType !== 'twohand_hammer') {
-                 damageMult += (perks.oneHandedDamage || 0);
-             } else {
-                 damageMult += (perks.twoHandedDamage || 0);
-             }
-             totalDmg = Math.round(totalDmg * damageMult);
-
-            if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
-                // Бонусы от перков пока закомментированы
-                 if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
-                 if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
-                     hitModifier += perks.twoHandedPowerAttackHitBonus;
-                 }
-                 let powerMult = 1.5;
-                 if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
-                 totalDmg = Math.round(totalDmg * powerMult);
-                totalDmg = Math.round(totalDmg * 1.5); // стандартная силовая атака
-                hitModifier -= 1; // стандартный штраф
-            }
-
-            // Бонусы от Боевых искусств пока закомментированы
-             if (perks.armorPenetrationDamage) totalDmg += perks.armorPenetrationDamage;
-             if (perks.hitBonus) hitModifier += perks.hitBonus;
-
-        } else {
-            // Дальний бой
-            baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
-            let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
-            wepType = document.getElementById('wep-ranged-type').value;
-            hitModifier = dexMod;
-            totalDmg = baseDmg + dex + ammoDmg;
-        }
-
-        hitModifier -= starve;
-        let sneakMult = (wepType === 'dagger') ? 3 : 2;
-
-        let finalHtml = `
-            <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
-            <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
-        `;
-        if (document.getElementById('chk-sneak-attack').checked) {
-            finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
-        }
-
-        document.getElementById('combat-results').innerHTML = finalHtml;
-        document.getElementById('main-panel-dmg').value = totalDmg;
+  function updateCombat(finalStr, finalDex) {
+    if (document.getElementById('manual-dmg-lock').checked) {
+        return;
     }
 
+    const mode = document.getElementById('active-combat-weapon').value;
+    const starve = parseInt(document.getElementById('food-starve').value) || 0;
+
+    let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
+    let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
+
+    const perks = window.perkBonuses || {};
+
+    let baseDmg = 2, totalDmg = 2, hitModifier = 0;
+    let wepType = 'unarmed';
+
+    const strMod = Math.floor((str - 10) / 2);
+    const dexMod = Math.floor((dex - 10) / 2);
+
+    if (mode === 'melee') {
+        baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
+        wepType = document.getElementById('wep-melee-type').value;
+        hitModifier = strMod;
+
+        if (wepType === 'twohand_sword') hitModifier -= 2;
+        if (wepType === 'twohand_axe') hitModifier -= 3;
+        if (wepType === 'twohand_hammer') hitModifier -= 4;
+
+        // === НОВАЯ ЛОГИКА: бонусы от перков добавляются к базовому урону ===
+        let perkBonus = 0;
+
+        // Процентные бонусы (Сильная рука, Варвар)
+        if (wepType !== 'twohand_sword' && wepType !== 'twohand_axe' && wepType !== 'twohand_hammer') {
+            // Одноручное
+            perkBonus += baseDmg * (perks.oneHandedDamage || 0);
+        } else {
+            // Двуручное
+            perkBonus += baseDmg * (perks.twoHandedDamage || 0);
+        }
+
+        // Фиксированные бонусы от кровопотери и через броню
+        // Для копий/пик
+        if (wepType === 'onehand' || wepType === 'twohand_sword') {
+            // Проверяем, содержит ли название оружия "копьё" или "пика" (упрощённо)
+            const wepName = document.getElementById('wep-melee-name').value.toLowerCase();
+            if (wepName.includes('коп') || wepName.includes('пик')) {
+                perkBonus += (perks.spearBleedDamage || 0) + (perks.spearResistDamage || 0);
+            }
+        }
+
+        // Для топоров (одноручных)
+        if (wepType === 'onehand') {
+            const wepName = document.getElementById('wep-melee-name').value.toLowerCase();
+            if (wepName.includes('топ')) {
+                perkBonus += (perks.axeBleedDamage || 0);
+            }
+        }
+        // Для двуручных секир
+        if (wepType === 'twohand_axe') {
+            perkBonus += (perks.greatAxeBleedDamage || 0);
+        }
+
+        // Боевые искусства (урон через броню) — добавляется отдельно, т.к. это не зависит от оружия
+        if (perks.armorPenetrationDamage) {
+            perkBonus += perks.armorPenetrationDamage;
+        }
+
+        // Итоговый урон: база + бонус от перков + сила
+        totalDmg = baseDmg + perkBonus + str;
+
+        // === Силовая атака ===
+        if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
+            // Бонусы к попаданию от Боевой стойки и Стойки чемпиона
+            if (perks.powerAttackHitBonus) {
+                hitModifier += perks.powerAttackHitBonus;
+            }
+            if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
+                hitModifier += perks.twoHandedPowerAttackHitBonus;
+            }
+
+            // Множитель силовой атаки (1.5) + бонусы (Безжалостный удар, Сокрушительный удар)
+            let powerMult = 1.5;
+            if (perks.standingPowerAttackDamage) {
+                powerMult += perks.standingPowerAttackDamage;
+            }
+            // Двойная мясорубка (если атака двумя оружиями) — пока не реализовано определение двух рук
+            // Добавим позже
+            totalDmg = Math.round(totalDmg * powerMult);
+        }
+
+        // Бонусы к попаданию от Боевых искусств и Мечника
+        if (perks.hitBonus) {
+            hitModifier += perks.hitBonus;
+        }
+        if (wepType === 'onehand' && document.getElementById('chk-power-attack').checked) {
+            const wepName = document.getElementById('wep-melee-name').value.toLowerCase();
+            if (wepName.includes('меч')) {
+                hitModifier += (perks.swordPowerAttackHitBonus || 0);
+            }
+        }
+        if (wepType === 'twohand_sword' && document.getElementById('chk-power-attack').checked) {
+            hitModifier += (perks.greatswordPowerAttackHitBonus || 0);
+        }
+
+        // Бонус от Двойного вихря (если атака двумя оружиями) — пока нет флага, оставим на потом
+
+        // Бонус от Рывка (спринт-атака) — пока нет флага, оставим на потом
+
+    } else {
+        // Дальний бой (без изменений)
+        baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
+        let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
+        wepType = document.getElementById('wep-ranged-type').value;
+        hitModifier = dexMod;
+        totalDmg = baseDmg + dex + ammoDmg;
+    }
+
+    hitModifier -= starve;
+    let sneakMult = (wepType === 'dagger') ? 3 : 2;
+
+    let finalHtml = `
+        <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
+        <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
+    `;
+    if (document.getElementById('chk-sneak-attack').checked) {
+        finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
+    }
+
+    document.getElementById('combat-results').innerHTML = finalHtml;
+    document.getElementById('main-panel-dmg').value = totalDmg;
+}
+    
     // Сохранение всех параметров листа в LocalStorage
     function saveLocalStorage() {
         let perkStates = {};
