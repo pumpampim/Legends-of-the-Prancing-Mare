@@ -1,13 +1,13 @@
 // ============================================================================
 // PERKS.JS — логика перков для системы «Скурим»
-// Версия 1.0 (Одноручное и Двуручное оружие)
+// Версия 1.1 (исправлено суммирование ступеней)
 // ============================================================================
 
 (function() {
     'use strict';
 
     const perkEffects = {
-        // ==================== ОДНОРУЧНОЕ ОРУЖИЕ (skillIdx = 0) ====================
+        // ОДНОРУЧНОЕ
         "0-0": (step) => ({ oneHandedDamage: 0.20 * step }),
         "0-1": () => ({ powerAttackHitBonus: 1 }),
         "0-2": () => ({ canUseGauntlets: true }),
@@ -22,7 +22,7 @@
         "0-11": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.05 }),
         "0-12": () => ({ sprintPowerAttackDouble: true }),
 
-        // ==================== ДВУРУЧНОЕ ОРУЖИЕ (skillIdx = 1) ====================
+        // ДВУРУЧНОЕ
         "1-0": (step) => ({ twoHandedDamage: 0.20 * step }),
         "1-1": () => ({ twoHandedPowerAttackHitBonus: 1 }),
         "1-2": (step) => ({ spearBleedDamage: 8 * step, spearResistDamage: 8 * step }),
@@ -36,11 +36,19 @@
     };
 
     window.applyPerks = function() {
-        console.log('Checked perks:');
-document.querySelectorAll('.perk-checkbox:checked').forEach(chk => {
-    console.log(`skillIdx=${chk.dataset.skillidx}, perkIdx=${chk.dataset.perkidx}, step=${chk.dataset.step}`);
-});
-console.log('maxSteps:', maxSteps);
+        // Собираем максимальную ступень для каждого перка
+        const maxSteps = {};
+        document.querySelectorAll('.perk-checkbox:checked').forEach(chk => {
+            const skillIdx = chk.dataset.skillidx;
+            const perkIdx = chk.dataset.perkidx;
+            const step = parseInt(chk.dataset.step);
+            const key = skillIdx + '-' + perkIdx;
+            if (!maxSteps[key] || step > maxSteps[key]) {
+                maxSteps[key] = step;
+            }
+        });
+
+        // Применяем эффекты только для максимальных ступеней
         const bonuses = {
             oneHandedDamage: 0,
             twoHandedDamage: 0,
@@ -68,27 +76,22 @@ console.log('maxSteps:', maxSteps);
             armorPenetrationDamage: 0
         };
 
-        const checkboxes = document.querySelectorAll('.perk-checkbox:checked');
-        checkboxes.forEach(chk => {
-            const skillIdx = parseInt(chk.dataset.skillidx);
-            const perkIdx = parseInt(chk.dataset.perkidx);
-            const step = parseInt(chk.dataset.step);
-            const key = skillIdx + '-' + perkIdx;
+        for (let [key, step] of Object.entries(maxSteps)) {
             const effectFn = perkEffects[key];
             if (typeof effectFn === 'function') {
                 const result = effectFn(step);
-                for (let [key, value] of Object.entries(result)) {
-                    if (typeof value === 'number') {
-                        bonuses[key] = (bonuses[key] || 0) + value;
-                    } else if (typeof value === 'boolean') {
-                        bonuses[key] = bonuses[key] || value;
+                for (let [k, v] of Object.entries(result)) {
+                    if (typeof v === 'number') {
+                        bonuses[k] = (bonuses[k] || 0) + v;
+                    } else if (typeof v === 'boolean') {
+                        bonuses[k] = bonuses[k] || v;
                     }
                 }
             }
-        });
+        }
 
         window.perkBonuses = bonuses;
-        console.log('Perk bonuses updated:', bonuses);
+        console.log('Perk bonuses (max steps only):', bonuses);
     };
 
     window.getPerkBonuses = function() {
