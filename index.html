@@ -1073,10 +1073,10 @@
         });
 
         // === ПРИМЕНЯЕМ ПЕРКИ (пока закомментировано, чтобы не мешало) ===
-        // if (typeof window.applyPerks === 'function') {
-        //     window.applyPerks();
-        // }
-        // const perks = window.perkBonuses || {};
+        if (typeof window.applyPerks === 'function') {
+             window.applyPerks();
+         }
+         const perks = window.perkBonuses || {};
 
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
@@ -1198,7 +1198,7 @@
         let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
         let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
 
-        // const perks = window.perkBonuses || {}; // пока закомментировано
+         const perks = window.perkBonuses || {}; 
 
         let baseDmg = 2, totalDmg = 2, hitModifier = 0;
         let wepType = 'unarmed';
@@ -1222,30 +1222,30 @@
             }
 
             // Бонусы перков (закомментированы, пока нет perks.js)
-            // let damageMult = 1;
-            // if (wepType !== 'twohand_sword' && wepType !== 'twohand_axe' && wepType !== 'twohand_hammer') {
-            //     damageMult += (perks.oneHandedDamage || 0);
-            // } else {
-            //     damageMult += (perks.twoHandedDamage || 0);
-            // }
-            // totalDmg = Math.round(totalDmg * damageMult);
+             let damageMult = 1;
+             if (wepType !== 'twohand_sword' && wepType !== 'twohand_axe' && wepType !== 'twohand_hammer') {
+                 damageMult += (perks.oneHandedDamage || 0);
+             } else {
+                 damageMult += (perks.twoHandedDamage || 0);
+             }
+             totalDmg = Math.round(totalDmg * damageMult);
 
             if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
                 // Бонусы от перков пока закомментированы
-                // if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
-                // if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
-                //     hitModifier += perks.twoHandedPowerAttackHitBonus;
-                // }
-                // let powerMult = 1.5;
-                // if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
-                // totalDmg = Math.round(totalDmg * powerMult);
+                 if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
+                 if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
+                     hitModifier += perks.twoHandedPowerAttackHitBonus;
+                 }
+                 let powerMult = 1.5;
+                 if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
+                 totalDmg = Math.round(totalDmg * powerMult);
                 totalDmg = Math.round(totalDmg * 1.5); // стандартная силовая атака
                 hitModifier -= 1; // стандартный штраф
             }
 
             // Бонусы от Боевых искусств пока закомментированы
-            // if (perks.armorPenetrationDamage) totalDmg += perks.armorPenetrationDamage;
-            // if (perks.hitBonus) hitModifier += perks.hitBonus;
+             if (perks.armorPenetrationDamage) totalDmg += perks.armorPenetrationDamage;
+             if (perks.hitBonus) hitModifier += perks.hitBonus;
 
         } else {
             // Дальний бой
@@ -1532,6 +1532,7 @@
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
+<script src="perks.js"></script>
 <script src="firebase-config.js"></script>
 <script src="cloud.js"></script>
 </body>
