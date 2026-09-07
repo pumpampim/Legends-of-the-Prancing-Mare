@@ -1,13 +1,13 @@
 // ============================================================================
 // PERKS.JS — логика перков для системы «Скурим»
-// Версия 1.1 (исправлено суммирование ступеней)
+// Версия 1.2 (исправлена ошибка с maxSteps)
 // ============================================================================
 
 (function() {
     'use strict';
 
     const perkEffects = {
-        // ОДНОРУЧНОЕ
+        // ==================== ОДНОРУЧНОЕ ОРУЖИЕ (skillIdx = 0) ====================
         "0-0": (step) => ({ oneHandedDamage: 0.20 * step }),
         "0-1": () => ({ powerAttackHitBonus: 1 }),
         "0-2": () => ({ canUseGauntlets: true }),
@@ -22,7 +22,7 @@
         "0-11": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.05 }),
         "0-12": () => ({ sprintPowerAttackDouble: true }),
 
-        // ДВУРУЧНОЕ
+        // ==================== ДВУРУЧНОЕ ОРУЖИЕ (skillIdx = 1) ====================
         "1-0": (step) => ({ twoHandedDamage: 0.20 * step }),
         "1-1": () => ({ twoHandedPowerAttackHitBonus: 1 }),
         "1-2": (step) => ({ spearBleedDamage: 8 * step, spearResistDamage: 8 * step }),
@@ -36,7 +36,7 @@
     };
 
     window.applyPerks = function() {
-        // Собираем максимальную ступень для каждого перка
+        // 1. Собираем максимальную ступень для каждого перка
         const maxSteps = {};
         document.querySelectorAll('.perk-checkbox:checked').forEach(chk => {
             const skillIdx = chk.dataset.skillidx;
@@ -48,7 +48,7 @@
             }
         });
 
-        // Применяем эффекты только для максимальных ступеней
+        // 2. Применяем эффекты только для максимальных ступеней
         const bonuses = {
             oneHandedDamage: 0,
             twoHandedDamage: 0,
@@ -75,6 +75,9 @@
             hitBonus: 0,
             armorPenetrationDamage: 0
         };
+
+        // Логируем, что мы нашли в чекбоксах (для отладки)
+        console.log('maxSteps:', maxSteps);
 
         for (let [key, step] of Object.entries(maxSteps)) {
             const effectFn = perkEffects[key];
