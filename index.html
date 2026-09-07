@@ -1081,6 +1081,11 @@
             }
         });
 
+        // Применяем бонусы перков
+    if (typeof window.applyPerks === 'function') {
+        window.applyPerks();
+    }
+    const perks = window.perkBonuses || {};
         // Расчет HP
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
@@ -1213,6 +1218,19 @@
 
         let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
         let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
+        function updateCombat(finalStr, finalDex) {
+    if (document.getElementById('manual-dmg-lock').checked) {
+        return;
+    }
+
+    const mode = document.getElementById('active-combat-weapon').value;
+    const starve = parseInt(document.getElementById('food-starve').value) || 0;
+
+    let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
+    let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
+
+    // ПОЛУЧАЕМ БОНУСЫ ПЕРКОВ
+    const perks = window.perkBonuses || {};
 
         let baseDmg = 2, totalDmg = 2, hitModifier = 0;
         let wepType = 'unarmed';
@@ -1221,24 +1239,126 @@
         const dexMod = Math.floor((dex - 10) / 2);
 
         if (mode === 'melee') {
-            baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
-            wepType = document.getElementById('wep-melee-type').value;
-            hitModifier = strMod;
-            
-            if (wepType === 'twohand_sword') hitModifier -= 2;
-            if (wepType === 'twohand_axe') hitModifier -= 3;
-            if (wepType === 'twohand_hammer') hitModifier -= 4;
-            
-            if (wepType === 'unarmed') {
-                totalDmg = baseDmg;
-            } else {
-                totalDmg = baseDmg + str;
+    baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
+    wepType = document.getElementById('wep-melee-type').value;
+    hitModifier = strMod;
+    
+    // Штрафы двуручного оружия
+    if (wepType === 'twohand_sword') hitModifier -= 2;
+    if (wepType === 'twohand_axe') hitModifier -= 3;
+    if (wepType === 'twohand_hammer') hitModifier -= 4;
+    
+    // Базовый расчёт урона
+    if (wepType === 'unarmed') {
+        totalDmg = baseDmg;
+        // Боевые искусства (доп. урон через броню)
+        if (perks.armorPenetrationDamage) {
+            totalDmg += perks.armorPenetrationDamage;
+        }
+        // Боевые искусства (бонус к попаданию)
+        if (perks.hitBonus) {
+            hitModifier += perks.hitBonus;
+        }
+        // Безоружный бой (кастеты) — пока просто флаг, можно добавить позже
+    } else {
+        // Урон с учётом силы и бонусов
+        let damageMult = 1;
+        let bonusDamage = 0;
+        
+        // Проверяем тип оружия и применяем соответствующие бонусы
+        const weaponType = document.getElementById('wep-melee-type').value;
+        
+        // Бонус от Сильной руки (для всего одноручного)
+        if (weaponType !== 'twohand_sword' && weaponType !== 'twohand_axe' && weaponType !== 'twohand_hammer') {
+            damageMult += (perks.oneHandedDamage || 0);
+        }
+        
+        // Бонус от Варвара (для двуручного)
+        if (weaponType === 'twohand_sword' || weaponType === 'twohand_axe' || weaponType === 'twohand_hammer') {
+            damageMult += (perks.twoHandedDamage || 0);
+        }
+        
+        // Специфические бонусы для мечей (Мечник, Глубокие раны)
+        if (weaponType === 'onehand' && document.getElementById('wep-melee-name').value.toLowerCase().includes('меч')) {
+            // Если есть Мечник, то бонус к силовой атаке
+            if (document.getElementById('chk-power-attack').checked && perks.swordPowerAttackHitBonus) {
+                hitModifier += perks.swordPowerAttackHitBonus;
             }
-            
-            if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
-                totalDmg = Math.round(totalDmg * 1.5);
-                hitModifier -= 1;
+        }
+        if (weaponType === 'twohand_sword') {
+            if (document.getElementById('chk-power-attack').checked && perks.greatswordPowerAttackHitBonus) {
+                hitModifier += perks.greatswordPowerAttackHitBonus;
             }
+        }
+        
+        // Бонус от Копейщика (для копий и пик)
+        if (weaponType === 'onehand' && document.getElementById('wep-melee-name').value.toLowerCase().includes('коп')) {
+            bonusDamage += (perks.spearBleedDamage || 0) + (perks.spearResistDamage || 0);
+        }
+        if (weaponType === 'twohand_sword' && document.getElementById('wep-melee-name').value.toLowerCase().includes('пик')) {
+            bonusDamage += (perks.spearBleedDamage || 0) + (perks.spearResistDamage || 0);
+        }
+        
+        // Бонус от Рубаки (для топоров)
+        if (weaponType === 'onehand' && document.getElementById('wep-melee-name').value.toLowerCase().includes('топ')) {
+            bonusDamage += (perks.axeBleedDamage || 0);
+        }
+        if (weaponType === 'twohand_axe') {
+            bonusDamage += (perks.greatAxeBleedDamage || 0);
+        }
+        
+        // Бонус от Костолома (игнорирование брони) — пока не применяем, т.к. у нас нет системы брони врагов
+        // Позже можно добавить в отдельный расчёт
+        
+        // Бонус от Крушителя черепов (для молотов)
+        if (weaponType === 'twohand_hammer') {
+            // Пока просто добавляем бронепробитие, но в updateCombat мы не рассчитываем защиту врага
+            // Это будет использоваться в основном боевом процессе, но здесь просто отметим
+        }
+        
+        // Бонус от Двойного вихря (для атак с двух рук)
+        if (document.getElementById('chk-dual-wield') && document.getElementById('chk-dual-wield').checked) {
+            hitModifier += (perks.dualWieldHitBonus || 0);
+            if (document.getElementById('chk-power-attack').checked) {
+                damageMult += (perks.dualWieldPowerAttackDamage || 0);
+            }
+        }
+        
+        // Бонус от Отшельника (для посохов)
+        if (weaponType === 'twohand_sword' && document.getElementById('wep-melee-name').value.toLowerCase().includes('посох')) {
+            // Увеличиваем силу зачарования и игнорирование брони
+            // Пока просто отметим
+        }
+        
+        // Бонус от Безжалостного удара / Сокрушительного удара (силовая атака стоя)
+        if (document.getElementById('chk-power-attack').checked) {
+            if (perks.standingPowerAttackDamage) {
+                damageMult += perks.standingPowerAttackDamage;
+            }
+            // Шанс отрубить голову — используем в отдельной механике
+        }
+        
+        // Бонус от Рывка / Великого рывка (спринт-атака)
+        if (perks.sprintPowerAttackDouble && document.getElementById('chk-sprint-attack') && document.getElementById('chk-sprint-attack').checked) {
+            damageMult *= 2;
+        }
+        
+        totalDmg = Math.round((baseDmg + str + bonusDamage) * damageMult);
+    }
+    
+    // Силовая атака (уже учтена в модификаторах выше, но если не учтена, добавим)
+    if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
+        // Если ещё не применили бонус от силовой атаки, добавим
+        // Но мы уже применили через damageMult, поэтому просто добавим штраф -1 к кубам (уже есть)
+        // Проверим, есть ли бонус от Боевой стойки
+        if (perks.powerAttackHitBonus) {
+            hitModifier += perks.powerAttackHitBonus;
+        }
+        if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
+            hitModifier += perks.twoHandedPowerAttackHitBonus;
+        }
+    }
+}
         } else {
             baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
             let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
