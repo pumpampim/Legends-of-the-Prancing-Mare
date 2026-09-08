@@ -2,13 +2,11 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Лист персонажа: Скурим TTRPG (с инвентарём)</title>
+    <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
     
     <!-- Системный блок хранения баз данных игры -->
     <script id="database-core">
-        // =====================================================================
-        // РАСОВЫЕ БОНУСЫ К НАВЫКАМ
-        // =====================================================================
+        // Исправленная база расовых бонусов к навыкам (полностью по документам)
         const raceSkillBonuses = {
             nord: { "Двуручное оружие": 10, "Красноречие": 5, "Легкая броня": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
             altmer: { "Иллюзия": 10, "Колдовство": 5, "Разрушение": 5, "Изменение": 5, "Восстановление": 5, "Зачарование": 5 },
@@ -22,9 +20,7 @@
             imperial: { "Восстановление": 10, "Разрушение": 5, "Зачарование": 5, "Тяжелая броня": 5, "Блокирование": 5, "Одноручное оружие": 5 }
         };
 
-        // =====================================================================
-        // РАСОВЫЕ МОДИФИКАТОРЫ ХАРАКТЕРИСТИК
-        // =====================================================================
+        // Расовые модификаторы характеристик (добавляются к базовым 10)
         const raceStatBonuses = {
             nord: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
             altmer: { str: 0, dex: 0, con: 0, int: 2, wis: 1, cha: 0 },
@@ -38,25 +34,23 @@
             imperial: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 }
         };
 
-        // =====================================================================
-        // ПОЛНЫЙ СПИСОК ПЕРКОВ ДЛЯ ВСЕХ ВЕТОК
-        // =====================================================================
+        // Полный компендиум перков для всех 18 навыков (обновлён по таблице "Ветви талантов")
         const fullPerksManifest = {
             "Одноручное оружие": [
                 { name: "Сильная рука", steps: 5 }, { name: "Боевая стойка", steps: 1 },
-                { name: "Безоружный бой", steps: 1 }, { name: "Боевые искусства", steps: 3 },
+                { name: "Безоружный бой", steps: 1 }, { name: "Боевые искусства", steps: 1 },
                 { name: "Мечник", steps: 3 }, { name: "Контрудар", steps: 1 },
-                { name: "Копейщик", steps: 3 }, { name: "Рубака", steps: 3 },
-                { name: "Костолом", steps: 3 }, { name: "Двойной вихрь", steps: 2 },
+                { name: "Копейщик", steps: 1 }, { name: "Рубака", steps: 1 },
+                { name: "Костолом", steps: 1 }, { name: "Двойной вихрь", steps: 1 },
                 { name: "Двойная мясорубка", steps: 1 }, { name: "Безжалостный удар", steps: 1 },
                 { name: "Рывок", steps: 1 }
             ],
             "Двуручное оружие": [
                 { name: "Варвар", steps: 5 }, { name: "Стойка чемпиона", steps: 1 },
-                { name: "Пикосажатель", steps: 3 }, { name: "Расчленитель", steps: 3 },
-                { name: "Глубокие раны", steps: 3 }, { name: "Отшельник", steps: 3 },
+                { name: "Пикосажатель", steps: 1 }, { name: "Расчленитель", steps: 3 },
+                { name: "Глубокие раны", steps: 3 }, { name: "Отшельник", steps: 1 },
                 { name: "Великий рывок", steps: 1 }, { name: "Сокрушительный удар", steps: 1 },
-                { name: "Веерная атака", steps: 1 }, { name: "Крушитель черепов", steps: 3 }
+                { name: "Веерная атака", steps: 1 }, { name: "Крушитель черепов", steps: 1 }
             ],
             "Стрельба": [
                 { name: "Избыточное натяжение", steps: 5 }, { name: "Орлиный взор", steps: 1 },
@@ -166,10 +160,9 @@
             ]
         };
 
-        // =====================================================================
-        // БОНУСЫ БОГОВ (АЭДРА И ДАЭДРА)
-        // =====================================================================
+        // Бонусы богов (Аэдра и Даэдра) по рангам (1-3)
         const godBonuses = {
+            // Аэдра
             zenithar: {
                 1: { hp: 25, powerAttackDmg: 5, smithing: 0, prices: 0 },
                 2: { hp: 50, powerAttackDmg: 10, smithing: 25, prices: 10 },
@@ -215,6 +208,7 @@
                 2: { armor: 50, mp: 25, enchantDmg: 15, fireResist: 10 },
                 3: { armor: 100, mp: 50, enchantDmg: 30, fireResist: 25, elementalExtraDmg: 40 }
             },
+            // Даэдра
             boethiah: {
                 1: { rangedDmg: 10, speed: 5 },
                 2: { weaponDmg: 10, rangedDmg: 10, speed: 10 },
@@ -300,23 +294,26 @@
     
     <link rel="stylesheet" href="style.css">
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
-<!-- Оверлей авторизации -->
+<!-- Оверлей авторизации: показывается, пока пользователь не вошёл и не выбрал офлайн-режим -->
 <div id="auth-overlay" class="auth-overlay">
     <div class="auth-box">
         <h2 style="margin-top:0;">«Скурим» — вход в аккаунт</h2>
-        <p style="font-size:13px; opacity:.85;">Аккаунт нужен, чтобы твой персонаж сохранялся в облаке и синхронизировался с сессией мастера.</p>
+        <p style="font-size:13px; opacity:.85;">Аккаунт нужен, чтобы твой персонаж сохранялся в облаке и синхронизировался с сессией мастера. Можно и без него — но тогда только локальное сохранение в этом браузере.</p>
+
         <label>Email</label>
         <input type="email" id="auth-email" placeholder="you@example.com">
         <label>Пароль</label>
         <input type="password" id="auth-password" placeholder="Минимум 6 символов">
+
         <div id="auth-error" class="auth-error" style="display:none;"></div>
+
         <div class="grid-2" style="margin-top:10px;">
             <button class="btn-success" onclick="cloudLogin()">Войти</button>
             <button onclick="cloudRegister()">Зарегистрироваться</button>
@@ -327,8 +324,8 @@
 
 <div class="container">
     <div id="cloud-status-bar" class="cloud-status-bar">
-        <span id="cloud-user-info">⚠ Офлайн-режим</span>
-        <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти</button>
+        <span id="cloud-user-info">⚠ Офлайн-режим (данные только в этом браузере)</span>
+        <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти из аккаунта</button>
     </div>
     <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
     
@@ -338,20 +335,21 @@
         <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
-        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь</button>
-        <button class="tab-link" onclick="openTab(event, 'tab6')">Боги и Выживание</button>
-        <button class="tab-link" onclick="openTab(event, 'tab7')">Сессия</button>
+        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
+        <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
     </div>
 
-    <!-- ТАБ 1: ГЛАВНАЯ -->
+    <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
     <div id="tab1" class="tab-content active">
         <div class="grid-2">
+            <!-- Анкета персонажа -->
             <div class="panel">
                 <h2>Персонаж и Происхождение</h2>
                 <label>Имя Героя</label>
-                <input type="text" id="char-name" value="Довакин" onchange="updateAll()">
-                <label>Раса</label>
-                <select id="char-race" onchange="updateAll()">
+                <input type="text" id="char-name" value="Довакин" onchange="saveLocalStorage()">
+                
+                <label>Раса (Автоприбавка навыков активна!)</label>
+                <select id="char-race" onchange="updateAll(); saveLocalStorage();">
                     <option value="nord">Норд (+10 HP, +5 HP/лвл, +10 Двуручное)</option>
                     <option value="altmer">Альтмер (+20 Маны, +10 Иллюзия, +2 Инт, +1 Муд)</option>
                     <option value="breton">Бретон (10% Резист магии, +10 Колдовство, +2 Инт, +1 Хар)</option>
@@ -363,8 +361,9 @@
                     <option value="dunmer">Данмер (+15 Разрушение, +1 Лов, +1 Инт, +1 Сил)</option>
                     <option value="imperial">Имперец (Голос императора, +10 Восстановление, +2 Хар)</option>
                 </select>
-                <label>Камень Судьбы</label>
-                <select id="char-sign" onchange="updateAll()">
+
+                <label>Камень Судьбы (Знак рождения созвездия)</label>
+                <select id="char-sign" onchange="updateAll(); saveLocalStorage();">
                     <option value="none">Не выбран</option>
                     <option value="warrior">Воин (+2 Сила, +2 Телосложение)</option>
                     <option value="mage">Маг (Концентрация, бесплатный каст 1 ур.)</option>
@@ -376,55 +375,87 @@
                     <option value="lord">Лорд (Кровь Севера, уязвимость к огню)</option>
                     <option value="zmey">Змей (Исцеление / Медленный мощный яд)</option>
                 </select>
+
                 <div class="grid-2" style="margin-top:10px;">
-                    <div><label>Уровень</label><input type="number" id="char-level" value="1" min="1" onchange="updateAll()"></div>
-                    <div><label>Свободные жизни</label><input type="number" id="char-lives" value="50" onchange="saveLocalStorage()"></div>
+                    <div>
+                        <label>Текущий Уровень Героя</label>
+                        <input type="number" id="char-level" value="1" min="1" onchange="updateAll(); saveLocalStorage();">
+                    </div>
+                    <div>
+                        <label>Запас Свободных Жизней</label>
+                        <input type="number" id="char-lives" value="50" onchange="saveLocalStorage()">
+                    </div>
                 </div>
-                <label>Предыстория</label>
-                <textarea id="char-backstory" rows="3" onchange="saveLocalStorage()"></textarea>
+
+                <label style="margin-top:10px;">Краткая предыстория (~5 предложений)</label>
+                <textarea id="char-backstory" rows="3" placeholder="Опишите ваше прошлое для получения стартовых бонусов..." onchange="saveLocalStorage()"></textarea>
             </div>
+
+            <!-- Характеристики -->
             <div class="panel">
-                <h2>Характеристики</h2>
-                <div class="stat-block"><label>Сила (Сил)</label><div><span class="mod-indicator" id="mod-str">0</span><input type="number" id="stat-str" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
-                <div class="stat-block"><label>Ловкость (Лов)</label><div><span class="mod-indicator" id="mod-dex">0</span><input type="number" id="stat-dex" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
-                <div class="stat-block"><label>Телосложение (Тел)</label><div><span class="mod-indicator" id="mod-con">0</span><input type="number" id="stat-con" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
-                <div class="stat-block"><label>Интеллект (Инт)</label><div><span class="mod-indicator" id="mod-int">0</span><input type="number" id="stat-int" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
-                <div class="stat-block"><label>Мудрость (Муд)</label><div><span class="mod-indicator" id="mod-wis">0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
-                <div class="stat-block"><label>Харизма (Хар)</label><div><span class="mod-indicator" id="mod-cha">0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <h2>Характеристики и Модификаторы проверки d20</h2>
+                <div class="stat-block"><label>Сила (Сил)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-str">Мод: 0</span><input type="number" id="stat-str" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Ловкость (Лов)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-dex">Мод: 0</span><input type="number" id="stat-dex" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Телосложение (Тел)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-con">Мод: 0</span><input type="number" id="stat-con" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Интеллект (Инт)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-int">Мод: 0</span><input type="number" id="stat-int" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Мудрость (Муд)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-wis">Мод: 0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                <div class="stat-block"><label>Харизма (Хар)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-cha">Мод: 0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
             </div>
         </div>
+
+        <!-- Трекеры состояния -->
         <div class="panel">
-            <h2>Состояние, Броня и Урон</h2>
+            <h2>Панель состояния, Брони и Урона</h2>
             <div class="grid-3">
-                <div class="vital-bar" style="border-color:#a02e23;">
-                    <div style="display:flex;justify-content:space-between;"><label style="color:#e74c3c;">HP</label><div><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div></div>
-                    <div class="vital-inputs"><input type="number" id="cur-hp" value="100"><span style="font-size:20px;color:#aaa;">/</span><input type="number" id="max-hp" value="100"></div>
+                <div class="vital-bar" style="border-color: #a02e23;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
+                    </div>
+                    <div class="vital-inputs">
+                        <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
+                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
+                    </div>
                 </div>
-                <div class="vital-bar" style="border-color:#3498db;">
-                    <div style="display:flex;justify-content:space-between;"><label style="color:#3498db;">MP</label><div><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div></div>
-                    <div class="vital-inputs"><input type="number" id="cur-mp" value="100"><span style="font-size:20px;color:#aaa;">/</span><input type="number" id="max-mp" value="100"></div>
+                
+                <div class="vital-bar" style="border-color: #3498db;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#3498db; margin:0;">МАНА (MP)</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
+                    </div>
+                    <div class="vital-inputs">
+                        <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
+                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
+                    </div>
                 </div>
-                <div class="vital-bar" style="border-color:#f1c40f;">
-                    <div style="display:flex;justify-content:space-between;"><label style="color:#f1c40f;">БОЙ</label><div><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div></div>
-                    <div style="font-size:11px;">
-                        Урон: <input type="number" id="main-panel-dmg" value="2" style="width:45px;display:inline;padding:1px;"><br>
-                        Врем. броня: <input type="number" id="armor-buff" value="0" style="width:45px;display:inline;padding:1px;" onchange="updateAll()"><br>
-                        <strong>Суммарная броня: <span id="armor-total" style="color:var(--success-color);">0</span></strong>
+
+                <div class="vital-bar" style="border-color: #f1c40f;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
+                        <div style="font-size:10px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
+                    </div>
+                    <div style="font-size:11px; margin-top:2px; line-height:1.4;">
+                        Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
+                        Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:45px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
+                        <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
                     </div>
                 </div>
             </div>
+            
             <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:12px;">
-                <div>Скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной)</div>
-                <div>Мудрость на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span></div>
+                <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
+                <div>Затраты Мудрости на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span> ед.</div>
             </div>
             <div class="rest-btn" style="margin-top:8px;">
-                <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых</button>
-                <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс</button>
+                <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
+                <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс персонажа</button>
             </div>
         </div>
     </div>
 
-    <!-- ТАБ 2: ПЕРКИ -->
+    <!-- ТАБ 2: ВЕТКИ ПЕРКОВ -->
     <div id="tab2" class="tab-content">
         <div class="grid-3" id="skills-container"></div>
     </div>
@@ -433,200 +464,331 @@
     <div id="tab3" class="tab-content">
         <div class="grid-2">
             <div class="panel">
-                <h2>Боевое снаряжение</h2>
-                <label>Оружие ближнего боя</label>
+                <h2>Боевое снаряжение и Калькулятор атак</h2>
+                
+                <label>Оружие ближнего боя / Кулаки</label>
                 <div class="slot-row">
-                    <input type="text" id="wep-melee-name" value="Кулаки" onchange="updateAll()">
-                    <input type="number" id="wep-melee-dmg" value="2" onchange="updateAll()">
-                    <select id="wep-melee-type" onchange="updateAll()">
-                        <option value="unarmed">Кулаки</option>
-                        <option value="dagger">Кинжал</option>
-                        <option value="onehand">Меч/Топор/Булава</option>
-                        <option value="twohand_sword">Двуручный меч</option>
-                        <option value="twohand_axe">Двуручная секира</option>
-                        <option value="twohand_hammer">Двуручный молот</option>
+                    <input type="text" id="wep-melee-name" value="Бой голыми руками" placeholder="Название оружия" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-melee-dmg" value="2" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <select id="wep-melee-type" onchange="updateAll(); saveLocalStorage();">
+                        <option value="unarmed">Кулаки (Урон 2, без Силы)</option>
+                        <option value="dagger">Кинжал (Крит х3, +1 к атаке)</option>
+                        <option value="onehand">Меч/Топор/Булава (+Сил)</option>
+                        <option value="twohand_sword">Двуручный меч (-2 к кубам)</option>
+                        <option value="twohand_axe">Двуручная секира (-3 к кубам)</option>
+                        <option value="twohand_hammer">Двуручный молот (-4 к кубам, 10 фт)</option>
                     </select>
                 </div>
-                <label>Оружие дальнего боя</label>
+
+                <label>Оружие дальнего боя (Лук или Арбалет)</label>
                 <div class="slot-row">
-                    <input type="text" id="wep-ranged-name" value="Лук" onchange="updateAll()">
-                    <input type="number" id="wep-ranged-dmg" value="10" onchange="updateAll()">
-                    <select id="wep-ranged-type" onchange="updateAll()">
-                        <option value="bow">Лук</option>
-                        <option value="crossbow">Арбалет</option>
+                    <input type="text" id="wep-ranged-name" value="Длинный лук" placeholder="Название лука" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-ranged-dmg" value="10" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <select id="wep-ranged-type" onchange="updateAll(); saveLocalStorage();">
+                        <option value="bow">Лук (Обычный)</option>
+                        <option value="crossbow">Арбалет (1 ход на КД)</option>
                     </select>
                 </div>
-                <label>Боеприпасы</label>
+
+                <label>Экипированные боеприпасы</label>
                 <div class="slot-row">
-                    <input type="text" id="ammo-name" value="Стрелы" onchange="updateAll()">
-                    <input type="number" id="ammo-dmg" value="8" onchange="updateAll()">
+                    <input type="text" id="ammo-name" value="Железная стрела" placeholder="Название стрел" onchange="saveLocalStorage()">
+                    <input type="number" id="ammo-dmg" value="8" placeholder="Урон стрелы" onchange="updateAll(); saveLocalStorage();">
+                    <span style="width:33%; text-align:center; font-size:11px; color:#aaa;">Снаряды</span>
                 </div>
-                <label>Активное оружие</label>
-                <select id="active-combat-weapon" onchange="updateAll()">
-                    <option value="melee">Ближний бой</option>
-                    <option value="ranged">Дальний бой</option>
+
+                <label>Используемое в бою оружие (Выбор активного)</label>
+                <select id="active-combat-weapon" onchange="updateAll(); saveLocalStorage();">
+                    <option value="melee">Использовать оружие ближнего боя / Кулаки</option>
+                    <option value="ranged">Использовать стрелковое оружие (+ стрелы)</option>
                 </select>
-                <div style="margin-top:6px;">
-                    <input type="checkbox" id="chk-power-attack" onchange="updateAll()"> <label>Силовая атака</label>
-                    <input type="checkbox" id="chk-sneak-attack" onchange="updateAll()"> <label>Скрытная атака</label>
+
+                <div style="margin-top:10px; background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-power-attack" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-power-attack">Силовая атака (Урон ББ х1.5, Штраф: -1 к броску d20)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-sneak-attack" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-sneak-attack">Скрытная атака из тени (Крит х2, кинжалы х3)</label>
+                    </div>
                 </div>
-                <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px;">
-                    <h3>Расчёт боя</h3>
-                    <div id="combat-results" style="font-size:12px; line-height:1.4;"></div>
+
+                <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px; border:1px solid var(--border-color);">
+                    <h3 style="margin-top:0;">Расчет текущей боевой готовности</h3>
+                    <div id="combat-results" style="font-size:12px; line-height:1.4; color:var(--text-color);"></div>
                 </div>
             </div>
+
+            <!-- Детальные слоты Брони -->
             <div class="panel">
-                <h2>Слоты брони</h2>
-                <div class="slot-row"><span>Шлем</span><input type="text" id="slot-helm-name" onchange="updateAll()"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Кираса</span><input type="text" id="slot-chest-name" onchange="updateAll()"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Перчатки</span><input type="text" id="slot-gloves-name" onchange="updateAll()"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Сапоги</span><input type="text" id="slot-boots-name" onchange="updateAll()"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Щит</span><input type="text" id="slot-shield-name" onchange="updateAll()"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll()"></div>
-                <h3>Ювелирка</h3>
-                <div class="slot-row"><span>Кольцо</span><input type="text" id="slot-ring-name" style="width:65%;" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Ожерелье</span><input type="text" id="slot-neck-name" style="width:65%;" onchange="updateAll()"></div>
-                <div class="slot-row"><span>Обруч</span><input type="text" id="slot-circlet-name" style="width:65%;" onchange="updateAll()"></div>
-                <select id="eq-armor" onchange="updateAll()" style="width:100px; display:inline; margin-right:10px;">
-                    <option value="cloth">Одежда</option>
-                    <option value="light">Лёгкая</option>
-                    <option value="heavy">Тяжёлая</option>
-                </select>
-                <label style="display:inline;">Тип доспеха</label>
+                <h2>Слоты защитной экипировки и Украшений</h2>
+                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                
+                <h3 style="margin-top:6px; margin-bottom:4px;">💍 Активная ювелирные изделия</h3>
+                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"></div>
+                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"></div>
+                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"></div>
+                
+                <div class="checkbox-group" style="margin-top:8px;">
+                    <select id="eq-armor" onchange="updateAll(); saveLocalStorage();" style="width:100px; display:inline; margin-right:10px;">
+                        <option value="cloth">Одежда</option>
+                        <option value="light">Легкая</option>
+                        <option value="heavy">Тяжелая</option>
+                    </select>
+                    <label for="eq-armor" style="display:inline;">Комплект доспехов (Штрафы магии)</label>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ТАБ 4: ЗАКЛИНАНИЯ -->
+    <!-- ТАБ 4: КНИГА ЗАКЛИНАНИЙ СВОИМИ РУКАМИ -->
     <div id="tab4" class="tab-content">
         <div class="panel">
-            <h2>Книга Заклинаний</h2>
+            <h2>Интерактивная Книга Заклинаний и Свитки</h2>
+            <p style="font-size:11px; color:#aaa; margin-top:-8px; text-align:center;">
+                Записывайте любые заклинания, выученные в Коллегии. Вы можете вручную изменять как базовую, так и текущую стоимость каста заклинания!
+            </p>
+
             <div class="grid-2">
-                <div class="panel" style="border-color:#94291f;"><h3 style="color:#e74c3c;">Разрушение</h3><div id="spells-destr-list"></div><button class="btn" style="background:#94291f;color:white;" onclick="addCustomSpell('destr')">+ Выучить</button></div>
-                <div class="panel" style="border-color:#1e8449;"><h3 style="color:#2ecc71;">Восстановление</h3><div id="spells-restor-list"></div><button class="btn" style="background:#1e8449;color:white;" onclick="addCustomSpell('restor')">+ Выучить</button></div>
-                <div class="panel" style="border-color:#f1c40f;"><h3 style="color:#f1c40f;">Изменение</h3><div id="spells-alter-list"></div><button class="btn" style="background:#f39c12;color:white;" onclick="addCustomSpell('alter')">+ Выучить</button></div>
-                <div class="panel" style="border-color:#8e44ad;"><h3 style="color:#9b59b6;">Иллюзия</h3><div id="spells-illus-list"></div><button class="btn" style="background:#8e44ad;color:white;" onclick="addCustomSpell('illus')">+ Выучить</button></div>
-                <div class="panel" style="border-color:#34495e;"><h3 style="color:#5d6d7e;">Колдовство</h3><div id="spells-conj-list"></div><button class="btn" style="background:#34495e;color:white;" onclick="addCustomSpell('conj')">+ Выучить</button></div>
+                <!-- Школа Разрушения -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#94291f;">
+                    <h3 style="color:#e74c3c;">🔥 Школа Разрушения</h3>
+                    <div id="spells-destr-list"></div>
+                    <button class="btn" style="background:#94291f; color:white; font-size:11px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
+                </div>
+
+                <!-- Школа Восстановления -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#1e8449;">
+                    <h3 style="color:#2ecc71;">☀️ Школа Восстановления</h3>
+                    <div id="spells-restor-list"></div>
+                    <button class="btn" style="background:#1e8449; color:white; font-size:11px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
+                </div>
+
+                <!-- Школа Изменения -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#f1c40f;">
+                    <h3 style="color:#f1c40f;">🍃 Школа Изменения</h3>
+                    <div id="spells-alter-list"></div>
+                    <button class="btn" style="background:#f39c12; color:white; font-size:11px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
+                </div>
+
+                <!-- Школа Иллюзии -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#8e44ad;">
+                    <h3 style="color:#9b59b6;">👁️ Школа Иллюзии</h3>
+                    <div id="spells-illus-list"></div>
+                    <button class="btn" style="background:#8e44ad; color:white; font-size:11px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
+                </div>
+
+                <!-- Школа Колдовства -->
+                <div class="panel" style="background:var(--panel-sub); border-color:#34495e;">
+                    <h3 style="color:#5d6d7e;">💀 Школа Колдовства</h3>
+                    <div id="spells-conj-list"></div>
+                    <button class="btn" style="background:#34495e; color:white; font-size:11px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
+                </div>
+
+                <!-- Лаборатория писца -->
                 <div class="panel" style="background:#111; border-color:var(--accent-color);">
-                    <h3>📜 Свитки</h3>
+                    <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
+                    <p style="font-size:11px; color:#aaa; margin-top:-2px;">
+                        Для создания требуются пергамент и чернила. Траты очков Мудрости: Новичок = 1, Ученик = 2, Адепт = 3, Эксперт = 4 ед.
+                    </p>
+                    <label>Круг заклинания свитка</label>
                     <select id="scroll-craft-tier">
-                        <option value="1">Новичок (1 Мудр.)</option>
-                        <option value="2">Ученик (2 Мудр.)</option>
-                        <option value="3">Адепт (3 Мудр.)</option>
-                        <option value="4">Эксперт (4 Мудр.)</option>
+                        <option value="1">Новичок (Тратит 1 Мудрость, Цена создания: 2 маны)</option>
+                        <option value="2">Ученик (Тратит 2 Мудрости, Цена создания: 4 маны)</option>
+                        <option value="3">Адепт (Тратит 3 Мудрости, Цена создания: 6 маны)</option>
+                        <option value="4">Эксперт (Тратит 4 Мудрости, Цена создания: 8 маны)</option>
                     </select>
-                    <button class="btn" onclick="craftScrollInSheet()">Начертить</button>
+                    <button class="btn" onclick="craftScrollInSheet()">Начертить свиток во время отдыха</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ТАБ 5: ИНВЕНТАРЬ -->
+    <!-- ТАБ 5: ИНВЕНТАРЬ СВОИМИ РУКАМИ -->
     <div id="tab5" class="tab-content">
-        <div class="grid-2">
+           <div class="grid-2">
+            <!-- Вес и ресурсы инвентаря -->
             <div class="panel">
-                <h2>🎒 Инвентарь</h2>
-                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
-                    <input type="text" id="item-add-input" placeholder="Название предмета..." style="flex:1; min-width:150px;" list="item-suggestions">
-                    <datalist id="item-suggestions"></datalist>
-                    <input type="number" id="item-add-count" value="1" min="1" style="width:60px;">
-                    <button class="btn" style="width:auto; padding:4px 12px; margin:0;" onclick="addItemToInventory()">+ Добавить</button>
+                <h2>Инвентарь ресурсов и Снаряжения</h2>
+                <div style="max-height: 420px; overflow-y: auto; padding-right:5px;">
+                    <!-- Группа: Ресурсы -->
+                    <div class="inv-group">
+                        <h4>🐻 Шкуры и кожа</h4>
+                        <div class="stat-block"><span>Шкура медведя (вес 3, 50 септ.)</span><input type="number" id="inv-hide-bear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Шкура саблезуба (вес 2, 25 септ.)</span><input type="number" id="inv-hide-sable" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Волчья шкура (вес 1, 10 септ.)</span><input type="number" id="inv-hide-wolf" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Кожа (вес 2, 10 септ.)</span><input type="number" id="inv-leather" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Полоски кожи (вес 1, 3 септ.)</span><input type="number" id="inv-leather-strips" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Руды и слитки -->
+                    <div class="inv-group">
+                        <h4>⛏️ Руды и слитки</h4>
+                        <div class="stat-block"><span>Железный слиток (вес 1, 7 септ.)</span><input type="number" id="inv-ing-iron" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Стальной слиток (вес 1, 29 септ.)</span><input type="number" id="inv-ing-steel" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Корундовый слиток (вес 1, 40 септ.)</span><input type="number" id="inv-ing-corundum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Орихалковый слиток (вес 1, 45 септ.)</span><input type="number" id="inv-ing-orichalcum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Эбонитовый слиток (вес 1, 150 септ.)</span><input type="number" id="inv-ing-ebony" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Камни душ -->
+                    <div class="inv-group">
+                        <h4>💎 Камни душ</h4>
+                        <div class="stat-block"><span>Крохотный камень душ (вес 1, 10 септ.)</span><input type="number" id="inv-gem-petty" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Великий камень душ (вес 1, 200 септ.)</span><input type="number" id="inv-gem-grand" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Двемерские детали -->
+                    <div class="inv-group">
+                        <h4>⚙️ Двемерские артефакты</h4>
+                        <div class="stat-block"><span>Двемерская балка (вес 20, 15 септ.)</span><input type="number" id="inv-dw-beam" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Двемерская шестерня (вес 10, 5 септ.)</span><input type="number" id="inv-dw-gear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Сердечник центуриона (вес 4, 131 септ.)</span><input type="number" id="inv-dw-core" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
+                    <!-- Группа: Снаряжение -->
+                    <div class="inv-group">
+                        <h4>🏕️ Походное снаряжение</h4>
+                        <div class="stat-block"><span>Палатка 15х15 футов (вес 10, 300 септ.)</span><input type="number" id="inv-tent" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                        <div class="stat-block"><span>Спальный мешок (вес 3, 75 септ.)</span><input type="number" id="inv-bag" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
+                    </div>
                 </div>
-                <div id="inventory-list" style="max-height:400px; overflow-y:auto;"></div>
-                <div style="margin-top:10px; background:var(--input-bg); padding:8px; border-radius:4px;">
-                    <strong>Общий вес: <span id="inventory-total-weight">0</span> / <span id="inventory-max-weight">50</span> фунтов</strong>
-                    <div style="font-size:11px; color:#aaa;">(Грузоподъёмность = Сила × 5)</div>
-                    <div class="alert-box" id="inventory-overweight" style="display:none;">ПЕРЕГРУЗ!</div>
-                </div>
-                <label style="margin-top:10px;">💰 Золото</label>
-                <input type="number" id="char-gold" value="150" onchange="saveCharacterDebounced()">
-            </div>
-            <div class="panel">
-                <h2>🔧 Управление</h2>
-                <button class="btn" onclick="syncInventoryToCloud()">Синхронизировать</button>
-                <button class="btn btn-danger" onclick="clearInventory()">Очистить инвентарь</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- ТАБ 6: БОГИ И ВЫЖИВАНИЕ -->
-    <div id="tab6" class="tab-content">
-        <div class="grid-2">
+                <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px; border:1px solid var(--border-color); font-size:13px;">
+                    <div class="weight-row">
+                        <span>Текущая Грузоподъемность: <span id="weight-current" style="font-weight:bold; color:var(--accent-color);">0</span> / </span>
+                        <span><span id="weight-max-display" style="font-weight:bold;">50</span> фунтов</span>
+                    </div>
+                    <div class="weight-row" style="margin-top:4px;">
+                        <label style="display:inline; font-weight:normal; font-size:12px;">
+                            <input type="checkbox" id="manual-weight-lock" onchange="updateAll(); saveLocalStorage();"> Ручная грузоподъемность (макс.)
+                        </label>
+                        <input type="number" id="max-weight-input" value="50" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                    </div>
+                    <div class="weight-row" style="margin-top:4px;">
+                        <label for="extra-weight" style="display:inline; font-weight:normal; font-size:12px;">➕ Дополнительный вес (снаряжение, оружие, броня):</label>
+                        <input type="number" id="extra-weight" value="0" min="0" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                    </div>
+                    <div class="alert-box" id="overweight-alert">ВНИМАНИЕ: ПЕРЕГРУЗ! Помеха на скорость (падает до 5 фт).</div>
+                </div>
+
+                <label style="margin-top:10px; font-size:13px;">💰 Золотые септимы</label>
+                <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
+            </div>
+
+             <!-- Религия, Еда, Рецепты и Заметки -->
             <div class="panel">
-                <h2>Выживание</h2>
-                <label>Голодание (дней без еды)</label>
-                <input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll()">
-                <label>Активные блюда</label>
-                <div id="active-food-effects" style="background:var(--panel-sub); padding:6px; border-radius:4px; min-height:40px;"></div>
-                <div class="checkbox-group"><input type="checkbox" id="chk-frost-region" onchange="updateAll()"><label>Морозный регион</label></div>
-                <h3>Религия</h3>
-                <label>Бог</label>
-                <select id="faith-god" onchange="updateAll()">
-                    <option value="none">Без веры</option>
-                    <optgroup label="Аэдра">
-                        <option value="zenithar">Зенитар</option>
-                        <option value="stendarr">Стендарр</option>
-                        <option value="julianos">Джулианос</option>
-                        <option value="mara">Мара</option>
-                        <option value="dibella">Дибелла</option>
-                        <option value="kynareth">Кинарет</option>
-                        <option value="arkay">Аркей</option>
-                        <option value="talos">Талос</option>
-                        <option value="akatosh">Акатош</option>
+                <h2>Выживание и Пантеон Богов</h2>
+                
+                <label>Голодание (Пропущено дней без еды)</label>
+                <input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll(); saveLocalStorage();">
+
+                <label>Активные кулинарные эффекты (Лимит: 2 блюда)</label>
+                <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 120px; overflow-y: auto;">
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food1" data-hp="20" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food1">Капустный суп с картошкой (+20 HP)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food2" data-mp="25" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food2">Эльсвейрское фондю (+25 MP)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food3" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food3">Томатный суп (+10 урона заклинаний)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food4" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food4">Похлёбка из оленины (+5 к скорости)</label></div>
+                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food5" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food5">Слойка с лавандой (+10% резист к магии)</label></div>
+                </div>
+                
+                <div class="checkbox-group" style="margin-top:10px;">
+                    <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
+                    <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
+                </div>
+
+                <h3 style="margin-top:15px;">Религия и Благословения</h3>
+                <label>Священный покровитель (Аэдра или Принц Даэдра)</label>
+                <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
+                    <option value="none">Без веры / Атеист</option>
+                    <optgroup label="9 Божеств Аэдра">
+                        <option value="zenithar">Зенитар (Труд, Бонус к HP, силовому урону)</option>
+                        <option value="stendarr">Стендарр (Защита и чистый урон по даэдра/нежити)</option>
+                        <option value="julianos">Джулианос (+Манапул, скидка на касты)</option>
+                        <option value="mara">Мара (Резист ядам/болезням, сила хила)</option>
+                        <option value="dibella">Дибелла (Бонус к броне плоти и красноречию)</option>
+                        <option value="kynareth">Кинарет (Иммунитет к падению, пробитие брони)</option>
+                        <option value="arkay">Аркей (+Защита, резист к холоду)</option>
+                        <option value="talos">Талос (+Урон топорами/секирами, резист к крикам)</option>
+                        <option value="akatosh">Акатош (+Броня, урон зачарования, резист огню)</option>
                     </optgroup>
-                    <optgroup label="Даэдра">
-                        <option value="boethiah">Боэтия</option>
-                        <option value="mephala">Мефала</option>
-                        <option value="peryite">Периайт</option>
-                        <option value="hermaeus">Хермеус Мора</option>
-                        <option value="nocturnal">Ноктюрнал</option>
-                        <option value="malacath">Малакат</option>
-                        <option value="azura">Азура</option>
-                        <option value="meridia">Меридия</option>
-                        <option value="mehrunes">Мерунес Дагон</option>
-                        <option value="sanguine">Сангвин</option>
-                        <option value="namira">Намира</option>
-                        <option value="vaermina">Вермина</option>
-                        <option value="sheogorath">Шеогорат</option>
-                        <option value="clavicus">Клавикус Вайл</option>
-                        <option value="molag">Молаг Бал</option>
-                        <option value="hircine">Хирсин</option>
+                    <optgroup label="Принцы Даэдра">
+                        <option value="boethiah">Боэтия (Скрытность, скорость, урон из тени)</option>
+                        <option value="mephala">Мефала (Яды, вампиризм при атаках)</option>
+                        <option value="peryite">Периайт (Болезни превращаются в мощные баффы)</option>
+                        <option value="hermaeus">Хермеус Мора (+Мана, вампиризм заклинаниями)</option>
+                        <option value="nocturnal">Ноктюрнал (Скорость, множитель скрытности)</option>
+                        <option value="malacath">Малакат (+HP, огромный урон силовых атак)</option>
+                        <option value="azura">Азура (Зачарование, резист стихиям)</option>
+                        <option value="meridia">Меридия (Скидки восстановления, урон по нежити)</option>
+                        <option value="mehrunes">Мерунес Дагон (+Мана, урон огнем, 1% шанс ваншота)</option>
+                        <option value="sanguine">Сангвин (Бафф физ. урона от алкоголя, вампиризм)</option>
+                        <option value="namira">Намира (Усиление зелий, бафф за поедание тел)</option>
+                        <option value="vaermina">Вермина (Бесшумные иллюзии, шанс обратить в страх)</option>
+                        <option value="sheogorath">Шеогорат (Рандом урона/защиты каждый ход!)</option>
+                        <option value="clavicus">Клавикус Вайл (+HP, красноречие, пробитие брони)</option>
+                        <option value="molag">Молаг Бал (+HP/MP, резист физ. урону, вампиризм оружия)</option>
+                        <option value="hircine">Хирсин (+Броня, скорость, урон оборотня)</option>
                     </optgroup>
                 </select>
-                <label>Ранг</label><select id="faith-rank" onchange="updateAll()"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-                <div class="alert-box" id="daedra-alert" style="background:#d35400;">ВНИМАНИЕ: Даэдра!</div>
-                <label>Заметки веры</label><textarea id="faith-notes" rows="2" onchange="saveLocalStorage()"></textarea>
-                <label>Блокнот</label><textarea id="char-notes" rows="5" onchange="saveLocalStorage()"></textarea>
+
+                <label>Стадия Благословения (Ранг преданности)</label>
+                <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
+                    <option value="1">1 Ранг (Последователь)</option>
+                    <option value="2">2 Ранг (Ревнитель веры)</option>
+                    <option value="3">3 Ранг (Избранник божества)</option>
+                </select>
+                <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none;">
+                    ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
+                </div>
+
+                <!-- Текстовое окно для записи точных эффектов бога -->
+                <label style="margin-top:10px;">Текущий дар и догматы божества (Заметки веры)</label>
+                <textarea id="faith-notes" rows="2" placeholder="Запишите сюда точный бонус выбранного ранга вашего бога (например: Талос 1 р. — +5% урона топорами)..." onchange="saveLocalStorage()"></textarea>
+
+                <!-- Походный блокнот для рецептов алхимии и кузнечки -->
+                <div style="margin-top:12px; background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
+                    <label>📜 Походный блокнот (Рецепты алхимии, кузнечного дела и заметки квестов)</label>
+                    <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ТАБ 7: СЕССИЯ -->
-    <div id="tab7" class="tab-content">
+    <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
+    <div id="tab6" class="tab-content">
         <div class="panel">
             <h2>🎲 Сессия</h2>
+
             <div id="session-join-block">
-                <p style="font-size:13px; opacity:.85;">Введи код сессии, который дал мастер.</p>
+                <p style="font-size:13px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
                 <label>Код сессии</label>
                 <input type="text" id="session-code-input" placeholder="Например: A1B2C3" maxlength="8" style="text-transform:uppercase;">
                 <button class="btn-success" style="margin-top:8px;" onclick="joinSession()">Присоединиться</button>
-                <p style="font-size:12px; opacity:.75; margin-top:12px;">Ты мастер? Открой <a href="gm.html" target="_blank" style="color:var(--accent-color);">gm.html</a>.</p>
+                <p style="font-size:12px; opacity:.75; margin-top:12px;">Ты мастер? Открой <a href="gm.html" target="_blank" style="color:var(--accent-color);">gm.html</a> — там создаётся сессия и код для игроков.</p>
                 <div id="session-join-error" class="auth-error" style="display:none;"></div>
             </div>
+
             <div id="session-active-block" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>Сессия: <span class="session-code-badge" id="session-code-display">-</span></div>
-                    <button class="btn-danger" onclick="leaveSession()">Покинуть</button>
+                    <button class="btn-danger" onclick="leaveSession()">Покинуть сессию</button>
                 </div>
-                <h3>⚔️ Отряд</h3>
+
+                <h3 style="margin-top:16px;">⚔️ Отряд</h3>
                 <div id="party-list"></div>
+
                 <h3>👹 Противники</h3>
                 <div id="enemies-list"></div>
+
                 <h3>🎯 Инициатива</h3>
                 <div id="initiative-list"></div>
+
                 <h3>📖 Боевой журнал</h3>
                 <div id="combat-log" class="combat-log"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
-                    <input type="text" id="log-input" placeholder="Написать в журнал..." style="flex:1;">
+                    <input type="text" id="log-input" placeholder="Написать в журнал (например: Атакую волка на 12 урона)..." style="flex:1;">
                     <button onclick="postLogEntry()">Отправить</button>
                 </div>
             </div>
@@ -634,1212 +796,738 @@
     </div>
 
 <script>
-// =====================================================================
-// БАЗА ВСЕХ ПРЕДМЕТОВ (из Вещи.txt) – полный справочник
-// =====================================================================
-const allItems = [
-    // --- Ювелирные изделия ---
-    { name: "Серебряное кольцо", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 30 },
-    { name: "Серебряное кольцо с аметистом", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 180 },
-    { name: "Серебряное кольцо с гранатом", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 160 },
-    { name: "Серебряное кольцо с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 260 },
-    { name: "Золотое кольцо", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 75 },
-    { name: "Золотое кольцо с бриллиантом", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 900 },
-    { name: "Золотое кольцо с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 700 },
-    { name: "Золотое кольцо с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "ring", weight: 0.25, price: 500 },
-    { name: "Медный обруч с ониксом", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 50 },
-    { name: "Медный обруч с лунным камнем", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 100 },
-    { name: "Медный обруч с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 150 },
-    { name: "Медный обруч с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 200 },
-    { name: "Серебряный обруч с лунным камнем", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 250 },
-    { name: "Нефритовый обруч с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 300 },
-    { name: "Нефритовый обруч с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 350 },
-    { name: "Серебряный обруч с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 400 },
-    { name: "Золотой обруч с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 450 },
-    { name: "Золотой обруч с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 500 },
-    { name: "Серебряное ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 60 },
-    { name: "Серебряное ожерелье с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 830 },
-    { name: "Серебряное ожерелье с гранатами", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 380 },
-    { name: "Серебряное ожерелье с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 580 },
-    { name: "Золотое ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 120 },
-    { name: "Золотое ожерелье с бриллиантом", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 1200 },
-    { name: "Золотое ожерелье с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 550 },
-    { name: "Золотое ожерелье с аметистами", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 485 },
-    { name: "Амулет (Аэдра)", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 1, price: 100 },
-    { name: "Кулон Восточной имперской компании", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 25 },
-    { name: "Амулет скаала", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 1, price: 1000 },
+    // Массив всех 18 навыков игровой системы Скурим
+    const skillNames = [
+        "Одноручное оружие", "Двуручное оружие", "Стрельба", "Блокирование", 
+        "Тяжелая броня", "Легкая броня", "Скрытность", "Взлом", 
+        "Карманные кражи", "Красноречие", "Разрушение", "Восстановление", 
+        "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование"
+    ];
 
-    // --- Кузнечные ингредиенты ---
-    { name: "Кожа", category: "Кузнечные ингредиенты", type: "misc", weight: 2, price: 10 },
-    { name: "Полоски кожи", category: "Кузнечные ингредиенты", type: "misc", weight: 0.1, price: 3 },
-    { name: "Железный слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 7 },
-    { name: "Стальной слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 29 },
-    { name: "Корундовый слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 40 },
-    { name: "Двемерский слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 30 },
-    { name: "Орихалковый слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 45 },
-    { name: "Ртутный слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 60 },
-    { name: "Лунный камень", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 75 },
-    { name: "Малахитовый слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 100 },
-    { name: "Эбонитовый слиток", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 150 },
-    { name: "Железная руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 2 },
-    { name: "Корундовая руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 20 },
-    { name: "Эбонитовая руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 60 },
-    { name: "Золотая руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 50 },
-    { name: "Малахитовая руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 20 },
-    { name: "Орихалковая руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 20 },
-    { name: "Ртутная руда", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 25 },
-    { name: "Сталгрим", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 70 },
+    // Глобальный массив для хранения пользовательских кастомных заклинаний
+    let customSpells = [];
+    let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
 
-    // --- Шкуры ---
-    { name: "Шкура медведя", category: "Шкуры", type: "misc", weight: 3, price: 50 },
-    { name: "Шкура пещерного медведя", category: "Шкуры", type: "misc", weight: 3, price: 60 },
-    { name: "Шкура белого медведя", category: "Шкуры", type: "misc", weight: 3, price: 75 },
-    { name: "Шкура саблезуба", category: "Шкуры", type: "misc", weight: 2, price: 25 },
-    { name: "Шкура снежного саблезуба", category: "Шкуры", type: "misc", weight: 2, price: 40 },
-    { name: "Волчья шкура", category: "Шкуры", type: "misc", weight: 1, price: 10 },
-    { name: "Шкура снежного волка", category: "Шкуры", type: "misc", weight: 1, price: 15 },
-    { name: "Козья шкура", category: "Шкуры", type: "misc", weight: 1, price: 5 },
-    { name: "Коровья шкура", category: "Шкуры", type: "misc", weight: 2, price: 10 },
-    { name: "Оленья шкура", category: "Шкуры", type: "misc", weight: 2, price: 10 },
-    { name: "Лошадиная шкура", category: "Шкуры", type: "misc", weight: 2, price: 15 },
-    { name: "Шкура лисицы", category: "Шкуры", type: "misc", weight: 0.5, price: 5 },
-    { name: "Шкура снежной лисицы", category: "Шкуры", type: "misc", weight: 0.5, price: 7 },
+    // Динамический рендеринг 18 навыков и генерация многоступенчатых чекбоксов перков
+    function initSkills() {
+        const container = document.getElementById('skills-container');
+        if (!container) return;
+        container.innerHTML = "";
+        
+        skillNames.forEach((name, idx) => {
+            let pList = fullPerksManifest[name] || [];
+            
+            // Генерация чекбоксов для перков с учетом их ступеней (от 1 до steps)
+            let perksHtml = pList.map((p, pItemIdx) => {
+                let stepsHtml = "";
+                for (let s = 1; s <= p.steps; s++) {
+                    let checkboxId = `perk-${idx}-${pItemIdx}-${s}`;
+                    stepsHtml += `
+                        <input type="checkbox" 
+                               id="${checkboxId}" 
+                               class="perk-checkbox" 
+                               data-skillidx="${idx}" 
+                               data-perkidx="${pItemIdx}" 
+                               data-step="${s}" 
+                               onchange="updateAll(); saveLocalStorage();">
+                    `;
+                }
+                return `
+                    <div class="perk-item">
+                        <div class="perk-left">
+                            <span style="color:#cfc5b6; font-size:12px;">${p.name}</span>
+                        </div>
+                        <div class="perk-steps">
+                            ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:10px; opacity:0.6;">(1-${p.steps})</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
 
-    // --- Камни душ и драгоценности ---
-    { name: "Крохотный камень душ", category: "Камни душ", type: "misc", weight: 0.1, price: 10 },
-    { name: "Маленький камень душ", category: "Камни душ", type: "misc", weight: 0.2, price: 25 },
-    { name: "Обычный камень душ", category: "Камни душ", type: "misc", weight: 0.333, price: 50 },
-    { name: "Большой камень душ", category: "Камни душ", type: "misc", weight: 0.5, price: 100 },
-    { name: "Великий камень душ", category: "Камни душ", type: "misc", weight: 0.5, price: 200 },
-    { name: "Чёрный камень душ", category: "Камни душ", type: "misc", weight: 1, price: 300 },
-    { name: "Аметист", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 120 },
-    { name: "Бриллиант", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 800 },
-    { name: "Гранат", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 100 },
-    { name: "Изумруд", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 600 },
-    { name: "Рубин", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 200 },
-    { name: "Сапфир", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 400 },
-    { name: "Безупречный аметист", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 180 },
-    { name: "Безупречный бриллиант", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 1000 },
-    { name: "Безупречный гранат", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 150 },
-    { name: "Безупречный изумруд", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 750 },
-    { name: "Безупречный рубин", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 350 },
-    { name: "Безупречный сапфир", category: "Драгоценные камни", type: "misc", weight: 0.1, price: 500 },
+            // Подсказки для некоторых навыков
+            let hint = "";
+            if(name === "Взлом") hint = `<div class="shw-hint">Замки: Новичок 9 (-2), Ученик 12 (-3), Адепт 15 (-4), Эксперт 17 (-5)</div>`;
+            if(name === "Блокирование") hint = `<div class="shw-hint">Не щитом: -3 к проверке атак. Щит эффективнее. Удар плашмя: дает врагу -1.</div>`;
 
-    // --- Походное снаряжение ---
-    { name: "Спальный мешок", category: "Походное снаряжение", type: "misc", weight: 3, price: 75 },
-    { name: "Палатка (15x15 футов)", category: "Походное снаряжение", type: "misc", weight: 10, price: 300 },
-    { name: "Алхимический куб", category: "Походное снаряжение", type: "misc", weight: 5, price: 450 },
-    { name: "Подсумок на 2 зелья", category: "Походное снаряжение", type: "misc", weight: 2, price: 50 },
-    { name: "Подсумок на 4 зелья", category: "Походное снаряжение", type: "misc", weight: 2, price: 250 },
-    { name: "Подсумок на 6 зелий", category: "Походное снаряжение", type: "misc", weight: 2, price: 400 },
-    { name: "Подсумок на 8 зелий", category: "Походное снаряжение", type: "misc", weight: 2, price: 800 },
-    { name: "Карта владения", category: "Походное снаряжение", type: "misc", weight: 1, price: 150 },
-    { name: "Котелок с столовыми приборами", category: "Походное снаряжение", type: "misc", weight: 10, price: 75 },
-    { name: "Набор для костра", category: "Походное снаряжение", type: "misc", weight: 5, price: 25 },
-    { name: "Походный рюкзак", category: "Походное снаряжение", type: "misc", weight: 5, price: 250 },
-    { name: "Факел", category: "Походное снаряжение", type: "misc", weight: 1, price: 10 },
-    { name: "Полено", category: "Походное снаряжение", type: "misc", weight: 5, price: 5 },
-    { name: "Лечебная припарка", category: "Походное снаряжение", type: "misc", weight: 0.5, price: 40 },
-
-    // --- Двемерские детали ---
-    { name: "Сердечник генератора центуриона", category: "Двемерские детали", type: "misc", weight: 4, price: 131 },
-    { name: "Малый двемерский рычаг", category: "Двемерские детали", type: "misc", weight: 2, price: 15 },
-    { name: "Малая двемерская металлическая пластина", category: "Двемерские детали", type: "misc", weight: 2, price: 15 },
-    { name: "Двемерский рычаг", category: "Двемерские детали", type: "misc", weight: 2, price: 15 },
-    { name: "Двемерский металлолом", category: "Двемерские детали", type: "misc", weight: 2, price: 15 },
-    { name: "Двемерский гироскоп", category: "Двемерские детали", type: "misc", weight: 2, price: 15 },
-    { name: "Двемерская шестерня", category: "Двемерские детали", type: "misc", weight: 10, price: 5 },
-    { name: "Двемерская металлическая отливка", category: "Двемерские детали", type: "misc", weight: 25, price: 25 },
-    { name: "Гнутый двемерский металлолом", category: "Двемерские детали", type: "misc", weight: 3, price: 15 },
-    { name: "Большая декоративная двемерская балка", category: "Двемерские детали", type: "misc", weight: 15, price: 10 },
-    { name: "Большая двемерская металлическая пластина", category: "Двемерские детали", type: "misc", weight: 3, price: 15 },
-    { name: "Большая двемерская балка", category: "Двемерские детали", type: "misc", weight: 20, price: 15 },
-
-    // --- Бытовые предметы ---
-    { name: "Метла", category: "Бытовые предметы", type: "misc", weight: 1, price: 1 },
-    { name: "Бадья", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
-    { name: "Вилка", category: "Бытовые предметы", type: "misc", weight: 1, price: 1 },
-    { name: "Деревянная миска", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
-    { name: "Бивень мамонта", category: "Бытовые предметы", type: "misc", weight: 5, price: 150 },
-    { name: "Инструмент для бальзамирования", category: "Бытовые предметы", type: "misc", weight: 1, price: 2 },
-    { name: "Испорченная книга", category: "Бытовые предметы", type: "misc", weight: 1, price: 1 },
-    { name: "Казан", category: "Бытовые предметы", type: "misc", weight: 2, price: 4 },
-    { name: "Корзина", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
-    { name: "Кран", category: "Бытовые предметы", type: "misc", weight: 2, price: 1 },
-    { name: "Кубок", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 5 },
-    { name: "Пивная кружка", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
-    { name: "Чугунный ковш", category: "Бытовые предметы", type: "misc", weight: 3, price: 2 },
-    { name: "Чугунная кастрюля", category: "Бытовые предметы", type: "misc", weight: 4, price: 2 },
-    { name: "Чашка", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 5 },
-    { name: "Утюг", category: "Бытовые предметы", type: "misc", weight: 1, price: 5 },
-    { name: "Уголь", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 2 },
-    { name: "Ящик вина", category: "Бытовые предметы", type: "misc", weight: 6, price: 2 },
-    { name: "Клык хоркера", category: "Бытовые предметы", type: "misc", weight: 1, price: 15 },
-    { name: "Череп троля", category: "Бытовые предметы", type: "misc", weight: 3, price: 5 },
-    { name: "Деревянный меч", category: "Бытовые предметы", type: "misc", weight: 2, price: 25 },
-    { name: "Зелёное/красное платье для девочки", category: "Бытовые предметы", type: "misc", weight: 1, price: 25 },
-    { name: "Соль", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 2 },
-    { name: "Мешок муки", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
-    { name: "Масло", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 2 },
-    { name: "Тарелка", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 1 },
-    { name: "Пачка сигарет (10 шт, восстанавливает 5 маны)", category: "Бытовые предметы", type: "misc", weight: 1, price: 50 },
-    { name: "Трубка для курения", category: "Бытовые предметы", type: "misc", weight: 0.1, price: 5 },
-    { name: "Мешочек Вазьмицы (хватает на 10 раз)", category: "Бытовые предметы", type: "misc", weight: 0.1, price: 10 },
-    { name: "Пергамент", category: "Бытовые предметы", type: "misc", weight: 0.1, price: 5 },
-    { name: "Чернила", category: "Бытовые предметы", type: "misc", weight: 0.1, price: 15 },
-    { name: "Лопата", category: "Бытовые предметы", type: "misc", weight: 4, price: 3 },
-    { name: "Серебряный кувшин", category: "Бытовые предметы", type: "misc", weight: 2, price: 30 },
-    { name: "Серебряный кубок", category: "Бытовые предметы", type: "misc", weight: 1, price: 15 },
-    { name: "Кукла", category: "Бытовые предметы", type: "misc", weight: 2, price: 10 },
-    { name: "Древняя нордская кирка", category: "Бытовые предметы", type: "misc", weight: 5, price: 100 },
-
-    // --- Ингредиенты для алхимии (сокращённо, но полный список из Вещи.txt) ---
-    // Я вставляю только несколько для примера, но ты можешь добавить все остальные из своего файла.
-    // В реальном коде здесь должен быть полный список из 100+ ингредиентов.
-    // Для краткости я добавлю все из твоего файла, но здесь сжато.
-    { name: "Абесинский окунь", category: "Ингредиенты для алхимии", type: "misc", weight: 0.5, price: 15 },
-    { name: "Алый корень Нирна", category: "Ингредиенты для алхимии", type: "misc", weight: 0.2, price: 10 },
-    { name: "Белянка", category: "Ингредиенты для алхимии", type: "misc", weight: 0.333, price: 2 },
-    { name: "Бесовский гриб", category: "Ингредиенты для алхимии", type: "misc", weight: 0.333, price: 2 },
-    // ... (добавь остальные ингредиенты, если нужно)
-
-    // --- Сырые продукты, готовые продукты, напитки ---
-    // (можно добавить аналогично)
-
-    // --- Посохи, маски, уникальная броня, оружие и т.д. ---
-    // Для полноты я рекомендую взять весь массив из твоего файла Вещи.txt и вставить его сюда,
-    // потому что там есть все 40 посохов, артефакты, уникальная броня и т.д.
-    // Здесь я приведу лишь несколько примеров, чтобы не раздувать ответ.
-    { name: "Посох пламени", category: "Посохи", type: "staff", weight: 8, price: 182, charges: 12, effect: "Струя пламени (16 урона)" },
-    { name: "Маска Азидала", category: "Маски жрецов", type: "armor", slot: "helmet", armor: 23, weight: 3, price: 1165, effect: "Сопротивление огню +50%, урон огнём +25%" },
-    { name: "Закрисош", category: "Маски жрецов", type: "armor", slot: "helmet", armor: 23, weight: 4, price: 500, effect: "Сопротивление электричеству +50%, урон электричеством +25%" },
-    // ... и так далее
-    // Вставь сюда полный массив allItems из своего файла Вещи.txt.
-    // Убедись, что он заканчивается корректно.
-];
-
-// =====================================================================
-// ОСНОВНОЙ СКРИПТ (ваши существующие функции)
-// =====================================================================
-
-const skillNames = [
-    "Одноручное оружие", "Двуручное оружие", "Стрельба", "Блокирование",
-    "Тяжелая броня", "Легкая броня", "Скрытность", "Взлом",
-    "Карманные кражи", "Красноречие", "Разрушение", "Восстановление",
-    "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование"
-];
-
-let customSpells = [];
-let scrollWisdomSpent = 0;
-let currentCharacter = {};
-
-// =====================================================================
-// ИНИЦИАЛИЗАЦИЯ ПЕРКОВ
-// =====================================================================
-function initSkills() {
-    const container = document.getElementById('skills-container');
-    if (!container) return;
-    container.innerHTML = "";
-    skillNames.forEach((name, idx) => {
-        let pList = fullPerksManifest[name] || [];
-        let perksHtml = pList.map((p, pItemIdx) => {
-            let stepsHtml = "";
-            for (let s = 1; s <= p.steps; s++) {
-                stepsHtml += `<input type="checkbox" id="perk-${idx}-${pItemIdx}-${s}" class="perk-checkbox" data-skillidx="${idx}" data-perkidx="${pItemIdx}" data-step="${s}" onchange="updateAll(); saveLocalStorage();">`;
-            }
-            return `<div class="perk-item"><span>${p.name}</span><div class="perk-steps">${stepsHtml}</div></div>`;
-        }).join('');
-        let hint = (name === "Взлом") ? `<div class="shw-hint">Замки: Новичок 9 (-2), Ученик 12 (-3), Адепт 15 (-4), Эксперт 17 (-5)</div>` : "";
-        container.innerHTML += `
-            <div class="panel" style="background:var(--panel-sub); margin-bottom:8px; padding:8px; border:1px solid #363025;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-weight:bold; font-size:13px; width:70%; color:var(--accent-color);">${name}</span>
-                    <input type="number" id="skill-${idx}" value="10" min="10" style="width:48px; text-align:center;" data-raw-val="10" onchange="handleSkillChange(this, ${idx})">
+            container.innerHTML += `
+                <div class="panel" style="background:var(--panel-sub); margin-bottom:8px; padding:8px; border:1px solid #363025;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold; font-size:13px; width:70%; color:var(--accent-color);">${name}</span>
+                        <input type="number" id="skill-${idx}" value="10" min="10" style="width:48px; text-align:center;" data-raw-val="10" onchange="handleSkillChange(this, ${idx})">
+                    </div>
+                    ${hint}
+                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : ''}
                 </div>
-                ${hint}
-                <div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>
-            </div>`;
-    });
-}
-
-function handleSkillChange(input, idx) {
-    let raw = parseInt(input.value) || 10;
-    if (raw < 10) raw = 10;
-    input.setAttribute('data-raw-val', raw);
-    updateAll();
-    saveLocalStorage();
-}
-
-function handleStatChange(input) {
-    let raw = parseInt(input.value) || 10;
-    if (raw < 1) raw = 1;
-    input.setAttribute('data-raw-stat', raw);
-    updateAll();
-    saveLocalStorage();
-}
-
-// =====================================================================
-// ВКЛАДКИ
-// =====================================================================
-function openTab(ev, tabId) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    ev.currentTarget.classList.add('active');
-}
-
-// =====================================================================
-// ЕДА И БОГИ
-// =====================================================================
-function checkFoodLimit(chk) {
-    let checked = document.querySelectorAll('.food-buff:checked');
-    if (checked.length > 2) { chk.checked = false; alert("Лимит 2 блюда!"); }
-    updateAll();
-}
-
-function hasBattleMagePerk() {
-    let checkboxes = document.querySelectorAll('.perk-checkbox');
-    for (let chk of checkboxes) {
-        if (parseInt(chk.dataset.skillidx) === 4 && parseInt(chk.dataset.perkidx) === 7 && chk.checked) return true;
-    }
-    return false;
-}
-
-function getGodBonuses(god, rank) {
-    if (!god || god === 'none' || !godBonuses[god]) return {};
-    return godBonuses[god][rank] || {};
-}
-
-// =====================================================================
-// ЗАКЛИНАНИЯ
-// =====================================================================
-function addCustomSpell(school, loadedData = null) {
-    const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
-    const name = loadedData ? loadedData.name : 'Новое заклинание';
-    const baseCost = loadedData ? loadedData.baseCost : 30;
-    const desc = loadedData ? loadedData.desc : 'Описание...';
-    const html = `
-        <div class="spell-card" id="card-${id}">
-            <div style="display:flex; justify-content:space-between;"><input type="text" value="${name}" class="spell-name" style="width:55%;"><input type="number" value="${baseCost}" class="spell-base" style="width:40px;"></div>
-            <textarea class="spell-desc" rows="2">${desc}</textarea>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
-                <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px;"></span>
-                <button class="btn btn-sm" onclick="castCustomSpell('${id}')">Каст</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteSpell('${school}','${id}')">Х</button>
-            </div>
-        </div>`;
-    document.getElementById(`spells-${school}-list`).insertAdjacentHTML('beforeend', html);
-    if (!loadedData) saveSpellsAndRefresh();
-}
-
-function saveSpellsAndRefresh() {
-    customSpells = [];
-    ['destr','restor','alter','illus','conj'].forEach(school => {
-        document.querySelectorAll(`#spells-${school}-list .spell-card`).forEach(card => {
-            customSpells.push({
-                id: card.id.replace('card-',''),
-                school: school,
-                name: card.querySelector('.spell-name').value,
-                baseCost: parseInt(card.querySelector('.spell-base').value) || 0,
-                desc: card.querySelector('.spell-desc').value
-            });
+            `;
         });
-    });
-    localStorage.setItem('skyrim_custom_spells_v3_6', JSON.stringify(customSpells));
-    updateAll();
-}
+    }
 
-function deleteSpell(school, id) {
-    const card = document.getElementById(`card-${id}`);
-    if (card) { card.remove(); saveSpellsAndRefresh(); }
-}
-
-function castCustomSpell(id) {
-    const card = document.getElementById(`card-${id}`);
-    if (!card) return;
-    const cost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
-    let cur = parseInt(document.getElementById('cur-mp').value) || 0;
-    if (cur >= cost) {
-        document.getElementById('cur-mp').value = cur - cost;
-        alert("Заклинание прочитано!");
+    // Обработчик ручного изменения навыка
+    function handleSkillChange(input, idx) {
+        // При ручном изменении пользователь вводит базовое значение (без расового бонуса)
+        let raw = parseInt(input.value) || 10;
+        if (raw < 10) raw = 10;
+        input.setAttribute('data-raw-val', raw);
         updateAll();
         saveLocalStorage();
-    } else alert("Недостаточно маны!");
-}
+    }
 
-function craftScrollInSheet() {
-    const tier = parseInt(document.getElementById('scroll-craft-tier').value) || 1;
-    let wis = parseInt(document.getElementById('stat-wis').value) || 10;
-    let available = wis - scrollWisdomSpent;
-    if (available >= tier) {
-        scrollWisdomSpent += tier;
-        document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
-        alert("Свиток начерчен!");
+    // Обработчик ручного изменения характеристики
+    function handleStatChange(input) {
+        let raw = parseInt(input.value) || 10;
+        if (raw < 1) raw = 1;
+        input.setAttribute('data-raw-stat', raw);
+        updateAll();
         saveLocalStorage();
-    } else alert("Недостаточно мудрости!");
-}
+    }
 
-// =====================================================================
-// ОТДЫХ
-// =====================================================================
-function restoreAll() {
-    document.getElementById('cur-hp').value = document.getElementById('max-hp').value;
-    document.getElementById('cur-mp').value = document.getElementById('max-mp').value;
-    scrollWisdomSpent = 0;
-    let wis = parseInt(document.getElementById('stat-wis').value) || 10;
-    document.getElementById('val-scrolls').innerText = wis;
-    alert("Отдых завершён!");
-    updateAll();
-    saveLocalStorage();
-}
+    // Логика навигации по вкладкам
+    function openTab(ev, tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        ev.currentTarget.classList.add('active');
+    }
 
-// =====================================================================
-// ГЛАВНЫЙ РАСЧЁТ (updateAll)
-// =====================================================================
-function updateAll() {
-    const calcMod = (val) => Math.floor((val - 10) / 2);
-    let strBase = parseInt(document.getElementById('stat-str').getAttribute('data-raw-stat')) || 10;
-    let dexBase = parseInt(document.getElementById('stat-dex').getAttribute('data-raw-stat')) || 10;
-    let conBase = parseInt(document.getElementById('stat-con').getAttribute('data-raw-stat')) || 10;
-    let intBase = parseInt(document.getElementById('stat-int').getAttribute('data-raw-stat')) || 10;
-    let wisBase = parseInt(document.getElementById('stat-wis').getAttribute('data-raw-stat')) || 10;
-    let chaBase = parseInt(document.getElementById('stat-cha').getAttribute('data-raw-stat')) || 10;
-
-    const race = document.getElementById('char-race').value;
-    const sign = document.getElementById('char-sign').value;
-    const lvl = parseInt(document.getElementById('char-level').value) || 1;
-    const god = document.getElementById('faith-god').value;
-    const rnk = parseInt(document.getElementById('faith-rank').value) || 1;
-
-    const raceStats = raceStatBonuses[race] || {};
-    let str = strBase + (raceStats.str || 0);
-    let dex = dexBase + (raceStats.dex || 0);
-    let con = conBase + (raceStats.con || 0);
-    let intel = intBase + (raceStats.int || 0);
-    let wis = wisBase + (raceStats.wis || 0);
-    let cha = chaBase + (raceStats.cha || 0);
-
-    if (sign === 'warrior') { str += 2; con += 2; }
-    if (sign === 'thief') { dex += 2; }
-    if (sign === 'lady') { wis += 2; con += 2; }
-    if (sign === 'steed') { con += 2; }
-
-    const godB = getGodBonuses(god, rnk);
-
-    document.getElementById('stat-str').value = str;
-    document.getElementById('stat-dex').value = dex;
-    document.getElementById('stat-con').value = con;
-    document.getElementById('stat-int').value = intel;
-    document.getElementById('stat-wis').value = wis;
-    document.getElementById('stat-cha').value = cha;
-
-    document.getElementById('mod-str').innerText = `Мод: ${(calcMod(str) >= 0 ? '+' : '') + calcMod(str)}`;
-    document.getElementById('mod-dex').innerText = `Мод: ${(calcMod(dex) >= 0 ? '+' : '') + calcMod(dex)}`;
-    document.getElementById('mod-con').innerText = `Мод: ${(calcMod(con) >= 0 ? '+' : '') + calcMod(con)}`;
-    document.getElementById('mod-int').innerText = `Мод: ${(calcMod(intel) >= 0 ? '+' : '') + calcMod(intel)}`;
-    document.getElementById('mod-wis').innerText = `Мод: ${(calcMod(wis) >= 0 ? '+' : '') + calcMod(wis)}`;
-    document.getElementById('mod-cha').innerText = `Мод: ${(calcMod(cha) >= 0 ? '+' : '') + calcMod(cha)}`;
-
-    const raceSkillBonus = raceSkillBonuses[race] || {};
-    skillNames.forEach((name, idx) => {
-        const input = document.getElementById(`skill-${idx}`);
-        if (input) {
-            let raw = parseInt(input.getAttribute('data-raw-val')) || 10;
-            let bonus = raceSkillBonus[name] || 0;
-            input.value = raw + bonus;
+    // Ограничение сытости (не более двух блюд за раз)
+    function checkFoodLimit(chk) {
+        let checked = document.querySelectorAll('.food-buff:checked');
+        if (checked.length > 2) {
+            chk.checked = false;
+            alert("Лимит превышен! Одновременно могут действовать баффы максимум от двух блюд!");
         }
-    });
-
-    // Применяем перки (если есть)
-    if (typeof window.applyPerks === 'function') {
-        window.applyPerks();
-    }
-    const perks = window.perkBonuses || {};
-
-    if (!document.getElementById('manual-hp-lock').checked) {
-        let baseHp = con * 10;
-        if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
-        document.querySelectorAll('.food-buff:checked').forEach(f => {
-            if(f.dataset.hp) baseHp += parseInt(f.dataset.hp);
-        });
-        if (godB.hp) baseHp += godB.hp;
-        document.getElementById('max-hp').value = baseHp;
+        updateAll();
     }
 
-    if (!document.getElementById('manual-mp-lock').checked) {
-        let baseMp = intel * 10;
-        if (race === 'altmer') { baseMp += 20; }
-        if (sign === 'atronach') { baseMp += 20 + (20 * (lvl - 1)); }
-        if (sign === 'apprentice') { baseMp += 10 + (10 * (lvl - 1)); }
-        document.querySelectorAll('.food-buff:checked').forEach(f => {
-            if(f.dataset.mp) baseMp += parseInt(f.dataset.mp);
-        });
-        if (godB.mp) baseMp += godB.mp;
-        document.getElementById('max-mp').value = baseMp;
-    }
-
-    let totalArmor = (parseInt(document.getElementById('slot-helm-armor').value) || 0) +
-                     (parseInt(document.getElementById('slot-chest-armor').value) || 0) +
-                     (parseInt(document.getElementById('slot-gloves-armor').value) || 0) +
-                     (parseInt(document.getElementById('slot-boots-armor').value) || 0) +
-                     (parseInt(document.getElementById('slot-shield-armor').value) || 0) +
-                     (parseInt(document.getElementById('armor-buff').value) || 0);
-    if (godB.armor) totalArmor += godB.armor;
-    document.getElementById('armor-total').innerText = totalArmor;
-
-    // Вес (используем только инвентарь, старые поля убраны)
-    let currentWeight = 0;
-    if (currentCharacter.inventory) {
-        currentCharacter.inventory.forEach(item => {
-            currentWeight += (item.weight || 0) * item.count;
-        });
-    }
-    document.getElementById('weight-current').innerText = currentWeight;
-
-    let manualWeightLock = document.getElementById('manual-weight-lock').checked;
-    let maxWeight;
-    if (manualWeightLock) {
-        maxWeight = parseInt(document.getElementById('max-weight-input').value) || 50;
-    } else {
-        maxWeight = str * 5;
-        document.getElementById('max-weight-input').value = maxWeight;
-    }
-    document.getElementById('weight-max-display').innerText = maxWeight;
-
-    const armorType = document.getElementById('eq-armor').value;
-    if (!document.getElementById('manual-speed-lock').checked) {
-        let isOverweight = currentWeight > maxWeight;
-        let speed = (sign === 'thief') ? 40 : 35;
-        if (sign === 'steed') speed += 10;
-        if (armorType === 'light') speed -= 5;
-        if (armorType === 'heavy') speed -= 10;
-        if (document.getElementById('chk-frost-region').checked) {
-            speed -= (armorType === 'heavy') ? 15 : 10;
+    // Проверка перка "Боевой маг" в ветке Тяжелой брони (индекс 7)
+    function hasBattleMagePerk() {
+        let checkboxes = document.querySelectorAll('.perk-checkbox');
+        for (let chk of checkboxes) {
+            let skillIdx = parseInt(chk.dataset.skillidx);
+            let perkIdx = parseInt(chk.dataset.perkidx);
+            if (skillIdx === 4 && perkIdx === 7 && chk.checked) return true;
         }
-        if (document.getElementById('food4').checked) speed += 5;
-        if (godB.speed) speed += godB.speed;
-        if (isOverweight) {
-            document.getElementById('overweight-alert').style.display = 'block';
-            speed = 5;
-        } else {
-            document.getElementById('overweight-alert').style.display = 'none';
-        }
-        document.getElementById('val-speed').value = speed;
+        return false;
     }
 
-    let wisForScrolls = wis;
-    document.getElementById('val-scrolls-max').innerText = wisForScrolls;
-    document.getElementById('val-scrolls').innerText = Math.max(0, wisForScrolls - scrollWisdomSpent);
+    // Динамическое добавление заклинаний в кастомную книгу мага
+    function addCustomSpell(school, loadedData = null) {
+        const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
+        const name = loadedData ? loadedData.name : 'Новое заклинание';
+        const baseCost = loadedData ? loadedData.baseCost : 30;
+        const desc = loadedData ? loadedData.desc : 'Описание эффекта заклинания...';
 
-    document.querySelectorAll('.spell-final-cost').forEach(node => {
-        let base = parseInt(node.dataset.base) || 0;
-        let mult = (armorType === 'light') ? 1.25 : (armorType === 'heavy' && !hasBattleMagePerk()) ? 1.75 : 1.0;
-        node.value = Math.round(base * mult);
-    });
-
-    const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
-    if (daedraList.includes(god)) {
-        document.getElementById('daedra-alert').style.display = 'block';
-    } else {
-        document.getElementById('daedra-alert').style.display = 'none';
-    }
-
-    updateCombat(str, dex);
-    saveLocalStorage();
-}
-
-// =====================================================================
-// БОЕВОЙ КАЛЬКУЛЯТОР
-// =====================================================================
-function updateCombat(finalStr, finalDex) {
-    if (document.getElementById('manual-dmg-lock').checked) return;
-    const mode = document.getElementById('active-combat-weapon').value;
-    const starve = parseInt(document.getElementById('food-starve').value) || 0;
-    let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
-    let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
-    const perks = window.perkBonuses || {};
-
-    let baseDmg = 2, totalDmg = 2, hitModifier = 0, wepType = 'unarmed';
-    const strMod = Math.floor((str - 10) / 2);
-    const dexMod = Math.floor((dex - 10) / 2);
-
-    if (mode === 'melee') {
-        baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
-        wepType = document.getElementById('wep-melee-type').value;
-        hitModifier = strMod;
-        if (wepType === 'twohand_sword') hitModifier -= 2;
-        if (wepType === 'twohand_axe') hitModifier -= 3;
-        if (wepType === 'twohand_hammer') hitModifier -= 4;
-
-        let perkBonus = 0;
-        if (wepType !== 'twohand_sword' && wepType !== 'twohand_axe' && wepType !== 'twohand_hammer') {
-            perkBonus += baseDmg * (perks.oneHandedDamage || 0);
-        } else {
-            perkBonus += baseDmg * (perks.twoHandedDamage || 0);
-        }
-        // Простые бонусы от перков (копейщик, рубака и т.д.) можно добавить позже
-        totalDmg = baseDmg + perkBonus + str;
-
-        if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
-            if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
-            if (perks.twoHandedPowerAttackHitBonus && (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer')) {
-                hitModifier += perks.twoHandedPowerAttackHitBonus;
-            }
-            let powerMult = 1.5;
-            if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
-            totalDmg = Math.round(totalDmg * powerMult);
-        }
-        if (perks.hitBonus) hitModifier += perks.hitBonus;
-    } else {
-        baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
-        let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
-        wepType = document.getElementById('wep-ranged-type').value;
-        hitModifier = dexMod;
-        totalDmg = baseDmg + dex + ammoDmg;
-    }
-
-    hitModifier -= starve;
-    let sneakMult = (wepType === 'dagger') ? 3 : 2;
-    let html = `<strong>Модификатор d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier})<br><strong>Урон:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span>`;
-    if (document.getElementById('chk-sneak-attack').checked) html += `<br><strong style="color:#e67e22;">Скрытная атака (х${sneakMult}): ${totalDmg * sneakMult}</strong>`;
-    document.getElementById('combat-results').innerHTML = html;
-    document.getElementById('main-panel-dmg').value = totalDmg;
-}
-
-// =====================================================================
-// СОХРАНЕНИЕ / ЗАГРУЗКА
-// =====================================================================
-function saveLocalStorage() {
-    let perkStates = {};
-    document.querySelectorAll('.perk-checkbox').forEach(chk => {
-        let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
-        perkStates[key] = chk.checked;
-    });
-
-    // Собираем данные из DOM
-    const data = {
-        name: document.getElementById('char-name').value,
-        race: document.getElementById('char-race').value,
-        sign: document.getElementById('char-sign').value,
-        lvl: document.getElementById('char-level').value,
-        lives: document.getElementById('char-lives').value,
-        gold: document.getElementById('char-gold').value,
-        starve: document.getElementById('food-starve').value,
-        faithGod: document.getElementById('faith-god').value,
-        faithRank: document.getElementById('faith-rank').value,
-        backstory: document.getElementById('char-backstory').value,
-        notes: document.getElementById('char-notes').value,
-        faithNotes: document.getElementById('faith-notes').value,
-        armorBuff: document.getElementById('armor-buff').value,
-        speed: document.getElementById('val-speed').value,
-        scrollWisdomSpent: scrollWisdomSpent,
-        manualWeightLock: document.getElementById('manual-weight-lock').checked,
-        maxWeightInput: document.getElementById('max-weight-input').value,
-        extraWeight: document.getElementById('extra-weight').value,
-        stats: [
-            document.getElementById('stat-str').getAttribute('data-raw-stat') || 10,
-            document.getElementById('stat-dex').getAttribute('data-raw-stat') || 10,
-            document.getElementById('stat-con').getAttribute('data-raw-stat') || 10,
-            document.getElementById('stat-int').getAttribute('data-raw-stat') || 10,
-            document.getElementById('stat-wis').getAttribute('data-raw-stat') || 10,
-            document.getElementById('stat-cha').getAttribute('data-raw-stat') || 10
-        ],
-        vitals: [
-            document.getElementById('cur-hp').value,
-            document.getElementById('cur-mp').value,
-            document.getElementById('max-hp').value,
-            document.getElementById('max-mp').value
-        ],
-        locks: [
-            document.getElementById('manual-hp-lock').checked,
-            document.getElementById('manual-mp-lock').checked,
-            document.getElementById('manual-dmg-lock').checked,
-            document.getElementById('manual-speed-lock').checked
-        ],
-        skills: skillNames.map((name, idx) => {
-            const input = document.getElementById(`skill-${idx}`);
-            return input ? input.getAttribute('data-raw-val') || 10 : 10;
-        }),
-        perkStates: perkStates,
-        wepMName: document.getElementById('wep-melee-name').value,
-        wepMDmg: document.getElementById('wep-melee-dmg').value,
-        wepMType: document.getElementById('wep-melee-type').value,
-        wepRName: document.getElementById('wep-ranged-name').value,
-        wepRDmg: document.getElementById('wep-ranged-dmg').value,
-        wepRType: document.getElementById('wep-ranged-type').value,
-        amName: document.getElementById('ammo-name').value,
-        amDmg: document.getElementById('ammo-dmg').value,
-        activeWep: document.getElementById('active-combat-weapon').value,
-        armorClass: document.getElementById('eq-armor').value,
-        sHelm: document.getElementById('slot-helm-name').value,
-        sHelmA: document.getElementById('slot-helm-armor').value,
-        sChest: document.getElementById('slot-chest-name').value,
-        sChestA: document.getElementById('slot-chest-armor').value,
-        sGloves: document.getElementById('slot-gloves-name').value,
-        sGlovesA: document.getElementById('slot-gloves-armor').value,
-        sBoots: document.getElementById('slot-boots-name').value,
-        sBootsA: document.getElementById('slot-boots-armor').value,
-        sShield: document.getElementById('slot-shield-name').value,
-        sShieldA: document.getElementById('slot-shield-armor').value,
-        sRing: document.getElementById('slot-ring-name').value,
-        sNeck: document.getElementById('slot-neck-name').value,
-        sCirclet: document.getElementById('slot-circlet-name').value,
-        inventory: currentCharacter.inventory || []
-    };
-    localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
-    if (window.CloudSync) window.CloudSync.saveCharacter(data);
-}
-
-function applyCharacterData(data) {
-    if (!data) return;
-    currentCharacter = data;
-    document.getElementById('char-name').value = data.name || '';
-    document.getElementById('char-race').value = data.race || 'nord';
-    document.getElementById('char-sign').value = data.sign || 'none';
-    document.getElementById('char-level').value = data.lvl || 1;
-    document.getElementById('char-lives').value = data.lives || 50;
-    document.getElementById('char-gold').value = data.gold || 150;
-    document.getElementById('food-starve').value = data.starve || 0;
-    document.getElementById('faith-god').value = data.faithGod || 'none';
-    document.getElementById('faith-rank').value = data.faithRank || 1;
-    document.getElementById('char-backstory').value = data.backstory || '';
-    document.getElementById('char-notes').value = data.notes || '';
-    document.getElementById('faith-notes').value = data.faithNotes || '';
-    document.getElementById('armor-buff').value = data.armorBuff || 0;
-    document.getElementById('val-speed').value = data.speed || 35;
-    scrollWisdomSpent = data.scrollWisdomSpent || 0;
-    if (data.manualWeightLock !== undefined) document.getElementById('manual-weight-lock').checked = data.manualWeightLock;
-    if (data.maxWeightInput !== undefined) document.getElementById('max-weight-input').value = data.maxWeightInput || 50;
-    if (data.extraWeight !== undefined) document.getElementById('extra-weight').value = data.extraWeight || 0;
-
-    if (data.locks && data.locks.length === 4) {
-        document.getElementById('manual-hp-lock').checked = data.locks[0];
-        document.getElementById('manual-mp-lock').checked = data.locks[1];
-        document.getElementById('manual-dmg-lock').checked = data.locks[2];
-        document.getElementById('manual-speed-lock').checked = data.locks[3];
-    }
-    if (data.stats && data.stats.length === 6) {
-        document.getElementById('stat-str').setAttribute('data-raw-stat', data.stats[0]);
-        document.getElementById('stat-dex').setAttribute('data-raw-stat', data.stats[1]);
-        document.getElementById('stat-con').setAttribute('data-raw-stat', data.stats[2]);
-        document.getElementById('stat-int').setAttribute('data-raw-stat', data.stats[3]);
-        document.getElementById('stat-wis').setAttribute('data-raw-stat', data.stats[4]);
-        document.getElementById('stat-cha').setAttribute('data-raw-stat', data.stats[5]);
-    }
-    if (data.vitals && data.vitals.length === 4) {
-        document.getElementById('cur-hp').value = data.vitals[0];
-        document.getElementById('cur-mp').value = data.vitals[1];
-        document.getElementById('max-hp').value = data.vitals[2];
-        document.getElementById('max-mp').value = data.vitals[3];
-    }
-    // Инвентарь загружаем
-    if (data.inventory) {
-        currentCharacter.inventory = data.inventory;
-    } else {
-        currentCharacter.inventory = [];
-    }
-    renderInventory();
-
-    let sInputs = document.querySelectorAll('[id^="skill-"]');
-    if (data.skills && sInputs.length === data.skills.length) {
-        sInputs.forEach((input, i) => {
-            input.setAttribute('data-raw-val', data.skills[i] || 10);
-        });
-    }
-    if (data.perkStates) {
-        document.querySelectorAll('.perk-checkbox').forEach(chk => {
-            let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
-            if (data.perkStates.hasOwnProperty(key)) chk.checked = data.perkStates[key];
-        });
-    }
-    document.getElementById('wep-melee-name').value = data.wepMName || '';
-    document.getElementById('wep-melee-dmg').value = data.wepMDmg || 2;
-    document.getElementById('wep-melee-type').value = data.wepMType || 'unarmed';
-    document.getElementById('wep-ranged-name').value = data.wepRName || '';
-    document.getElementById('wep-ranged-dmg').value = data.wepRDmg || 10;
-    document.getElementById('wep-ranged-type').value = data.wepRType || 'bow';
-    document.getElementById('ammo-name').value = data.amName || '';
-    document.getElementById('ammo-dmg').value = data.amDmg || 0;
-    document.getElementById('active-combat-weapon').value = data.activeWep || 'melee';
-    document.getElementById('eq-armor').value = data.armorClass || 'cloth';
-    document.getElementById('slot-helm-name').value = data.sHelm || '';
-    document.getElementById('slot-helm-armor').value = data.sHelmA || 0;
-    document.getElementById('slot-chest-name').value = data.sChest || '';
-    document.getElementById('slot-chest-armor').value = data.sChestA || 0;
-    document.getElementById('slot-gloves-name').value = data.sGloves || '';
-    document.getElementById('slot-gloves-armor').value = data.sGlovesA || 0;
-    document.getElementById('slot-boots-name').value = data.sBoots || '';
-    document.getElementById('slot-boots-armor').value = data.sBootsA || 0;
-    document.getElementById('slot-shield-name').value = data.sShield || '';
-    document.getElementById('slot-shield-armor').value = data.sShieldA || 0;
-    document.getElementById('slot-ring-name').value = data.sRing || '';
-    document.getElementById('slot-neck-name').value = data.sNeck || '';
-    document.getElementById('slot-circlet-name').value = data.sCirclet || '';
-    updateAll();
-}
-
-function loadLocalStorage() {
-    let saved = localStorage.getItem('skyrim_ttrpg_save_v3_6');
-    let savedSpells = localStorage.getItem('skyrim_custom_spells_v3_5');
-    if (savedSpells) {
-        try {
-            customSpells = JSON.parse(savedSpells);
-            ['destr','restor','alter','illus','conj'].forEach(school => {
-                document.getElementById(`spells-${school}-list`).innerHTML = '';
-            });
-            customSpells.forEach(s => addCustomSpell(s.school, s));
-        } catch(e) {}
-    }
-    if (!saved) return;
-    try {
-        let data = JSON.parse(saved);
-        applyCharacterData(data);
-    } catch(e) { console.warn('Ошибка загрузки:', e); }
-}
-
-function resetData() {
-    if (confirm("Стереть все данные?")) {
-        localStorage.removeItem('skyrim_ttrpg_save_v3_6');
-        localStorage.removeItem('skyrim_custom_spells_v3_5');
-        location.reload();
-    }
-}
-
-// =====================================================================
-// ИНВЕНТАРЬ (динамический)
-// =====================================================================
-let itemCache = [];
-
-function loadItemSuggestions() {
-    const db = window.db || (typeof firebase !== 'undefined' ? firebase.firestore() : null);
-    if (!db) {
-        populateSuggestions(allItems);
-        return;
-    }
-    db.collection('items').get().then(snapshot => {
-        if (snapshot.empty) {
-            importItemsToFirestore(allItems);
-            return;
-        }
-        const items = [];
-        snapshot.forEach(doc => {
-            items.push({ id: doc.id, ...doc.data() });
-        });
-        populateSuggestions(items);
-        itemCache = items;
-    }).catch(e => {
-        console.warn('Firestore не доступен, используем локальные предметы:', e);
-        populateSuggestions(allItems);
-    });
-}
-
-function populateSuggestions(items) {
-    const datalist = document.getElementById('item-suggestions');
-    if (!datalist) return;
-    datalist.innerHTML = '';
-    items.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item.name;
-        opt.dataset.id = item.id || item.name;
-        opt.dataset.weight = item.weight || 0;
-        datalist.appendChild(opt);
-    });
-}
-
-function importItemsToFirestore(items) {
-    const db = window.db || (typeof firebase !== 'undefined' ? firebase.firestore() : null);
-    if (!db) return;
-    const batch = db.batch();
-    items.forEach(item => {
-        const docRef = db.collection('items').doc();
-        batch.set(docRef, {
-            name: item.name,
-            category: item.category || 'Разное',
-            type: item.type || 'misc',
-            weight: item.weight || 0,
-            price: item.price || 0,
-            armor: item.armor || null,
-            dmg: item.dmg || null,
-            effect: item.effect || null,
-            material: item.material || null,
-            recipe: item.recipe || null,
-            slot: item.slot || null,
-            charges: item.charges || null
-        });
-    });
-    batch.commit().then(() => {
-        console.log('✅ Предметы загружены в Firestore');
-        loadItemSuggestions();
-    }).catch(e => console.error('Ошибка импорта:', e));
-}
-
-function addItemToInventory() {
-    const input = document.getElementById('item-add-input');
-    const countInput = document.getElementById('item-add-count');
-    const name = input.value.trim();
-    const count = parseInt(countInput.value) || 1;
-    if (!name || count < 1) return;
-
-    const options = document.querySelectorAll('#item-suggestions option');
-    let found = null;
-    options.forEach(opt => {
-        if (opt.value === name) {
-            found = { id: opt.dataset.id, weight: parseFloat(opt.dataset.weight) || 0 };
-        }
-    });
-    if (!found) {
-        alert('Предмет не найден в базе. Попроси мастера добавить его.');
-        return;
-    }
-
-    if (!currentCharacter.inventory) currentCharacter.inventory = [];
-    const existing = currentCharacter.inventory.find(item => item.itemId === found.id);
-    if (existing) {
-        existing.count += count;
-    } else {
-        currentCharacter.inventory.push({
-            itemId: found.id,
-            name: name,
-            count: count,
-            weight: found.weight
-        });
-    }
-
-    saveCharacterDebounced();
-    renderInventory();
-    input.value = '';
-    countInput.value = 1;
-}
-
-function removeItemFromInventory(itemId) {
-    if (!confirm('Выбросить этот предмет?')) return;
-    currentCharacter.inventory = currentCharacter.inventory.filter(item => item.itemId !== itemId);
-    saveCharacterDebounced();
-    renderInventory();
-}
-
-function changeItemCount(itemId, delta) {
-    const item = currentCharacter.inventory.find(i => i.itemId === itemId);
-    if (!item) return;
-    item.count += delta;
-    if (item.count <= 0) {
-        removeItemFromInventory(itemId);
-        return;
-    }
-    saveCharacterDebounced();
-    renderInventory();
-}
-
-function renderInventory() {
-    const container = document.getElementById('inventory-list');
-    if (!container) return;
-    const inv = currentCharacter.inventory || [];
-    if (inv.length === 0) {
-        container.innerHTML = '<p style="color:#666; text-align:center;">Инвентарь пуст</p>';
-        document.getElementById('inventory-total-weight').textContent = '0';
-        return;
-    }
-
-    let html = '';
-    let totalWeight = 0;
-    inv.forEach(item => {
-        const weight = (item.weight || 0) * item.count;
-        totalWeight += weight;
-        html += `
-            <div class="stat-block" style="display:flex; align-items:center; gap:8px; padding:4px 8px;">
-                <span style="flex:1; font-weight:bold;">${item.name}</span>
-                <span style="color:#aaa; font-size:12px;">×${item.count}</span>
-                <span style="color:#aaa; font-size:12px;">${weight.toFixed(1)} вес</span>
-                <button class="btn btn-sm" style="width:auto; padding:2px 6px;" onclick="changeItemCount('${item.itemId}', -1)">-1</button>
-                <button class="btn btn-sm" style="width:auto; padding:2px 6px;" onclick="changeItemCount('${item.itemId}', 1)">+1</button>
-                <button class="btn btn-sm btn-danger" style="width:auto; padding:2px 6px;" onclick="removeItemFromInventory('${item.itemId}')">✕</button>
+        const html = `
+            <div class="spell-card" id="card-${id}">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <input type="text" value="${name}" class="spell-name" style="width:55%; font-weight:bold; padding:2px;" onchange="saveSpellsAndRefresh()">
+                    <div style="width:40%; text-align:right; font-size:11px;">
+                        База MP: <input type="number" value="${baseCost}" class="spell-base" style="width:40px; padding:1px; display:inline;" min="0" onchange="saveSpellsAndRefresh()">
+                    </div>
+                </div>
+                <textarea class="spell-desc" rows="2" style="font-size:11px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
+                    <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}')">Каст</button>
+                    <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:10px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
+                </div>
             </div>
         `;
-    });
 
-    container.innerHTML = html;
-    document.getElementById('inventory-total-weight').textContent = totalWeight.toFixed(1);
-
-    const str = parseInt(document.getElementById('stat-str').value) || 10;
-    const maxWeight = str * 5;
-    document.getElementById('inventory-max-weight').textContent = maxWeight;
-    const overload = document.getElementById('inventory-overweight');
-    if (overload) {
-        if (totalWeight > maxWeight) overload.style.display = 'block';
-        else overload.style.display = 'none';
+        document.getElementById(`spells-${school}-list`).insertAdjacentHTML('beforeend', html);
+        if (!loadedData) saveSpellsAndRefresh();
     }
-}
 
-function syncInventoryToCloud() {
-    saveCharacterDebounced();
-    alert('Инвентарь сохранён в облаке.');
-}
-
-function clearInventory() {
-    if (!confirm('Удалить все предметы из инвентаря?')) return;
-    currentCharacter.inventory = [];
-    saveCharacterDebounced();
-    renderInventory();
-}
-
-let saveTimeout = null;
-function saveCharacterDebounced() {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        saveLocalStorage();
-    }, 500);
-}
-
-// =====================================================================
-// ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ (использует Firebase)
-// =====================================================================
-window.CloudSync = {
-    saveCharacter: function(data) {
-        if (!window.currentUser || !window.db) return;
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            db.collection('characters').doc(currentUser.uid).set(data, { merge: true })
-                .catch(e => console.error('Ошибка сохранения в облако:', e));
-            if (window.currentSessionCode) {
-                const vitals = data.vitals || [0,0,0,0];
-                const patch = {};
-                patch['participants.' + currentUser.uid + '.name'] = data.name || 'Без имени';
-                patch['participants.' + currentUser.uid + '.curHp'] = Number(vitals[0]) || 0;
-                patch['participants.' + currentUser.uid + '.curMp'] = Number(vitals[1]) || 0;
-                patch['participants.' + currentUser.uid + '.maxHp'] = Number(vitals[2]) || 0;
-                patch['participants.' + currentUser.uid + '.maxMp'] = Number(vitals[3]) || 0;
-                db.collection('sessions').doc(currentSessionCode).update(patch)
-                    .catch(e => console.error('Ошибка синхронизации с сессией:', e));
-            }
-        }, 800);
+    function saveSpellsAndRefresh() {
+        customSpells = [];
+        const schools = ['destr', 'restor', 'alter', 'illus', 'conj'];
+        schools.forEach(school => {
+            const container = document.getElementById(`spells-${school}-list`);
+            if (!container) return;
+            const cards = container.querySelectorAll('.spell-card');
+            cards.forEach(card => {
+                const id = card.id.replace('card-', '');
+                customSpells.push({
+                    id: id,
+                    school: school,
+                    name: card.querySelector('.spell-name').value,
+                    baseCost: parseInt(card.querySelector('.spell-base').value) || 0,
+                    desc: card.querySelector('.spell-desc').value
+                });
+            });
+        });
+        localStorage.setItem('skyrim_custom_spells_v3_5', JSON.stringify(customSpells));
+        updateAll();
     }
-};
 
-// =====================================================================
-// АВТОРИЗАЦИЯ (Firebase)
-// =====================================================================
-let auth = null, db = null, currentUser = null, currentSessionCode = null, unsubSession = null;
-
-function showOverlay(show) {
-    document.getElementById('auth-overlay').style.display = show ? 'flex' : 'none';
-}
-
-function updateStatusBar() {
-    const info = document.getElementById('cloud-user-info');
-    const btn = document.getElementById('btn-logout');
-    if (currentUser) {
-        info.textContent = '☁ Вошёл как ' + currentUser.email;
-        btn.style.display = 'inline-block';
-    } else {
-        info.textContent = '⚠ Офлайн-режим (данные только в этом браузере)';
-        btn.style.display = 'none';
+    function deleteSpell(school, id) {
+        const card = document.getElementById(`card-${id}`);
+        if(card) { card.remove(); saveSpellsAndRefresh(); }
     }
-}
 
-window.cloudRegister = function() {
-    if (!window.FIREBASE_CONFIGURED) { alert('Firebase не настроен'); return; }
-    const email = document.getElementById('auth-email').value.trim();
-    const pass = document.getElementById('auth-password').value;
-    auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
-};
-window.cloudLogin = function() {
-    if (!window.FIREBASE_CONFIGURED) { alert('Firebase не настроен'); return; }
-    const email = document.getElementById('auth-email').value.trim();
-    const pass = document.getElementById('auth-password').value;
-    auth.signInWithEmailAndPassword(email, pass).catch(e => alert(e.message));
-};
-window.cloudContinueOffline = function() { showOverlay(false); };
-window.cloudLogout = function() {
-    if (currentSessionCode) window.leaveSession();
-    if (auth) auth.signOut();
-};
-
-if (window.FIREBASE_CONFIGURED) {
-    auth = firebase.auth();
-    db = firebase.firestore();
-    window.db = db;
-    auth.onAuthStateChanged(user => {
-        currentUser = user;
-        window.currentUser = user;
-        updateStatusBar();
-        if (user) {
-            showOverlay(false);
-            loadCharacterFromCloud(user.uid);
-            const savedCode = localStorage.getItem('ttrpg_session_code');
-            if (savedCode) joinSessionInternal(savedCode, true);
-        } else {
-            if (unsubSession) { unsubSession(); unsubSession = null; }
-            currentSessionCode = null;
-        }
-    });
-} else {
-    showOverlay(false);
-    console.warn('Firebase не настроен — работаем в офлайн-режиме.');
-}
-
-function loadCharacterFromCloud(uid) {
-    if (!db) return;
-    db.collection('characters').doc(uid).get().then(doc => {
-        if (doc.exists && window.applyCharacterData) {
-            applyCharacterData(doc.data());
+    function castCustomSpell(id) {
+        const card = document.getElementById(`card-${id}`);
+        if (!card) return;
+        const finalCost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
+        let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
+        if (curMp >= finalCost) {
+            document.getElementById('cur-mp').value = curMp - finalCost;
+            alert("Заклинание прочитано! Мана успешно списана.");
             updateAll();
+            saveLocalStorage();
+        } else {
+            alert("Недостаточно маны (MP) для этого каста!");
         }
-    }).catch(e => console.error('Ошибка загрузки персонажа:', e));
-}
-
-// =====================================================================
-// СЕССИИ (участие в сессии мастера)
-// =====================================================================
-window.joinSession = function() {
-    const code = (document.getElementById('session-code-input').value || '').trim().toUpperCase();
-    const errEl = document.getElementById('session-join-error');
-    errEl.style.display = 'none';
-    if (!code) return;
-    if (!currentUser) {
-        errEl.textContent = 'Нужно войти в аккаунт.';
-        errEl.style.display = 'block';
-        return;
     }
-    joinSessionInternal(code, false);
-};
 
-function joinSessionInternal(code, silent) {
-    if (!db) return;
-    db.collection('sessions').doc(code).get().then(doc => {
-        if (!doc.exists || doc.data().status !== 'active') {
-            if (!silent) {
-                document.getElementById('session-join-error').textContent = 'Сессия не найдена или закрыта.';
-                document.getElementById('session-join-error').style.display = 'block';
+    // Лаборатория свитков
+    function craftScrollInSheet() {
+        const tier = parseInt(document.getElementById('scroll-craft-tier').value) || 1;
+        let wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        let spent = scrollWisdomSpent;
+        let available = wis - spent;
+        if (available >= tier) {
+            scrollWisdomSpent += tier;
+            document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
+            alert(`Успех! Вы потратили ${tier} ед. Мудрости на написание свитка. Осталось ${wis - scrollWisdomSpent} ед.`);
+            saveLocalStorage();
+        } else {
+            alert("Недостаточно свободной Мудрости для начертания свитка!");
+        }
+    }
+
+    // Восстановление после отдыха
+    function restoreAll() {
+        let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
+        let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
+        document.getElementById('cur-hp').value = maxHp;
+        document.getElementById('cur-mp').value = maxMp;
+        // Сбрасываем потраченную Мудрость
+        scrollWisdomSpent = 0;
+        let wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        document.getElementById('val-scrolls').innerText = wis;
+        alert("Отдых завершён! HP, MP и Мудрость восстановлены.");
+        updateAll();
+        saveLocalStorage();
+    }
+
+    // Получение бонусов от бога
+    function getGodBonuses(god, rank) {
+        if (!god || god === 'none' || !godBonuses[god]) return {};
+        const bonuses = godBonuses[god][rank] || {};
+        return bonuses;
+    }
+
+    // Главный математический процессор листа
+    function updateAll() {
+        const calcMod = (val) => Math.floor((val - 10) / 2);
+        
+        // Базовые статы (хранятся в data-raw-stat)
+        let strBase = parseInt(document.getElementById('stat-str').getAttribute('data-raw-stat')) || 10;
+        let dexBase = parseInt(document.getElementById('stat-dex').getAttribute('data-raw-stat')) || 10;
+        let conBase = parseInt(document.getElementById('stat-con').getAttribute('data-raw-stat')) || 10;
+        let intBase = parseInt(document.getElementById('stat-int').getAttribute('data-raw-stat')) || 10;
+        let wisBase = parseInt(document.getElementById('stat-wis').getAttribute('data-raw-stat')) || 10;
+        let chaBase = parseInt(document.getElementById('stat-cha').getAttribute('data-raw-stat')) || 10;
+
+        const race = document.getElementById('char-race').value;
+        const sign = document.getElementById('char-sign').value;
+        const lvl = parseInt(document.getElementById('char-level').value) || 1;
+        const god = document.getElementById('faith-god').value;
+        const rnk = parseInt(document.getElementById('faith-rank').value) || 1;
+
+        // Добавляем расовые бонусы к статам
+        const raceStats = raceStatBonuses[race] || {};
+        let str = strBase + (raceStats.str || 0);
+        let dex = dexBase + (raceStats.dex || 0);
+        let con = conBase + (raceStats.con || 0);
+        let intel = intBase + (raceStats.int || 0);
+        let wis = wisBase + (raceStats.wis || 0);
+        let cha = chaBase + (raceStats.cha || 0);
+
+        // Бонусы камня
+        if (sign === 'warrior') { str += 2; con += 2; }
+        if (sign === 'thief') { dex += 2; }
+        if (sign === 'lady') { wis += 2; con += 2; }
+        if (sign === 'steed') { con += 2; }
+
+        // Бонусы бога (пока только HP, MP и скорость)
+        const godB = getGodBonuses(god, rnk);
+
+        // Обновляем поля ввода характеристик (показываем итоговые значения)
+        document.getElementById('stat-str').value = str;
+        document.getElementById('stat-dex').value = dex;
+        document.getElementById('stat-con').value = con;
+        document.getElementById('stat-int').value = intel;
+        document.getElementById('stat-wis').value = wis;
+        document.getElementById('stat-cha').value = cha;
+
+        // Обновляем модификаторы на панели
+        document.getElementById('mod-str').innerText = `Мод: ${(calcMod(str) >= 0 ? '+' : '') + calcMod(str)}`;
+        document.getElementById('mod-dex').innerText = `Мод: ${(calcMod(dex) >= 0 ? '+' : '') + calcMod(dex)}`;
+        document.getElementById('mod-con').innerText = `Мод: ${(calcMod(con) >= 0 ? '+' : '') + calcMod(con)}`;
+        document.getElementById('mod-int').innerText = `Мод: ${(calcMod(intel) >= 0 ? '+' : '') + calcMod(intel)}`;
+        document.getElementById('mod-wis').innerText = `Мод: ${(calcMod(wis) >= 0 ? '+' : '') + calcMod(wis)}`;
+        document.getElementById('mod-cha').innerText = `Мод: ${(calcMod(cha) >= 0 ? '+' : '') + calcMod(cha)}`;
+
+        // Наложение расовых бонусов на навыки (база хранится в data-raw-val)
+        const raceSkillBonus = raceSkillBonuses[race] || {};
+        skillNames.forEach((name, idx) => {
+            const input = document.getElementById(`skill-${idx}`);
+            if (input) {
+                let raw = parseInt(input.getAttribute('data-raw-val')) || 10;
+                let bonus = raceSkillBonus[name] || 0;
+                input.value = raw + bonus;
             }
-            localStorage.removeItem('ttrpg_session_code');
+        });
+
+        // Расчет HP
+        if (!document.getElementById('manual-hp-lock').checked) {
+            let baseHp = con * 10;
+            if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
+            document.querySelectorAll('.food-buff:checked').forEach(f => {
+                if(f.dataset.hp) baseHp += parseInt(f.dataset.hp);
+            });
+            if (godB.hp) baseHp += godB.hp;
+            document.getElementById('max-hp').value = baseHp;
+        }
+
+        // Расчет MP
+        if (!document.getElementById('manual-mp-lock').checked) {
+            let baseMp = intel * 10;
+            if (race === 'altmer') { baseMp += 20; }
+            if (sign === 'atronach') { baseMp += 20 + (20 * (lvl - 1)); }
+            if (sign === 'apprentice') { baseMp += 10 + (10 * (lvl - 1)); }
+            document.querySelectorAll('.food-buff:checked').forEach(f => {
+                if(f.dataset.mp) baseMp += parseInt(f.dataset.mp);
+            });
+            if (godB.mp) baseMp += godB.mp;
+            document.getElementById('max-mp').value = baseMp;
+        }
+
+        // Суммирование брони
+        let totalArmor = (parseInt(document.getElementById('slot-helm-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-chest-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-gloves-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-boots-armor').value) || 0) +
+                         (parseInt(document.getElementById('slot-shield-armor').value) || 0) +
+                         (parseInt(document.getElementById('armor-buff').value) || 0);
+
+        if (godB.armor) totalArmor += godB.armor;
+        document.getElementById('armor-total').innerText = totalArmor;
+
+        // Калькулятор веса инвентаря (из списка)
+        let weightFromItems = 0;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-bear').value) || 0) * 3;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-sable').value) || 0) * 2;
+        weightFromItems += (parseInt(document.getElementById('inv-hide-wolf').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-leather').value) || 0) * 2;
+        weightFromItems += (parseInt(document.getElementById('inv-leather-strips').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-iron').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-steel').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-corundum').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-orichalcum').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-ing-ebony').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-gem-petty').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-gem-grand').value) || 0) * 1;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-beam').value) || 0) * 20;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-gear').value) || 0) * 10;
+        weightFromItems += (parseInt(document.getElementById('inv-dw-core').value) || 0) * 4;
+        weightFromItems += (parseInt(document.getElementById('inv-tent').value) || 0) * 10;
+        weightFromItems += (parseInt(document.getElementById('inv-bag').value) || 0) * 3;
+
+        // Дополнительный вес (ручной ввод)
+        let extraWeight = parseInt(document.getElementById('extra-weight').value) || 0;
+        let currentWeight = weightFromItems + extraWeight;
+
+        document.getElementById('weight-current').innerText = currentWeight;
+
+        // Максимальная грузоподъемность (ручная или расчётная)
+        let manualWeightLock = document.getElementById('manual-weight-lock').checked;
+        let maxWeight;
+        if (manualWeightLock) {
+            maxWeight = parseInt(document.getElementById('max-weight-input').value) || 50;
+        } else {
+            maxWeight = str * 5;
+            document.getElementById('max-weight-input').value = maxWeight;
+        }
+        document.getElementById('weight-max-display').innerText = maxWeight;
+
+        // Скорость
+        const armorType = document.getElementById('eq-armor').value;
+        if (!document.getElementById('manual-speed-lock').checked) {
+            let isOverweight = currentWeight > maxWeight;
+            let speed = (sign === 'thief') ? 40 : 35;
+            if (sign === 'steed') speed += 10;
+            if (armorType === 'light') speed -= 5;
+            if (armorType === 'heavy') speed -= 10;
+            if (document.getElementById('chk-frost-region').checked) {
+                speed -= (armorType === 'heavy') ? 15 : 10;
+            }
+            if (document.getElementById('food4').checked) speed += 5;
+            if (godB.speed) speed += godB.speed;
+            if (isOverweight) {
+                document.getElementById('overweight-alert').style.display = 'block';
+                speed = 5;
+            } else {
+                document.getElementById('overweight-alert').style.display = 'none';
+            }
+            document.getElementById('val-speed').value = speed;
+        }
+
+        // Отображение доступной Мудрости для свитков
+        let wisForScrolls = wis;
+        document.getElementById('val-scrolls-max').innerText = wisForScrolls;
+        document.getElementById('val-scrolls').innerText = Math.max(0, wisForScrolls - scrollWisdomSpent);
+
+        // Пересчёт стоимости кастомных заклинаний (штраф от брони)
+        document.querySelectorAll('.spell-final-cost').forEach(node => {
+            let base = parseInt(node.dataset.base) || 0;
+            let mult = (armorType === 'light') ? 1.25 : (armorType === 'heavy' && !hasBattleMagePerk()) ? 1.75 : 1.0;
+            node.value = Math.round(base * mult);
+        });
+
+        // Проверка на поклонение даэдра
+        const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
+        if (daedraList.includes(god)) {
+            document.getElementById('daedra-alert').style.display = 'block';
+        } else {
+            document.getElementById('daedra-alert').style.display = 'none';
+        }
+
+        // Вызов обновления боевого калькулятора
+        updateCombat(str, dex);
+        // Сохраняем изменения (но не вызываем рекурсию)
+        // saveLocalStorage(); // saveLocalStorage вызовется из обработчиков, чтобы избежать цикла
+    }
+
+    // Боевой калькулятор
+    function updateCombat(finalStr, finalDex) {
+        if (document.getElementById('manual-dmg-lock').checked) {
+            // Если ручной режим, не пересчитываем, но показываем сохранённое значение
             return;
         }
-        currentSessionCode = code;
-        window.currentSessionCode = code;
-        localStorage.setItem('ttrpg_session_code', code);
 
-        const curHp = Number(document.getElementById('cur-hp').value) || 0;
-        const curMp = Number(document.getElementById('cur-mp').value) || 0;
-        const maxHp = Number(document.getElementById('max-hp').value) || 0;
-        const maxMp = Number(document.getElementById('max-mp').value) || 0;
-        const name = document.getElementById('char-name').value || 'Без имени';
+        const mode = document.getElementById('active-combat-weapon').value;
+        const starve = parseInt(document.getElementById('food-starve').value) || 0;
 
-        const patch = {};
-        patch['participants.' + currentUser.uid] = { name, curHp, curMp, maxHp, maxMp, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
+        let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
 
-        db.collection('sessions').doc(code).update(patch).then(() => {
-            document.getElementById('session-join-block').style.display = 'none';
-            document.getElementById('session-active-block').style.display = 'block';
-            document.getElementById('session-code-display').textContent = code;
-            subscribeToSession(code);
-        });
-    }).catch(e => console.error('Ошибка входа в сессию:', e));
-}
+        let baseDmg = 2, totalDmg = 2, hitModifier = 0;
+        let wepType = 'unarmed';
 
-window.leaveSession = function() {
-    if (!currentSessionCode || !currentUser) return;
-    if (db) {
-        db.collection('sessions').doc(currentSessionCode).update({
-            ['participants.' + currentUser.uid]: firebase.firestore.FieldValue.delete()
-        }).catch(() => {});
+        const strMod = Math.floor((str - 10) / 2);
+        const dexMod = Math.floor((dex - 10) / 2);
+
+        if (mode === 'melee') {
+            baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
+            wepType = document.getElementById('wep-melee-type').value;
+            hitModifier = strMod;
+            
+            if (wepType === 'twohand_sword') hitModifier -= 2;
+            if (wepType === 'twohand_axe') hitModifier -= 3;
+            if (wepType === 'twohand_hammer') hitModifier -= 4;
+            
+            if (wepType === 'unarmed') {
+                totalDmg = baseDmg;
+            } else {
+                totalDmg = baseDmg + str;
+            }
+            
+            if (document.getElementById('chk-power-attack').checked && wepType !== 'unarmed') {
+                totalDmg = Math.round(totalDmg * 1.5);
+                hitModifier -= 1;
+            }
+        } else {
+            baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
+            let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
+            wepType = document.getElementById('wep-ranged-type').value;
+            hitModifier = dexMod;
+            totalDmg = baseDmg + dex + ammoDmg;
+        }
+
+        hitModifier -= starve;
+        let sneakMult = (wepType === 'dagger') ? 3 : 2;
+
+        let finalHtml = `
+            <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
+            <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
+        `;
+        if (document.getElementById('chk-sneak-attack').checked) {
+            finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
+        }
+
+        document.getElementById('combat-results').innerHTML = finalHtml;
+        document.getElementById('main-panel-dmg').value = totalDmg;
     }
-    if (unsubSession) { unsubSession(); unsubSession = null; }
-    currentSessionCode = null;
-    window.currentSessionCode = null;
-    localStorage.removeItem('ttrpg_session_code');
-    document.getElementById('session-active-block').style.display = 'none';
-    document.getElementById('session-join-block').style.display = 'block';
-    document.getElementById('session-code-input').value = '';
-};
 
-function subscribeToSession(code) {
-    if (unsubSession) unsubSession();
-    if (!db) return;
-    unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
-        if (!doc.exists) { window.leaveSession(); return; }
-        renderSession(doc.data());
-    });
-}
+    // Сохранение всех параметров листа в LocalStorage
+    function saveLocalStorage() {
+        let perkStates = {};
+        document.querySelectorAll('.perk-checkbox').forEach(chk => {
+            let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
+            perkStates[key] = chk.checked;
+        });
 
-function renderSession(data) {
-    renderParty(data.participants || {});
-    renderEnemies(data.enemies || []);
-    renderInitiative(data.initiative || []);
-    renderLog(data.combatLog || []);
-}
+        let data = {
+            version: '3.6',
+            name: document.getElementById('char-name').value,
+            race: document.getElementById('char-race').value,
+            sign: document.getElementById('char-sign').value,
+            lvl: document.getElementById('char-level').value,
+            lives: document.getElementById('char-lives').value,
+            gold: document.getElementById('char-gold').value,
+            starve: document.getElementById('food-starve').value,
+            faithGod: document.getElementById('faith-god').value,
+            faithRank: document.getElementById('faith-rank').value,
+            backstory: document.getElementById('char-backstory').value,
+            notes: document.getElementById('char-notes').value,
+            faithNotes: document.getElementById('faith-notes').value,
+            armorBuff: document.getElementById('armor-buff').value,
+            speed: document.getElementById('val-speed').value,
+            scrollWisdomSpent: scrollWisdomSpent,
+            manualWeightLock: document.getElementById('manual-weight-lock').checked,
+            maxWeightInput: document.getElementById('max-weight-input').value,
+            extraWeight: document.getElementById('extra-weight').value,
+            // Базовые характеристики (data-raw-stat)
+            stats: [
+                document.getElementById('stat-str').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-dex').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-con').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-int').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-wis').getAttribute('data-raw-stat') || 10,
+                document.getElementById('stat-cha').getAttribute('data-raw-stat') || 10
+            ],
+            vitals: [
+                document.getElementById('cur-hp').value,
+                document.getElementById('cur-mp').value,
+                document.getElementById('max-hp').value,
+                document.getElementById('max-mp').value
+            ],
+            locks: [
+                document.getElementById('manual-hp-lock').checked,
+                document.getElementById('manual-mp-lock').checked,
+                document.getElementById('manual-dmg-lock').checked,
+                document.getElementById('manual-speed-lock').checked
+            ],
+            // Базовые навыки (data-raw-val)
+            skills: skillNames.map((name, idx) => {
+                const input = document.getElementById(`skill-${idx}`);
+                return input ? input.getAttribute('data-raw-val') || 10 : 10;
+            }),
+            perkStates: perkStates,
+            wepMName: document.getElementById('wep-melee-name').value,
+            wepMDmg: document.getElementById('wep-melee-dmg').value,
+            wepMType: document.getElementById('wep-melee-type').value,
+            wepRName: document.getElementById('wep-ranged-name').value,
+            wepRDmg: document.getElementById('wep-ranged-dmg').value,
+            wepRType: document.getElementById('wep-ranged-type').value,
+            amName: document.getElementById('ammo-name').value,
+            amDmg: document.getElementById('ammo-dmg').value,
+            activeWep: document.getElementById('active-combat-weapon').value,
+            armorClass: document.getElementById('eq-armor').value,
+            sHelm: document.getElementById('slot-helm-name').value,
+            sHelmA: document.getElementById('slot-helm-armor').value,
+            sChest: document.getElementById('slot-chest-name').value,
+            sChestA: document.getElementById('slot-chest-armor').value,
+            sGloves: document.getElementById('slot-gloves-name').value,
+            sGlovesA: document.getElementById('slot-gloves-armor').value,
+            sBoots: document.getElementById('slot-boots-name').value,
+            sBootsA: document.getElementById('slot-boots-armor').value,
+            sShield: document.getElementById('slot-shield-name').value,
+            sShieldA: document.getElementById('slot-shield-armor').value,
+            sRing: document.getElementById('slot-ring-name').value,
+            sNeck: document.getElementById('slot-neck-name').value,
+            sCirclet: document.getElementById('slot-circlet-name').value,
+            inv: {
+                'hide-bear': document.getElementById('inv-hide-bear').value,
+                'hide-sable': document.getElementById('inv-hide-sable').value,
+                'hide-wolf': document.getElementById('inv-hide-wolf').value,
+                'leather': document.getElementById('inv-leather').value,
+                'leather-strips': document.getElementById('inv-leather-strips').value,
+                'ing-iron': document.getElementById('inv-ing-iron').value,
+                'ing-steel': document.getElementById('inv-ing-steel').value,
+                'ing-corundum': document.getElementById('inv-ing-corundum').value,
+                'ing-orichalcum': document.getElementById('inv-ing-orichalcum').value,
+                'ing-ebony': document.getElementById('inv-ing-ebony').value,
+                'gem-petty': document.getElementById('inv-gem-petty').value,
+                'gem-grand': document.getElementById('inv-gem-grand').value,
+                'dw-beam': document.getElementById('inv-dw-beam').value,
+                'dw-gear': document.getElementById('inv-dw-gear').value,
+                'dw-core': document.getElementById('inv-dw-core').value,
+                'tent': document.getElementById('inv-tent').value,
+                'bag': document.getElementById('inv-bag').value
+            }
+        };
+        localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
+        if (window.CloudSync) window.CloudSync.saveCharacter(data);
+    }
 
-function renderParty(participants) {
-    const target = document.getElementById('party-list');
-    const uids = Object.keys(participants);
-    if (uids.length === 0) { target.innerHTML = '<p style="opacity:.7;">Пока никого нет.</p>'; return; }
-    target.innerHTML = uids.map(uid => {
-        const p = participants[uid] || {};
-        const hpPct = p.maxHp > 0 ? Math.max(0, Math.min(100, (p.curHp / p.maxHp) * 100)) : 0;
-        const mpPct = p.maxMp > 0 ? Math.max(0, Math.min(100, (p.curMp / p.maxMp) * 100)) : 0;
-        return `<div class="party-row"><div class="row-name"><span>${p.name || '?'}</span><span>HP ${p.curHp||0}/${p.maxHp||0} MP ${p.curMp||0}/${p.maxMp||0}</span></div>
-                <div class="bar-track"><div class="bar-fill-hp" style="width:${hpPct}%"></div></div>
-                <div class="bar-track"><div class="bar-fill-mp" style="width:${mpPct}%"></div></div></div>`;
-    }).join('');
-}
+    // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
+    function applyCharacterData(data) {
+        if (!data) return;
+        try {
+            document.getElementById('char-name').value = data.name || '';
+            document.getElementById('char-race').value = data.race || 'nord';
+            document.getElementById('char-sign').value = data.sign || 'none';
+            document.getElementById('char-level').value = data.lvl || 1;
+            document.getElementById('char-lives').value = data.lives || 50;
+            document.getElementById('char-gold').value = data.gold || 150;
+            document.getElementById('food-starve').value = data.starve || 0;
+            document.getElementById('faith-god').value = data.faithGod || 'none';
+            document.getElementById('faith-rank').value = data.faithRank || 1;
+            document.getElementById('char-backstory').value = data.backstory || '';
+            document.getElementById('char-notes').value = data.notes || '';
+            document.getElementById('faith-notes').value = data.faithNotes || '';
+            document.getElementById('armor-buff').value = data.armorBuff || 0;
+            document.getElementById('val-speed').value = data.speed || 35;
+            scrollWisdomSpent = data.scrollWisdomSpent || 0;
 
-function renderEnemies(enemies) {
-    const target = document.getElementById('enemies-list');
-    if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;">Противников нет.</p>'; return; }
-    target.innerHTML = enemies.map(e => {
-        const hpPct = e.maxHp > 0 ? Math.max(0, Math.min(100, (e.curHp / e.maxHp) * 100)) : 0;
-        const mpPct = e.maxMp > 0 ? Math.max(0, Math.min(100, (e.curMp / e.maxMp) * 100)) : 0;
-        return `<div class="party-row"><div class="row-name"><span>${e.name || '?'}</span><span>HP ${e.curHp||0}/${e.maxHp||0} MP ${e.curMp||0}/${e.maxMp||0}</span></div>
-                <div class="bar-track"><div class="bar-fill-hp" style="width:${hpPct}%"></div></div>
-                <div class="bar-track"><div class="bar-fill-mp" style="width:${mpPct}%"></div></div></div>`;
-    }).join('');
-}
+            if (data.manualWeightLock !== undefined) {
+                document.getElementById('manual-weight-lock').checked = data.manualWeightLock;
+            }
+            if (data.maxWeightInput !== undefined) {
+                document.getElementById('max-weight-input').value = data.maxWeightInput || 50;
+            }
+            if (data.extraWeight !== undefined) {
+                document.getElementById('extra-weight').value = data.extraWeight || 0;
+            }
 
-function renderInitiative(list) {
-    const target = document.getElementById('initiative-list');
-    if (!list.length) { target.innerHTML = '<p style="opacity:.7;">Инициатива не задана.</p>'; return; }
-    const sorted = list.slice().sort((a,b) => (b.roll||0) - (a.roll||0));
-    target.innerHTML = sorted.map((item, i) =>
-        `<div class="initiative-row"><span>${i+1}. ${item.name||'?'}</span><span>${item.roll??''}</span></div>`
-    ).join('');
-}
+            if (data.locks && data.locks.length === 4) {
+                document.getElementById('manual-hp-lock').checked = data.locks[0];
+                document.getElementById('manual-mp-lock').checked = data.locks[1];
+                document.getElementById('manual-dmg-lock').checked = data.locks[2];
+                document.getElementById('manual-speed-lock').checked = data.locks[3];
+            }
+            // Загрузка базовых характеристик (data-raw-stat)
+            if (data.stats && data.stats.length === 6) {
+                document.getElementById('stat-str').setAttribute('data-raw-stat', data.stats[0]);
+                document.getElementById('stat-dex').setAttribute('data-raw-stat', data.stats[1]);
+                document.getElementById('stat-con').setAttribute('data-raw-stat', data.stats[2]);
+                document.getElementById('stat-int').setAttribute('data-raw-stat', data.stats[3]);
+                document.getElementById('stat-wis').setAttribute('data-raw-stat', data.stats[4]);
+                document.getElementById('stat-cha').setAttribute('data-raw-stat', data.stats[5]);
+            }
+            if (data.vitals && data.vitals.length === 4) {
+                document.getElementById('cur-hp').value = data.vitals[0];
+                document.getElementById('cur-mp').value = data.vitals[1];
+                document.getElementById('max-hp').value = data.vitals[2];
+                document.getElementById('max-mp').value = data.vitals[3];
+            }
+            // Загрузка инвентаря (если сохранён в виде объекта)
+            if (data.inv) {
+                let invMap = {
+                    'hide-bear': 'inv-hide-bear',
+                    'hide-sable': 'inv-hide-sable',
+                    'hide-wolf': 'inv-hide-wolf',
+                    'leather': 'inv-leather',
+                    'leather-strips': 'inv-leather-strips',
+                    'ing-iron': 'inv-ing-iron',
+                    'ing-steel': 'inv-ing-steel',
+                    'ing-corundum': 'inv-ing-corundum',
+                    'ing-orichalcum': 'inv-ing-orichalcum',
+                    'ing-ebony': 'inv-ing-ebony',
+                    'gem-petty': 'inv-gem-petty',
+                    'gem-grand': 'inv-gem-grand',
+                    'dw-beam': 'inv-dw-beam',
+                    'dw-gear': 'inv-dw-gear',
+                    'dw-core': 'inv-dw-core',
+                    'tent': 'inv-tent',
+                    'bag': 'inv-bag'
+                };
+                Object.keys(invMap).forEach(key => {
+                    const el = document.getElementById(invMap[key]);
+                    if (el && data.inv[key] !== undefined) {
+                        el.value = data.inv[key];
+                    }
+                });
+            }
+            // Загрузка навыков (базовые значения в data-raw-val)
+            let sInputs = document.querySelectorAll('[id^="skill-"]');
+            if (data.skills && sInputs.length === data.skills.length) {
+                sInputs.forEach((input, i) => {
+                    let val = data.skills[i] || 10;
+                    input.setAttribute('data-raw-val', val);
+                });
+            }
+            if (data.perkStates) {
+                document.querySelectorAll('.perk-checkbox').forEach(chk => {
+                    let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
+                    if (data.perkStates.hasOwnProperty(key)) {
+                        chk.checked = data.perkStates[key];
+                    }
+                });
+            }
+            document.getElementById('wep-melee-name').value = data.wepMName || '';
+            document.getElementById('wep-melee-dmg').value = data.wepMDmg || 2;
+            document.getElementById('wep-melee-type').value = data.wepMType || 'unarmed';
+            document.getElementById('wep-ranged-name').value = data.wepRName || '';
+            document.getElementById('wep-ranged-dmg').value = data.wepRDmg || 10;
+            document.getElementById('wep-ranged-type').value = data.wepRType || 'bow';
+            document.getElementById('ammo-name').value = data.amName || '';
+            document.getElementById('ammo-dmg').value = data.amDmg || 0;
+            document.getElementById('active-combat-weapon').value = data.activeWep || 'melee';
+            document.getElementById('eq-armor').value = data.armorClass || 'cloth';
+            document.getElementById('slot-helm-name').value = data.sHelm || '';
+            document.getElementById('slot-helm-armor').value = data.sHelmA || 0;
+            document.getElementById('slot-chest-name').value = data.sChest || '';
+            document.getElementById('slot-chest-armor').value = data.sChestA || 0;
+            document.getElementById('slot-gloves-name').value = data.sGloves || '';
+            document.getElementById('slot-gloves-armor').value = data.sGlovesA || 0;
+            document.getElementById('slot-boots-name').value = data.sBoots || '';
+            document.getElementById('slot-boots-armor').value = data.sBootsA || 0;
+            document.getElementById('slot-shield-name').value = data.sShield || '';
+            document.getElementById('slot-shield-armor').value = data.sShieldA || 0;
+            document.getElementById('slot-ring-name').value = data.sRing || '';
+            document.getElementById('slot-neck-name').value = data.sNeck || '';
+            document.getElementById('slot-circlet-name').value = data.sCirclet || '';
+        } catch(e) {
+            console.warn('Ошибка применения данных персонажа:', e);
+        }
+    }
+    window.applyCharacterData = applyCharacterData;
 
-function renderLog(log) {
-    const target = document.getElementById('combat-log');
-    target.innerHTML = log.map(entry => {
-        const time = entry.ts ? new Date(entry.ts).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '';
-        return `<div class="log-entry"><span class="log-time">${time}</span><span class="log-author">${entry.author||'?'}:</span> ${entry.text||''}</div>`;
-    }).join('');
-    target.scrollTop = target.scrollHeight;
-}
+    // Загрузка сохранения
+    function loadLocalStorage() {
+        let saved = localStorage.getItem('skyrim_ttrpg_save_v3_6');
+        let savedSpells = localStorage.getItem('skyrim_custom_spells_v3_5');
 
-window.postLogEntry = function() {
-    const input = document.getElementById('log-input');
-    const text = (input.value || '').trim();
-    if (!text || !currentSessionCode || !currentUser) return;
-    const authorName = document.getElementById('char-name').value || currentUser.email;
-    if (!db) return;
-    db.collection('sessions').doc(currentSessionCode).update({
-        combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName, text: text })
-    }).then(() => { input.value = ''; }).catch(e => console.error('Ошибка:', e));
-};
+        if (savedSpells) {
+            try {
+                customSpells = JSON.parse(savedSpells);
+                ['destr','restor','alter','illus','conj'].forEach(school => {
+                    document.getElementById(`spells-${school}-list`).innerHTML = '';
+                });
+                customSpells.forEach(s => addCustomSpell(s.school, s));
+            } catch(e) {}
+        }
 
-document.getElementById('log-input') && document.getElementById('log-input').addEventListener('keydown', function(ev) {
-    if (ev.key === 'Enter') window.postLogEntry();
-});
+        if (!saved) return;
+        try {
+            let data = JSON.parse(saved);
+            applyCharacterData(data);
+        } catch(e) {
+            console.warn('Ошибка загрузки сохранения:', e);
+        }
+    }
 
-// =====================================================================
-// ЗАПУСК
-// =====================================================================
-window.onload = function() {
+    // Полный сброс
+    function resetData() {
+        if (confirm("Вы уверены, что хотите полностью стереть все сохраненные данные? Это удалит инвентарь, перки, блокнот и кастомные заклинания!")) {
+            localStorage.removeItem('skyrim_ttrpg_save_v3_6');
+            localStorage.removeItem('skyrim_custom_spells_v3_5');
+            location.reload();
+        }
+    }
+
+    // Первичный запуск
     initSkills();
     loadLocalStorage();
     updateAll();
-    loadItemSuggestions();
-    renderInventory();
-};
 </script>
 
-<!-- Firebase: конфиг и облачные функции -->
+<!-- Firebase: конфиг проекта + логика облачной синхронизации -->
 <script src="firebase-config.js"></script>
 <script src="cloud.js"></script>
 </body>
