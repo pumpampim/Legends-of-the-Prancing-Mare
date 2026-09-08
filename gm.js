@@ -44,7 +44,9 @@
             'auth/wrong-password': 'Неверный пароль.',
             'auth/user-not-found': 'Аккаунт с таким email не найден.',
             'auth/invalid-credential': 'Неверный email или пароль.',
-            'auth/too-many-requests': 'Слишком много попыток. Подожди немного.'
+            'auth/too-many-requests': 'Слишком много попыток. Подожди немного.',
+            'auth/popup-blocked': 'Браузер заблокировал всплывающее окно — разреши всплывающие окна для этого сайта.',
+            'auth/account-exists-with-different-credential': 'Этот email уже привязан к аккаунту с другим способом входа.'
         };
         return map[e.code] || ('Ошибка: ' + e.message);
     }
@@ -73,6 +75,16 @@
         const pass = el('auth-password').value;
         showAuthError('');
         auth.signInWithEmailAndPassword(email, pass).catch(e => showAuthError(translateAuthError(e)));
+    };
+
+    window.cloudLoginGoogle = function () {
+        if (!window.FIREBASE_CONFIGURED) { showAuthError('Firebase ещё не настроен — см. README-FIREBASE.md'); return; }
+        showAuthError('');
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(e => {
+            if (e.code === 'auth/popup-closed-by-user') return;
+            showAuthError(translateAuthError(e));
+        });
     };
 
     window.cloudLogout = function () {
