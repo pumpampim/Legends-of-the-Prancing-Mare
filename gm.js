@@ -434,4 +434,57 @@
             alert(`Предмет "${itemName}" передан игроку ${playerList[idx].name}!`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+        // ---------- Импорт всех предметов в Firestore ----------
+    window.importAllItems = function() {
+        if (!db) {
+            alert('Firebase не подключён.');
+            return;
+        }
+        // Пытаемся получить allItems из глобального объекта (из index.html)
+        let items = window.allItems;
+        if (!items || items.length === 0) {
+            // Если нет, пробуем через localStorage или другие источники — но лучше просто попросить вставить массив
+            alert('Нет данных для импорта. Убедись, что в index.html определён window.allItems.');
+            return;
+        }
+        if (!confirm(`Импортировать ${items.length} предметов в Firestore?`)) return;
+
+        const batch = db.batch();
+        let count = 0;
+        items.forEach(item => {
+            const docRef = db.collection('items').doc(); // автогенерация ID
+            batch.set(docRef, {
+                name: item.name,
+                category: item.category || 'Разное',
+                type: item.type || 'misc',
+                weight: item.weight || 0,
+                price: item.price || 0,
+                armor: item.armor || null,
+                dmg: item.dmg || null,
+                effect: item.effect || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                slot: item.slot || null,
+                charges: item.charges || null
+            });
+            count++;
+            // Firestore batch лимит 500 записей, поэтому коммитим по 500
+            if (count % 500 === 0) {
+                batch.commit().then(() => {
+                    console.log(`Импортировано ${count} из ${items.length}`);
+                }).catch(e => console.error('Ошибка импорта:', e));
+                // Создаём новый batch для остальных
+                // Но проще использовать один batch на все 500, здесь у нас около 400 предметов, так что один batch подойдёт
+            }
+        });
+
+        // Коммитим оставшиеся
+        batch.commit().then(() => {
+            alert(`✅ Импортировано ${count} предметов!`);
+            window.loadGmItems(); // обновляем таблицу
+        }).catch(e => {
+            console.error('Ошибка импорта:', e);
+            alert('Ошибка импорта: ' + e.message);
+        });
+    };
 })();
