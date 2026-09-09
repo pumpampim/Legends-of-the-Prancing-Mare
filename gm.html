@@ -100,32 +100,32 @@
         </div>
 
         <!-- ===== НОВЫЙ БЛОК: БАЗА ПРЕДМЕТОВ ===== -->
-        <div class="panel">
-            <h2>📦 База предметов</h2>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
-                <select id="gm-item-category" onchange="filterGmItems()">
-                    <option value="all">Все категории</option>
-                </select>
-                <button onclick="loadGmItems()">Обновить</button>
-            </div>
-            <div style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px;">
-                <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                    <thead style="position:sticky; top:0; background:var(--panel-bg);">
-                        <tr>
-                            <th>Название</th>
-                            <th>Категория</th>
-                            <th>Вес</th>
-                            <th>Цена</th>
-                            <th>Действие</th>
-                        </tr>
-                    </thead>
-                    <tbody id="gm-items-table-body"></tbody>
-                </table>
-            </div>
-            <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
-        </div>
+       <div class="panel">
+    <h2>📦 База предметов</h2>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
+        <select id="gm-item-category" onchange="filterGmItems()">
+            <option value="all">Все категории</option>
+        </select>
+        <button onclick="loadGmItems()">Обновить</button>
+        <button onclick="importAllItems()" class="btn-success" style="width:auto;">📤 Импорт</button>
     </div>
+    <!-- таблица -->
+    <div style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead style="position:sticky; top:0; background:var(--panel-bg);">
+                <tr>
+                    <th>Название</th>
+                    <th>Категория</th>
+                    <th>Вес</th>
+                    <th>Цена</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody id="gm-items-table-body"></tbody>
+        </table>
+    </div>
+    <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
 </div>
 
 <script src="firebase-config.js"></script>
