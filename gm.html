@@ -6,7 +6,7 @@
     <title>Экран Мастера — «Скурим» TTRPG</title>
     <link rel="stylesheet" href="style.css">
 
-    <!-- Firebase SDK (см. README-FIREBASE.md для настройки) -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -16,7 +16,7 @@
 <div id="auth-overlay" class="auth-overlay">
     <div class="auth-box">
         <h2 style="margin-top:0;">Вход мастера</h2>
-        <p style="font-size:13px; opacity:.85;">Экран мастера требует аккаунт — с него создаются сессии и ведётся бой. Используй тот же аккаунт, что и в основном листе персонажа, либо отдельный, только для мастера.</p>
+        <p style="font-size:13px; opacity:.85;">Экран мастера требует аккаунт — с него создаются сессии и ведётся бой.</p>
         <label>Email</label>
         <input type="email" id="auth-email" placeholder="you@example.com">
         <label>Пароль</label>
@@ -26,7 +26,6 @@
             <button class="btn-success" onclick="cloudLogin()">Войти</button>
             <button onclick="cloudRegister()">Зарегистрироваться</button>
         </div>
-
         <div style="display:flex; align-items:center; gap:8px; margin:12px 0; opacity:.6; font-size:12px;">
             <div style="flex:1; height:1px; background:var(--border-color);"></div>или<div style="flex:1; height:1px; background:var(--border-color);"></div>
         </div>
@@ -44,7 +43,7 @@
 
     <div id="no-session-block" class="panel" style="display:none;">
         <h2>Начать сессию</h2>
-        <p style="font-size:13px; opacity:.85;">Создай сессию и передай код игрокам — они введут его на вкладке «Сессия» своего листа персонажа.</p>
+        <p style="font-size:13px; opacity:.85;">Создай сессию и передай код игрокам.</p>
         <button class="btn-success" onclick="createSession()">Создать новую сессию</button>
     </div>
 
@@ -98,6 +97,33 @@
                 </div>
                 <button style="margin-top:6px; width:100%;" onclick="clearLog()">Очистить журнал</button>
             </div>
+        </div>
+
+        <!-- ===== НОВЫЙ БЛОК: БАЗА ПРЕДМЕТОВ ===== -->
+        <div class="panel">
+            <h2>📦 База предметов</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
+                <select id="gm-item-category" onchange="filterGmItems()">
+                    <option value="all">Все категории</option>
+                </select>
+                <button onclick="loadGmItems()">Обновить</button>
+            </div>
+            <div style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                    <thead style="position:sticky; top:0; background:var(--panel-bg);">
+                        <tr>
+                            <th>Название</th>
+                            <th>Категория</th>
+                            <th>Вес</th>
+                            <th>Цена</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gm-items-table-body"></tbody>
+                </table>
+            </div>
+            <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
         </div>
     </div>
 </div>
