@@ -487,4 +487,8 @@
             alert('Ошибка импорта: ' + e.message);
         });
     };
+        window.importAllItems = function() {
+        // Просто вызываем loadGmItems, который сам проверит и импортирует
+        window.loadGmItems();
+    };
 })();
