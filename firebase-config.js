@@ -16,7 +16,7 @@ const firebaseConfig = {
   storageBucket: "legends-of-the-prancing-mare.firebasestorage.app",
   messagingSenderId: "479204281567",
   appId: "1:479204281567:web:03db757500f708844d2d6a",
-  measurementId: "G-6S40NQNNXS
+  measurementId: "G-6S40NQNNXS",
 };
 
 window.FIREBASE_CONFIGURED = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("ВСТАВЬ");
