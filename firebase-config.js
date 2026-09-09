@@ -19,11 +19,7 @@ const firebaseConfig = {
   measurementId: "G-6S40NQNNXS
 };
 
-// Флаг: заполнен ли конфиг реальными значениями (используется cloud.js,
-// чтобы не пытаться подключаться к Firebase, пока ты не вставил свои ключи,
-// и вместо ошибки просто работать в офлайн-режиме).
 window.FIREBASE_CONFIGURED = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("ВСТАВЬ");
-
 if (window.FIREBASE_CONFIGURED) {
     try {
         firebase.initializeApp(firebaseConfig);
