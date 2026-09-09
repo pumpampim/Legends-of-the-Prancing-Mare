@@ -163,16 +163,17 @@
 
     function enterSessionView(code) {
         currentCode = code;
-        el('no-session-block').style.display = 'none';
-        el('session-block').style.display = 'block';
-        el('gm-session-code').textContent = code;
-        if (unsubSession) unsubSession();
-        unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
-            if (!doc.exists) return;
-            lastData = doc.data();
-            renderAll();
-        });
-    }
+    el('no-session-block').style.display = 'none';
+    el('session-block').style.display = 'block';
+    el('gm-session-code').textContent = code;
+    loadGmItems();
+    if (unsubSession) unsubSession();
+    unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
+        if (!doc.exists) return;
+        lastData = doc.data();
+        renderAll();
+    });
+}
 
     function renderAll() {
         renderParty(lastData.participants || {});
@@ -315,4 +316,129 @@
         showOverlay(false);
         console.warn('Firebase не настроен — см. README-FIREBASE.md');
     }
+        // ---------- База предметов для мастера ----------
+    let gmAllItems = [];
+    let gmFilteredItems = [];
+
+    function loadGmItems() {
+        if (!db) return;
+        db.collection('items').get().then(snapshot => {
+            gmAllItems = [];
+            snapshot.forEach(doc => {
+                gmAllItems.push({ id: doc.id, ...doc.data() });
+            });
+            // Если коллекция пуста, пробуем загрузить из локальной базы (если есть)
+            if (gmAllItems.length === 0) {
+                console.warn('Коллекция items пуста, используем локальную базу из index.html (если доступна).');
+                // У нас нет прямого доступа к allItems из глобального скоупа, но можно попробовать
+                // Если allItems определён в window, использовать его.
+                if (typeof window.allItems !== 'undefined') {
+                    gmAllItems = window.allItems.map(item => ({ ...item, id: item.name }));
+                } else {
+                    // Заглушка: если нет данных, показать сообщение
+                    document.getElementById('gm-items-table-body').innerHTML = '<tr><td colspan="5">Нет данных. Загрузите предметы через index.html.</td></tr>';
+                    return;
+                }
+            }
+            // Заполняем фильтр категорий
+            const catSelect = document.getElementById('gm-item-category');
+            const cats = [...new Set(gmAllItems.map(i => i.category || 'Разное'))];
+            catSelect.innerHTML = '<option value="all">Все категории</option>';
+            cats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                catSelect.appendChild(opt);
+            });
+            gmFilteredItems = gmAllItems;
+            renderGmItemsTable();
+        }).catch(e => console.error('Ошибка загрузки предметов для мастера:', e));
+    }
+
+    function filterGmItems() {
+        const search = document.getElementById('gm-item-search').value.toLowerCase().trim();
+        const category = document.getElementById('gm-item-category').value;
+        gmFilteredItems = gmAllItems.filter(item => {
+            const matchName = item.name.toLowerCase().includes(search);
+            const matchCat = category === 'all' || item.category === category;
+            return matchName && matchCat;
+        });
+        renderGmItemsTable();
+    }
+
+    function renderGmItemsTable() {
+        const tbody = document.getElementById('gm-items-table-body');
+        const countSpan = document.getElementById('gm-items-count');
+        if (!tbody) return;
+        if (gmFilteredItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#666;">Ничего не найдено</td></tr>';
+            if (countSpan) countSpan.textContent = '0';
+            return;
+        }
+        let html = '';
+        gmFilteredItems.forEach(item => {
+            // Определяем, есть ли у нас ID для передачи
+            const itemId = item.id || item.name;
+            html += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td>${item.weight || 0}</td>
+                    <td>${item.price || 0}</td>
+                    <td>
+                        <button class="btn btn-sm" onclick="gmGiveItemFromTable('${itemId}', '${item.name}', ${item.weight || 0})">Передать</button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+        if (countSpan) countSpan.textContent = gmFilteredItems.length;
+    }
+
+    window.gmGiveItemFromTable = function(itemId, itemName, itemWeight) {
+        // Проверяем, есть ли игроки в сессии
+        const uids = Object.keys(lastData.participants || {});
+        if (uids.length === 0) {
+            alert('Нет игроков в сессии. Сначала дождись, пока кто-то присоединится.');
+            return;
+        }
+        // Создаём простой выбор игрока через prompt (можно улучшить до выпадающего списка)
+        let playerList = uids.map(uid => {
+            const p = lastData.participants[uid];
+            return { uid, name: p.name || uid };
+        });
+        let choices = playerList.map((p, idx) => `${idx+1}: ${p.name}`).join('\n');
+        let choice = prompt(`Выберите игрока для передачи:\n${choices}\n\nВведите номер (1-${playerList.length}):`);
+        if (choice === null) return;
+        let idx = parseInt(choice) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= playerList.length) {
+            alert('Неверный номер.');
+            return;
+        }
+        const targetUid = playerList[idx].uid;
+        const count = prompt('Введите количество:', '1');
+        if (count === null) return;
+        const numCount = parseInt(count) || 1;
+        if (numCount < 1) return;
+
+        // Добавляем предмет игроку
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.data();
+            let inv = data.inventory || [];
+            const existing = inv.find(item => item.itemId === itemId);
+            if (existing) {
+                existing.count += numCount;
+            } else {
+                inv.push({
+                    itemId: itemId,
+                    name: itemName,
+                    count: numCount,
+                    weight: itemWeight
+                });
+            }
+            return db.collection('characters').doc(targetUid).update({ inventory: inv });
+        }).then(() => {
+            alert(`Предмет "${itemName}" передан игроку ${playerList[idx].name}!`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
 })();
