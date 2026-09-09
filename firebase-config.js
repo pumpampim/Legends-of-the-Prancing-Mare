@@ -9,12 +9,14 @@
 // ============================================================================
 
 const firebaseConfig = {
-    apiKey: "ВСТАВЬ_СЮДА_apiKey",
-    authDomain: "ВСТАВЬ_СЮДА.firebaseapp.com",
-    projectId: "ВСТАВЬ_СЮДА_projectId",
-    storageBucket: "ВСТАВЬ_СЮДА.appspot.com",
-    messagingSenderId: "ВСТАВЬ_СЮДА",
-    appId: "ВСТАВЬ_СЮДА"
+  apiKey: "AIzaSyAxisxsU0n9LoleQFX1nJ4GCQnZwVkv2EM",
+  authDomain: "legends-of-the-prancing-mare.firebaseapp.com",
+  databaseURL: "https://legends-of-the-prancing-mare-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "legends-of-the-prancing-mare",
+  storageBucket: "legends-of-the-prancing-mare.firebasestorage.app",
+  messagingSenderId: "479204281567",
+  appId: "1:479204281567:web:03db757500f708844d2d6a",
+  measurementId: "G-6S40NQNNXS
 };
 
 // Флаг: заполнен ли конфиг реальными значениями (используется cloud.js,
