@@ -440,19 +440,16 @@
             alert('Firebase не подключён.');
             return;
         }
-        // Пытаемся получить allItems из глобального объекта (из index.html)
-        let items = window.allItems;
+        const items = window.allItems;
         if (!items || items.length === 0) {
-            // Если нет, пробуем через localStorage или другие источники — но лучше просто попросить вставить массив
-            alert('Нет данных для импорта. Убедись, что в index.html определён window.allItems.');
+            alert('Нет данных для импорта. Проверь, что allItems определён в index.html.');
             return;
         }
-        if (!confirm(`Импортировать ${items.length} предметов в Firestore?`)) return;
+        if (!confirm(`Импортировать ${items.length} предметов в Firestore? Это может занять несколько секунд.`)) return;
 
         const batch = db.batch();
-        let count = 0;
         items.forEach(item => {
-            const docRef = db.collection('items').doc(); // автогенерация ID
+            const docRef = db.collection('items').doc();
             batch.set(docRef, {
                 name: item.name,
                 category: item.category || 'Разное',
@@ -467,20 +464,9 @@
                 slot: item.slot || null,
                 charges: item.charges || null
             });
-            count++;
-            // Firestore batch лимит 500 записей, поэтому коммитим по 500
-            if (count % 500 === 0) {
-                batch.commit().then(() => {
-                    console.log(`Импортировано ${count} из ${items.length}`);
-                }).catch(e => console.error('Ошибка импорта:', e));
-                // Создаём новый batch для остальных
-                // Но проще использовать один batch на все 500, здесь у нас около 400 предметов, так что один batch подойдёт
-            }
         });
-
-        // Коммитим оставшиеся
         batch.commit().then(() => {
-            alert(`✅ Импортировано ${count} предметов!`);
+            alert(`✅ Импортировано ${items.length} предметов!`);
             window.loadGmItems(); // обновляем таблицу
         }).catch(e => {
             console.error('Ошибка импорта:', e);
@@ -491,4 +477,5 @@
         // Просто вызываем loadGmItems, который сам проверит и импортирует
         window.loadGmItems();
     };
+    
 })();
