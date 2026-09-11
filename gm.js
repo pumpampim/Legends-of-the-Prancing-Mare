@@ -328,12 +328,12 @@
             });
             // Если коллекция пуста, пробуем загрузить из локальной базы (если есть)
             if (gmAllItems.length === 0) {
-                console.warn('Коллекция items пуста, используем локальную базу из index.html (если доступна).');
-                // Пробуем получить allItems из глобального объекта (если он определён в index.html)
+                console.warn('Коллекция items пуста, используем локальную базу из items-data.js (если подключена).');
+                // Пробуем получить allItems из глобального объекта (задаётся в items-data.js)
                 if (typeof window.allItems !== 'undefined') {
                     gmAllItems = window.allItems.map(item => ({ ...item, id: item.name }));
                 } else {
-                    document.getElementById('gm-items-table-body').innerHTML = '<tr><td colspan="5">Нет данных. Загрузите предметы через index.html.</td></tr>';
+                    document.getElementById('gm-items-table-body').innerHTML = '<tr><td colspan="5">Нет данных. Убедись, что items-data.js подключён и нажми «Импорт».</td></tr>';
                     return;
                 }
             }
@@ -442,14 +442,17 @@
         }
         const items = window.allItems;
         if (!items || items.length === 0) {
-            alert('Нет данных для импорта. Проверь, что allItems определён в index.html.');
+            alert('Нет данных для импорта. Проверь, что items-data.js подключён на странице.');
             return;
         }
-        if (!confirm(`Импортировать ${items.length} предметов в Firestore? Это может занять несколько секунд.`)) return;
+        if (!confirm(`Импортировать ${items.length} предметов в Firestore? Повторный импорт просто обновит те же записи (без дублей).`)) return;
 
         const batch = db.batch();
         items.forEach(item => {
-            const docRef = db.collection('items').doc();
+            // ID делаем из названия предмета (без запрещённых в Firestore символов),
+            // чтобы повторный импорт обновлял те же документы, а не плодил дубли.
+            const safeId = item.name.replace(/[\/\.\#\$\[\]]/g, '_').slice(0, 300);
+            const docRef = db.collection('items').doc(safeId);
             batch.set(docRef, {
                 name: item.name,
                 category: item.category || 'Разное',
@@ -473,9 +476,5 @@
             alert('Ошибка импорта: ' + e.message);
         });
     };
-        window.importAllItems = function() {
-        // Просто вызываем loadGmItems, который сам проверит и импортирует
-        window.loadGmItems();
-    };
-    
+
 })();

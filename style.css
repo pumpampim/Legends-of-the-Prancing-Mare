@@ -121,13 +121,23 @@
         }
         .perk-item {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
             font-size: 12px;
             margin: 4px 0;
-            padding: 2px 4px;
+            padding: 3px 4px;
             background: #151511;
             border-radius: 3px;
+        }
+        .perk-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .perk-desc {
+            font-size: 10.5px;
+            color: #8a8171;
+            line-height: 1.35;
+            margin: 2px 2px 1px 2px;
         }
         .perk-left {
             display: flex;
