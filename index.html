@@ -390,6 +390,8 @@
     <script src="perks.js"></script>
     <script src="items-data.js"></script>
     <script src="cooking-data.js"></script>
+    <script src="smithing-data.js"></script>
+    <script src="enchant-data.js"></script>
 </head>
 <body>
 
@@ -435,6 +437,8 @@
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
         <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
+        <button class="tab-link" onclick="openTab(event, 'tab7')">⚒️ Кузница</button>
+        <button class="tab-link" onclick="openTab(event, 'tab8')">✨ Зачарование</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -865,12 +869,15 @@
             <!-- ОБЩИЙ ИНВЕНТАРЬ ПРЕДМЕТОВ -->
             <div class="panel">
                 <h2>🎒 Инвентарь предметов</h2>
-                <p style="font-size:11px; opacity:.75;">Сюда попадают продукты, которые ты завёл вручную, приготовленные блюда, свитки и вещи, которые передал мастер.</p>
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
-                    <select id="add-item-select" style="flex:1; min-width:140px;"></select>
-                    <input type="number" id="add-item-qty" value="1" min="1" style="width:60px;">
-                    <button style="width:auto;" onclick="addIngredientToInventory()">Добавить</button>
+                <p style="font-size:11px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
+
+                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                    <label style="font-size:12px;">👕 Надеть/взять в руки предмет из инвентаря</label>
+                    <select id="equip-item-select"></select>
+                    <button class="btn-success" style="width:100%; margin-top:4px;" onclick="equipSelectedItem()">Экипировать</button>
+                    <div id="equipped-enchants-summary" style="margin-top:8px; font-size:12px;"></div>
                 </div>
+
                 <div id="player-inventory-list" style="max-height:280px; overflow-y:auto;"></div>
             </div>
 
@@ -930,6 +937,71 @@
         </div>
     </div>
 
+    <!-- ТАБ 7: КУЗНИЦА -->
+    <div id="tab7" class="tab-content">
+        <div class="panel">
+            <h2>⚒️ Кузница</h2>
+            <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+            <div id="smithing-list"></div>
+        </div>
+    </div>
+
+    <!-- ТАБ 8: ЗАЧАРОВАНИЕ -->
+    <div id="tab8" class="tab-content">
+        <div class="panel">
+            <h2>✨ Зачарование брони и оружия</h2>
+            <p style="font-size:12px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
+
+            <label>Незачарованный предмет из инвентаря (броня, украшение или оружие)</label>
+            <select id="enchant-item-select" onchange="onEnchantItemPicked()"></select>
+            <div id="enchant-item-info" style="font-size:11px; opacity:.7; margin:4px 0 8px;"></div>
+
+            <label>Эффект</label>
+            <select id="enchant-effect" onchange="updateEnchantCalc()"></select>
+
+            <label>Камень душ (нужен в инвентаре)</label>
+            <select id="enchant-soulgem" onchange="updateEnchantCalc()">
+                <option value="Крохотный">Крохотный (25%)</option>
+                <option value="Маленький">Маленький (50%)</option>
+                <option value="Обычный" selected>Обычный (100%)</option>
+                <option value="Большой">Большой (125%)</option>
+                <option value="Великий">Великий (150%)</option>
+            </select>
+
+            <label>Навык «Зачарование» (берётся с вкладки навыков, можно поправить)</label>
+            <input type="number" id="enchant-skill-override" placeholder="Авто с вкладки навыков" onchange="updateEnchantCalc()">
+
+            <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
+            <div id="enchant-result" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🪄 Посохи</h2>
+            <p style="font-size:12px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
+
+            <label>Эффект нового посоха</label>
+            <select id="staff-effect" onchange="updateStaffCalc()"></select>
+
+            <label>Камень душ</label>
+            <select id="staff-soulgem" onchange="updateStaffCalc()">
+                <option value="Крохотный">Крохотный (25%)</option>
+                <option value="Маленький">Маленький (50%)</option>
+                <option value="Обычный" selected>Обычный (100%)</option>
+                <option value="Большой">Большой (125%)</option>
+                <option value="Великий">Великий (150%)</option>
+            </select>
+
+            <div id="staff-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+
+            <button class="btn-success" style="width:100%;" onclick="createStaff()">Создать новый посох</button>
+
+            <h3 style="margin-top:16px;">Твои посохи</h3>
+            <div id="staff-list"></div>
+        </div>
+    </div>
+
 <script>
     // Массив всех 19 навыков игровой системы Скурим
     const skillNames = [
@@ -944,6 +1016,8 @@
     let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
     let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
+    let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
+    let equippedSlots = { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
     function initSkills() {
@@ -1151,16 +1225,18 @@
         return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0);
     }
 
-    function addToInventory(itemId, name, qty, weight, category, effect) {
+    function addToInventory(itemId, name, qty, weight, category, effect, extra) {
         const existing = playerInventory.find(i => i.itemId === itemId);
         if (existing) {
             existing.count += qty;
             if (effect) existing.effect = effect;
+            if (extra) Object.assign(existing, extra);
         } else {
-            playerInventory.push({ itemId, name, count: qty, weight: weight || 0, category: category || '', effect: effect || '' });
+            playerInventory.push(Object.assign({ itemId, name, count: qty, weight: weight || 0, category: category || '', effect: effect || '' }, extra || {}));
         }
         renderInventoryList();
         renderKitchenPot();
+        if (typeof renderEquipPanel === 'function') renderEquipPanel();
         updateAll();
     }
 
@@ -1205,35 +1281,6 @@
                 </span>
             </div>
         `).join('');
-    }
-
-    function populateAddItemSelect() {
-        const select = document.getElementById('add-item-select');
-        if (!select || !window.cookingIngredients) return;
-        const byCategory = {};
-        Object.keys(window.cookingIngredients).forEach(name => {
-            const cat = window.cookingIngredients[name].category || 'Разное';
-            (byCategory[cat] = byCategory[cat] || []).push(name);
-        });
-        let html = '';
-        Object.keys(byCategory).sort().forEach(cat => {
-            html += `<optgroup label="${escHtml(cat)}">`;
-            byCategory[cat].sort().forEach(name => {
-                html += `<option value="${escHtml(name)}">${escHtml(name)}</option>`;
-            });
-            html += `</optgroup>`;
-        });
-        select.innerHTML = html;
-    }
-
-    function addIngredientToInventory() {
-        const select = document.getElementById('add-item-select');
-        if (!select || !select.value) return;
-        const name = select.value;
-        const qty = parseInt(document.getElementById('add-item-qty').value) || 1;
-        const info = (window.cookingIngredients && window.cookingIngredients[name]) || {};
-        addToInventory(name, name, qty, info.weight || 0, info.category || '', '');
-        saveLocalStorage();
     }
 
     function renderKitchenPot() {
@@ -1346,7 +1393,394 @@
         saveLocalStorage();
     }
 
-    // Восстановление после отдыха
+    // ========================================================================
+    // КУЗНИЦА
+    // ========================================================================
+
+    function getAllSmithingRecipes() {
+        return [...(window.armorRecipes || []), ...(window.jewelryRecipes || [])];
+    }
+
+    function countInInventory(name) {
+        const item = playerInventory.find(i => i.itemId === name);
+        return item ? item.count : 0;
+    }
+
+    function renderSmithingList() {
+        const el = document.getElementById('smithing-list');
+        if (!el) return;
+        const known = getAllSmithingRecipes().filter(r => knownSmithingRecipes.includes(r.name));
+        if (!known.length) {
+            el.innerHTML = '<p style="opacity:.7; font-size:13px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
+            return;
+        }
+        el.innerHTML = known.map((r, idx) => {
+            const canMake = r.ingredients.every(i => countInInventory(i.name) >= i.qty);
+            const ingList = r.ingredients.map(i => {
+                const have = countInInventory(i.name);
+                const ok = have >= i.qty;
+                return `<span style="color:${ok ? '#2ecc71' : '#e74c3c'};">${escHtml(i.name)} ${have}/${i.qty}</span>`;
+            }).join(', ');
+            const statLine = r.resistance !== undefined && r.slot !== 'jewelry'
+                ? `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`
+                : (r.yieldCount ? `Выход: ${r.yieldCount} шт.` : '');
+            return `<div class="party-row">
+                <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:11px; opacity:.7;">${escHtml(statLine)}</span></div>
+                <div style="font-size:12px; margin:4px 0;">${ingList}</div>
+                <button class="btn-success" style="width:100%;" ${canMake ? '' : 'disabled'} onclick="craftSmithingItem(${idx})">Сковать</button>
+            </div>`;
+        }).join('');
+        el.dataset.knownList = JSON.stringify(known.map(r => r.name));
+    }
+
+    const SMITHING_SLOT_MAP = {
+        'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves',
+        'Сапоги и ботинки': 'boots', 'Щиты': 'shield'
+    };
+
+    window.craftSmithingItem = function(idx) {
+        const known = getAllSmithingRecipes().filter(r => knownSmithingRecipes.includes(r.name));
+        const recipe = known[idx];
+        if (!recipe) return;
+        const canMake = recipe.ingredients.every(i => countInInventory(i.name) >= i.qty);
+        if (!canMake) { alert('Не хватает материалов.'); return; }
+        recipe.ingredients.forEach(i => removeFromInventoryByName(i.name, i.qty));
+        const yieldCount = recipe.yieldCount || 1;
+        const isJewelry = recipe.slot === 'jewelry';
+        const desc = isJewelry ? 'Ювелирное изделие' : `Сопротивление ${recipe.resistance}`;
+        const extra = isJewelry
+            ? { slot: recipe.name.includes('кольцо') || recipe.name.includes('Кольцо') ? 'ring' : 'amulet' }
+            : { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: recipe.resistance };
+        addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, 'Скованное', desc, extra);
+        renderSmithingList();
+        saveLocalStorage();
+    };
+
+    // ========================================================================
+    // ЗАЧАРОВАНИЕ
+    // ========================================================================
+
+    function getSkillRawValue(name) {
+        const idx = skillNames.indexOf(name);
+        const input = idx >= 0 ? document.getElementById(`skill-${idx}`) : null;
+        return input ? parseInt(input.getAttribute('data-raw-val') || input.value) || 0 : 0;
+    }
+
+    function getEnchantSkill() {
+        const override = document.getElementById('enchant-skill-override').value;
+        return override ? (parseInt(override) || 0) : getSkillRawValue('Зачарование');
+    }
+
+    // Слоты экипировки (helmet/chest/gloves/boots/shield/...) используют другие коды,
+    // чем таблица эффектов зачарования (helmet/armor/gauntlets/boots/shield/...).
+    function equipSlotToEnchantSlot(s) {
+        return { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' }[s] || s;
+    }
+
+    function isWeaponSlot(slot) {
+        return slot === 'melee' || slot === 'ranged';
+    }
+
+    // ---------- Зачарование существующего предмета из инвентаря ----------
+
+    function getEnchantableInventoryItems() {
+        return playerInventory.filter(i => i.slot && !i.enchantment && !i.isStaff);
+    }
+
+    function renderEnchantItemSelect() {
+        const select = document.getElementById('enchant-item-select');
+        if (!select) return;
+        const items = getEnchantableInventoryItems();
+        select.innerHTML = items.length
+            ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (${escHtml(slotLabel(i.slot))})</option>`).join('')
+            : '<option value="">Нет незачарованных предметов с слотом экипировки в инвентаре</option>';
+        onEnchantItemPicked();
+    }
+
+    window.onEnchantItemPicked = function () {
+        const itemId = document.getElementById('enchant-item-select').value;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        const infoEl = document.getElementById('enchant-item-info');
+        const effectSelect = document.getElementById('enchant-effect');
+        if (!item) {
+            infoEl.textContent = '';
+            effectSelect.innerHTML = '';
+            updateEnchantCalc();
+            return;
+        }
+        infoEl.textContent = isWeaponSlot(item.slot)
+            ? 'Оружие: зачарование продержится 5 дней, затем нужна подзарядка.'
+            : 'Броня/украшение: зачарование постоянное.';
+        let effects;
+        if (isWeaponSlot(item.slot)) {
+            effects = window.enchantWeaponEffects || [];
+        } else {
+            const eSlot = equipSlotToEnchantSlot(item.slot);
+            effects = (window.enchantArmorEffects || []).filter(e => e.slots.includes(eSlot));
+        }
+        effectSelect.innerHTML = effects.map((e, i) => `<option value="${i}">${escHtml(e.name)}</option>`).join('');
+        updateEnchantCalc();
+    };
+
+    function getPickedEnchantItemAndEffect() {
+        const itemId = document.getElementById('enchant-item-select').value;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return { item: null, effect: null };
+        const idx = parseInt(document.getElementById('enchant-effect').value) || 0;
+        const effects = isWeaponSlot(item.slot)
+            ? (window.enchantWeaponEffects || [])
+            : (window.enchantArmorEffects || []).filter(e => e.slots.includes(equipSlotToEnchantSlot(item.slot)));
+        return { item, effect: effects[idx] };
+    }
+
+    function updateEnchantCalc() {
+        const resultEl = document.getElementById('enchant-calc-result');
+        if (!resultEl) return;
+        const { item, effect } = getPickedEnchantItemAndEffect();
+        if (!item || !effect) { resultEl.innerHTML = ''; return; }
+        const soulGem = document.getElementById('enchant-soulgem').value;
+        const skill = getEnchantSkill();
+        const gemCount = countInInventory(soulGem + ' камень душ');
+        const calc = window.calcEnchantPower(effect, soulGem, skill);
+
+        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
+        if (calc.boolean) {
+            html += `<div style="margin-top:6px;">Эффект без числовой величины (вкл/выкл).</div>`;
+        } else {
+            html += `<div style="margin-top:6px; font-size:16px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
+            html += `<div style="font-size:11px; opacity:.6;">При навыке ${skill} и камне «${escHtml(soulGem)}» (макс. по таблице: ${effect.maxValue}${effect.unit})</div>`;
+        }
+        if (gemCount === 0) {
+            html += `<div style="color:#e74c3c; margin-top:4px; font-size:12px;">⚠ В инвентаре нет камня душ «${escHtml(soulGem)}» — сначала попроси у мастера.</div>`;
+        }
+        resultEl.innerHTML = html;
+    }
+    window.updateEnchantCalc = updateEnchantCalc;
+
+    window.enchantItem = function () {
+        const { item, effect } = getPickedEnchantItemAndEffect();
+        const resultEl = document.getElementById('enchant-result');
+        if (!item || !effect) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери предмет и эффект.</span>'; return; }
+        const soulGem = document.getElementById('enchant-soulgem').value;
+        const gemKey = soulGem + ' камень душ';
+        if (countInInventory(gemKey) <= 0) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Нет камня душ «${escHtml(soulGem)}» в инвентаре.</span>`;
+            return;
+        }
+        const skill = getEnchantSkill();
+        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
+
+        removeFromInventoryByName(gemKey, 1);
+        removeFromInventoryByName(item.itemId, 1);
+
+        const enchantedName = `${item.name} [${effect.name}]`;
+        const extra = Object.assign({}, item, {
+            enchantment: { name: effect.name, value: calc.boolean ? null : calc.value, unit: effect.unit, description: desc }
+        });
+        delete extra.itemId; delete extra.count;
+        if (isWeaponSlot(item.slot)) extra.chargeDaysLeft = 5;
+
+        addToInventory(enchantedName + '#' + Date.now(), enchantedName, 1, item.weight, item.category, desc, extra);
+        resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Готово: «${escHtml(enchantedName)}» — ${escHtml(desc)}</div>`;
+        renderEnchantItemSelect();
+        saveLocalStorage();
+    };
+
+    // ---------- Посохи ----------
+
+    function renderStaffEffectSelect() {
+        const select = document.getElementById('staff-effect');
+        if (!select) return;
+        const effects = window.enchantWeaponEffects || [];
+        select.innerHTML = effects.map((e, i) => `<option value="${i}">${escHtml(e.name)}</option>`).join('');
+    }
+
+    function updateStaffCalc() {
+        const resultEl = document.getElementById('staff-calc-result');
+        if (!resultEl) return;
+        const idx = parseInt(document.getElementById('staff-effect').value) || 0;
+        const effect = (window.enchantWeaponEffects || [])[idx];
+        if (!effect) { resultEl.innerHTML = ''; return; }
+        const soulGem = document.getElementById('staff-soulgem').value;
+        const skill = getEnchantSkill();
+        const gemCount = countInInventory(soulGem + ' камень душ');
+        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
+        html += calc.boolean
+            ? `<div style="margin-top:6px;">Эффект без числовой величины.</div>`
+            : `<div style="margin-top:6px; font-size:16px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
+        if (gemCount === 0) html += `<div style="color:#e74c3c; margin-top:4px; font-size:12px;">⚠ Нет камня душ «${escHtml(soulGem)}» в инвентаре.</div>`;
+        resultEl.innerHTML = html;
+    }
+    window.updateStaffCalc = updateStaffCalc;
+
+    window.createStaff = function () {
+        const idx = parseInt(document.getElementById('staff-effect').value) || 0;
+        const effect = (window.enchantWeaponEffects || [])[idx];
+        const soulGem = document.getElementById('staff-soulgem').value;
+        const gemKey = soulGem + ' камень душ';
+        if (!effect) return;
+        if (countInInventory(gemKey) <= 0) {
+            alert(`Нет камня душ «${soulGem}» в инвентаре.`);
+            return;
+        }
+        const skill = getEnchantSkill();
+        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
+        removeFromInventoryByName(gemKey, 1);
+        const name = `Посох: ${effect.name}`;
+        addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', desc, {
+            isStaff: true, chargeDaysLeft: 5, slot: 'ranged',
+            enchantment: { name: effect.name, value: calc.boolean ? null : calc.value, unit: effect.unit, description: desc }
+        });
+        renderStaffList();
+        saveLocalStorage();
+    };
+
+    function renderStaffList() {
+        const el = document.getElementById('staff-list');
+        if (!el) return;
+        const staves = playerInventory.filter(i => i.isStaff);
+        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Посохов пока нет.</p>'; return; }
+        el.innerHTML = staves.map(s => `
+            <div class="party-row">
+                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:11px;">Заряд: ${s.chargeDaysLeft} дн.</span></div>
+                <div style="font-size:12px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
+                <div style="display:flex; gap:6px;">
+                    <button style="flex:1;" onclick="advanceStaffDay('${escHtml(s.itemId)}')" ${s.chargeDaysLeft <= 0 ? 'disabled' : ''}>−1 день</button>
+                    <button class="btn-success" style="flex:1;" onclick="rechargeStaff('${escHtml(s.itemId)}')">Перезарядить (камень душ)</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.advanceStaffDay = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        item.chargeDaysLeft = Math.max(0, (item.chargeDaysLeft || 0) - 1);
+        renderStaffList();
+        saveLocalStorage();
+    };
+
+    window.rechargeStaff = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        const soulGem = document.getElementById('staff-soulgem').value;
+        const gemKey = soulGem + ' камень душ';
+        if (countInInventory(gemKey) <= 0) {
+            alert(`Выбери камень душ выше и убедись, что он есть в инвентаре («${soulGem}» отсутствует).`);
+            return;
+        }
+        removeFromInventoryByName(gemKey, 1);
+        item.chargeDaysLeft = 5;
+        renderStaffList();
+        saveLocalStorage();
+    };
+
+    // ---------- Экипировка из инвентаря ----------
+
+    function slotLabel(slot) {
+        return ({
+            helmet: 'Шлем', chest: 'Броня (корпус)', gloves: 'Перчатки/наручи', boots: 'Сапоги', shield: 'Щит',
+            ring: 'Кольцо', amulet: 'Амулет', circlet: 'Обруч', 'melee': 'Оружие ближнего боя', 'ranged': 'Дальнобойное/посох'
+        })[slot] || slot;
+    }
+
+    const SLOT_FIELD_MAP = {
+        helmet: ['slot-helm-name', 'slot-helm-armor'], chest: ['slot-chest-name', 'slot-chest-armor'],
+        gloves: ['slot-gloves-name', 'slot-gloves-armor'], boots: ['slot-boots-name', 'slot-boots-armor'],
+        shield: ['slot-shield-name', 'slot-shield-armor']
+    };
+
+    function getEquippableInventoryItems() {
+        return playerInventory.filter(i => i.slot);
+    }
+
+    function renderEquipPanel() {
+        const select = document.getElementById('equip-item-select');
+        if (!select) return;
+        const items = getEquippableInventoryItems();
+        select.innerHTML = items.length
+            ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} — ${escHtml(slotLabel(i.slot))}${i.enchantment ? ' 🔮' : ''}</option>`).join('')
+            : '<option value="">Нет подходящих предметов в инвентаре</option>';
+        renderEquippedSummary();
+    }
+
+    window.equipSelectedItem = function () {
+        const itemId = document.getElementById('equip-item-select').value;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        const slot = item.slot;
+        if (SLOT_FIELD_MAP[slot]) {
+            document.getElementById(SLOT_FIELD_MAP[slot][0]).value = item.name;
+            document.getElementById(SLOT_FIELD_MAP[slot][1]).value = item.armorValue || 0;
+            equippedSlots[slot] = item.itemId;
+        } else if (slot === 'ring') {
+            document.getElementById('slot-ring-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            equippedSlots.ring = item.itemId;
+        } else if (slot === 'amulet') {
+            document.getElementById('slot-neck-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            equippedSlots.neck = item.itemId;
+        } else if (slot === 'circlet') {
+            document.getElementById('slot-circlet-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            equippedSlots.circlet = item.itemId;
+        } else if (slot === 'melee') {
+            document.getElementById('wep-melee-name').value = item.name;
+            document.getElementById('wep-melee-dmg').value = item.weaponDmg || 2;
+            equippedSlots.meleeWeapon = item.itemId;
+        } else if (slot === 'ranged') {
+            document.getElementById('wep-ranged-name').value = item.name;
+            document.getElementById('wep-ranged-dmg').value = item.weaponDmg || 0;
+            equippedSlots.rangedWeapon = item.itemId;
+        }
+        renderEquippedSummary();
+        updateAll();
+        saveLocalStorage();
+    };
+
+    function renderEquippedSummary() {
+        const el = document.getElementById('equipped-enchants-summary');
+        if (!el) return;
+        const lines = [];
+        Object.keys(equippedSlots).forEach(slotKey => {
+            const itemId = equippedSlots[slotKey];
+            if (!itemId) return;
+            const item = playerInventory.find(i => i.itemId === itemId);
+            if (item && item.enchantment) {
+                lines.push(`<div>🔮 <strong>${escHtml(item.name)}</strong>: ${escHtml(item.enchantment.description)}</div>`);
+            }
+        });
+        el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:12px;">Зачарованных предметов не надето.</p>';
+    }
+
+    const ENCHANT_AUTO_APPLY_ARMOR = {
+        'Повышение здоровья': 'hp', 'Повышение магии': 'mp', 'Повышение переносимого веса': 'weight',
+        'Повышение навыка: «Тяжёлая броня»': 'armor', 'Повышение навыка: «Легкая броня»': 'armor'
+    };
+    const ENCHANT_AUTO_APPLY_WEAPON = { 'Урон огнем': true, 'Урон холодом': true, 'Урон электричеством': true };
+
+    function getEquipmentEnchantBonuses() {
+        const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0 };
+        ['helmet', 'chest', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
+            const itemId = equippedSlots[slotKey];
+            if (!itemId) return;
+            const item = playerInventory.find(i => i.itemId === itemId);
+            if (!item || !item.enchantment) return;
+            const key = ENCHANT_AUTO_APPLY_ARMOR[item.enchantment.name];
+            if (key && typeof item.enchantment.value === 'number') bonuses[key] += item.enchantment.value;
+        });
+        return bonuses;
+    }
+
+    function getActiveWeaponEnchantDmg(isMelee) {
+        const itemId = isMelee ? equippedSlots.meleeWeapon : equippedSlots.rangedWeapon;
+        if (!itemId) return 0;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.enchantment) return 0;
+        return (ENCHANT_AUTO_APPLY_WEAPON[item.enchantment.name] && typeof item.enchantment.value === 'number') ? item.enchantment.value : 0;
+    }
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -1436,6 +1870,8 @@
             kitchenAlchemyBlock.style.display = perks.cookingAddAlchemyIngredient ? 'block' : 'none';
         }
 
+        const equipBonuses = (typeof getEquipmentEnchantBonuses === 'function') ? getEquipmentEnchantBonuses() : { hp: 0, mp: 0, weight: 0, armor: 0 };
+
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
             if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
@@ -1443,6 +1879,7 @@
                 if(f.dataset.hp) baseHp += parseInt(f.dataset.hp);
             });
             if (godB.hp) baseHp += godB.hp;
+            baseHp += equipBonuses.hp;
             document.getElementById('max-hp').value = baseHp;
         }
 
@@ -1455,6 +1892,7 @@
                 if(f.dataset.mp) baseMp += parseInt(f.dataset.mp);
             });
             if (godB.mp) baseMp += godB.mp;
+            baseMp += equipBonuses.mp;
             document.getElementById('max-mp').value = baseMp;
         }
 
@@ -1465,6 +1903,7 @@
                          (parseInt(document.getElementById('slot-shield-armor').value) || 0) +
                          (parseInt(document.getElementById('armor-buff').value) || 0);
         if (godB.armor) totalArmor += godB.armor;
+        totalArmor += equipBonuses.armor;
         document.getElementById('armor-total').innerText = totalArmor;
 
         // Вес
@@ -1498,6 +1937,7 @@
             maxWeight = parseInt(document.getElementById('max-weight-input').value) || 50;
         } else {
             maxWeight = str * 5;
+            maxWeight += equipBonuses.weight;
             document.getElementById('max-weight-input').value = maxWeight;
         }
         document.getElementById('weight-max-display').innerText = maxWeight;
@@ -1620,6 +2060,7 @@
 
         // Итоговый урон: база + бонус от перков + сила
         totalDmg = baseDmg + perkBonus + str;
+        totalDmg += getActiveWeaponEnchantDmg(true);
 
         // === Двойное оружие (одноручное/кинжал, не для двуручного) ===
         if (isDualWield && !isTwoHanded && wepType !== 'unarmed') {
@@ -1683,6 +2124,7 @@
         wepType = document.getElementById('wep-ranged-type').value;
         hitModifier = dexMod;
         totalDmg = baseDmg + dex + ammoDmg;
+        totalDmg += getActiveWeaponEnchantDmg(false);
     }
 
     hitModifier -= starve;
@@ -1780,6 +2222,7 @@
             sNeck: document.getElementById('slot-neck-name').value,
             sCirclet: document.getElementById('slot-circlet-name').value,
             inventory: playerInventory,
+            equippedSlots: equippedSlots,
             inv: {
                 'hide-bear': document.getElementById('inv-hide-bear').value,
                 'hide-sable': document.getElementById('inv-hide-sable').value,
@@ -1921,8 +2364,18 @@
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
+            equippedSlots = data.equippedSlots && typeof data.equippedSlots === 'object'
+                ? Object.assign({ helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null }, data.equippedSlots)
+                : { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
             renderInventoryList();
             renderKitchenPot();
+            renderEquipPanel();
+            renderStaffList();
+            renderEnchantItemSelect();
+
+            // Рецепты кузницы открывает только мастер (gm.html) — здесь только читаем, не сохраняем обратно
+            knownSmithingRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
+            renderSmithingList();
         } catch(e) {
             console.warn('Ошибка применения данных персонажа:', e);
         }
@@ -1964,11 +2417,16 @@
 
     // Первичный запуск
     initSkills();
-    populateAddItemSelect();
     loadLocalStorage();
     updateAll();
     renderInventoryList();
     renderKitchenPot();
+    renderSmithingList();
+    renderEnchantItemSelect();
+    renderStaffEffectSelect();
+    updateStaffCalc();
+    renderStaffList();
+    renderEquipPanel();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

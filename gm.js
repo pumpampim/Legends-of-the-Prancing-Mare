@@ -11,6 +11,8 @@
     let lastData = { participants: {}, enemies: [], initiative: [], combatLog: [] };
     let gmAllItems = [];
     let gmFilteredItems = [];
+    let currentRecipePlayerUid = null;
+    let currentPlayerKnownRecipes = [];
     const GM_SESSION_KEY = 'ttrpg_gm_session_code';
     const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без похожих O/0, I/1
 
@@ -182,6 +184,7 @@
         renderEnemies(lastData.enemies || []);
         renderInitiative(lastData.initiative || []);
         renderLog(lastData.combatLog || []);
+        populateRecipePlayerSelect();
     }
 
     // ---------- Отряд ----------
@@ -382,7 +385,7 @@
                     <td>${item.weight || 0}</td>
                     <td>${item.price || 0}</td>
                     <td>
-                        <button class="btn btn-sm" onclick="window.gmGiveItemFromTable('${itemId}', '${item.name}', ${item.weight || 0})">Передать</button>
+                        <button class="btn btn-sm" onclick="window.gmGiveItemFromTable('${itemId}')">Передать</button>
                     </td>
                 </tr>
             `;
@@ -391,7 +394,9 @@
         if (countSpan) countSpan.textContent = gmFilteredItems.length;
     };
 
-    window.gmGiveItemFromTable = function(itemId, itemName, itemWeight) {
+    window.gmGiveItemFromTable = function(itemId) {
+        const sourceItem = (gmAllItems || []).find(i => (i.id || i.name) === itemId);
+        if (!sourceItem) { alert('Предмет не найден.'); return; }
         const uids = Object.keys(lastData.participants || {});
         if (uids.length === 0) {
             alert('Нет игроков в сессии. Сначала дождись, пока кто-то присоединится.');
@@ -415,23 +420,33 @@
         const numCount = parseInt(count) || 1;
         if (numCount < 1) return;
 
+        // Переносим слот/броню/урон, чтобы игрок мог сразу надеть/взять в руки предмет.
+        const extra = {};
+        if (sourceItem.slot) extra.slot = sourceItem.slot;
+        if (typeof sourceItem.armor === 'number') extra.armorValue = sourceItem.armor;
+        if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
+        if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
+
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.data();
             let inv = data.inventory || [];
             const existing = inv.find(item => item.itemId === itemId);
             if (existing) {
                 existing.count += numCount;
+                Object.assign(existing, extra);
             } else {
-                inv.push({
+                inv.push(Object.assign({
                     itemId: itemId,
-                    name: itemName,
+                    name: sourceItem.name,
                     count: numCount,
-                    weight: itemWeight
-                });
+                    weight: sourceItem.weight || 0,
+                    category: sourceItem.category || '',
+                    effect: sourceItem.effect || ''
+                }, extra));
             }
             return db.collection('characters').doc(targetUid).update({ inventory: inv });
         }).then(() => {
-            alert(`Предмет "${itemName}" передан игроку ${playerList[idx].name}!`);
+            alert(`Предмет "${sourceItem.name}" передан игроку ${playerList[idx].name}!`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
         // ---------- Импорт всех предметов в Firestore ----------
@@ -475,6 +490,84 @@
             console.error('Ошибка импорта:', e);
             alert('Ошибка импорта: ' + e.message);
         });
+    };
+
+    // ---------- Открытие рецептов кузницы ----------
+
+    function getAllSmithingRecipeNames() {
+        const armor = window.armorRecipes || [];
+        const jewelry = window.jewelryRecipes || [];
+        return [...armor, ...jewelry];
+    }
+
+    function populateRecipePlayerSelect() {
+        const select = el('recipe-player-select');
+        if (!select) return;
+        const uids = Object.keys(lastData.participants || {});
+        const prevValue = select.value;
+        select.innerHTML = '<option value="">— выбери игрока —</option>' +
+            uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
+        if (uids.includes(prevValue)) {
+            select.value = prevValue;
+        } else {
+            currentRecipePlayerUid = null;
+            currentPlayerKnownRecipes = [];
+            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+        }
+    }
+
+    window.loadPlayerKnownRecipes = function () {
+        const select = el('recipe-player-select');
+        const uid = select.value;
+        if (!uid) {
+            currentRecipePlayerUid = null;
+            currentPlayerKnownRecipes = [];
+            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            return;
+        }
+        currentRecipePlayerUid = uid;
+        el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Загрузка...</p>';
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            currentPlayerKnownRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
+            renderRecipeChecklist();
+        }).catch(e => {
+            el('recipe-checklist').innerHTML = '<p style="color:#e74c3c; font-size:12px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
+        });
+    };
+
+    window.renderRecipeChecklist = function () {
+        const container = el('recipe-checklist');
+        if (!currentRecipePlayerUid) return;
+        const search = (el('recipe-search').value || '').toLowerCase();
+        const all = getAllSmithingRecipeNames().filter(r => r.name.toLowerCase().includes(search));
+        if (!all.length) {
+            container.innerHTML = '<p style="opacity:.6; font-size:12px;">Ничего не найдено.</p>';
+            return;
+        }
+        container.innerHTML = all.map(r => {
+            const checked = currentPlayerKnownRecipes.includes(r.name) ? 'checked' : '';
+            const sub = r.slot === 'jewelry' ? 'Ювелирное' : `${r.armorType || ''} · ${r.slot || ''}`;
+            return `<label style="display:flex; align-items:center; gap:8px; padding:4px 2px; border-bottom:1px solid var(--border-color); font-size:13px;">
+                <input type="checkbox" ${checked} onchange="toggleRecipeKnown('${escapeHtml(r.name)}', this.checked)">
+                <span style="flex:1;">${escapeHtml(r.name)} <span style="opacity:.6; font-size:11px;">(${escapeHtml(sub)})</span></span>
+            </label>`;
+        }).join('');
+    };
+
+    window.toggleRecipeKnown = function (name, isChecked) {
+        if (!currentRecipePlayerUid) return;
+        const ref = db.collection('characters').doc(currentRecipePlayerUid);
+        const op = isChecked
+            ? firebase.firestore.FieldValue.arrayUnion(name)
+            : firebase.firestore.FieldValue.arrayRemove(name);
+        ref.set({ knownSmithingRecipes: op }, { merge: true }).then(() => {
+            if (isChecked) {
+                if (!currentPlayerKnownRecipes.includes(name)) currentPlayerKnownRecipes.push(name);
+            } else {
+                currentPlayerKnownRecipes = currentPlayerKnownRecipes.filter(n => n !== name);
+            }
+        }).catch(e => alert('Ошибка сохранения: ' + e.message));
     };
 
 })();

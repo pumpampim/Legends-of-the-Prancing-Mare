@@ -127,11 +127,25 @@
     </div>
     <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
 </div>
+
+        <!-- ===== ОТКРЫТИЕ РЕЦЕПТОВ КУЗНИЦЫ ===== -->
+        <div class="panel">
+            <h2>⚒️ Открыть рецепты кузницы игроку</h2>
+            <p style="font-size:12px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит».</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <select id="recipe-player-select" style="flex:1; min-width:150px;" onchange="loadPlayerKnownRecipes()"></select>
+                <input type="text" id="recipe-search" placeholder="Поиск рецепта..." style="flex:1; min-width:150px;" oninput="renderRecipeChecklist()">
+            </div>
+            <div id="recipe-checklist" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; padding:6px;">
+                <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="firebase-config.js"></script>
 <script src="items-data.js"></script>
+<script src="smithing-data.js"></script>
 <script src="gm.js"></script>
 </body>
 </html>
