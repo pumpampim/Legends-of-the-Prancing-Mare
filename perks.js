@@ -32,7 +32,15 @@
         "1-6": () => ({ sprintPowerAttackDouble: true }),
         "1-7": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.10 }),
         "1-8": () => ({ sweepingSideAttack: true }),
-        "1-9": (step) => ({ hammerArmorPenetration: 0.25 * step })
+        "1-9": (step) => ({ hammerArmorPenetration: 0.25 * step }),
+
+        // ==================== КУЛИНАРИЯ (skillIdx = 18) ====================
+        "18-0": (step) => ({ cookingDishPowerPercent: 0.10 * step }),
+        "18-1": () => ({ cookingIngredientSubstitution: true }),
+        "18-2": () => ({ cookingDurationBonus: 0.50 }),
+        "18-3": () => ({ cookingExtraDishChance: 0.50 }),
+        "18-4": () => ({ cookingAddAlchemyIngredient: true }),
+        "18-5": () => ({ cookingDurationBonus: 1.00, cookingDishPowerPercent: 0.25 })
     };
 
     window.applyPerks = function() {
@@ -73,7 +81,12 @@
             counterAttackBonus: false,
             sweepingSideAttack: false,
             hitBonus: 0,
-            armorPenetrationDamage: 0
+            armorPenetrationDamage: 0,
+            cookingDishPowerPercent: 0,
+            cookingIngredientSubstitution: false,
+            cookingDurationBonus: 0,
+            cookingExtraDishChance: 0,
+            cookingAddAlchemyIngredient: false
         };
 
         // Логируем, что мы нашли в чекбоксах (для отладки)

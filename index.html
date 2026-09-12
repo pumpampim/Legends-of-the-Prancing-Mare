@@ -34,7 +34,7 @@
             imperial: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 }
         };
 
-        // Полный компендиум перков для всех 18 навыков (обновлён по таблице "Ветви талантов")
+        // Полный компендиум перков для всех 19 навыков (обновлён по таблице "Ветви талантов")
         const fullPerksManifest = {
             "Одноручное оружие": [
                 { name: "Сильная рука", steps: 5, desc: "Базовый урон одноручного оружия увеличивается на 20% с каждым очком навыка (макс 100%)" },
@@ -240,6 +240,14 @@
                 { name: "Чары умений", steps: 1, desc: "Чары повышения навыков, накладываемые на доспехи, на 25 % сильнее." },
                 { name: "Грозовые чары", steps: 1, desc: "Электрические чары, накладываемые на оружие и доспехи, на 25 % сильнее." },
                 { name: "Жизненные чары", steps: 1, desc: "Чары здоровья, магии , накладываемые на доспехи, на 25 % сильнее." }
+            ],
+            "Кулинария": [
+                { name: "Поварское дело", steps: 5, desc: "Ваши блюда на 10/20/30/40/50% сильнее" },
+                { name: "Сочетание вкуса", steps: 1, desc: "Возможно заменить 1 ингредиент на другой, если его нет" },
+                { name: "Сытный обед", steps: 1, desc: "Баффы от блюд действуют на 50% дольше" },
+                { name: "Полевой опыт", steps: 1, desc: "Шанс 50%, что при готовке получится создать ещё 1 блюдо" },
+                { name: "Утонченный вкус", steps: 1, desc: "Позволяет добавить алхимический ингредиент в блюдо (берётся первое его полезное св-во)" },
+                { name: "Шеф повар", steps: 1, desc: "Баффы от блюд действуют на 100% дольше и на 25% сильнее" }
             ]
         };
 
@@ -381,6 +389,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
     <script src="perks.js"></script>
     <script src="items-data.js"></script>
+    <script src="cooking-data.js"></script>
 </head>
 <body>
 
@@ -774,7 +783,7 @@
                 <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
             </div>
 
-             <!-- Религия, Еда, Рецепты и Заметки -->
+            <!-- Религия, Еда, Рецепты и Заметки -->
             <div class="panel">
                 <h2>Выживание и Пантеон Богов</h2>
                 
@@ -851,6 +860,35 @@
                 </div>
             </div>
         </div>
+
+        <div class="grid-2">
+            <!-- ОБЩИЙ ИНВЕНТАРЬ ПРЕДМЕТОВ -->
+            <div class="panel">
+                <h2>🎒 Инвентарь предметов</h2>
+                <p style="font-size:11px; opacity:.75;">Сюда попадают продукты, которые ты завёл вручную, приготовленные блюда, свитки и вещи, которые передал мастер.</p>
+                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+                    <select id="add-item-select" style="flex:1; min-width:140px;"></select>
+                    <input type="number" id="add-item-qty" value="1" min="1" style="width:60px;">
+                    <button style="width:auto;" onclick="addIngredientToInventory()">Добавить</button>
+                </div>
+                <div id="player-inventory-list" style="max-height:280px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- КУХНЯ -->
+            <div class="panel">
+                <h2>🍲 Кухня</h2>
+                <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
+                <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
+                    <p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>
+                </div>
+                <div id="kitchen-alchemy-block" style="display:none; margin-bottom:8px;">
+                    <label style="font-size:12px;">🧪 «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
+                    <input type="text" id="kitchen-alchemy-note" placeholder="Например: Белянка — уязвимость к холоду">
+                </div>
+                <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
+                <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
+            </div>
+        </div>
     </div>
 
     <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
@@ -893,19 +931,21 @@
     </div>
 
 <script>
-    // Массив всех 18 навыков игровой системы Скурим
+    // Массив всех 19 навыков игровой системы Скурим
     const skillNames = [
         "Одноручное оружие", "Двуручное оружие", "Стрельба", "Блокирование", 
         "Тяжелая броня", "Легкая броня", "Скрытность", "Взлом", 
         "Карманные кражи", "Красноречие", "Разрушение", "Восстановление", 
-        "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование"
+        "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование", "Кулинария"
     ];
 
     // Глобальный массив для хранения пользовательских кастомных заклинаний
     let customSpells = [];
     let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
+    let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
+    let potSelections = {}; // Текущий "котёл": { itemId: qty }
 
-    // Динамический рендеринг 18 навыков и генерация многоступенчатых чекбоксов перков
+    // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
     function initSkills() {
         const container = document.getElementById('skills-container');
         if (!container) return;
@@ -1082,18 +1122,228 @@
 
     // Лаборатория свитков
     function craftScrollInSheet() {
-        const tier = parseInt(document.getElementById('scroll-craft-tier').value) || 1;
+        const tierSelect = document.getElementById('scroll-craft-tier');
+        const tier = parseInt(tierSelect.value) || 1;
+        const tierLabel = tierSelect.options[tierSelect.selectedIndex].text.split('(')[0].trim();
         let wis = parseInt(document.getElementById('stat-wis').value) || 10;
         let spent = scrollWisdomSpent;
         let available = wis - spent;
         if (available >= tier) {
             scrollWisdomSpent += tier;
             document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
-            alert(`Успех! Вы потратили ${tier} ед. Мудрости на написание свитка. Осталось ${wis - scrollWisdomSpent} ед.`);
+            addToInventory('Свиток: ' + tierLabel, 'Свиток: ' + tierLabel, 1, 0.1, 'Свиток', 'Создан во время отдыха (уровень: ' + tierLabel + ')');
+            alert(`Успех! Вы потратили ${tier} ед. Мудрости на написание свитка. Осталось ${wis - scrollWisdomSpent} ед. Свиток добавлен в инвентарь.`);
             saveLocalStorage();
         } else {
             alert("Недостаточно свободной Мудрости для начертания свитка!");
         }
+    }
+
+    // ========================================================================
+    // ИНВЕНТАРЬ ПРЕДМЕТОВ + КУХНЯ
+    // ========================================================================
+
+    function escHtml(str) {
+        return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function getInventoryTotalWeight() {
+        return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0);
+    }
+
+    function addToInventory(itemId, name, qty, weight, category, effect) {
+        const existing = playerInventory.find(i => i.itemId === itemId);
+        if (existing) {
+            existing.count += qty;
+            if (effect) existing.effect = effect;
+        } else {
+            playerInventory.push({ itemId, name, count: qty, weight: weight || 0, category: category || '', effect: effect || '' });
+        }
+        renderInventoryList();
+        renderKitchenPot();
+        updateAll();
+    }
+
+    function removeFromInventoryByName(itemId, qty) {
+        const idx = playerInventory.findIndex(i => i.itemId === itemId);
+        if (idx === -1) return;
+        playerInventory[idx].count -= qty;
+        if (playerInventory[idx].count <= 0) playerInventory.splice(idx, 1);
+    }
+
+    function adjustInventoryQty(itemId, delta) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        item.count += delta;
+        if (item.count <= 0) {
+            playerInventory = playerInventory.filter(i => i.itemId !== itemId);
+            delete potSelections[itemId];
+        }
+        renderInventoryList();
+        renderKitchenPot();
+        updateAll();
+        saveLocalStorage();
+    }
+
+    function renderInventoryList() {
+        const el = document.getElementById('player-inventory-list');
+        if (!el) return;
+        if (!playerInventory.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Инвентарь пуст.</p>';
+            return;
+        }
+        el.innerHTML = playerInventory.map(item => `
+            <div class="stat-block" style="align-items:flex-start;">
+                <span>
+                    <strong>${escHtml(item.name)}</strong> × ${item.count}
+                    ${item.weight ? `<span style="opacity:.6; font-size:11px;"> (вес ${item.weight} / шт.)</span>` : ''}
+                    ${item.effect ? `<br><span style="font-size:11px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
+                </span>
+                <span style="display:flex; gap:4px; flex-shrink:0;">
+                    <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
+                    <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
+                </span>
+            </div>
+        `).join('');
+    }
+
+    function populateAddItemSelect() {
+        const select = document.getElementById('add-item-select');
+        if (!select || !window.cookingIngredients) return;
+        const byCategory = {};
+        Object.keys(window.cookingIngredients).forEach(name => {
+            const cat = window.cookingIngredients[name].category || 'Разное';
+            (byCategory[cat] = byCategory[cat] || []).push(name);
+        });
+        let html = '';
+        Object.keys(byCategory).sort().forEach(cat => {
+            html += `<optgroup label="${escHtml(cat)}">`;
+            byCategory[cat].sort().forEach(name => {
+                html += `<option value="${escHtml(name)}">${escHtml(name)}</option>`;
+            });
+            html += `</optgroup>`;
+        });
+        select.innerHTML = html;
+    }
+
+    function addIngredientToInventory() {
+        const select = document.getElementById('add-item-select');
+        if (!select || !select.value) return;
+        const name = select.value;
+        const qty = parseInt(document.getElementById('add-item-qty').value) || 1;
+        const info = (window.cookingIngredients && window.cookingIngredients[name]) || {};
+        addToInventory(name, name, qty, info.weight || 0, info.category || '', '');
+        saveLocalStorage();
+    }
+
+    function renderKitchenPot() {
+        const el = document.getElementById('kitchen-pot-list');
+        if (!el) return;
+        const cookable = playerInventory.filter(i => window.cookingIngredients && window.cookingIngredients.hasOwnProperty(i.itemId));
+        if (!cookable.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>';
+            return;
+        }
+        el.innerHTML = cookable.map(item => {
+            const sel = potSelections[item.itemId] || 0;
+            return `
+            <div class="stat-block">
+                <span>${escHtml(item.name)} <span style="opacity:.6; font-size:11px;">(есть: ${item.count})</span></span>
+                <input type="number" min="0" max="${item.count}" value="${sel}" style="width:55px;"
+                    onchange="setPotQty('${escHtml(item.itemId)}', this.value, ${item.count})">
+            </div>`;
+        }).join('');
+    }
+
+    function setPotQty(itemId, value, maxCount) {
+        let qty = parseInt(value) || 0;
+        if (qty < 0) qty = 0;
+        if (qty > maxCount) qty = maxCount;
+        if (qty === 0) delete potSelections[itemId];
+        else potSelections[itemId] = qty;
+        renderKitchenPot();
+    }
+
+    // Масштабирует текст вида "+20 хп на 45 ходов" по бонусам силы/длительности от перков Кулинарии
+    function scaleEffectText(text, powerBonus, durBonus) {
+        let result = text;
+        if (powerBonus > 0) {
+            result = result.replace(/^([+\-]?)(\d+)/, (m, sign, num) => sign + Math.round(parseInt(num) * (1 + powerBonus)));
+        }
+        if (durBonus > 0) {
+            result = result.replace(/(\d+)(\s*ход)/, (m, num, suffix) => Math.round(parseInt(num) * (1 + durBonus)) + suffix);
+        }
+        return result;
+    }
+
+    function cookFood() {
+        const potMap = {};
+        Object.keys(potSelections).forEach(id => {
+            if (potSelections[id] > 0) potMap[id] = potSelections[id];
+        });
+        const potNames = Object.keys(potMap);
+        const resultEl = document.getElementById('kitchen-result');
+        if (potNames.length === 0) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Сначала выбери продукты и их количество слева.</span>';
+            return;
+        }
+
+        const perks = window.perkBonuses || {};
+        const canSubstitute = !!perks.cookingIngredientSubstitution;
+
+        let matchedRecipe = null;
+        let usedSubstitution = false;
+
+        for (const recipe of (window.recipes || [])) {
+            const reqNames = recipe.ingredients.map(i => i.name);
+            const extra = potNames.filter(n => !reqNames.includes(n));
+            const mismatches = recipe.ingredients.filter(req => potMap[req.name] !== req.qty);
+
+            if (extra.length === 0 && mismatches.length === 0) {
+                matchedRecipe = recipe;
+                usedSubstitution = false;
+                break;
+            }
+            if (canSubstitute && extra.length === 0 && mismatches.length === 1) {
+                matchedRecipe = recipe;
+                usedSubstitution = true;
+                break;
+            }
+        }
+
+        // Ингредиенты списываются в любом случае — их уже "смешали"
+        potNames.forEach(name => removeFromInventoryByName(name, potMap[name]));
+
+        const powerBonus = perks.cookingDishPowerPercent || 0;
+        const durBonus = perks.cookingDurationBonus || 0;
+        let alchemyNote = '';
+        if (perks.cookingAddAlchemyIngredient) {
+            const noteInput = document.getElementById('kitchen-alchemy-note');
+            const note = noteInput ? noteInput.value.trim() : '';
+            if (note) alchemyNote = ' + ' + note;
+        }
+
+        const dish = matchedRecipe || window.failedDish;
+        const finalEffect = scaleEffectText(dish.effect, powerBonus, durBonus) + alchemyNote;
+        addToInventory(dish.name, dish.name, 1, dish.weight || 1, matchedRecipe ? 'Блюдо' : 'Провал готовки', finalEffect);
+
+        let extraNote = '';
+        // Полевой опыт: шанс получить ещё одно такое же блюдо
+        if (matchedRecipe && perks.cookingExtraDishChance && Math.random() < perks.cookingExtraDishChance) {
+            addToInventory(dish.name, dish.name, 1, dish.weight || 1, 'Блюдо', finalEffect);
+            extraNote = '<div style="color:#2ecc71;">🍀 «Полевой опыт» сработал — получилось на 1 блюдо больше!</div>';
+        }
+
+        if (matchedRecipe) {
+            resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: ${escHtml(matchedRecipe.name)}${usedSubstitution ? ' <span style="font-weight:normal;">(с заменой ингредиента — «Сочетание вкуса»)</span>' : ''}</div>` +
+                `<div style="opacity:.85;">${escHtml(finalEffect)}</div>` + extraNote;
+        } else {
+            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышла Похлёбка</div>` +
+                `<div style="opacity:.85;">${escHtml(finalEffect)}</div>`;
+        }
+
+        potSelections = {};
+        saveLocalStorage();
     }
 
     // Восстановление после отдыха
@@ -1180,6 +1430,12 @@
          }
          const perks = window.perkBonuses || {};
 
+        // Кухня: показываем поле алхимического ингредиента только если открыт «Утончённый вкус»
+        const kitchenAlchemyBlock = document.getElementById('kitchen-alchemy-block');
+        if (kitchenAlchemyBlock) {
+            kitchenAlchemyBlock.style.display = perks.cookingAddAlchemyIngredient ? 'block' : 'none';
+        }
+
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
             if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
@@ -1230,6 +1486,7 @@
         weightFromItems += (parseInt(document.getElementById('inv-dw-core').value) || 0) * 4;
         weightFromItems += (parseInt(document.getElementById('inv-tent').value) || 0) * 10;
         weightFromItems += (parseInt(document.getElementById('inv-bag').value) || 0) * 3;
+        weightFromItems += getInventoryTotalWeight();
 
         let extraWeight = parseInt(document.getElementById('extra-weight').value) || 0;
         let currentWeight = weightFromItems + extraWeight;
@@ -1522,6 +1779,7 @@
             sRing: document.getElementById('slot-ring-name').value,
             sNeck: document.getElementById('slot-neck-name').value,
             sCirclet: document.getElementById('slot-circlet-name').value,
+            inventory: playerInventory,
             inv: {
                 'hide-bear': document.getElementById('inv-hide-bear').value,
                 'hide-sable': document.getElementById('inv-hide-sable').value,
@@ -1661,6 +1919,10 @@
             document.getElementById('slot-ring-name').value = data.sRing || '';
             document.getElementById('slot-neck-name').value = data.sNeck || '';
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
+
+            playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
+            renderInventoryList();
+            renderKitchenPot();
         } catch(e) {
             console.warn('Ошибка применения данных персонажа:', e);
         }
@@ -1702,8 +1964,11 @@
 
     // Первичный запуск
     initSkills();
+    populateAddItemSelect();
     loadLocalStorage();
     updateAll();
+    renderInventoryList();
+    renderKitchenPot();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
