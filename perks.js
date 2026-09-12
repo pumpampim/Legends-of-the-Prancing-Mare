@@ -40,7 +40,17 @@
         "18-2": () => ({ cookingDurationBonus: 0.50 }),
         "18-3": () => ({ cookingExtraDishChance: 0.50 }),
         "18-4": () => ({ cookingAddAlchemyIngredient: true }),
-        "18-5": () => ({ cookingDurationBonus: 1.00, cookingDishPowerPercent: 0.25 })
+        "18-5": () => ({ cookingDurationBonus: 1.00, cookingDishPowerPercent: 0.25 }),
+
+        // ==================== АЛХИМИЯ (skillIdx = 15) ====================
+        "15-0": (step) => ({ alchemistRank: step }),
+        "15-1": () => ({ alchemyHealer: true }),
+        "15-2": () => ({ alchemyProvisor: true }),
+        "15-3": () => ({ alchemyPoisoner: true }),
+        "15-4": (step) => ({ alchemyExperimentatorRank: step }),
+        "15-5": () => ({ alchemyConcentratedPoison: true }),
+        "15-6": () => ({ alchemyHerbalistDouble: true }),
+        "15-7": () => ({ alchemyPoisonResist50: true })
     };
 
     window.applyPerks = function() {
@@ -86,7 +96,15 @@
             cookingIngredientSubstitution: false,
             cookingDurationBonus: 0,
             cookingExtraDishChance: 0,
-            cookingAddAlchemyIngredient: false
+            cookingAddAlchemyIngredient: false,
+            alchemistRank: 0,
+            alchemyHealer: false,
+            alchemyProvisor: false,
+            alchemyPoisoner: false,
+            alchemyExperimentatorRank: 0,
+            alchemyConcentratedPoison: false,
+            alchemyHerbalistDouble: false,
+            alchemyPoisonResist50: false
         };
 
         // Логируем, что мы нашли в чекбоксах (для отладки)

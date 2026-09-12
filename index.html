@@ -392,6 +392,8 @@
     <script src="cooking-data.js"></script>
     <script src="smithing-data.js"></script>
     <script src="enchant-data.js"></script>
+    <script src="spell-data.js"></script>
+    <script src="alchemy-data.js"></script>
 </head>
 <body>
 
@@ -439,6 +441,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
         <button class="tab-link" onclick="openTab(event, 'tab7')">⚒️ Кузница</button>
         <button class="tab-link" onclick="openTab(event, 'tab8')">✨ Зачарование</button>
+        <button class="tab-link" onclick="openTab(event, 'tab9')">🧪 Алхимия</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -704,15 +707,11 @@
                 <div class="panel" style="background:#111; border-color:var(--accent-color);">
                     <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
                     <p style="font-size:11px; color:#aaa; margin-top:-2px;">
-                        Для создания требуются пергамент и чернила. Траты очков Мудрости: Новичок = 1, Ученик = 2, Адепт = 3, Эксперт = 4 ед.
+                        Свиток можно сделать только из заклинания, которое ты знаешь (выучено на вкладках выше), и только если оно не тратит ману «за ход» (такие эффекты нельзя записать в свиток одноразово).
                     </p>
-                    <label>Круг заклинания свитка</label>
-                    <select id="scroll-craft-tier">
-                        <option value="1">Новичок (Тратит 1 Мудрость, Цена создания: 2 маны)</option>
-                        <option value="2">Ученик (Тратит 2 Мудрости, Цена создания: 4 маны)</option>
-                        <option value="3">Адепт (Тратит 3 Мудрости, Цена создания: 6 маны)</option>
-                        <option value="4">Эксперт (Тратит 4 Мудрости, Цена создания: 8 маны)</option>
-                    </select>
+                    <label>Заклинание для свитка</label>
+                    <select id="scroll-spell-select" onchange="updateScrollInfo()"></select>
+                    <div id="scroll-spell-info" style="font-size:12px; opacity:.9; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
                     <button class="btn" onclick="craftScrollInSheet()">Начертить свиток во время отдыха</button>
                 </div>
             </div>
@@ -724,46 +723,17 @@
            <div class="grid-2">
             <!-- Вес и ресурсы инвентаря -->
             <div class="panel">
-                <h2>Инвентарь ресурсов и Снаряжения</h2>
-                <div style="max-height: 420px; overflow-y: auto; padding-right:5px;">
-                    <!-- Группа: Ресурсы -->
-                    <div class="inv-group">
-                        <h4>🐻 Шкуры и кожа</h4>
-                        <div class="stat-block"><span>Шкура медведя (вес 3, 50 септ.)</span><input type="number" id="inv-hide-bear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Шкура саблезуба (вес 2, 25 септ.)</span><input type="number" id="inv-hide-sable" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Волчья шкура (вес 1, 10 септ.)</span><input type="number" id="inv-hide-wolf" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Кожа (вес 2, 10 септ.)</span><input type="number" id="inv-leather" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Полоски кожи (вес 1, 3 септ.)</span><input type="number" id="inv-leather-strips" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                    </div>
-                    <!-- Группа: Руды и слитки -->
-                    <div class="inv-group">
-                        <h4>⛏️ Руды и слитки</h4>
-                        <div class="stat-block"><span>Железный слиток (вес 1, 7 септ.)</span><input type="number" id="inv-ing-iron" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Стальной слиток (вес 1, 29 септ.)</span><input type="number" id="inv-ing-steel" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Корундовый слиток (вес 1, 40 септ.)</span><input type="number" id="inv-ing-corundum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Орихалковый слиток (вес 1, 45 септ.)</span><input type="number" id="inv-ing-orichalcum" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Эбонитовый слиток (вес 1, 150 септ.)</span><input type="number" id="inv-ing-ebony" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                    </div>
-                    <!-- Группа: Камни душ -->
-                    <div class="inv-group">
-                        <h4>💎 Камни душ</h4>
-                        <div class="stat-block"><span>Крохотный камень душ (вес 1, 10 септ.)</span><input type="number" id="inv-gem-petty" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Великий камень душ (вес 1, 200 септ.)</span><input type="number" id="inv-gem-grand" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                    </div>
-                    <!-- Группа: Двемерские детали -->
-                    <div class="inv-group">
-                        <h4>⚙️ Двемерские артефакты</h4>
-                        <div class="stat-block"><span>Двемерская балка (вес 20, 15 септ.)</span><input type="number" id="inv-dw-beam" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Двемерская шестерня (вес 10, 5 септ.)</span><input type="number" id="inv-dw-gear" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Сердечник центуриона (вес 4, 131 септ.)</span><input type="number" id="inv-dw-core" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                    </div>
-                    <!-- Группа: Снаряжение -->
-                    <div class="inv-group">
-                        <h4>🏕️ Походное снаряжение</h4>
-                        <div class="stat-block"><span>Палатка 15х15 футов (вес 10, 300 септ.)</span><input type="number" id="inv-tent" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                        <div class="stat-block"><span>Спальный мешок (вес 3, 75 септ.)</span><input type="number" id="inv-bag" value="0" min="0" onchange="updateAll(); saveLocalStorage();"></div>
-                    </div>
+                <h2>🎒 Инвентарь предметов</h2>
+                <p style="font-size:11px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
+
+                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                    <label style="font-size:12px;">👕 Надеть/взять в руки предмет из инвентаря</label>
+                    <select id="equip-item-select"></select>
+                    <button class="btn-success" style="width:100%; margin-top:4px;" onclick="equipSelectedItem()">Экипировать</button>
+                    <div id="equipped-enchants-summary" style="margin-top:8px; font-size:12px;"></div>
                 </div>
+
+                <div id="player-inventory-list" style="max-height:280px; overflow-y:auto;"></div>
 
                 <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px; border:1px solid var(--border-color); font-size:13px;">
                     <div class="weight-row">
@@ -865,24 +835,8 @@
             </div>
         </div>
 
-        <div class="grid-2">
-            <!-- ОБЩИЙ ИНВЕНТАРЬ ПРЕДМЕТОВ -->
-            <div class="panel">
-                <h2>🎒 Инвентарь предметов</h2>
-                <p style="font-size:11px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
-
-                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
-                    <label style="font-size:12px;">👕 Надеть/взять в руки предмет из инвентаря</label>
-                    <select id="equip-item-select"></select>
-                    <button class="btn-success" style="width:100%; margin-top:4px;" onclick="equipSelectedItem()">Экипировать</button>
-                    <div id="equipped-enchants-summary" style="margin-top:8px; font-size:12px;"></div>
-                </div>
-
-                <div id="player-inventory-list" style="max-height:280px; overflow-y:auto;"></div>
-            </div>
-
-            <!-- КУХНЯ -->
-            <div class="panel">
+        <!-- КУХНЯ -->
+        <div class="panel">
                 <h2>🍲 Кухня</h2>
                 <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
                 <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
@@ -895,7 +849,6 @@
                 <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
                 <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
             </div>
-        </div>
     </div>
 
     <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
@@ -1002,6 +955,41 @@
         </div>
     </div>
 
+    <!-- ТАБ 9: АЛХИМИЯ -->
+    <div id="tab9" class="tab-content">
+        <div class="panel">
+            <h2>🍽️ Съесть ингредиент</h2>
+            <p style="font-size:12px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
+            <select id="alch-eat-select" style="width:100%;"></select>
+            <div id="alch-eat-info" style="font-size:12px; opacity:.85; margin:6px 0;"></div>
+            <button class="btn-success" style="width:100%;" onclick="eatIngredient()">Съесть</button>
+            <div id="alch-eat-result" style="margin-top:8px; font-size:13px;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>⚗️ Варка зелья / яда</h2>
+            <p style="font-size:12px; opacity:.8;">Выбери 2 или 3 ингредиента из инвентаря. Если у них нет общих свойств — варево не получится (ингредиенты всё равно расходуются). Новые совпавшие свойства сразу становятся известны.</p>
+            <label>Ингредиент 1</label>
+            <select id="alch-ing-0" onchange="updateBrewPreview()"></select>
+            <label>Ингредиент 2</label>
+            <select id="alch-ing-1" onchange="updateBrewPreview()"></select>
+            <label>Ингредиент 3 (необязательно)</label>
+            <select id="alch-ing-2" onchange="updateBrewPreview()"></select>
+
+            <div id="alch-gear-info" style="font-size:11px; opacity:.7; margin-top:6px;"></div>
+            <div id="alch-brew-preview" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+
+            <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
+            <div id="alch-brew-result" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📖 Известные свойства ингредиентов</h2>
+            <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
+            <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
+        </div>
+    </div>
+
 <script>
     // Массив всех 19 навыков игровой системы Скурим
     const skillNames = [
@@ -1018,6 +1006,7 @@
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
     let equippedSlots = { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
+    let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
     function initSkills() {
@@ -1125,20 +1114,49 @@
     }
 
     // Динамическое добавление заклинаний в кастомную книгу мага
+    function isKnownSpellName(school, name) {
+        const data = (window.spellsData && window.spellsData[school]) || {};
+        for (const tier of [1, 2, 3, 4]) {
+            if ((data[tier] || []).some(s => s.name === name)) return true;
+        }
+        return false;
+    }
+
+    function buildSpellOptions(school, selectedName) {
+        const tierLabels = { 1: 'Новичок', 2: 'Ученик', 3: 'Адепт', 4: 'Эксперт' };
+        const data = (window.spellsData && window.spellsData[school]) || {};
+        let html = `<option value="__custom__" ${!selectedName ? '' : ''}>✏️ Своё название (ввести вручную)</option>`;
+        [1, 2, 3, 4].forEach(tier => {
+            const list = data[tier] || [];
+            if (!list.length) return;
+            html += `<optgroup label="${tierLabels[tier]}">`;
+            list.forEach(s => {
+                const sel = s.name === selectedName ? 'selected' : '';
+                html += `<option value="${escHtml(s.name)}" ${sel}>${escHtml(s.name)}</option>`;
+            });
+            html += `</optgroup>`;
+        });
+        return html;
+    }
+
     function addCustomSpell(school, loadedData = null) {
         const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
-        const name = loadedData ? loadedData.name : 'Новое заклинание';
+        const name = loadedData ? loadedData.name : '';
         const baseCost = loadedData ? loadedData.baseCost : 30;
         const desc = loadedData ? loadedData.desc : 'Описание эффекта заклинания...';
+        const isCustomName = loadedData ? (loadedData.isCustom !== undefined ? loadedData.isCustom : !isKnownSpellName(school, name)) : false;
 
         const html = `
             <div class="spell-card" id="card-${id}">
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <input type="text" value="${name}" class="spell-name" style="width:55%; font-weight:bold; padding:2px;" onchange="saveSpellsAndRefresh()">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:4px;">
+                    <select class="spell-name-select" style="width:55%; font-weight:bold; padding:2px;" onchange="onSpellPicked('${id}', '${school}')">
+                        ${buildSpellOptions(school, isCustomName ? null : name)}
+                    </select>
                     <div style="width:40%; text-align:right; font-size:11px;">
                         База MP: <input type="number" value="${baseCost}" class="spell-base" style="width:40px; padding:1px; display:inline;" min="0" onchange="saveSpellsAndRefresh()">
                     </div>
                 </div>
+                <input type="text" value="${escHtml(name)}" class="spell-name-custom" placeholder="Название заклинания..." style="width:100%; font-weight:bold; padding:2px; margin-bottom:4px; display:${isCustomName || !name ? 'block' : 'none'};" onchange="saveSpellsAndRefresh()">
                 <textarea class="spell-desc" rows="2" style="font-size:11px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
                     <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
@@ -1149,8 +1167,37 @@
         `;
 
         document.getElementById(`spells-${school}-list`).insertAdjacentHTML('beforeend', html);
+        if (loadedData && isCustomName) {
+            document.getElementById(`card-${id}`).querySelector('.spell-name-select').value = '__custom__';
+        }
         if (!loadedData) saveSpellsAndRefresh();
     }
+
+    window.onSpellPicked = function(id, school) {
+        const card = document.getElementById(`card-${id}`);
+        const select = card.querySelector('.spell-name-select');
+        const customInput = card.querySelector('.spell-name-custom');
+        if (select.value === '__custom__') {
+            customInput.style.display = 'block';
+            customInput.value = '';
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+            customInput.value = select.value;
+            const data = (window.spellsData && window.spellsData[school]) || {};
+            let found = null;
+            [1, 2, 3, 4].forEach(tier => {
+                (data[tier] || []).forEach(s => { if (s.name === select.value) found = s; });
+            });
+            if (found) {
+                card.querySelector('.spell-base').value = found.baseCost;
+                card.querySelector('.spell-final-cost').value = found.baseCost;
+                card.querySelector('.spell-final-cost').setAttribute('data-base', found.baseCost);
+                card.querySelector('.spell-desc').value = found.desc;
+            }
+        }
+        saveSpellsAndRefresh();
+    };
 
     function saveSpellsAndRefresh() {
         customSpells = [];
@@ -1161,16 +1208,21 @@
             const cards = container.querySelectorAll('.spell-card');
             cards.forEach(card => {
                 const id = card.id.replace('card-', '');
+                const select = card.querySelector('.spell-name-select');
+                const isCustom = select.value === '__custom__';
+                const name = isCustom ? card.querySelector('.spell-name-custom').value : select.value;
                 customSpells.push({
                     id: id,
                     school: school,
-                    name: card.querySelector('.spell-name').value,
+                    name: name,
+                    isCustom: isCustom,
                     baseCost: parseInt(card.querySelector('.spell-base').value) || 0,
                     desc: card.querySelector('.spell-desc').value
                 });
             });
         });
         localStorage.setItem('skyrim_custom_spells_v3_5', JSON.stringify(customSpells));
+        renderScrollSpellSelect();
         updateAll();
     }
 
@@ -1195,23 +1247,86 @@
     }
 
     // Лаборатория свитков
-    function craftScrollInSheet() {
-        const tierSelect = document.getElementById('scroll-craft-tier');
-        const tier = parseInt(tierSelect.value) || 1;
-        const tierLabel = tierSelect.options[tierSelect.selectedIndex].text.split('(')[0].trim();
+    function isPerTurnSpell(desc) {
+        return /стоимость[^\n]{0,40}ход(?!ов)/i.test(desc || '');
+    }
+
+    function getSpellTierByName(school, name) {
+        const data = (window.spellsData && window.spellsData[school]) || {};
+        for (const tier of [1, 2, 3, 4]) {
+            if ((data[tier] || []).some(s => s.name === name)) return tier;
+        }
+        return null;
+    }
+
+    function renderScrollSpellSelect() {
+        const select = document.getElementById('scroll-spell-select');
+        if (!select) return;
+        const eligible = customSpells.filter(s => s.name && !isPerTurnSpell(s.desc));
+        if (!eligible.length) {
+            select.innerHTML = '<option value="">Нет доступных заклинаний — выучи хотя бы одно на вкладках выше</option>';
+            document.getElementById('scroll-spell-info').innerHTML = '';
+            return;
+        }
+        const prevValue = select.value;
+        select.innerHTML = eligible.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join('');
+        if (eligible.some(s => s.id === prevValue)) select.value = prevValue;
+        updateScrollInfo();
+    }
+
+    function updateScrollInfo() {
+        const select = document.getElementById('scroll-spell-select');
+        const infoEl = document.getElementById('scroll-spell-info');
+        if (!select || !infoEl) return;
+        const spell = customSpells.find(s => s.id === select.value);
+        if (!spell) { infoEl.innerHTML = ''; return; }
+        const knownTier = spell.isCustom ? null : getSpellTierByName(spell.school, spell.name);
+        const tierNames = ['', 'Новичок', 'Ученик', 'Адепт', 'Эксперт'];
+        let html = `<div><strong>${escHtml(spell.name)}</strong></div>` +
+            `<div style="opacity:.8; margin:4px 0;">${escHtml(spell.desc)}</div>` +
+            `<div>База: ${spell.baseCost} MP</div>`;
+        if (knownTier) {
+            html += `<div>Круг: ${tierNames[knownTier]} (Мудрость на свиток: ${knownTier})</div>`;
+        } else {
+            html += `<label style="font-size:11px; margin-top:4px;">Своё заклинание — укажи круг вручную</label>
+                <select id="scroll-manual-tier" onchange="updateScrollManualTierLabel()">
+                    <option value="1">Новичок (Мудрость: 1)</option>
+                    <option value="2">Ученик (Мудрость: 2)</option>
+                    <option value="3">Адепт (Мудрость: 3)</option>
+                    <option value="4">Эксперт (Мудрость: 4)</option>
+                </select>`;
+        }
+        infoEl.dataset.knownTier = knownTier || '';
+    }
+
+    window.updateScrollManualTierLabel = function () {}; // хук на будущее, значение уже читается напрямую при крафте
+
+    function getCurrentScrollTier() {
+        const infoEl = document.getElementById('scroll-spell-info');
+        const known = infoEl ? parseInt(infoEl.dataset.knownTier) : 0;
+        if (known) return known;
+        const manualSelect = document.getElementById('scroll-manual-tier');
+        return manualSelect ? (parseInt(manualSelect.value) || 1) : 1;
+    }
+
+    window.craftScrollInSheet = function () {
+        const select = document.getElementById('scroll-spell-select');
+        const spell = customSpells.find(s => s.id === select.value);
+        if (!spell) { alert('Сначала выучи и выбери заклинание.'); return; }
+        const tier = getCurrentScrollTier();
+        const tierNames = ['', 'Новичок', 'Ученик', 'Адепт', 'Эксперт'];
         let wis = parseInt(document.getElementById('stat-wis').value) || 10;
-        let spent = scrollWisdomSpent;
-        let available = wis - spent;
+        let available = wis - scrollWisdomSpent;
         if (available >= tier) {
             scrollWisdomSpent += tier;
             document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
-            addToInventory('Свиток: ' + tierLabel, 'Свиток: ' + tierLabel, 1, 0.1, 'Свиток', 'Создан во время отдыха (уровень: ' + tierLabel + ')');
-            alert(`Успех! Вы потратили ${tier} ед. Мудрости на написание свитка. Осталось ${wis - scrollWisdomSpent} ед. Свиток добавлен в инвентарь.`);
+            addToInventory('Свиток: ' + spell.name, 'Свиток: ' + spell.name, 1, 0.1, 'Свиток', spell.desc, { scrollTier: tierNames[tier] });
+            alert(`Успех! Потрачено ${tier} ед. Мудрости на свиток «${spell.name}». Осталось ${wis - scrollWisdomSpent} ед. Свиток добавлен в инвентарь.`);
             saveLocalStorage();
         } else {
-            alert("Недостаточно свободной Мудрости для начертания свитка!");
+            alert("Недостаточно свободной Мудрости для начертания этого свитка!");
         }
-    }
+    };
 
     // ========================================================================
     // ИНВЕНТАРЬ ПРЕДМЕТОВ + КУХНЯ
@@ -1237,6 +1352,8 @@
         renderInventoryList();
         renderKitchenPot();
         if (typeof renderEquipPanel === 'function') renderEquipPanel();
+        if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
+        if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         updateAll();
     }
 
@@ -1257,6 +1374,8 @@
         }
         renderInventoryList();
         renderKitchenPot();
+        if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
+        if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         updateAll();
         saveLocalStorage();
     }
@@ -1398,7 +1517,7 @@
     // ========================================================================
 
     function getAllSmithingRecipes() {
-        return [...(window.armorRecipes || []), ...(window.jewelryRecipes || [])];
+        return [...(window.armorRecipes || []), ...(window.jewelryRecipes || []), ...(window.weaponRecipes || [])];
     }
 
     function countInInventory(name) {
@@ -1421,9 +1540,14 @@
                 const ok = have >= i.qty;
                 return `<span style="color:${ok ? '#2ecc71' : '#e74c3c'};">${escHtml(i.name)} ${have}/${i.qty}</span>`;
             }).join(', ');
-            const statLine = r.resistance !== undefined && r.slot !== 'jewelry'
-                ? `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`
-                : (r.yieldCount ? `Выход: ${r.yieldCount} шт.` : '');
+            let statLine;
+            if (r.hasOwnProperty('damage')) {
+                statLine = `Урон: ${r.damage} · Вес: ${r.weight} · Цена: ${r.price}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
+            } else if (r.slot === 'jewelry') {
+                statLine = r.yieldCount ? `Выход: ${r.yieldCount} шт.` : 'Ювелирное изделие';
+            } else {
+                statLine = `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`;
+            }
             return `<div class="party-row">
                 <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:11px; opacity:.7;">${escHtml(statLine)}</span></div>
                 <div style="font-size:12px; margin:4px 0;">${ingList}</div>
@@ -1446,12 +1570,20 @@
         if (!canMake) { alert('Не хватает материалов.'); return; }
         recipe.ingredients.forEach(i => removeFromInventoryByName(i.name, i.qty));
         const yieldCount = recipe.yieldCount || 1;
-        const isJewelry = recipe.slot === 'jewelry';
-        const desc = isJewelry ? 'Ювелирное изделие' : `Сопротивление ${recipe.resistance}`;
-        const extra = isJewelry
-            ? { slot: recipe.name.includes('кольцо') || recipe.name.includes('Кольцо') ? 'ring' : 'amulet' }
-            : { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: recipe.resistance };
-        addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, 'Скованное', desc, extra);
+
+        let desc, extra;
+        if (recipe.hasOwnProperty('damage')) {
+            // Оружие или боеприпасы
+            desc = recipe.isAmmo ? `Урон ${recipe.damage} (боеприпас)` : `Урон ${recipe.damage}`;
+            extra = recipe.isAmmo ? { category: 'Боеприпасы' } : { slot: 'melee', weaponDmg: recipe.damage };
+        } else if (recipe.slot === 'jewelry') {
+            desc = 'Ювелирное изделие';
+            extra = { slot: recipe.name.includes('кольцо') ? 'ring' : 'amulet' };
+        } else {
+            desc = `Сопротивление ${recipe.resistance}`;
+            extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: recipe.resistance };
+        }
+        addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, extra.category || 'Скованное', desc, extra);
         renderSmithingList();
         saveLocalStorage();
     };
@@ -1781,6 +1913,221 @@
         return (ENCHANT_AUTO_APPLY_WEAPON[item.enchantment.name] && typeof item.enchantment.value === 'number') ? item.enchantment.value : 0;
     }
 
+    // ========================================================================
+    // АЛХИМИЯ
+    // ========================================================================
+
+    function getAlchemyPerkState() {
+        const perks = window.perkBonuses || {};
+        let gearBonus = 0;
+        Object.keys(equippedSlots).forEach(slotKey => {
+            const itemId = equippedSlots[slotKey];
+            if (!itemId) return;
+            const item = playerInventory.find(i => i.itemId === itemId);
+            if (item && item.enchantment && item.enchantment.name === 'Повышение навыка: «Алхимия»' && typeof item.enchantment.value === 'number') {
+                gearBonus += item.enchantment.value;
+            }
+        });
+        return {
+            alchemistRank: perks.alchemistRank || 0,
+            hasHealer: !!perks.alchemyHealer,
+            hasProvisor: !!perks.alchemyProvisor,
+            hasPoisoner: !!perks.alchemyPoisoner,
+            experimentatorRank: perks.alchemyExperimentatorRank || 0,
+            gearBonus: gearBonus
+        };
+    }
+
+    function getAlchemySkillValue() {
+        return getSkillRawValue('Алхимия');
+    }
+
+    function getAlchemyIngredientsInInventory() {
+        return playerInventory.filter(i => window.alchemyIngredients && window.alchemyIngredients.hasOwnProperty(i.itemId) && i.count > 0);
+    }
+
+    function renderAlchEatSelect() {
+        const select = document.getElementById('alch-eat-select');
+        if (!select) return;
+        const items = getAlchemyIngredientsInInventory();
+        select.innerHTML = items.length
+            ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
+            : '<option value="">Нет ингредиентов в инвентаре</option>';
+        updateAlchEatInfo();
+    }
+
+    window.updateAlchEatInfo = function () {
+        const select = document.getElementById('alch-eat-select');
+        const infoEl = document.getElementById('alch-eat-info');
+        if (!select || !infoEl) return;
+        const name = select.value;
+        const data = window.alchemyIngredients[name];
+        if (!data) { infoEl.innerHTML = ''; return; }
+        const known = knownIngredientProps[name] || [false, false, false, false];
+        const knownCount = known.filter(Boolean).length;
+        const perkState = getAlchemyPerkState();
+        infoEl.innerHTML = `Известно свойств: ${knownCount}/4. При поедании узнаешь ещё до ${Math.min(1 + perkState.experimentatorRank, 4 - knownCount)}.`;
+    };
+    document.getElementById('alch-eat-select') && document.getElementById('alch-eat-select').addEventListener('change', window.updateAlchEatInfo);
+
+    window.eatIngredient = function () {
+        const select = document.getElementById('alch-eat-select');
+        const name = select.value;
+        const resultEl = document.getElementById('alch-eat-result');
+        const data = window.alchemyIngredients[name];
+        if (!data) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери ингредиент.</span>'; return; }
+        if (countInInventory(name) <= 0) { resultEl.innerHTML = '<span style="color:#e74c3c;">Ингредиента больше нет в инвентаре.</span>'; return; }
+
+        const perkState = getAlchemyPerkState();
+        const toReveal = 1 + perkState.experimentatorRank;
+        if (!knownIngredientProps[name]) knownIngredientProps[name] = [false, false, false, false];
+        const known = knownIngredientProps[name];
+        let revealed = [];
+        for (let i = 0; i < 4 && revealed.length < toReveal; i++) {
+            if (!known[i]) { known[i] = true; revealed.push(data.effects[i]); }
+        }
+        removeFromInventoryByName(name, 1);
+
+        if (revealed.length) {
+            resultEl.innerHTML = `<div style="color:#2ecc71;">Съел «${escHtml(name)}». Узнал: ${revealed.map(escHtml).join(', ')}</div>`;
+        } else {
+            resultEl.innerHTML = `<div style="opacity:.8;">Съел «${escHtml(name)}». Все свойства этого ингредиента уже были известны.</div>`;
+        }
+        renderAlchEatSelect();
+        renderKnownIngredients();
+        saveLocalStorage();
+    };
+
+    function renderAlchIngredientSelects() {
+        const items = getAlchemyIngredientsInInventory();
+        ['alch-ing-0', 'alch-ing-1', 'alch-ing-2'].forEach(id => {
+            const select = document.getElementById(id);
+            if (!select) return;
+            const prev = select.value;
+            select.innerHTML = '<option value="">—</option>' + items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('');
+            if (items.some(i => i.itemId === prev)) select.value = prev;
+        });
+        updateBrewPreview();
+    }
+
+    function getSharedAlchemyEffects(name1, name2, name3) {
+        const props1 = (window.alchemyIngredients[name1] || {}).effects || [];
+        const props2 = (window.alchemyIngredients[name2] || {}).effects || [];
+        const effSet = new Set(props1.filter(p => props2.includes(p)));
+        if (name3) {
+            const props3 = (window.alchemyIngredients[name3] || {}).effects || [];
+            const firstTwo = new Set([...props1, ...props2]);
+            props3.forEach(p => { if (firstTwo.has(p)) effSet.add(p); });
+        }
+        return Array.from(effSet);
+    }
+
+    function computeBrewEffects() {
+        const name1 = document.getElementById('alch-ing-0').value;
+        const name2 = document.getElementById('alch-ing-1').value;
+        const name3 = document.getElementById('alch-ing-2').value;
+        if (!name1 || !name2 || name1 === name2) return { effects: [], name1, name2, name3 };
+        const effects = getSharedAlchemyEffects(name1, name2, name3);
+        const perkState = getAlchemyPerkState();
+        const skill = getAlchemySkillValue();
+        const computed = effects.map(effName => {
+            const info = window.alchemyBaseEffects[effName] || { base: 5, hasDuration: true, unit: '', polarity: 'positive', priceBase: 5 };
+            const magnitude = calcAlchemyValue(info.base, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, perkState.gearBonus, info.polarity, effName);
+            const duration = info.hasDuration ? calcAlchemyValue(1, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, perkState.gearBonus, info.polarity, effName) : null;
+            const price = calcAlchemyEffectPrice(effName, magnitude, duration);
+            return { name: effName, magnitude, duration, unit: info.unit, polarity: info.polarity, price };
+        });
+        return { effects: computed, name1, name2, name3 };
+    }
+
+    window.updateBrewPreview = function () {
+        renderAlchGearInfo();
+        const previewEl = document.getElementById('alch-brew-preview');
+        const { effects, name1, name2 } = computeBrewEffects();
+        if (!name1 || !name2) { previewEl.innerHTML = '<span style="opacity:.7;">Выбери минимум 2 ингредиента.</span>'; return; }
+        if (!effects.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ Нет общих свойств — варево не получится.</span>'; return; }
+        previewEl.innerHTML = effects.map(e => {
+            const durStr = e.duration ? ` · ${e.duration} ход(ов)` : '';
+            return `<div>🧪 <strong>${escHtml(e.name)}</strong>: ${e.magnitude}${escHtml(e.unit)}${durStr} <span style="opacity:.6;">(${e.price} септ.)</span></div>`;
+        }).join('');
+    };
+
+    function renderAlchGearInfo() {
+        const el = document.getElementById('alch-gear-info');
+        if (!el) return;
+        const perkState = getAlchemyPerkState();
+        el.textContent = `Навык: ${getAlchemySkillValue()} · Алхимик: ранг ${perkState.alchemistRank} · Провизор: ${perkState.hasProvisor ? 'да' : 'нет'} · Целитель: ${perkState.hasHealer ? 'да' : 'нет'} · Отравитель: ${perkState.hasPoisoner ? 'да' : 'нет'} · Снаряжение: +${perkState.gearBonus}%`;
+    }
+
+    window.brewPotion = function () {
+        const resultEl = document.getElementById('alch-brew-result');
+        const { effects, name1, name2, name3 } = computeBrewEffects();
+        if (!name1 || !name2) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери минимум 2 ингредиента.</span>'; return; }
+        const names = [name1, name2, name3].filter(Boolean);
+        if (names.some(n => countInInventory(n) <= 0)) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Каких-то из выбранных ингредиентов уже не хватает в инвентаре.</span>';
+            return;
+        }
+
+        // Ингредиенты расходуются в любом случае — попытка есть попытка
+        names.forEach(n => removeFromInventoryByName(n, 1));
+
+        // Новые совпавшие свойства становятся известны сразу
+        const effectNames = effects.map(e => e.name);
+        names.forEach(n => {
+            const data = window.alchemyIngredients[n];
+            if (!data) return;
+            if (!knownIngredientProps[n]) knownIngredientProps[n] = [false, false, false, false];
+            data.effects.forEach((eff, idx) => {
+                if (effectNames.includes(eff)) knownIngredientProps[n][idx] = true;
+            });
+        });
+        renderKnownIngredients();
+
+        if (!effects.length) {
+            resultEl.innerHTML = '<div style="color:#e74c3c; font-weight:bold;">Варево провалилось — общих свойств не нашлось. Ингредиенты потрачены впустую.</div>';
+            renderAlchIngredientSelects();
+            saveLocalStorage();
+            return;
+        }
+
+        const totalPrice = effects.reduce((s, e) => s + e.price, 0);
+        const descLines = effects.map(e => `${e.name}: ${e.magnitude}${e.unit}${e.duration ? ' на ' + e.duration + ' ход(ов)' : ''}`);
+        const desc = descLines.join('; ');
+        const isPoison = effects.every(e => e.polarity === 'negative');
+        const isMixed = effects.some(e => e.polarity === 'negative') && effects.some(e => e.polarity === 'positive');
+        const itemName = (isPoison ? 'Яд' : 'Зелье') + ': ' + effects.map(e => e.name).join(' + ');
+
+        addToInventory(itemName + '#' + Date.now(), itemName, 1, 0.25, isPoison ? 'Яд' : 'Зелье', desc, {
+            alchemyEffects: effects
+        });
+
+        let html = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: «${escHtml(itemName)}» (${totalPrice} септ.)</div>`;
+        html += `<div style="opacity:.85; margin-top:4px;">${escHtml(desc)}</div>`;
+        if (isMixed) html += `<div style="color:#e67e22; margin-top:4px; font-size:12px;">⚠ В варианте есть и положительные, и отрицательные свойства — сам реши, зелье это или яд (оба эффекта сохранятся).</div>`;
+        resultEl.innerHTML = html;
+
+        renderAlchIngredientSelects();
+        saveLocalStorage();
+    };
+
+    function renderKnownIngredients() {
+        const listEl = document.getElementById('alch-known-list');
+        if (!listEl) return;
+        const search = (document.getElementById('alch-known-search').value || '').toLowerCase();
+        const names = Object.keys(window.alchemyIngredients || {}).filter(n => n.toLowerCase().includes(search)).sort();
+        listEl.innerHTML = names.map(name => {
+            const known = knownIngredientProps[name] || [false, false, false, false];
+            const data = window.alchemyIngredients[name];
+            const propsHtml = data.effects.map((e, i) => known[i]
+                ? `<span style="color:#2ecc71;">${escHtml(e)}</span>`
+                : `<span style="opacity:.4;">???</span>`
+            ).join(', ');
+            return `<div class="party-row"><div class="row-name"><strong>${escHtml(name)}</strong></div><div style="font-size:12px;">${propsHtml}</div></div>`;
+        }).join('');
+    }
+    window.renderKnownIngredients = renderKnownIngredients;
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -1908,23 +2255,6 @@
 
         // Вес
         let weightFromItems = 0;
-        weightFromItems += (parseInt(document.getElementById('inv-hide-bear').value) || 0) * 3;
-        weightFromItems += (parseInt(document.getElementById('inv-hide-sable').value) || 0) * 2;
-        weightFromItems += (parseInt(document.getElementById('inv-hide-wolf').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-leather').value) || 0) * 2;
-        weightFromItems += (parseInt(document.getElementById('inv-leather-strips').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-ing-iron').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-ing-steel').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-ing-corundum').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-ing-orichalcum').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-ing-ebony').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-gem-petty').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-gem-grand').value) || 0) * 1;
-        weightFromItems += (parseInt(document.getElementById('inv-dw-beam').value) || 0) * 20;
-        weightFromItems += (parseInt(document.getElementById('inv-dw-gear').value) || 0) * 10;
-        weightFromItems += (parseInt(document.getElementById('inv-dw-core').value) || 0) * 4;
-        weightFromItems += (parseInt(document.getElementById('inv-tent').value) || 0) * 10;
-        weightFromItems += (parseInt(document.getElementById('inv-bag').value) || 0) * 3;
         weightFromItems += getInventoryTotalWeight();
 
         let extraWeight = parseInt(document.getElementById('extra-weight').value) || 0;
@@ -2223,25 +2553,7 @@
             sCirclet: document.getElementById('slot-circlet-name').value,
             inventory: playerInventory,
             equippedSlots: equippedSlots,
-            inv: {
-                'hide-bear': document.getElementById('inv-hide-bear').value,
-                'hide-sable': document.getElementById('inv-hide-sable').value,
-                'hide-wolf': document.getElementById('inv-hide-wolf').value,
-                'leather': document.getElementById('inv-leather').value,
-                'leather-strips': document.getElementById('inv-leather-strips').value,
-                'ing-iron': document.getElementById('inv-ing-iron').value,
-                'ing-steel': document.getElementById('inv-ing-steel').value,
-                'ing-corundum': document.getElementById('inv-ing-corundum').value,
-                'ing-orichalcum': document.getElementById('inv-ing-orichalcum').value,
-                'ing-ebony': document.getElementById('inv-ing-ebony').value,
-                'gem-petty': document.getElementById('inv-gem-petty').value,
-                'gem-grand': document.getElementById('inv-gem-grand').value,
-                'dw-beam': document.getElementById('inv-dw-beam').value,
-                'dw-gear': document.getElementById('inv-dw-gear').value,
-                'dw-core': document.getElementById('inv-dw-core').value,
-                'tent': document.getElementById('inv-tent').value,
-                'bag': document.getElementById('inv-bag').value
-            }
+            knownIngredientProps: knownIngredientProps
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -2297,33 +2609,9 @@
                 document.getElementById('max-hp').value = data.vitals[2];
                 document.getElementById('max-mp').value = data.vitals[3];
             }
-            if (data.inv) {
-                let invMap = {
-                    'hide-bear': 'inv-hide-bear',
-                    'hide-sable': 'inv-hide-sable',
-                    'hide-wolf': 'inv-hide-wolf',
-                    'leather': 'inv-leather',
-                    'leather-strips': 'inv-leather-strips',
-                    'ing-iron': 'inv-ing-iron',
-                    'ing-steel': 'inv-ing-steel',
-                    'ing-corundum': 'inv-ing-corundum',
-                    'ing-orichalcum': 'inv-ing-orichalcum',
-                    'ing-ebony': 'inv-ing-ebony',
-                    'gem-petty': 'inv-gem-petty',
-                    'gem-grand': 'inv-gem-grand',
-                    'dw-beam': 'inv-dw-beam',
-                    'dw-gear': 'inv-dw-gear',
-                    'dw-core': 'inv-dw-core',
-                    'tent': 'inv-tent',
-                    'bag': 'inv-bag'
-                };
-                Object.keys(invMap).forEach(key => {
-                    const el = document.getElementById(invMap[key]);
-                    if (el && data.inv[key] !== undefined) {
-                        el.value = data.inv[key];
-                    }
-                });
-            }
+            // Миграция старого инвентаря ресурсов (фиксированные счётчики) в новый общий
+            // инвентарь выполняется ниже, после восстановления playerInventory из data.inventory.
+            window._legacyInvToMigrate = data.inv || null;
             let sInputs = document.querySelectorAll('[id^="skill-"]');
             if (data.skills && sInputs.length === data.skills.length) {
                 sInputs.forEach((input, i) => {
@@ -2364,6 +2652,41 @@
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
+
+            // Миграция старого инвентаря ресурсов (фиксированные счётчики) в новый общий —
+            // чтобы у тех, кто сохранялся раньше, ресурсы не потерялись.
+            if (window._legacyInvToMigrate) {
+                const legacyMap = {
+                    'hide-bear': { name: 'Шкура медведя', weight: 3, price: 50, category: 'Шкуры' },
+                    'hide-sable': { name: 'Шкура саблезуба', weight: 2, price: 25, category: 'Шкуры' },
+                    'hide-wolf': { name: 'Волчья шкура', weight: 1, price: 10, category: 'Шкуры' },
+                    'leather': { name: 'Кожа', weight: 2, price: 10, category: 'Кузнечные ингредиенты' },
+                    'leather-strips': { name: 'Полоски кожи', weight: 0.1, price: 3, category: 'Кузнечные ингредиенты' },
+                    'ing-iron': { name: 'Железный слиток', weight: 1, price: 7, category: 'Кузнечные ингредиенты' },
+                    'ing-steel': { name: 'Стальной слиток', weight: 1, price: 29, category: 'Кузнечные ингредиенты' },
+                    'ing-corundum': { name: 'Корундовый слиток', weight: 1, price: 40, category: 'Кузнечные ингредиенты' },
+                    'ing-orichalcum': { name: 'Орихалковый слиток', weight: 1, price: 45, category: 'Кузнечные ингредиенты' },
+                    'ing-ebony': { name: 'Эбонитовый слиток', weight: 1, price: 150, category: 'Кузнечные ингредиенты' },
+                    'gem-petty': { name: 'Крохотный камень душ', weight: 1, price: 10, category: 'Камни душ' },
+                    'gem-grand': { name: 'Великий камень душ', weight: 1, price: 200, category: 'Камни душ' },
+                    'dw-beam': { name: 'Двемерская балка', weight: 20, price: 15, category: 'Двемерские детали' },
+                    'dw-gear': { name: 'Двемерская шестерня', weight: 10, price: 5, category: 'Двемерские детали' },
+                    'dw-core': { name: 'Сердечник центуриона', weight: 4, price: 131, category: 'Двемерские детали' },
+                    'tent': { name: 'Палатка 15х15 футов', weight: 10, price: 300, category: 'Походное снаряжение' },
+                    'bag': { name: 'Спальный мешок', weight: 3, price: 75, category: 'Походное снаряжение' }
+                };
+                Object.keys(legacyMap).forEach(key => {
+                    const qty = parseInt(window._legacyInvToMigrate[key]) || 0;
+                    if (qty > 0) {
+                        const info = legacyMap[key];
+                        const already = playerInventory.find(i => i.itemId === info.name);
+                        if (!already) {
+                            playerInventory.push({ itemId: info.name, name: info.name, count: qty, weight: info.weight, category: info.category, effect: '' });
+                        }
+                    }
+                });
+                window._legacyInvToMigrate = null;
+            }
             equippedSlots = data.equippedSlots && typeof data.equippedSlots === 'object'
                 ? Object.assign({ helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null }, data.equippedSlots)
                 : { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
@@ -2372,6 +2695,11 @@
             renderEquipPanel();
             renderStaffList();
             renderEnchantItemSelect();
+
+            knownIngredientProps = (data.knownIngredientProps && typeof data.knownIngredientProps === 'object') ? data.knownIngredientProps : {};
+            renderAlchEatSelect();
+            renderAlchIngredientSelects();
+            renderKnownIngredients();
 
             // Рецепты кузницы открывает только мастер (gm.html) — здесь только читаем, не сохраняем обратно
             knownSmithingRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
@@ -2427,6 +2755,10 @@
     updateStaffCalc();
     renderStaffList();
     renderEquipPanel();
+    renderScrollSpellSelect();
+    renderAlchEatSelect();
+    renderAlchIngredientSelects();
+    renderKnownIngredients();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

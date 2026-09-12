@@ -140,12 +140,33 @@
                 <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
             </div>
         </div>
+
+        <!-- ===== ИНВЕНТАРЬ И ДЕНЬГИ ИГРОКОВ ===== -->
+        <div class="panel">
+            <h2>🎒 Инвентарь и деньги игрока</h2>
+            <p style="font-size:12px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить или списать.</p>
+            <select id="inv-player-select" style="width:100%; margin-bottom:10px;" onchange="loadPlayerInventoryForGm()"></select>
+
+            <div id="inv-gold-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                <div>💰 Золото: <strong id="inv-gold-current">0</strong> септимов</div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <input type="number" id="inv-gold-delta" placeholder="Сумма" style="flex:1;">
+                    <button class="btn-success" style="width:auto;" onclick="applyGoldDelta(1)">Добавить</button>
+                    <button class="btn-danger" style="width:auto;" onclick="applyGoldDelta(-1)">Списать</button>
+                </div>
+            </div>
+
+            <div id="inv-items-list" style="max-height:400px; overflow-y:auto;">
+                <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="firebase-config.js"></script>
 <script src="items-data.js"></script>
 <script src="smithing-data.js"></script>
+<script src="cooking-data.js"></script>
 <script src="gm.js"></script>
 </body>
 </html>

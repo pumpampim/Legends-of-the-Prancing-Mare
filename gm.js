@@ -185,6 +185,7 @@
         renderInitiative(lastData.initiative || []);
         renderLog(lastData.combatLog || []);
         populateRecipePlayerSelect();
+        populateInvPlayerSelect();
     }
 
     // ---------- Отряд ----------
@@ -322,6 +323,56 @@
         console.warn('Firebase не настроен — см. README-FIREBASE.md');
     }
     // ---------- База предметов для мастера (глобально доступные) ----------
+    const GM_SMITHING_SLOT_MAP = {
+        'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves',
+        'Сапоги и ботинки': 'boots', 'Щиты': 'shield'
+    };
+
+    // Собирает броню/украшения/оружие/боеприпасы из smithing-data.js в том же формате,
+    // что и обычные предметы из items-data.js — чтобы мастер мог выдать готовую вещь
+    // напрямую, без крафта игроком.
+    function getSmithingGiveableItems() {
+        const out = [];
+        (window.armorRecipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: r.armorType || 'Броня',
+                weight: r.weight, price: r.price, armor: r.resistance, dmg: null,
+                effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
+                slot: GM_SMITHING_SLOT_MAP[r.slot] || null
+            });
+        });
+        (window.jewelryRecipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: 'Ювелирное изделие',
+                weight: r.weight || 0.1, price: r.price || 0, armor: null, dmg: null, effect: '',
+                slot: r.name.includes('кольцо') ? 'ring' : 'amulet'
+            });
+        });
+        (window.weaponRecipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: (r.category || 'Оружие') + (r.subcat ? ' — ' + r.subcat : ''),
+                weight: r.weight, price: r.price, armor: null,
+                dmg: r.damage, effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
+                slot: r.isAmmo ? null : r.slot
+            });
+        });
+        (window.recipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: 'Блюдо (кулинария)',
+                weight: r.weight || 0.5, price: r.price || 0, armor: null, dmg: null,
+                effect: r.effect || '', slot: null
+            });
+        });
+        if (window.failedDish) {
+            out.push({
+                name: window.failedDish.name, category: 'Блюдо (кулинария)',
+                weight: window.failedDish.weight || 1, price: window.failedDish.price || 0,
+                armor: null, dmg: null, effect: window.failedDish.effect || '', slot: null
+            });
+        }
+        return out;
+    }
+
     window.loadGmItems = function() {
         if (!db) return;
         db.collection('items').get().then(snapshot => {
@@ -340,6 +391,8 @@
                     return;
                 }
             }
+            // Броня/оружие/украшения из кузницы — всегда добавляем поверх (не хранятся в Firestore).
+            gmAllItems = gmAllItems.concat(getSmithingGiveableItems());
             // Заполняем фильтр категорий
             const catSelect = document.getElementById('gm-item-category');
             const cats = [...new Set(gmAllItems.map(i => i.category || 'Разное'))];
@@ -497,7 +550,8 @@
     function getAllSmithingRecipeNames() {
         const armor = window.armorRecipes || [];
         const jewelry = window.jewelryRecipes || [];
-        return [...armor, ...jewelry];
+        const weapons = window.weaponRecipes || [];
+        return [...armor, ...jewelry, ...weapons];
     }
 
     function populateRecipePlayerSelect() {
@@ -547,7 +601,9 @@
         }
         container.innerHTML = all.map(r => {
             const checked = currentPlayerKnownRecipes.includes(r.name) ? 'checked' : '';
-            const sub = r.slot === 'jewelry' ? 'Ювелирное' : `${r.armorType || ''} · ${r.slot || ''}`;
+            const sub = r.hasOwnProperty('damage')
+                ? `${r.category || ''} · ${r.subcat || ''}`
+                : (r.slot === 'jewelry' ? 'Ювелирное' : `${r.armorType || ''} · ${r.slot || ''}`);
             return `<label style="display:flex; align-items:center; gap:8px; padding:4px 2px; border-bottom:1px solid var(--border-color); font-size:13px;">
                 <input type="checkbox" ${checked} onchange="toggleRecipeKnown('${escapeHtml(r.name)}', this.checked)">
                 <span style="flex:1;">${escapeHtml(r.name)} <span style="opacity:.6; font-size:11px;">(${escapeHtml(sub)})</span></span>
@@ -568,6 +624,91 @@
                 currentPlayerKnownRecipes = currentPlayerKnownRecipes.filter(n => n !== name);
             }
         }).catch(e => alert('Ошибка сохранения: ' + e.message));
+    };
+
+    // ---------- Инвентарь и деньги игроков ----------
+
+    let currentInvPlayerUid = null;
+    let currentPlayerInvData = { inventory: [], gold: 0 };
+
+    function populateInvPlayerSelect() {
+        const select = el('inv-player-select');
+        if (!select) return;
+        const uids = Object.keys(lastData.participants || {});
+        const prevValue = select.value;
+        select.innerHTML = '<option value="">— выбери игрока —</option>' +
+            uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
+        if (uids.includes(prevValue)) {
+            select.value = prevValue;
+        } else {
+            currentInvPlayerUid = null;
+            el('inv-gold-block').style.display = 'none';
+            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+        }
+    }
+
+    window.loadPlayerInventoryForGm = function () {
+        const uid = el('inv-player-select').value;
+        if (!uid) {
+            currentInvPlayerUid = null;
+            el('inv-gold-block').style.display = 'none';
+            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            return;
+        }
+        currentInvPlayerUid = uid;
+        el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Загрузка...</p>';
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            currentPlayerInvData = {
+                inventory: Array.isArray(data.inventory) ? data.inventory : [],
+                gold: parseInt(data.gold) || 0
+            };
+            el('inv-gold-block').style.display = 'block';
+            el('inv-gold-current').textContent = currentPlayerInvData.gold;
+            renderGmPlayerInventory();
+        }).catch(e => {
+            el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:12px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
+        });
+    };
+
+    function renderGmPlayerInventory() {
+        const target = el('inv-items-list');
+        const items = currentPlayerInvData.inventory;
+        if (!items.length) {
+            target.innerHTML = '<p style="opacity:.6; font-size:12px;">Инвентарь пуст.</p>';
+            return;
+        }
+        target.innerHTML = items.map(item => `
+            <div class="party-row">
+                <div class="row-name">
+                    <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:11px;">(вес ${item.weight})</span>` : ''}</span>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:11px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
+                </div>
+                ${item.effect ? `<div style="font-size:11px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
+            </div>
+        `).join('');
+    }
+
+    window.deletePlayerItem = function (itemId) {
+        if (!currentInvPlayerUid) return;
+        if (!confirm('Удалить этот предмет у игрока?')) return;
+        const newInv = currentPlayerInvData.inventory.filter(i => i.itemId !== itemId);
+        db.collection('characters').doc(currentInvPlayerUid).update({ inventory: newInv }).then(() => {
+            currentPlayerInvData.inventory = newInv;
+            renderGmPlayerInventory();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.applyGoldDelta = function (sign) {
+        if (!currentInvPlayerUid) return;
+        const amount = parseInt(el('inv-gold-delta').value) || 0;
+        if (amount <= 0) { alert('Укажи положительную сумму.'); return; }
+        const newGold = Math.max(0, currentPlayerInvData.gold + sign * amount);
+        db.collection('characters').doc(currentInvPlayerUid).update({ gold: newGold }).then(() => {
+            currentPlayerInvData.gold = newGold;
+            el('inv-gold-current').textContent = newGold;
+            el('inv-gold-delta').value = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
 
 })();

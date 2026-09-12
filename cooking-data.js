@@ -73,7 +73,11 @@ const cookingIngredients = {
     "Мора тапинелла": { price: 4, weight: 0.333, category: "Алхимия (для готовки)" },
     "Чеснок": { price: 1, weight: 0.333, category: "Алхимия (для готовки)" },
     "Соль": { price: 2.0, weight: 0.2, category: "Бытовое (для готовки)" },
-    "Мешок муки": { price: 1.0, weight: 0.5, category: "Бытовое (для готовки)" }
+    "Мешок муки": { price: 1.0, weight: 0.5, category: "Бытовое (для готовки)" },
+    "Виноград джазби": { price: 2, weight: 0.2, category: "Алхимия (для готовки)" },
+    "Снежные ягоды": { price: 4, weight: 0.1, category: "Алхимия (для готовки)" },
+    "Ягоды можжевельника": { price: 1, weight: 0.1, category: "Алхимия (для готовки)" },
+    "Масло": { price: 2, weight: 0.2, category: "Бытовое (для готовки)" },
 };
 
 const recipes = [
@@ -154,7 +158,7 @@ const recipes = [
         weight: 0.5,
         price: 25,
         needsWater: false,
-        ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Чеснок", qty: 1 }],
+        ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Масло", qty: 1 }],
         effect: "+25% сопротивления к болезням на 45 ходов"
     },
     {
@@ -170,7 +174,7 @@ const recipes = [
         weight: 0.5,
         price: 25,
         needsWater: false,
-        ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Картофель", qty: 1 }, { name: "Соль", qty: 1 }],
+        ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Картофель", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Соль", qty: 1 }],
         effect: "+20% сопротивления к ядам на 45 ходов"
     },
     {
@@ -178,7 +182,7 @@ const recipes = [
         weight: 0.5,
         price: 35,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Зелёное яблоко", qty: 2 }, { name: "Красное яблоко", qty: 2 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Зелёное яблоко", qty: 2 }, { name: "Красное яблоко", qty: 2 }],
         effect: "+10 к урону через броню на 45 ходов"
     },
     {
@@ -186,7 +190,7 @@ const recipes = [
         weight: 0.5,
         price: 35,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Лунный сахар", qty: 2 }, { name: "Лаванда", qty: 2 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Лунный сахар", qty: 2 }, { name: "Лаванда", qty: 2 }],
         effect: "+10% сопротивления к магии на 45 ходов"
     },
     {
@@ -194,7 +198,7 @@ const recipes = [
         weight: 0.5,
         price: 35,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Куриная грудка", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Чеснок", qty: 1 }, { name: "Соль", qty: 1 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Куриная грудка", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Чеснок", qty: 1 }, { name: "Соль", qty: 1 }],
         effect: "+5% к физическому урону на 45 ходов"
     },
     {
@@ -202,7 +206,7 @@ const recipes = [
         weight: 1,
         price: 40,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Виноград джазби", qty: 5 }],
         effect: "+10% сопротивления к огню на 45 ходов"
     },
     {
@@ -210,7 +214,7 @@ const recipes = [
         weight: 1,
         price: 40,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Снежные ягоды", qty: 5 }],
         effect: "+10% сопротивления к холоду на 45 ходов"
     },
     {
@@ -218,7 +222,7 @@ const recipes = [
         weight: 1,
         price: 40,
         needsWater: false,
-        ingredients: [{ name: "Мешок муки", qty: 1 }],
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Ягоды можжевельника", qty: 5 }],
         effect: "+10% сопротивления к электричеству на 45 ходов"
     },
     {
