@@ -109,7 +109,17 @@
         "6-4": () => ({ assassinBladeUnlocked: true }),
 
         // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
-        "8-4": () => ({ extraCarryWeight: 50 })
+        "8-4": () => ({ extraCarryWeight: 50 }),
+
+        // ==================== ВЗЛОМ (skillIdx = 7) ====================
+        "7-0": () => ({ lockpickNoviceUnlocked: true }),
+        "7-1": () => ({ lockpickApprenticeUnlocked: true }),
+        "7-2": () => ({ lockpickSilent: true }),
+        "7-3": () => ({ lockpickWaxKey: true }),
+        "7-4": () => ({ lockpickAdeptUnlocked: true }),
+        "7-5": () => ({ lockpickGoldBonus: true }),
+        "7-6": () => ({ lockpickTreasureBonus: true }),
+        "7-7": () => ({ lockpickExpertUnlocked: true })
     };
 
     window.applyPerks = function() {
@@ -178,7 +188,9 @@
             heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
             lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
             sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false,
-            extraCarryWeight: 0
+            extraCarryWeight: 0,
+            lockpickNoviceUnlocked: false, lockpickApprenticeUnlocked: false, lockpickAdeptUnlocked: false, lockpickExpertUnlocked: false,
+            lockpickSilent: false, lockpickWaxKey: false, lockpickGoldBonus: false, lockpickTreasureBonus: false
         };
 
         // Логируем, что мы нашли в чекбоксах (для отладки)

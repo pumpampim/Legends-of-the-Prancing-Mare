@@ -513,7 +513,8 @@ const allItems = [
     { name: "Подсумок на 2 зелья", category: "Подсумки", type: "pouch", slot: "pouch", capacity: 2, weight: 2, price: 50, effect: "Вмещает 2 зелья/яда для быстрого использования в бою" },
     { name: "Подсумок на 4 зелья", category: "Подсумки", type: "pouch", slot: "pouch", capacity: 4, weight: 2, price: 250, effect: "Вмещает 4 зелья/яда для быстрого использования в бою" },
     { name: "Подсумок на 6 зелий", category: "Подсумки", type: "pouch", slot: "pouch", capacity: 6, weight: 2, price: 400, effect: "Вмещает 6 зелий/ядов для быстрого использования в бою" },
-    { name: "Подсумок на 8 зелий", category: "Подсумки", type: "pouch", slot: "pouch", capacity: 8, weight: 2, price: 800, effect: "Вмещает 8 зелий/ядов для быстрого использования в бою" }
+    { name: "Подсумок на 8 зелий", category: "Подсумки", type: "pouch", slot: "pouch", capacity: 8, weight: 2, price: 800, effect: "Вмещает 8 зелий/ядов для быстрого использования в бою" },
+    { name: "Отмычка", category: "Бытовые предметы", type: "misc", slot: null, weight: 0.1, price: 5, effect: "Расходуется при взломе замков; ломается при провале проверки" }
 ];
 
 // Делаем глобально доступным для мастера

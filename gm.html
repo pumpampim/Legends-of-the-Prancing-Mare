@@ -156,6 +156,22 @@
                 </div>
             </div>
 
+            <div id="inv-level-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                <div>🎓 Уровень: <strong id="inv-level-current">1</strong> · Очков перка: <strong id="inv-perkpoints-current">0</strong></div>
+                <div id="inv-level-progress" style="font-size:12px; opacity:.8; margin:4px 0;"></div>
+                <label style="font-size:12px;">Характеристика для +1 при начислении уровня</label>
+                <select id="inv-level-stat-choice">
+                    <option value="str">Сила</option>
+                    <option value="dex">Ловкость</option>
+                    <option value="con">Телосложение</option>
+                    <option value="int">Интеллект</option>
+                    <option value="wis">Мудрость</option>
+                    <option value="cha">Харизма</option>
+                </select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="grantLevelUp()">Начислить уровень (+1 перк, +1 характеристика)</button>
+                <button style="width:100%; margin-top:4px;" onclick="grantPerkPointOnly()">Начислить только 1 очко перка</button>
+            </div>
+
             <div id="inv-items-list" style="max-height:400px; overflow-y:auto;">
                 <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
             </div>

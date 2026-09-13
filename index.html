@@ -1060,7 +1060,24 @@
     <div id="tab10" class="tab-content">
         <div class="panel">
             <h2>🎲 Бросок кубов</h2>
-            <p style="font-size:12px; opacity:.8;">Выбери кубик и, если нужно, характеристику и/или навык — их значения добавятся к результату броска.</p>
+            <p style="font-size:12px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
+
+            <label>Навык проверки</label>
+            <select id="dice-skill" onchange="onDiceSkillPicked()">
+                <option value="">— без навыка (просто характеристика или голый кубик) —</option>
+            </select>
+
+            <label>Характеристика (модификатор)</label>
+            <select id="dice-stat" onchange="updateDiceStatInfo()">
+                <option value="">— не добавлять —</option>
+                <option value="str">Сила</option>
+                <option value="dex">Ловкость</option>
+                <option value="con">Телосложение</option>
+                <option value="int">Интеллект</option>
+                <option value="wis">Мудрость</option>
+                <option value="cha">Харизма</option>
+            </select>
+            <div id="dice-stat-info" style="font-size:11px; opacity:.7; margin:-4px 0 6px;"></div>
 
             <label>Кубик</label>
             <select id="dice-type">
@@ -1070,31 +1087,61 @@
                 <option value="100">к100</option>
             </select>
 
-            <label>Характеристика (модификатор)</label>
-            <select id="dice-stat">
-                <option value="">— не добавлять —</option>
-                <option value="str">Сила</option>
-                <option value="dex">Ловкость</option>
-                <option value="con">Телосложение</option>
-                <option value="int">Интеллект</option>
-                <option value="wis">Мудрость</option>
-                <option value="cha">Харизма</option>
-            </select>
-
-            <label>Навык (значение навыка целиком)</label>
-            <select id="dice-skill">
-                <option value="">— не добавлять —</option>
-            </select>
+            <label>Сложность проверки (Сложность/DC, необязательно)</label>
+            <input type="number" id="dice-dc" placeholder="Например: 15">
 
             <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()">🎲 Бросить</button>
 
             <div id="dice-result" style="margin-top:14px; padding:12px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
                 <div style="font-size:32px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
                 <div style="font-size:12px; opacity:.75;" id="dice-result-formula"></div>
+                <div style="font-size:14px; font-weight:bold; margin-top:4px;" id="dice-result-verdict"></div>
             </div>
 
             <h3 style="margin-top:16px;">Журнал бросков</h3>
             <div id="dice-history" style="max-height:220px; overflow-y:auto; font-size:12px;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🔓 Взлом замка</h2>
+            <p style="font-size:12px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф −5, если не открыт соответствующий перк «Взломщик-...».</p>
+
+            <label>Сложность замка</label>
+            <select id="lock-tier" onchange="updateLockInfo()">
+                <option value="0">Новичок (Сложность 10, порог навыка 0)</option>
+                <option value="1">Ученик (Сложность 15, порог навыка 25)</option>
+                <option value="2">Адепт (Сложность 20, порог навыка 50)</option>
+                <option value="3">Эксперт (Сложность 25, порог навыка 75)</option>
+            </select>
+
+            <div id="lock-info" style="font-size:12px; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+
+            <button class="btn-success" style="width:100%;" onclick="attemptLockpick()">🔓 Взломать</button>
+            <div id="lock-result" style="margin-top:10px; font-size:14px; text-align:center; font-weight:bold;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🎓 Прокачка персонажа</h2>
+            <p style="font-size:11px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап = уровень×2+2.</p>
+
+            <div id="level-summary" style="padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
+
+            <div id="levelup-ready-block" style="display:none; padding:8px; background:#2ecc7122; border:1px solid #2ecc71; border-radius:4px; margin-bottom:10px;">
+                <div style="font-weight:bold; color:#2ecc71;">🎉 Готов новый уровень!</div>
+                <label style="font-size:12px;">Какую характеристику поднять на 1?</label>
+                <select id="levelup-stat-choice">
+                    <option value="str">Сила</option>
+                    <option value="dex">Ловкость</option>
+                    <option value="con">Телосложение</option>
+                    <option value="int">Интеллект</option>
+                    <option value="wis">Мудрость</option>
+                    <option value="cha">Харизма</option>
+                </select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="applyLevelUp()">Применить уровень</button>
+            </div>
+
+            <h3 style="margin-top:10px;">Прогресс по навыкам</h3>
+            <div id="skill-progress-list"></div>
         </div>
     </div>
 
@@ -1118,6 +1165,10 @@
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
     let gameTurn = 0, gameRound = 0;
+    let characterLevel = 1;
+    let levelUpProgress = 0; // очков навыков накоплено к следующему уровню
+    let perkPointsAvailable = 0; // свободные очки перков от левел-апов (справочно, не блокирует существующие перки)
+    let skillProgress = {}; // { skillIdx: успехов накоплено к следующей ступени навыка }
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
     function initSkills() {
@@ -1477,6 +1528,8 @@
         if(card) { card.remove(); saveSpellsAndRefresh(); }
     }
 
+    const SCHOOL_CODE_TO_SKILL = { destr: 'Разрушение', restor: 'Восстановление', conj: 'Колдовство', illus: 'Иллюзия', alter: 'Изменение' };
+
     function castCustomSpell(id) {
         const card = document.getElementById(`card-${id}`);
         if (!card) return;
@@ -1485,6 +1538,11 @@
         if (curMp >= finalCost) {
             document.getElementById('cur-mp').value = curMp - finalCost;
             alert("Заклинание прочитано! Мана успешно списана.");
+            const container = card.closest('[id^="spells-"]');
+            const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
+            if (school && SCHOOL_CODE_TO_SKILL[school] && typeof logSkillSuccessByName === 'function') {
+                logSkillSuccessByName(SCHOOL_CODE_TO_SKILL[school]);
+            }
             updateAll();
             saveLocalStorage();
         } else {
@@ -1888,6 +1946,7 @@
         const dish = matchedRecipe || window.failedDish;
         const finalEffect = scaleEffectText(dish.effect, powerBonus, durBonus) + alchemyNote;
         addToInventory(dish.name, dish.name, 1, dish.weight || 1, matchedRecipe ? 'Блюдо' : 'Провал готовки', finalEffect, { price: dish.price || 0 });
+        if (matchedRecipe && typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария');
 
         let extraNote = '';
         // Полевой опыт: шанс получить ещё одно такое же блюдо
@@ -1980,6 +2039,7 @@
             extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: recipe.resistance, price: recipe.price };
         }
         addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, extra.category || 'Скованное', desc, extra);
+        if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кузнечное дело');
         renderSmithingList();
         saveLocalStorage();
     };
@@ -2111,6 +2171,7 @@
         if (isWeaponSlot(item.slot)) extra.chargeDaysLeft = 5;
 
         addToInventory(enchantedName + '#' + Date.now(), enchantedName, 1, item.weight, item.category, desc, extra);
+        if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Зачарование');
         resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Готово: «${escHtml(enchantedName)}» — ${escHtml(desc)}</div>`;
         renderEnchantItemSelect();
         saveLocalStorage();
@@ -2790,6 +2851,7 @@
         addToInventory(itemName + '#' + Date.now(), itemName, 1, 0.25, isPoison ? 'Яд' : 'Зелье', desc, {
             alchemyEffects: effects, price: totalPrice
         });
+        if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Алхимия');
 
         let html = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: «${escHtml(itemName)}» (${totalPrice} септ.)</div>`;
         html += `<div style="opacity:.85; margin-top:4px;">${escHtml(desc)}</div>`;
@@ -2823,12 +2885,51 @@
 
     let diceHistory = [];
 
+    // Какая характеристика отвечает за какой навык (правила явно называют лишь
+    // Харизму→Красноречие и Мудрость→Колдовство/Восстановление/Зачарование;
+    // остальное распределено по смыслу: Сила — силовые бои и тяжёлая экипировка,
+    // Ловкость — меткость и ловкость рук, Интеллект — прикладные/боевые школы магии
+    // и ремёсла, Мудрость — интуитивные школы магии и стряпня, Телосложение
+    // навыков не даёт (по правилам оно пассивно).
+    const SKILL_TO_STAT = {
+        'Одноручное оружие': 'str', 'Двуручное оружие': 'str', 'Тяжелая броня': 'str', 'Блокирование': 'str',
+        'Стрельба': 'dex', 'Легкая броня': 'dex', 'Скрытность': 'dex', 'Взлом': 'dex', 'Карманные кражи': 'dex',
+        'Разрушение': 'int', 'Иллюзия': 'int', 'Изменение': 'int', 'Кузнечное дело': 'int', 'Алхимия': 'int',
+        'Восстановление': 'wis', 'Колдовство': 'wis', 'Зачарование': 'wis', 'Кулинария': 'wis',
+        'Красноречие': 'cha'
+    };
+    const STAT_LABELS = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
+
+    // В боевых проверках ничья (бросок игрока = сложность/бросок мастера) — кубы перекидываются.
+    const COMBAT_SKILLS_TIE_REROLL = ['Одноручное оружие', 'Двуручное оружие', 'Стрельба', 'Разрушение', 'Блокирование'];
+
     function renderDiceSkillSelect() {
         const select = document.getElementById('dice-skill');
         if (!select) return;
-        select.innerHTML = '<option value="">— не добавлять —</option>' +
-            skillNames.map((n, i) => `<option value="${i}">${escHtml(n)}</option>`).join('');
+        select.innerHTML = '<option value="">— без навыка (просто характеристика или голый кубик) —</option>' +
+            skillNames.map((n, i) => `<option value="${i}">${escHtml(n)} (${STAT_LABELS[SKILL_TO_STAT[n]] || '—'})</option>`).join('');
     }
+
+    window.onDiceSkillPicked = function () {
+        const skillIdx = document.getElementById('dice-skill').value;
+        const statSelect = document.getElementById('dice-stat');
+        if (skillIdx === '') return;
+        const skillName = skillNames[parseInt(skillIdx)];
+        const stat = SKILL_TO_STAT[skillName];
+        if (stat) statSelect.value = stat;
+        updateDiceStatInfo();
+    };
+
+    window.updateDiceStatInfo = function () {
+        const statKey = document.getElementById('dice-stat').value;
+        const infoEl = document.getElementById('dice-stat-info');
+        if (!infoEl) return;
+        if (!statKey) { infoEl.textContent = ''; return; }
+        const statInput = document.getElementById('stat-' + statKey);
+        const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
+        const mod = calcAbilityMod(rawStat);
+        infoEl.textContent = `${STAT_LABELS[statKey]}: ${rawStat} → модификатор ${mod >= 0 ? '+' : ''}${mod}`;
+    };
 
     function calcAbilityMod(val) {
         return Math.floor((val - 10) / 2);
@@ -2838,32 +2939,56 @@
         const dieSize = parseInt(document.getElementById('dice-type').value) || 20;
         const statKey = document.getElementById('dice-stat').value;
         const skillIdx = document.getElementById('dice-skill').value;
+        const dc = document.getElementById('dice-dc').value === '' ? null : parseInt(document.getElementById('dice-dc').value);
+        const skillLabel = skillIdx !== '' ? skillNames[parseInt(skillIdx)] : '';
 
-        const roll = Math.floor(Math.random() * dieSize) + 1;
         let statMod = 0, statLabel = '';
         if (statKey) {
             const statInput = document.getElementById('stat-' + statKey);
             const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
             statMod = calcAbilityMod(rawStat);
-            const labels = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
-            statLabel = labels[statKey];
-        }
-        let skillVal = 0, skillLabel = '';
-        if (skillIdx !== '') {
-            skillVal = getSkillRawValue(skillNames[parseInt(skillIdx)]);
-            skillLabel = skillNames[parseInt(skillIdx)];
+            statLabel = STAT_LABELS[statKey];
         }
 
-        const total = roll + statMod + skillVal;
+        const isCombatSkill = skillLabel && COMBAT_SKILLS_TIE_REROLL.includes(skillLabel);
+        const hasDc = dc !== null && !isNaN(dc);
 
+        // Ничья у боевых навыков — кубы перекидываются (не провал). Ограничение в 20 попыток
+        // просто страхует от бесконечного цикла, на практике повторных ничьих почти не бывает.
+        let roll, total, rerolls = 0;
+        do {
+            roll = Math.floor(Math.random() * dieSize) + 1;
+            total = roll + statMod;
+            if (!(isCombatSkill && hasDc && total === dc)) break;
+            rerolls++;
+        } while (rerolls < 20);
+
+        // Значение самого навыка в бросок НЕ идёт — только кубик + модификатор характеристики.
         let formulaParts = [`к${dieSize}: ${roll}`];
         if (statKey) formulaParts.push(`${statLabel} ${statMod >= 0 ? '+' : ''}${statMod}`);
-        if (skillIdx !== '') formulaParts.push(`${skillLabel} +${skillVal}`);
+        let formulaText = (skillLabel ? skillLabel + ' — ' : '') + formulaParts.join(' + ');
+        if (rerolls > 0) formulaText += ` (перекинуто из-за ничьей: ${rerolls} раз)`;
 
         document.getElementById('dice-result-total').textContent = total;
-        document.getElementById('dice-result-formula').textContent = formulaParts.join(' + ');
+        document.getElementById('dice-result-formula').textContent = formulaText;
 
-        diceHistory.unshift({ roll, dieSize, statLabel, statMod, skillLabel, skillVal, total });
+        const verdictEl = document.getElementById('dice-result-verdict');
+        let verdict = null;
+        if (hasDc) {
+            verdict = total >= dc;
+            verdictEl.textContent = verdict ? `✅ Успех (нужно было ${dc})` : `❌ Провал (нужно было ${dc})`;
+            verdictEl.style.color = verdict ? '#2ecc71' : '#e74c3c';
+        } else {
+            verdictEl.textContent = '';
+        }
+
+        // Небоевые навыки качаются «за каждое успешное действие» — если это была проверка
+        // конкретного небоевого навыка и она удалась, фиксируем это в прогресс.
+        if (verdict === true && skillLabel && !isCombatSkill) {
+            logSkillSuccessByName(skillLabel);
+        }
+
+        diceHistory.unshift({ roll, dieSize, statLabel, statMod, skillLabel, total, dc, verdict, rerolls });
         diceHistory = diceHistory.slice(0, 20);
         renderDiceHistory();
     };
@@ -2875,12 +3000,187 @@
         el.innerHTML = diceHistory.map(h => {
             let parts = [`к${h.dieSize}=${h.roll}`];
             if (h.statLabel) parts.push(`${h.statLabel} ${h.statMod >= 0 ? '+' : ''}${h.statMod}`);
-            if (h.skillLabel) parts.push(`${h.skillLabel} +${h.skillVal}`);
-            return `<div style="padding:3px 0; border-bottom:1px solid var(--border-color);">${parts.join(' + ')} = <strong style="color:var(--accent-color);">${h.total}</strong></div>`;
+            const skillPrefix = h.skillLabel ? `<span style="opacity:.7;">${escHtml(h.skillLabel)}: </span>` : '';
+            const dcSuffix = (h.dc !== null && h.dc !== undefined && !isNaN(h.dc))
+                ? ` <span style="color:${h.verdict ? '#2ecc71' : '#e74c3c'};">(Слож. ${h.dc} — ${h.verdict ? 'успех' : 'провал'})</span>` : '';
+            const rerollSuffix = h.rerolls ? ` <span style="opacity:.6;">[перекид ×${h.rerolls}]</span>` : '';
+            return `<div style="padding:3px 0; border-bottom:1px solid var(--border-color);">${skillPrefix}${parts.join(' + ')} = <strong style="color:var(--accent-color);">${h.total}</strong>${dcSuffix}${rerollSuffix}</div>`;
         }).join('');
     }
 
+    // ========================================================================
+    // ВЗЛОМ ЗАМКОВ
+    // ========================================================================
 
+    // Сложность/порог навыка по ступеням — сложности своей цифрой в правилах не даны
+    // (только качественное "значительно легче"), так что это моя разумная оценка;
+    // пороги навыка (0/25/50/75) взяты из реальных требований перков «Взломщик-...».
+    const LOCK_TIERS = [
+        { name: 'Новичок', dc: 10, threshold: 0, perkKey: 'lockpickNoviceUnlocked' },
+        { name: 'Ученик', dc: 15, threshold: 25, perkKey: 'lockpickApprenticeUnlocked' },
+        { name: 'Адепт', dc: 20, threshold: 50, perkKey: 'lockpickAdeptUnlocked' },
+        { name: 'Эксперт', dc: 25, threshold: 75, perkKey: 'lockpickExpertUnlocked' }
+    ];
+
+    window.updateLockInfo = function () {
+        const tier = LOCK_TIERS[parseInt(document.getElementById('lock-tier').value)];
+        const infoEl = document.getElementById('lock-info');
+        if (!tier || !infoEl) return;
+        const perks = window.perkBonuses || {};
+        const lockpickSkill = getSkillRawValue('Взлом');
+        const dexMod = calcAbilityMod(parseInt((document.getElementById('stat-dex') || {}).getAttribute('data-raw-stat')) || 10);
+        const hasPerk = !!perks[tier.perkKey];
+        const belowThreshold = lockpickSkill < tier.threshold;
+        const penalty = (belowThreshold && !hasPerk) ? -5 : 0;
+        const lockpickCount = countInInventory('Отмычка');
+
+        let html = `Сложность: <strong>${tier.dc}</strong> · Ловкость мод: ${dexMod >= 0 ? '+' : ''}${dexMod}`;
+        if (penalty) html += ` · <span style="color:#e74c3c;">Штраф без навыка: ${penalty}</span>`;
+        else if (belowThreshold && hasPerk) html += ` · <span style="color:#2ecc71;">Штраф снят перком «Взломщик-${tier.name.toLowerCase()}»</span>`;
+        html += `<br>Отмычек в инвентаре: <strong>${lockpickCount}</strong>`;
+        if (hasPerk && (tier.perkKey === 'lockpickAdeptUnlocked' || tier.perkKey === 'lockpickExpertUnlocked') && perks.lockpickGoldBonus) {
+            html += `<br><span style="opacity:.7;">🪙 «Золотоискатель»: больше золота в сундуке (на усмотрение мастера)</span>`;
+        }
+        if (perks.lockpickTreasureBonus) {
+            html += `<br><span style="opacity:.7;">💎 «Охотник за сокровищами»: +50% шанс особого лута (на усмотрение мастера)</span>`;
+        }
+        if (perks.lockpickSilent) {
+            html += `<br><span style="opacity:.7;">🤫 «Умелые ручки»: взлом бесшумный</span>`;
+        }
+        infoEl.innerHTML = html;
+    };
+
+    window.attemptLockpick = function () {
+        const tier = LOCK_TIERS[parseInt(document.getElementById('lock-tier').value)];
+        const resultEl = document.getElementById('lock-result');
+        const lockpickCount = countInInventory('Отмычка');
+        if (lockpickCount <= 0) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Нет отмычек в инвентаре.</span>';
+            return;
+        }
+        const perks = window.perkBonuses || {};
+        const lockpickSkill = getSkillRawValue('Взлом');
+        const dexInput = document.getElementById('stat-dex');
+        const dexMod = calcAbilityMod(dexInput ? (parseInt(dexInput.getAttribute('data-raw-stat')) || 10) : 10);
+        const hasPerk = !!perks[tier.perkKey];
+        const belowThreshold = lockpickSkill < tier.threshold;
+        const penalty = (belowThreshold && !hasPerk) ? -5 : 0;
+
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const total = roll + dexMod + penalty;
+        const success = total >= tier.dc;
+
+        let html = `к20: ${roll} + Ловкость ${dexMod >= 0 ? '+' : ''}${dexMod}${penalty ? ' − 5 (штраф)' : ''} = ${total} против Сложности ${tier.dc}<br>`;
+        if (success) {
+            html += `<span style="color:#2ecc71;">✅ Замок взломан! Отмычка цела.</span>`;
+            logSkillSuccessByName('Взлом');
+        } else {
+            removeFromInventoryByName('Отмычка', 1);
+            html += `<span style="color:#e74c3c;">❌ Провал. Отмычка сломалась.</span>`;
+            renderInventoryList();
+        }
+        resultEl.innerHTML = html;
+
+        diceHistory.unshift({ roll, dieSize: 20, statLabel: 'Ловкость', statMod: dexMod + penalty, skillLabel: `Взлом (${tier.name})`, total, dc: tier.dc, verdict: success });
+        diceHistory = diceHistory.slice(0, 20);
+        renderDiceHistory();
+        saveLocalStorage();
+    };
+
+    // ========================================================================
+    // ПРОКАЧКА ПЕРСОНАЖА
+    // ========================================================================
+
+    // Формулы — моя оценка, подогнанная под пример игрока (4→5 уровень за 10 очков навыков)
+    // и под пример из правил (навык 75→76 нужно ~15 успехов).
+    function getSuccessesNeededForSkill(skillValue) {
+        return Math.max(1, Math.ceil(skillValue / 5));
+    }
+    function getSkillUpsNeededForLevel(level) {
+        return level * 2 + 2;
+    }
+
+    function renderLevelPanel() {
+        const summaryEl = document.getElementById('level-summary');
+        const readyBlock = document.getElementById('levelup-ready-block');
+        if (!summaryEl) return;
+        const needed = getSkillUpsNeededForLevel(characterLevel);
+        const ready = levelUpProgress >= needed;
+        summaryEl.innerHTML = `Уровень: <strong>${characterLevel}</strong> · Очков перка свободно: <strong>${perkPointsAvailable}</strong><br>` +
+            `Прогресс к след. уровню: ${levelUpProgress} / ${needed} очков навыков`;
+        if (readyBlock) readyBlock.style.display = ready ? 'block' : 'none';
+        renderSkillProgressList();
+    }
+
+    function renderSkillProgressList() {
+        const el = document.getElementById('skill-progress-list');
+        if (!el) return;
+        el.innerHTML = skillNames.map((name, idx) => {
+            const skillInput = document.getElementById('skill-' + idx);
+            const skillVal = skillInput ? (parseInt(skillInput.getAttribute('data-raw-val')) || 10) : 10;
+            const needed = getSuccessesNeededForSkill(skillVal);
+            const progress = skillProgress[idx] || 0;
+            return `<div class="party-row">
+                <div class="row-name"><span>${escHtml(name)} (${skillVal})</span><span>${progress} / ${needed}</span></div>
+                <button style="width:100%; margin-top:2px;" onclick="logSkillSuccess(${idx})">+1 успех</button>
+            </div>`;
+        }).join('');
+    }
+
+    // Обёртка для автоматической фиксации успеха по имени навыка (крафт/каст) —
+    // не боевые навыки качаются «за каждое успешное действие», это и есть та фиксация.
+    function logSkillSuccessByName(skillName) {
+        const idx = skillNames.indexOf(skillName);
+        if (idx === -1) return;
+        window.logSkillSuccess(idx);
+    }
+
+    window.logSkillSuccess = function (skillIdx) {
+        const skillInput = document.getElementById('skill-' + skillIdx);
+        if (!skillInput) return;
+        let skillVal = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
+        const needed = getSuccessesNeededForSkill(skillVal);
+        skillProgress[skillIdx] = (skillProgress[skillIdx] || 0) + 1;
+
+        if (skillProgress[skillIdx] >= needed) {
+            skillProgress[skillIdx] = 0;
+            skillVal += 1;
+            skillInput.value = skillVal;
+            skillInput.setAttribute('data-raw-val', skillVal);
+            levelUpProgress += 1;
+            alert(`Навык «${skillNames[skillIdx]}» вырос до ${skillVal}!`);
+        }
+
+        // Проверяем, не готов ли левел-ап
+        const neededForLevel = getSkillUpsNeededForLevel(characterLevel);
+        if (levelUpProgress >= neededForLevel) {
+            // не применяем автоматически — просто показываем блок выбора
+        }
+
+        updateAll();
+        renderLevelPanel();
+        saveLocalStorage();
+    };
+
+    window.applyLevelUp = function () {
+        const needed = getSkillUpsNeededForLevel(characterLevel);
+        if (levelUpProgress < needed) return;
+        const statKey = document.getElementById('levelup-stat-choice').value;
+        const statInput = document.getElementById('stat-' + statKey);
+        if (statInput) {
+            const rawStat = parseInt(statInput.getAttribute('data-raw-stat')) || 10;
+            statInput.value = rawStat + 1;
+            statInput.setAttribute('data-raw-stat', rawStat + 1);
+        }
+        levelUpProgress -= needed; // остаток переносится на следующий уровень
+        characterLevel += 1;
+        perkPointsAvailable += 1;
+
+        alert(`Новый уровень: ${characterLevel}! +1 к характеристике «${STAT_LABELS[statKey]}», +1 очко перка.`);
+        updateAll();
+        renderLevelPanel();
+        saveLocalStorage();
+    };
 
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
@@ -2975,6 +3275,12 @@
         }
         if (typeof renderSellList === 'function' && document.getElementById('sell-items-list')) {
             renderSellList();
+        }
+        if (typeof updateLockInfo === 'function' && document.getElementById('lock-info')) {
+            updateLockInfo();
+        }
+        if (typeof renderLevelPanel === 'function' && document.getElementById('level-summary')) {
+            renderLevelPanel();
         }
 
         const equipBonuses = (typeof getEquipmentEnchantBonuses === 'function') ? getEquipmentEnchantBonuses() : { hp: 0, mp: 0, weight: 0, armor: 0 };
@@ -3407,7 +3713,11 @@
             pouchContents: pouchContents,
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
-            gameRound: gameRound
+            gameRound: gameRound,
+            characterLevel: characterLevel,
+            levelUpProgress: levelUpProgress,
+            perkPointsAvailable: perkPointsAvailable,
+            skillProgress: skillProgress
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -3523,6 +3833,11 @@
             gameRound = parseInt(data.gameRound) || 0;
             renderActiveEffects();
             updateTurnRoundDisplay();
+
+            characterLevel = parseInt(data.characterLevel) || 1;
+            levelUpProgress = parseInt(data.levelUpProgress) || 0;
+            perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
+            skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
 
@@ -3644,6 +3959,8 @@
     renderActiveEffects();
     updateTurnRoundDisplay();
     renderDiceSkillSelect();
+    updateLockInfo();
+    renderLevelPanel();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

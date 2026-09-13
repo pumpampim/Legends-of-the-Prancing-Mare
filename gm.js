@@ -670,6 +670,7 @@
         if (!uid) {
             currentInvPlayerUid = null;
             el('inv-gold-block').style.display = 'none';
+            el('inv-level-block').style.display = 'none';
             el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
             return;
         }
@@ -679,14 +680,58 @@
             const data = doc.exists ? doc.data() : {};
             currentPlayerInvData = {
                 inventory: Array.isArray(data.inventory) ? data.inventory : [],
-                gold: parseInt(data.gold) || 0
+                gold: parseInt(data.gold) || 0,
+                characterLevel: parseInt(data.characterLevel) || 1,
+                levelUpProgress: parseInt(data.levelUpProgress) || 0,
+                perkPointsAvailable: parseInt(data.perkPointsAvailable) || 0
             };
             el('inv-gold-block').style.display = 'block';
             el('inv-gold-current').textContent = currentPlayerInvData.gold;
+            el('inv-level-block').style.display = 'block';
+            el('inv-level-current').textContent = currentPlayerInvData.characterLevel;
+            el('inv-perkpoints-current').textContent = currentPlayerInvData.perkPointsAvailable;
+            const needed = currentPlayerInvData.characterLevel * 2 + 2;
+            el('inv-level-progress').textContent = `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков`;
             renderGmPlayerInventory();
         }).catch(e => {
             el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:12px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
         });
+    };
+
+    window.grantLevelUp = function () {
+        if (!currentInvPlayerUid) return;
+        const statKey = el('inv-level-stat-choice').value;
+        const statLabels = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
+        const statOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+        const statPos = statOrder.indexOf(statKey);
+        db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const newLevel = (parseInt(data.characterLevel) || 1) + 1;
+            const newPerkPoints = (parseInt(data.perkPointsAvailable) || 0) + 1;
+            const stats = Array.isArray(data.stats) ? data.stats.slice() : [10, 10, 10, 10, 10, 10];
+            stats[statPos] = (parseInt(stats[statPos]) || 10) + 1;
+            return db.collection('characters').doc(currentInvPlayerUid).update({
+                characterLevel: newLevel,
+                perkPointsAvailable: newPerkPoints,
+                levelUpProgress: 0,
+                stats: stats
+            });
+        }).then(() => {
+            alert(`Уровень начислен! Новый уровень + 1 очко перка + 1 к характеристике «${statLabels[statKey]}».`);
+            window.loadPlayerInventoryForGm();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.grantPerkPointOnly = function () {
+        if (!currentInvPlayerUid) return;
+        db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const newPerkPoints = (parseInt(data.perkPointsAvailable) || 0) + 1;
+            return db.collection('characters').doc(currentInvPlayerUid).update({ perkPointsAvailable: newPerkPoints });
+        }).then(() => {
+            alert('Начислено 1 очко перка.');
+            window.loadPlayerInventoryForGm();
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
 
     function renderGmPlayerInventory() {
