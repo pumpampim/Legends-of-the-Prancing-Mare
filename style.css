@@ -243,6 +243,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 4px;
             margin-bottom: 4px;
             background: var(--panel-sub);
             padding: 4px 8px;
@@ -259,11 +261,15 @@
             width: 60%;
         }
         .slot-picker {
-            width: auto;
-            max-width: 34px;
+            width: 80px;
+            min-width: 80px;
             font-size: 10px;
             padding: 2px;
             flex-shrink: 0;
+            background: var(--accent-color);
+            color: #1a1712;
+            border-radius: 3px;
+            font-weight: bold;
         }
         .slot-enchant-info {
             font-size: 11px;

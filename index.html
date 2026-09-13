@@ -442,6 +442,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab7')">⚒️ Кузница</button>
         <button class="tab-link" onclick="openTab(event, 'tab8')">✨ Зачарование</button>
         <button class="tab-link" onclick="openTab(event, 'tab9')">🧪 Алхимия</button>
+        <button class="tab-link" onclick="openTab(event, 'tab10')">🎲 Проверка</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -676,6 +677,31 @@
                     <label for="eq-armor" style="display:inline;">Комплект доспехов (Штрафы магии)</label>
                 </div>
             </div>
+
+            <!-- ПОДСУМОК, ХОДЫ И АКТИВНЫЕ ЭФФЕКТЫ -->
+            <div class="panel">
+                <h2>🎒 Подсумок и ⏱️ активные эффекты</h2>
+
+                <div id="pouch-block">
+                    <p style="font-size:11px; opacity:.75;">Подсумок надевается в разделе слотов экипировки выше. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
+                    <div id="pouch-capacity-info" style="font-size:12px; margin-bottom:4px;"></div>
+                    <div style="display:flex; gap:6px;">
+                        <select id="pouch-load-select" style="flex:1;"></select>
+                        <button style="width:auto;" onclick="loadPouch()">Загрузить</button>
+                    </div>
+                    <div id="pouch-contents-list" style="margin-top:8px;"></div>
+                </div>
+
+                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <div id="turn-round-display" style="font-size:14px; font-weight:bold; color:var(--accent-color); margin-bottom:6px;">Ход: 0 | Круг: 0</div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-success" style="flex:1;" onclick="nextTurn()">➡️ Следующий ход</button>
+                        <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
+                    </div>
+                    <p style="font-size:10px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
+                    <div id="active-timed-effects-list" style="margin-top:8px;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -799,31 +825,6 @@
                 <div id="sell-charm-locked" style="font-size:11px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
 
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
-            </div>
-
-            <!-- ПОДСУМОК, ХОДЫ И АКТИВНЫЕ ЭФФЕКТЫ -->
-            <div class="panel">
-                <h2>🎒 Подсумок и ⏱️ активные эффекты</h2>
-
-                <div id="pouch-block">
-                    <p style="font-size:11px; opacity:.75;">Подсумок надевается в разделе слотов экипировки. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
-                    <div id="pouch-capacity-info" style="font-size:12px; margin-bottom:4px;"></div>
-                    <div style="display:flex; gap:6px;">
-                        <select id="pouch-load-select" style="flex:1;"></select>
-                        <button style="width:auto;" onclick="loadPouch()">Загрузить</button>
-                    </div>
-                    <div id="pouch-contents-list" style="margin-top:8px;"></div>
-                </div>
-
-                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
-                    <div id="turn-round-display" style="font-size:14px; font-weight:bold; color:var(--accent-color); margin-bottom:6px;">Ход: 0 | Круг: 0</div>
-                    <div style="display:flex; gap:6px;">
-                        <button class="btn-success" style="flex:1;" onclick="nextTurn()">➡️ Следующий ход</button>
-                        <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
-                    </div>
-                    <p style="font-size:10px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
-                    <div id="active-timed-effects-list" style="margin-top:8px;"></div>
-                </div>
             </div>
 
             <!-- Религия, Еда, Рецепты и Заметки -->
@@ -1052,6 +1053,48 @@
             <h2>📖 Известные свойства ингредиентов</h2>
             <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
             <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
+        </div>
+    </div>
+
+    <!-- ТАБ 10: ПРОВЕРКА КУБОВ -->
+    <div id="tab10" class="tab-content">
+        <div class="panel">
+            <h2>🎲 Бросок кубов</h2>
+            <p style="font-size:12px; opacity:.8;">Выбери кубик и, если нужно, характеристику и/или навык — их значения добавятся к результату броска.</p>
+
+            <label>Кубик</label>
+            <select id="dice-type">
+                <option value="20">к20 (стандартная проверка)</option>
+                <option value="12">к12</option>
+                <option value="6">к6</option>
+                <option value="100">к100</option>
+            </select>
+
+            <label>Характеристика (модификатор)</label>
+            <select id="dice-stat">
+                <option value="">— не добавлять —</option>
+                <option value="str">Сила</option>
+                <option value="dex">Ловкость</option>
+                <option value="con">Телосложение</option>
+                <option value="int">Интеллект</option>
+                <option value="wis">Мудрость</option>
+                <option value="cha">Харизма</option>
+            </select>
+
+            <label>Навык (значение навыка целиком)</label>
+            <select id="dice-skill">
+                <option value="">— не добавлять —</option>
+            </select>
+
+            <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()">🎲 Бросить</button>
+
+            <div id="dice-result" style="margin-top:14px; padding:12px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
+                <div style="font-size:32px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
+                <div style="font-size:12px; opacity:.75;" id="dice-result-formula"></div>
+            </div>
+
+            <h3 style="margin-top:16px;">Журнал бросков</h3>
+            <div id="dice-history" style="max-height:220px; overflow-y:auto; font-size:12px;"></div>
         </div>
     </div>
 
@@ -2288,7 +2331,7 @@
             const wantedSlot = SLOT_PICKER_MAP[pickerId];
             const matchSlot = wantedSlot === 'melee_offhand' ? 'melee' : wantedSlot;
             const items = playerInventory.filter(i => i.slot === matchSlot);
-            select.innerHTML = '<option value="">⚙</option>' +
+            select.innerHTML = '<option value="">Надеть...</option>' +
                 items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)}${i.enchantment ? ' 🔮' : ''}</option>`).join('');
         });
         renderSlotEnchantInfoLines();
@@ -2774,6 +2817,71 @@
     }
     window.renderKnownIngredients = renderKnownIngredients;
 
+    // ========================================================================
+    // ПРОВЕРКА КУБОВ
+    // ========================================================================
+
+    let diceHistory = [];
+
+    function renderDiceSkillSelect() {
+        const select = document.getElementById('dice-skill');
+        if (!select) return;
+        select.innerHTML = '<option value="">— не добавлять —</option>' +
+            skillNames.map((n, i) => `<option value="${i}">${escHtml(n)}</option>`).join('');
+    }
+
+    function calcAbilityMod(val) {
+        return Math.floor((val - 10) / 2);
+    }
+
+    window.rollDiceCheck = function () {
+        const dieSize = parseInt(document.getElementById('dice-type').value) || 20;
+        const statKey = document.getElementById('dice-stat').value;
+        const skillIdx = document.getElementById('dice-skill').value;
+
+        const roll = Math.floor(Math.random() * dieSize) + 1;
+        let statMod = 0, statLabel = '';
+        if (statKey) {
+            const statInput = document.getElementById('stat-' + statKey);
+            const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
+            statMod = calcAbilityMod(rawStat);
+            const labels = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
+            statLabel = labels[statKey];
+        }
+        let skillVal = 0, skillLabel = '';
+        if (skillIdx !== '') {
+            skillVal = getSkillRawValue(skillNames[parseInt(skillIdx)]);
+            skillLabel = skillNames[parseInt(skillIdx)];
+        }
+
+        const total = roll + statMod + skillVal;
+
+        let formulaParts = [`к${dieSize}: ${roll}`];
+        if (statKey) formulaParts.push(`${statLabel} ${statMod >= 0 ? '+' : ''}${statMod}`);
+        if (skillIdx !== '') formulaParts.push(`${skillLabel} +${skillVal}`);
+
+        document.getElementById('dice-result-total').textContent = total;
+        document.getElementById('dice-result-formula').textContent = formulaParts.join(' + ');
+
+        diceHistory.unshift({ roll, dieSize, statLabel, statMod, skillLabel, skillVal, total });
+        diceHistory = diceHistory.slice(0, 20);
+        renderDiceHistory();
+    };
+
+    function renderDiceHistory() {
+        const el = document.getElementById('dice-history');
+        if (!el) return;
+        if (!diceHistory.length) { el.innerHTML = '<p style="opacity:.6;">Пока пусто.</p>'; return; }
+        el.innerHTML = diceHistory.map(h => {
+            let parts = [`к${h.dieSize}=${h.roll}`];
+            if (h.statLabel) parts.push(`${h.statLabel} ${h.statMod >= 0 ? '+' : ''}${h.statMod}`);
+            if (h.skillLabel) parts.push(`${h.skillLabel} +${h.skillVal}`);
+            return `<div style="padding:3px 0; border-bottom:1px solid var(--border-color);">${parts.join(' + ')} = <strong style="color:var(--accent-color);">${h.total}</strong></div>`;
+        }).join('');
+    }
+
+
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -2867,9 +2975,6 @@
         }
         if (typeof renderSellList === 'function' && document.getElementById('sell-items-list')) {
             renderSellList();
-        }
-        if (typeof applySpellDiscounts === 'function') {
-            applySpellDiscounts();
         }
 
         const equipBonuses = (typeof getEquipmentEnchantBonuses === 'function') ? getEquipmentEnchantBonuses() : { hp: 0, mp: 0, weight: 0, armor: 0 };
@@ -2976,10 +3081,32 @@
         document.getElementById('val-scrolls-max').innerText = wisForScrolls;
         document.getElementById('val-scrolls').innerText = Math.max(0, wisForScrolls - scrollWisdomSpent);
 
-        document.querySelectorAll('.spell-final-cost').forEach(node => {
-            let base = parseInt(node.dataset.base) || 0;
-            let mult = (armorType === 'light') ? 1.25 : (armorType === 'heavy' && !hasBattleMagePerk()) ? 1.75 : 1.0;
-            node.value = Math.round(base * mult);
+        document.querySelectorAll('.spell-card').forEach(card => {
+            const finalCostInput = card.querySelector('.spell-final-cost');
+            if (!finalCostInput) return;
+            const container = card.closest('[id^="spells-"]');
+            const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
+            const select = card.querySelector('.spell-name-select');
+            const isCustom = select && select.value === '__custom__';
+            const name = isCustom ? (card.querySelector('.spell-name-custom') || {}).value : (select ? select.value : '');
+            const baseInput = card.querySelector('.spell-base');
+            const base = parseInt((baseInput || {}).value) || 0;
+            finalCostInput.setAttribute('data-base', base);
+
+            // Штраф брони на стоимость заклинаний (снимается перками «Боевой маг»/«Чувство маны»)
+            let armorMult = 1.0;
+            if (armorType === 'light' && !perks.lightArmorMageRobe) armorMult = 1.25;
+            if (armorType === 'heavy' && !hasBattleMagePerk()) armorMult = 1.75;
+
+            // Скидка школы («Новичок/Ученик/Адепт/Эксперт школы Х» — -50% для заклинаний этого ранга)
+            let schoolMult = 1.0;
+            const tier = (school && !isCustom) ? getSpellTier(school, name) : null;
+            if (tier) {
+                const key = 'discount' + SCHOOL_DISCOUNT_PREFIX[school] + tier;
+                if (perks[key]) schoolMult = 0.5;
+            }
+
+            finalCostInput.value = Math.round(base * armorMult * schoolMult);
         });
 
         const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
@@ -3516,6 +3643,7 @@
     renderPouchPanel();
     renderActiveEffects();
     updateTurnRoundDisplay();
+    renderDiceSkillSelect();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

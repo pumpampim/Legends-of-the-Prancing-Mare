@@ -101,6 +101,7 @@
         "5-1": () => ({ lightFullSetBonus1: 0.25 }),
         "5-3": () => ({ lightFullSetSpeedBonus: 5 }),
         "5-4": () => ({ lightFullSetBonus2: 0.25 }),
+        "5-5": () => ({ lightArmorMageRobe: true }),
 
         // ==================== СКРЫТНОСТЬ (skillIdx = 6) ====================
         "6-0": (step) => ({ sneakDetectBonus: step }),
@@ -175,7 +176,7 @@
             discountAlter1: false, discountAlter2: false, discountAlter3: false, discountAlter4: false,
             shieldArmorBonus: 0,
             heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
-            lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0,
+            lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
             sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false,
             extraCarryWeight: 0
         };
