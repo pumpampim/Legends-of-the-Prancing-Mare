@@ -1104,14 +1104,14 @@
 
         <div class="panel">
             <h2>🔓 Взлом замка</h2>
-            <p style="font-size:12px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф −5, если не открыт соответствующий перк «Взломщик-...».</p>
+            <p style="font-size:12px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф (−2 до −5 в зависимости от ступени), если не открыт соответствующий перк «Взломщик-...».</p>
 
             <label>Сложность замка</label>
             <select id="lock-tier" onchange="updateLockInfo()">
-                <option value="0">Новичок (Сложность 10, порог навыка 0)</option>
-                <option value="1">Ученик (Сложность 15, порог навыка 25)</option>
-                <option value="2">Адепт (Сложность 20, порог навыка 50)</option>
-                <option value="3">Эксперт (Сложность 25, порог навыка 75)</option>
+                <option value="0">Новичок (Сложность 9, порог навыка 0)</option>
+                <option value="1">Ученик (Сложность 12, порог навыка 25)</option>
+                <option value="2">Адепт (Сложность 15, порог навыка 50)</option>
+                <option value="3">Эксперт (Сложность 17, порог навыка 75)</option>
             </select>
 
             <div id="lock-info" style="font-size:12px; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
@@ -3012,14 +3012,14 @@
     // ВЗЛОМ ЗАМКОВ
     // ========================================================================
 
-    // Сложность/порог навыка по ступеням — сложности своей цифрой в правилах не даны
-    // (только качественное "значительно легче"), так что это моя разумная оценка;
+    // Сложность и штраф по ступеням — нашлись прямо в подсказке навыка «Взлом» на листе
+    // персонажа (использую эти цифры вместо своей прежней оценки 10/15/20/25 и флэт -5);
     // пороги навыка (0/25/50/75) взяты из реальных требований перков «Взломщик-...».
     const LOCK_TIERS = [
-        { name: 'Новичок', dc: 10, threshold: 0, perkKey: 'lockpickNoviceUnlocked' },
-        { name: 'Ученик', dc: 15, threshold: 25, perkKey: 'lockpickApprenticeUnlocked' },
-        { name: 'Адепт', dc: 20, threshold: 50, perkKey: 'lockpickAdeptUnlocked' },
-        { name: 'Эксперт', dc: 25, threshold: 75, perkKey: 'lockpickExpertUnlocked' }
+        { name: 'Новичок', dc: 9, penalty: -2, threshold: 0, perkKey: 'lockpickNoviceUnlocked' },
+        { name: 'Ученик', dc: 12, penalty: -3, threshold: 25, perkKey: 'lockpickApprenticeUnlocked' },
+        { name: 'Адепт', dc: 15, penalty: -4, threshold: 50, perkKey: 'lockpickAdeptUnlocked' },
+        { name: 'Эксперт', dc: 17, penalty: -5, threshold: 75, perkKey: 'lockpickExpertUnlocked' }
     ];
 
     window.updateLockInfo = function () {
@@ -3031,7 +3031,7 @@
         const dexMod = calcAbilityMod(parseInt((document.getElementById('stat-dex') || {}).getAttribute('data-raw-stat')) || 10);
         const hasPerk = !!perks[tier.perkKey];
         const belowThreshold = lockpickSkill < tier.threshold;
-        const penalty = (belowThreshold && !hasPerk) ? -5 : 0;
+        const penalty = (belowThreshold && !hasPerk) ? tier.penalty : 0;
         const lockpickCount = countInInventory('Отмычка');
 
         let html = `Сложность: <strong>${tier.dc}</strong> · Ловкость мод: ${dexMod >= 0 ? '+' : ''}${dexMod}`;
@@ -3064,7 +3064,7 @@
         const dexMod = calcAbilityMod(dexInput ? (parseInt(dexInput.getAttribute('data-raw-stat')) || 10) : 10);
         const hasPerk = !!perks[tier.perkKey];
         const belowThreshold = lockpickSkill < tier.threshold;
-        const penalty = (belowThreshold && !hasPerk) ? -5 : 0;
+        const penalty = (belowThreshold && !hasPerk) ? tier.penalty : 0;
 
         const roll = Math.floor(Math.random() * 20) + 1;
         const total = roll + dexMod + penalty;
@@ -3898,6 +3898,11 @@
             // Рецепты кузницы открывает только мастер (gm.html) — здесь только читаем, не сохраняем обратно
             knownSmithingRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
             renderSmithingList();
+
+            // Пересчитываем все производные значения (HP/MP/броня/вес/панель прокачки и т.д.)
+            // заново с уже восстановленными данными — раньше это могло остаться на дефолтных
+            // значениях, если персонаж подгружался асинхронно из облака.
+            updateAll();
         } catch(e) {
             console.warn('Ошибка применения данных персонажа:', e);
         }
