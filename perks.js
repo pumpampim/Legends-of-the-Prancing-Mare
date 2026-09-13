@@ -50,7 +50,11 @@
         "15-4": (step) => ({ alchemyExperimentatorRank: step }),
         "15-5": () => ({ alchemyConcentratedPoison: true }),
         "15-6": () => ({ alchemyHerbalistDouble: true }),
-        "15-7": () => ({ alchemyPoisonResist50: true })
+        "15-7": () => ({ alchemyPoisonResist50: true }),
+
+        // ==================== КРАСНОРЕЧИЕ (skillIdx = 9) ====================
+        "9-0": (step) => ({ merchantPriceBonus: 0.05 * (step + 1) }),
+        "9-1": () => ({ hasCharmPerk: true })
     };
 
     window.applyPerks = function() {
@@ -104,7 +108,9 @@
             alchemyExperimentatorRank: 0,
             alchemyConcentratedPoison: false,
             alchemyHerbalistDouble: false,
-            alchemyPoisonResist50: false
+            alchemyPoisonResist50: false,
+            merchantPriceBonus: 0,
+            hasCharmPerk: false
         };
 
         // Логируем, что мы нашли в чекбоксах (для отладки)

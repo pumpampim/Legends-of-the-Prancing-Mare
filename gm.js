@@ -356,6 +356,21 @@
                 slot: r.isAmmo ? null : r.slot
             });
         });
+        (window.armorNonCraftable || []).forEach(a => {
+            out.push({
+                name: a.name, category: (a.armorType || 'Броня') + ' (лут)',
+                weight: a.weight, price: a.price, armor: a.resistance, dmg: null,
+                effect: 'Не куётся — только лут/покупка/квест', slot: a.slot
+            });
+        });
+        (window.weaponsNonCraftable || []).forEach(w => {
+            out.push({
+                name: w.name, category: (w.category || 'Оружие') + (w.subcat ? ' — ' + w.subcat : '') + ' (лут)',
+                weight: w.weight, price: w.price, armor: null,
+                dmg: w.damage, effect: 'Не куётся — только лут/покупка/квест',
+                slot: w.isAmmo ? null : w.slot
+            });
+        });
         (window.recipes || []).forEach(r => {
             out.push({
                 name: r.name, category: 'Блюдо (кулинария)',
@@ -473,11 +488,13 @@
         const numCount = parseInt(count) || 1;
         if (numCount < 1) return;
 
-        // Переносим слот/броню/урон, чтобы игрок мог сразу надеть/взять в руки предмет.
+        // Переносим слот/броню/урон/цену, чтобы игрок мог сразу надеть/взять в руки предмет
+        // и видеть его цену.
         const extra = {};
         if (sourceItem.slot) extra.slot = sourceItem.slot;
         if (typeof sourceItem.armor === 'number') extra.armorValue = sourceItem.armor;
         if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
+        if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
 
         db.collection('characters').doc(targetUid).get().then(doc => {
