@@ -571,7 +571,7 @@
             <div class="panel">
                 <h2>Боевое снаряжение и Калькулятор атак</h2>
                 
-                <label>Оружие ближнего боя / Кулаки</label>
+                <label>Оружие ближнего боя / Кулаки (правая рука)</label>
                 <div class="slot-row">
                     <input type="text" id="wep-melee-name" value="Бой голыми руками" placeholder="Название оружия" onchange="saveLocalStorage()">
                     <input type="number" id="wep-melee-dmg" value="2" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
@@ -583,7 +583,17 @@
                         <option value="twohand_axe">Двуручная секира (-3 к кубам)</option>
                         <option value="twohand_hammer">Двуручный молот (-4 к кубам, 10 фт)</option>
                     </select>
+                    <select id="slot-melee-picker" class="slot-picker" onchange="equipToSlotDirect('melee', this.value, 'slot-melee-picker')"></select>
                 </div>
+                <div id="slot-melee-enchant-info" class="slot-enchant-info"></div>
+
+                <label>Второе одноручное оружие (левая рука, для боя двумя оружиями)</label>
+                <div class="slot-row">
+                    <input type="text" id="wep-melee-offhand-name" placeholder="Название (необязательно)" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-melee-offhand-dmg" value="0" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <select id="slot-melee-offhand-picker" class="slot-picker" onchange="equipToSlotDirect('melee_offhand', this.value, 'slot-melee-offhand-picker')"></select>
+                </div>
+                <div id="slot-melee-offhand-enchant-info" class="slot-enchant-info"></div>
 
                 <label>Оружие дальнего боя (Лук или Арбалет)</label>
                 <div class="slot-row">
@@ -593,7 +603,9 @@
                         <option value="bow">Лук (Обычный)</option>
                         <option value="crossbow">Арбалет (1 ход на КД)</option>
                     </select>
+                    <select id="slot-ranged-picker" class="slot-picker" onchange="equipToSlotDirect('ranged', this.value, 'slot-ranged-picker')"></select>
                 </div>
+                <div id="slot-ranged-enchant-info" class="slot-enchant-info"></div>
 
                 <label>Экипированные боеприпасы</label>
                 <div class="slot-row">
@@ -636,16 +648,24 @@
             <!-- Детальные слоты Брони -->
             <div class="panel">
                 <h2>Слоты защитной экипировки и Украшений</h2>
-                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
-                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
-                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
-                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
-                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll(); saveLocalStorage();"></div>
+                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-helmet-picker" class="slot-picker" onchange="equipToSlotDirect('helmet', this.value, 'slot-helmet-picker')"></select></div>
+                <div id="slot-helmet-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-chest-picker" class="slot-picker" onchange="equipToSlotDirect('chest', this.value, 'slot-chest-picker')"></select></div>
+                <div id="slot-chest-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🥋 Одеяние:</span><input type="text" id="slot-robe-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-robe-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-robe-picker" class="slot-picker" onchange="equipToSlotDirect('robe', this.value, 'slot-robe-picker')"></select></div>
+                <div id="slot-robe-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-gloves-picker" class="slot-picker" onchange="equipToSlotDirect('gloves', this.value, 'slot-gloves-picker')"></select></div>
+                <div id="slot-gloves-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-boots-picker" class="slot-picker" onchange="equipToSlotDirect('boots', this.value, 'slot-boots-picker')"></select></div>
+                <div id="slot-boots-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" onchange="updateAll(); saveLocalStorage();"><select id="slot-shield-picker" class="slot-picker" onchange="equipToSlotDirect('shield', this.value, 'slot-shield-picker')"></select></div>
+                <div id="slot-shield-enchant-info" class="slot-enchant-info"></div>
+                <div class="slot-row"><span>🎒 Подсумок:</span><input type="text" id="slot-pouch-name" placeholder="Название" readonly style="width:45%;"><select id="slot-pouch-picker" class="slot-picker" onchange="equipToSlotDirect('pouch', this.value, 'slot-pouch-picker')"></select></div>
                 
                 <h3 style="margin-top:6px; margin-bottom:4px;">💍 Активная ювелирные изделия</h3>
-                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"></div>
-                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"></div>
-                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"></div>
+                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-ring-picker" class="slot-picker" onchange="equipToSlotDirect('ring', this.value, 'slot-ring-picker')"></select></div>
+                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-neck-picker" class="slot-picker" onchange="equipToSlotDirect('amulet', this.value, 'slot-neck-picker')"></select></div>
+                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-circlet-picker" class="slot-picker" onchange="equipToSlotDirect('circlet', this.value, 'slot-circlet-picker')"></select></div>
                 
                 <div class="checkbox-group" style="margin-top:8px;">
                     <select id="eq-armor" onchange="updateAll(); saveLocalStorage();" style="width:100px; display:inline; margin-right:10px;">
@@ -781,6 +801,31 @@
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
             </div>
 
+            <!-- ПОДСУМОК, ХОДЫ И АКТИВНЫЕ ЭФФЕКТЫ -->
+            <div class="panel">
+                <h2>🎒 Подсумок и ⏱️ активные эффекты</h2>
+
+                <div id="pouch-block">
+                    <p style="font-size:11px; opacity:.75;">Подсумок надевается в разделе слотов экипировки. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
+                    <div id="pouch-capacity-info" style="font-size:12px; margin-bottom:4px;"></div>
+                    <div style="display:flex; gap:6px;">
+                        <select id="pouch-load-select" style="flex:1;"></select>
+                        <button style="width:auto;" onclick="loadPouch()">Загрузить</button>
+                    </div>
+                    <div id="pouch-contents-list" style="margin-top:8px;"></div>
+                </div>
+
+                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <div id="turn-round-display" style="font-size:14px; font-weight:bold; color:var(--accent-color); margin-bottom:6px;">Ход: 0 | Круг: 0</div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-success" style="flex:1;" onclick="nextTurn()">➡️ Следующий ход</button>
+                        <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
+                    </div>
+                    <p style="font-size:10px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
+                    <div id="active-timed-effects-list" style="margin-top:8px;"></div>
+                </div>
+            </div>
+
             <!-- Религия, Еда, Рецепты и Заметки -->
             <div class="panel">
                 <h2>Выживание и Пантеон Богов</h2>
@@ -789,12 +834,8 @@
                 <input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll(); saveLocalStorage();">
 
                 <label>Активные кулинарные эффекты (Лимит: 2 блюда)</label>
-                <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 120px; overflow-y: auto;">
-                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food1" data-hp="20" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food1">Капустный суп с картошкой (+20 HP)</label></div>
-                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food2" data-mp="25" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food2">Эльсвейрское фондю (+25 MP)</label></div>
-                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food3" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food3">Томатный суп (+10 урона заклинаний)</label></div>
-                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food4" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food4">Похлёбка из оленины (+5 к скорости)</label></div>
-                    <div class="checkbox-group"><input type="checkbox" class="food-buff" id="food5" onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="food5">Слойка с лавандой (+10% резист к магии)</label></div>
+                <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 160px; overflow-y: auto;">
+                    <div id="food-buffs-list"></div>
                 </div>
                 
                 <div class="checkbox-group" style="margin-top:10px;">
@@ -1029,8 +1070,11 @@
     let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
-    let equippedSlots = { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
+    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
+    let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
+    let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
+    let gameTurn = 0, gameRound = 0;
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
     function initSkills() {
@@ -1182,6 +1226,36 @@
     }
 
     // Ограничение сытости (не более двух блюд за раз)
+    // Полный список блюд с баффами — генерируется из cooking-data.js (раньше был статичный
+    // список из 5 названий, не совпадавший с реальными 21 рецептом).
+    function parseFoodBuffAttrs(effectText) {
+        const attrs = {};
+        let m = effectText.match(/\+\s*(\d+)\s*хп/i);
+        if (m) attrs.hp = m[1];
+        m = effectText.match(/\+\s*(\d+)\s*мп(?=\s|$)/i);
+        if (m) attrs.mp = m[1];
+        m = effectText.match(/маги[а-я]*\s+увеличен\w*\s+на\s+(\d+)/i);
+        if (m) attrs.mp = m[1];
+        return attrs;
+    }
+
+    function isFoodBuffChecked(dishName) {
+        return !!document.querySelector(`.food-buff[data-name="${CSS.escape(dishName)}"]:checked`);
+    }
+
+    function renderFoodBuffsList() {
+        const container = document.getElementById('food-buffs-list');
+        if (!container) return;
+        const dishes = [...(window.recipes || [])];
+        if (window.failedDish) dishes.push(window.failedDish);
+        container.innerHTML = dishes.map((d, idx) => {
+            const attrs = parseFoodBuffAttrs(d.effect || '');
+            const attrStr = Object.keys(attrs).map(k => `data-${k}="${attrs[k]}"`).join(' ');
+            const id = `food-${idx}`;
+            return `<div class="checkbox-group"><input type="checkbox" class="food-buff" id="${id}" data-name="${escHtml(d.name)}" ${attrStr} onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="${id}">${escHtml(d.name)} (${escHtml(d.effect || '')})</label></div>`;
+        }).join('');
+    }
+
     function checkFoodLimit(chk) {
         let checked = document.querySelectorAll('.food-buff:checked');
         if (checked.length > 2) {
@@ -1227,6 +1301,46 @@
         });
         return html;
     }
+
+    function getSpellTier(school, name) {
+        const data = (window.spellsData && window.spellsData[school]) || {};
+        for (const tier of [1, 2, 3, 4]) {
+            if ((data[tier] || []).some(s => s.name === name)) return tier;
+        }
+        return null;
+    }
+
+    const SCHOOL_DISCOUNT_PREFIX = { destr: 'Destr', restor: 'Restor', conj: 'Conj', illus: 'Illus', alter: 'Alter' };
+
+    // Перки «Новичок/Ученик/Адепт/Эксперт школы Х» дают -50% к стоимости заклинаний
+    // соответствующего ранга этой школы — применяем автоматически к полю "Каст".
+    function applySpellDiscounts() {
+        const perks = window.perkBonuses || {};
+        const schools = ['destr', 'restor', 'alter', 'illus', 'conj'];
+        schools.forEach(school => {
+            const container = document.getElementById(`spells-${school}-list`);
+            if (!container) return;
+            container.querySelectorAll('.spell-card').forEach(card => {
+                const select = card.querySelector('.spell-name-select');
+                const isCustom = select.value === '__custom__';
+                const name = isCustom ? card.querySelector('.spell-name-custom').value : select.value;
+                const finalCostInput = card.querySelector('.spell-final-cost');
+                const baseInput = card.querySelector('.spell-base');
+                const base = parseInt(baseInput.value) || 0;
+                finalCostInput.setAttribute('data-base', base);
+                const tier = isCustom ? null : getSpellTier(school, name);
+                let mult = 1;
+                let discountApplied = false;
+                if (tier) {
+                    const key = 'discount' + SCHOOL_DISCOUNT_PREFIX[school] + tier;
+                    if (perks[key]) { mult = 0.5; discountApplied = true; }
+                }
+                finalCostInput.value = Math.round(base * mult);
+                finalCostInput.title = discountApplied ? 'Скидка школы применена: -50% (ранг ' + tier + ')' : '';
+            });
+        });
+    }
+    window.applySpellDiscounts = applySpellDiscounts;
 
     function addCustomSpell(school, loadedData = null) {
         const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
@@ -1444,6 +1558,7 @@
         if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
+        if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
     }
 
@@ -1467,6 +1582,7 @@
         if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
+        if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
         saveLocalStorage();
     }
@@ -1630,6 +1746,7 @@
                     ${item.effect ? `<br><span style="font-size:11px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
                 </span>
                 <span style="display:flex; gap:4px; flex-shrink:0;">
+                    ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
                 </span>
@@ -2059,6 +2176,7 @@
 
     const SLOT_FIELD_MAP = {
         helmet: ['slot-helm-name', 'slot-helm-armor'], chest: ['slot-chest-name', 'slot-chest-armor'],
+        robe: ['slot-robe-name', 'slot-robe-armor'],
         gloves: ['slot-gloves-name', 'slot-gloves-armor'], boots: ['slot-boots-name', 'slot-boots-armor'],
         shield: ['slot-shield-name', 'slot-shield-armor']
     };
@@ -2075,25 +2193,51 @@
             ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} — ${escHtml(slotLabel(i.slot))}${i.enchantment ? ' 🔮' : ''}</option>`).join('')
             : '<option value="">Нет подходящих предметов в инвентаре</option>';
         renderEquippedSummary();
+        renderAllSlotPickers();
     }
 
-    window.equipSelectedItem = function () {
-        const itemId = document.getElementById('equip-item-select').value;
-        const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item) return;
-        const slot = item.slot;
-        if (SLOT_FIELD_MAP[slot]) {
+    function getEffectDescriptionForItem(item) {
+        if (!item) return '';
+        if (item.enchantment && item.enchantment.description) return item.enchantment.description;
+        return item.effect || '';
+    }
+
+    function applyItemToSlot(item, slotOverride) {
+        const slot = slotOverride || item.slot;
+        if (slot === 'pouch') {
+            // Возвращаем содержимое старого подсумка обратно в инвентарь перед сменой
+            pouchContents.forEach(entry => {
+                addToInventory(entry.itemId, entry.name, 1, 0.25, 'Зелье', entry.effect, { alchemyEffects: entry.alchemyEffects });
+            });
+            pouchContents = [];
+            document.getElementById('slot-pouch-name').value = item.name;
+            equippedSlots.pouch = item.itemId;
+            renderPouchPanel();
+        } else if (slot === 'melee_offhand') {
+            if ((item.category || '').includes('Двуруч')) {
+                alert('Двуручное оружие нельзя держать во второй руке.');
+                return false;
+            }
+            document.getElementById('wep-melee-offhand-name').value = item.name;
+            document.getElementById('wep-melee-offhand-dmg').value = item.weaponDmg || 2;
+            equippedSlots.meleeWeaponOffhand = item.itemId;
+            const dualChk = document.getElementById('chk-dual-wield');
+            if (dualChk) dualChk.checked = true;
+        } else if (SLOT_FIELD_MAP[slot]) {
             document.getElementById(SLOT_FIELD_MAP[slot][0]).value = item.name;
             document.getElementById(SLOT_FIELD_MAP[slot][1]).value = item.armorValue || 0;
             equippedSlots[slot] = item.itemId;
         } else if (slot === 'ring') {
-            document.getElementById('slot-ring-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            const desc = getEffectDescriptionForItem(item);
+            document.getElementById('slot-ring-name').value = item.name + (desc ? ' — ' + desc : '');
             equippedSlots.ring = item.itemId;
         } else if (slot === 'amulet') {
-            document.getElementById('slot-neck-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            const desc = getEffectDescriptionForItem(item);
+            document.getElementById('slot-neck-name').value = item.name + (desc ? ' — ' + desc : '');
             equippedSlots.neck = item.itemId;
         } else if (slot === 'circlet') {
-            document.getElementById('slot-circlet-name').value = item.name + (item.enchantment ? ' — ' + item.enchantment.description : '');
+            const desc = getEffectDescriptionForItem(item);
+            document.getElementById('slot-circlet-name').value = item.name + (desc ? ' — ' + desc : '');
             equippedSlots.circlet = item.itemId;
         } else if (slot === 'melee') {
             document.getElementById('wep-melee-name').value = item.name;
@@ -2103,11 +2247,68 @@
             document.getElementById('wep-ranged-name').value = item.name;
             document.getElementById('wep-ranged-dmg').value = item.weaponDmg || 0;
             equippedSlots.rangedWeapon = item.itemId;
+        } else {
+            return false;
         }
         renderEquippedSummary();
+        renderAllSlotPickers();
         updateAll();
         saveLocalStorage();
+        return true;
+    }
+
+    window.equipSelectedItem = function () {
+        const itemId = document.getElementById('equip-item-select').value;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        applyItemToSlot(item);
     };
+
+    window.equipToSlotDirect = function (targetSlot, itemId, pickerId) {
+        if (!itemId) return;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        applyItemToSlot(item, targetSlot);
+        const picker = document.getElementById(pickerId);
+        if (picker) picker.value = '';
+    };
+
+    const SLOT_PICKER_MAP = {
+        'slot-helmet-picker': 'helmet', 'slot-chest-picker': 'chest', 'slot-robe-picker': 'robe',
+        'slot-gloves-picker': 'gloves', 'slot-boots-picker': 'boots', 'slot-shield-picker': 'shield',
+        'slot-pouch-picker': 'pouch',
+        'slot-ring-picker': 'ring', 'slot-neck-picker': 'amulet', 'slot-circlet-picker': 'circlet',
+        'slot-melee-picker': 'melee', 'slot-melee-offhand-picker': 'melee_offhand', 'slot-ranged-picker': 'ranged'
+    };
+
+    function renderAllSlotPickers() {
+        Object.keys(SLOT_PICKER_MAP).forEach(pickerId => {
+            const select = document.getElementById(pickerId);
+            if (!select) return;
+            const wantedSlot = SLOT_PICKER_MAP[pickerId];
+            const matchSlot = wantedSlot === 'melee_offhand' ? 'melee' : wantedSlot;
+            const items = playerInventory.filter(i => i.slot === matchSlot);
+            select.innerHTML = '<option value="">⚙</option>' +
+                items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)}${i.enchantment ? ' 🔮' : ''}</option>`).join('');
+        });
+        renderSlotEnchantInfoLines();
+    }
+
+    function renderSlotEnchantInfoLines() {
+        const map = {
+            helmet: 'slot-helmet-enchant-info', chest: 'slot-chest-enchant-info', robe: 'slot-robe-enchant-info',
+            gloves: 'slot-gloves-enchant-info', boots: 'slot-boots-enchant-info', shield: 'slot-shield-enchant-info',
+            meleeWeapon: 'slot-melee-enchant-info', meleeWeaponOffhand: 'slot-melee-offhand-enchant-info', rangedWeapon: 'slot-ranged-enchant-info'
+        };
+        Object.keys(map).forEach(slotKey => {
+            const el = document.getElementById(map[slotKey]);
+            if (!el) return;
+            const itemId = equippedSlots[slotKey];
+            const item = itemId ? playerInventory.find(i => i.itemId === itemId) : null;
+            const desc = getEffectDescriptionForItem(item);
+            el.textContent = desc ? '🔮 ' + desc : '';
+        });
+    }
 
     function renderEquippedSummary() {
         const el = document.getElementById('equipped-enchants-summary');
@@ -2117,12 +2318,183 @@
             const itemId = equippedSlots[slotKey];
             if (!itemId) return;
             const item = playerInventory.find(i => i.itemId === itemId);
-            if (item && item.enchantment) {
-                lines.push(`<div>🔮 <strong>${escHtml(item.name)}</strong>: ${escHtml(item.enchantment.description)}</div>`);
+            const desc = getEffectDescriptionForItem(item);
+            if (item && desc) {
+                lines.push(`<div>🔮 <strong>${escHtml(item.name)}</strong>: ${escHtml(desc)}</div>`);
             }
         });
-        el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:12px;">Зачарованных предметов не надето.</p>';
+        el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:12px;">Зачарованных/особых предметов не надето.</p>';
     }
+
+    // ========================================================================
+    // ПОДСУМОК
+    // ========================================================================
+
+    function getPouchCapacity() {
+        const itemId = equippedSlots.pouch;
+        if (!itemId) return 0;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        return item ? (item.capacity || 0) : 0;
+    }
+
+    function renderPouchPanel() {
+        const capEl = document.getElementById('pouch-capacity-info');
+        const loadSelect = document.getElementById('pouch-load-select');
+        const listEl = document.getElementById('pouch-contents-list');
+        if (!capEl || !loadSelect || !listEl) return;
+        const capacity = getPouchCapacity();
+        if (!equippedSlots.pouch) {
+            capEl.textContent = 'Подсумок не надет.';
+            loadSelect.innerHTML = '<option value="">—</option>';
+            loadSelect.disabled = true;
+            listEl.innerHTML = '';
+            return;
+        }
+        loadSelect.disabled = false;
+        capEl.textContent = `Занято: ${pouchContents.length} / ${capacity}`;
+        const potions = playerInventory.filter(i => (i.category === 'Зелье' || i.category === 'Яд') && i.count > 0);
+        loadSelect.innerHTML = potions.length
+            ? potions.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
+            : '<option value="">Нет зелий/ядов в инвентаре</option>';
+        listEl.innerHTML = pouchContents.length
+            ? pouchContents.map((entry, idx) => `
+                <div class="party-row">
+                    <div class="row-name"><span>${escHtml(entry.name)}</span></div>
+                    <div style="font-size:11px; opacity:.8; margin:2px 0;">${escHtml(entry.effect || '')}</div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-success" style="flex:1;" onclick="drinkFromPouch(${idx})">Выпить</button>
+                        <button style="flex:1;" onclick="returnFromPouch(${idx})">Убрать обратно</button>
+                    </div>
+                </div>`).join('')
+            : '<p style="opacity:.6; font-size:12px;">Подсумок пуст.</p>';
+    }
+
+    window.loadPouch = function () {
+        const select = document.getElementById('pouch-load-select');
+        const itemId = select.value;
+        if (!itemId || !equippedSlots.pouch) return;
+        const capacity = getPouchCapacity();
+        if (pouchContents.length >= capacity) { alert('Подсумок полон.'); return; }
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.count <= 0) return;
+        removeFromInventoryByName(itemId, 1);
+        pouchContents.push({ itemId: item.itemId, name: item.name, effect: item.effect || '', alchemyEffects: item.alchemyEffects || null });
+        renderPouchPanel();
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
+    window.drinkFromPouch = function (idx) {
+        const entry = pouchContents[idx];
+        if (!entry) return;
+        activateTimedEffectFromItem(entry);
+        pouchContents.splice(idx, 1);
+        renderPouchPanel();
+        updateAll();
+        saveLocalStorage();
+    };
+
+    window.returnFromPouch = function (idx) {
+        const entry = pouchContents[idx];
+        if (!entry) return;
+        addToInventory(entry.itemId, entry.name, 1, 0.25, 'Зелье', entry.effect, { alchemyEffects: entry.alchemyEffects });
+        pouchContents.splice(idx, 1);
+        renderPouchPanel();
+        saveLocalStorage();
+    };
+
+    // ========================================================================
+    // АКТИВНЫЕ ЭФФЕКТЫ ПО ХОДАМ (зелья/еда со сроком действия)
+    // ========================================================================
+
+    function parseDurationTurns(text) {
+        const m = (text || '').match(/(\d+)\s*ход/i);
+        return m ? parseInt(m[1]) : 45; // по умолчанию как у большинства блюд
+    }
+
+    function activateTimedEffectFromItem(item) {
+        if (item.alchemyEffects && item.alchemyEffects.length) {
+            item.alchemyEffects.forEach(e => {
+                const isHp = e.name === 'Восстановление здоровья' || e.name === 'Повышение здоровья';
+                const isMp = e.name === 'Восстановление магии' || e.name === 'Повышение магии';
+                activeTimedEffects.push({
+                    id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                    name: item.name, effectName: e.name,
+                    description: `${e.name}: ${e.magnitude}${e.unit || ''}${e.duration ? ' (' + e.duration + ' х.)' : ''}`,
+                    turnsRemaining: e.duration || 1,
+                    hp: isHp ? (e.magnitude || 0) : 0,
+                    mp: isMp ? (e.magnitude || 0) : 0
+                });
+            });
+        } else {
+            const duration = parseDurationTurns(item.effect);
+            const plain = parsePlainEffectBonus(item.effect);
+            activeTimedEffects.push({
+                id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                name: item.name, effectName: item.name,
+                description: item.effect || '',
+                turnsRemaining: duration,
+                hp: (plain && plain.key === 'hp') ? plain.value : 0,
+                mp: (plain && plain.key === 'mp') ? plain.value : 0
+            });
+        }
+        renderActiveEffects();
+    }
+
+    window.useInventoryItem = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.count <= 0) return;
+        removeFromInventoryByName(itemId, 1);
+        activateTimedEffectFromItem(item);
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+    };
+
+    function renderActiveEffects() {
+        const el = document.getElementById('active-timed-effects-list');
+        if (!el) return;
+        if (!activeTimedEffects.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных эффектов.</p>';
+            return;
+        }
+        el.innerHTML = activeTimedEffects.map(e => `
+            <div class="party-row">
+                <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${e.turnsRemaining} х.</span></div>
+            </div>`).join('');
+    }
+
+    function getActiveEffectBonuses() {
+        let hp = 0, mp = 0;
+        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; });
+        return { hp, mp };
+    }
+
+    function tickActiveEffects() {
+        activeTimedEffects.forEach(e => { e.turnsRemaining -= 1; });
+        activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0);
+        renderActiveEffects();
+        updateAll();
+    }
+
+    function updateTurnRoundDisplay() {
+        const el = document.getElementById('turn-round-display');
+        if (el) el.textContent = `Ход: ${gameTurn} | Круг: ${gameRound}`;
+    }
+
+    window.nextTurn = function () {
+        gameTurn++;
+        tickActiveEffects();
+        updateTurnRoundDisplay();
+        saveLocalStorage();
+    };
+
+    window.nextRound = function () {
+        gameRound++;
+        tickActiveEffects();
+        updateTurnRoundDisplay();
+        saveLocalStorage();
+    };
 
     const ENCHANT_AUTO_APPLY_ARMOR = {
         'Повышение здоровья': 'hp', 'Повышение магии': 'mp', 'Повышение переносимого веса': 'weight',
@@ -2130,15 +2502,37 @@
     };
     const ENCHANT_AUTO_APPLY_WEAPON = { 'Урон огнем': true, 'Урон холодом': true, 'Урон электричеством': true };
 
+    // Разбирает простой текстовый эффект вида "+50 маны" / "+30 хп" / "+20 веса" у обычных
+    // (не зачарованных игроком) уникальных предметов — чтобы такие бонусы тоже применялись.
+    function parsePlainEffectBonus(text) {
+        if (!text) return null;
+        const m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*)/i);
+        if (!m) return null;
+        const value = parseInt(m[1]);
+        const word = m[2].toLowerCase();
+        if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
+        if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
+        if (word.startsWith('вес')) return { key: 'weight', value };
+        return null;
+    }
+
     function getEquipmentEnchantBonuses() {
         const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0 };
-        ['helmet', 'chest', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
+        ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
             const itemId = equippedSlots[slotKey];
             if (!itemId) return;
             const item = playerInventory.find(i => i.itemId === itemId);
-            if (!item || !item.enchantment) return;
-            const key = ENCHANT_AUTO_APPLY_ARMOR[item.enchantment.name];
-            if (key && typeof item.enchantment.value === 'number') bonuses[key] += item.enchantment.value;
+            if (!item) return;
+            if (item.enchantment) {
+                const key = ENCHANT_AUTO_APPLY_ARMOR[item.enchantment.name];
+                if (key && typeof item.enchantment.value === 'number') {
+                    bonuses[key] += item.enchantment.value;
+                    return;
+                }
+            }
+            // Уникальные предметы без структурированного зачарования (просто текст-эффект)
+            const plain = parsePlainEffectBonus(item.effect);
+            if (plain) bonuses[plain.key] += plain.value;
         });
         return bonuses;
     }
@@ -2149,6 +2543,20 @@
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || !item.enchantment) return 0;
         return (ENCHANT_AUTO_APPLY_WEAPON[item.enchantment.name] && typeof item.enchantment.value === 'number') ? item.enchantment.value : 0;
+    }
+
+    function getOffhandWeaponEnchantDmg() {
+        const itemId = equippedSlots.meleeWeaponOffhand;
+        if (!itemId) return 0;
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.enchantment) return 0;
+        return (ENCHANT_AUTO_APPLY_WEAPON[item.enchantment.name] && typeof item.enchantment.value === 'number') ? item.enchantment.value : 0;
+    }
+
+    function getEquippedWeaponEnchantDesc(isMelee) {
+        const itemId = isMelee ? equippedSlots.meleeWeapon : equippedSlots.rangedWeapon;
+        const item = itemId ? playerInventory.find(i => i.itemId === itemId) : null;
+        return getEffectDescriptionForItem(item);
     }
 
     // ========================================================================
@@ -2460,8 +2868,12 @@
         if (typeof renderSellList === 'function' && document.getElementById('sell-items-list')) {
             renderSellList();
         }
+        if (typeof applySpellDiscounts === 'function') {
+            applySpellDiscounts();
+        }
 
         const equipBonuses = (typeof getEquipmentEnchantBonuses === 'function') ? getEquipmentEnchantBonuses() : { hp: 0, mp: 0, weight: 0, armor: 0 };
+        const activeEffectBonuses = (typeof getActiveEffectBonuses === 'function') ? getActiveEffectBonuses() : { hp: 0, mp: 0 };
 
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
@@ -2471,6 +2883,7 @@
             });
             if (godB.hp) baseHp += godB.hp;
             baseHp += equipBonuses.hp;
+            baseHp += activeEffectBonuses.hp;
             document.getElementById('max-hp').value = baseHp;
         }
 
@@ -2484,14 +2897,35 @@
             });
             if (godB.mp) baseMp += godB.mp;
             baseMp += equipBonuses.mp;
+            baseMp += activeEffectBonuses.mp;
             document.getElementById('max-mp').value = baseMp;
         }
 
-        let totalArmor = (parseInt(document.getElementById('slot-helm-armor').value) || 0) +
-                         (parseInt(document.getElementById('slot-chest-armor').value) || 0) +
-                         (parseInt(document.getElementById('slot-gloves-armor').value) || 0) +
-                         (parseInt(document.getElementById('slot-boots-armor').value) || 0) +
-                         (parseInt(document.getElementById('slot-shield-armor').value) || 0) +
+        const helmArmorVal = parseInt(document.getElementById('slot-helm-armor').value) || 0;
+        const chestArmorVal = parseInt(document.getElementById('slot-chest-armor').value) || 0;
+        const glovesArmorVal = parseInt(document.getElementById('slot-gloves-armor').value) || 0;
+        const bootsArmorVal = parseInt(document.getElementById('slot-boots-armor').value) || 0;
+        const shieldArmorVal = parseInt(document.getElementById('slot-shield-armor').value) || 0;
+        const armorType = document.getElementById('eq-armor').value;
+
+        // Джаггернаут (тяжёлая) / Ловкость в обороне (лёгкая): % к базовому значению брони —
+        // применяется ко всему комплекту разом (armorType — общий переключатель "во что одет" на листе).
+        let armorPercentBonus = 0;
+        if (armorType === 'heavy') armorPercentBonus = perks.heavyArmorBonus || 0;
+        if (armorType === 'light') armorPercentBonus = perks.lightArmorBonus || 0;
+
+        // Полный комплект: нужны все 4 базовых слота брони заполненные
+        const hasFullBodySet = !!(document.getElementById('slot-helm-name').value && document.getElementById('slot-chest-name').value &&
+            document.getElementById('slot-gloves-name').value && document.getElementById('slot-boots-name').value);
+        if (hasFullBodySet) {
+            if (armorType === 'heavy') armorPercentBonus += (perks.heavyFullSetBonus1 || 0) + (perks.heavyFullSetBonus2 || 0);
+            if (armorType === 'light') armorPercentBonus += (perks.lightFullSetBonus1 || 0) + (perks.lightFullSetBonus2 || 0);
+        }
+
+        const bodyArmorBase = helmArmorVal + chestArmorVal + glovesArmorVal + bootsArmorVal;
+        const shieldArmorBonused = Math.round(shieldArmorVal * (1 + (perks.shieldArmorBonus || 0)));
+
+        let totalArmor = Math.round(bodyArmorBase * (1 + armorPercentBonus)) + shieldArmorBonused +
                          (parseInt(document.getElementById('armor-buff').value) || 0);
         if (godB.armor) totalArmor += godB.armor;
         totalArmor += equipBonuses.armor;
@@ -2512,21 +2946,22 @@
         } else {
             maxWeight = str * 5;
             maxWeight += equipBonuses.weight;
+            maxWeight += (perks.extraCarryWeight || 0);
             document.getElementById('max-weight-input').value = maxWeight;
         }
         document.getElementById('weight-max-display').innerText = maxWeight;
 
-        const armorType = document.getElementById('eq-armor').value;
         if (!document.getElementById('manual-speed-lock').checked) {
             let isOverweight = currentWeight > maxWeight;
             let speed = (sign === 'thief') ? 40 : 35;
             if (sign === 'steed') speed += 10;
             if (armorType === 'light') speed -= 5;
             if (armorType === 'heavy') speed -= 10;
+            if (armorType === 'light' && hasFullBodySet && perks.lightFullSetSpeedBonus) speed += perks.lightFullSetSpeedBonus;
             if (document.getElementById('chk-frost-region').checked) {
                 speed -= (armorType === 'heavy') ? 15 : 10;
             }
-            if (document.getElementById('food4').checked) speed += 5;
+            if (isFoodBuffChecked('Похлёбка из оленины')) speed += 5;
             if (godB.speed) speed += godB.speed;
             if (isOverweight) {
                 document.getElementById('overweight-alert').style.display = 'block';
@@ -2576,6 +3011,7 @@
     let baseDmg = 2, totalDmg = 2, hitModifier = 0;
     let wepType = 'unarmed';
     let infoNotes = []; // текстовые пометки для GM (пробитие брони, обезглавливание, пассивки)
+    let enchantDmgMain = 0, offhandDmg = 0, offhandEnchantDmg = 0, statModForFormula = 0, statLabelForFormula = 'Сила';
 
     const strMod = Math.floor((str - 10) / 2);
     const dexMod = Math.floor((dex - 10) / 2);
@@ -2633,13 +3069,20 @@
         }
 
         // Итоговый урон: база + бонус от перков + сила
+        enchantDmgMain = getActiveWeaponEnchantDmg(true);
+        statModForFormula = str; statLabelForFormula = 'Сила';
         totalDmg = baseDmg + perkBonus + str;
-        totalDmg += getActiveWeaponEnchantDmg(true);
+        totalDmg += enchantDmgMain;
 
         // === Двойное оружие (одноручное/кинжал, не для двуручного) ===
         if (isDualWield && !isTwoHanded && wepType !== 'unarmed') {
             if (perks.dualWieldHitBonus) {
                 hitModifier += perks.dualWieldHitBonus;
+            }
+            offhandDmg = parseInt(document.getElementById('wep-melee-offhand-dmg').value) || 0;
+            offhandEnchantDmg = getOffhandWeaponEnchantDmg();
+            if (offhandDmg > 0 || offhandEnchantDmg > 0) {
+                totalDmg += offhandDmg + offhandEnchantDmg;
             }
         }
 
@@ -2697,17 +3140,48 @@
         let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
         wepType = document.getElementById('wep-ranged-type').value;
         hitModifier = dexMod;
+        enchantDmgMain = getActiveWeaponEnchantDmg(false);
+        statModForFormula = dex; statLabelForFormula = 'Ловкость';
         totalDmg = baseDmg + dex + ammoDmg;
-        totalDmg += getActiveWeaponEnchantDmg(false);
+        totalDmg += enchantDmgMain;
+
+        // Избыточное натяжение: +20%/ранг к базовому урону лука
+        if (perks.rangedDamagePercent) {
+            const bonus = Math.round(baseDmg * perks.rangedDamagePercent);
+            totalDmg += bonus;
+        }
+        // Критический выстрел: добавляет долю модификатора Силы к урону
+        if (perks.criticalShotStrFraction) {
+            const strBonus = Math.round(strMod * perks.criticalShotStrFraction);
+            if (strBonus) {
+                totalDmg += strBonus;
+                infoNotes.push(`🎯 Критический выстрел: +${strBonus} от Силы`);
+            }
+        }
+        // Твёрдая рука: бонус к попаданию
+        if (perks.rangedHitBonus) hitModifier += perks.rangedHitBonus;
     }
 
     hitModifier -= starve;
-    let sneakMult = (wepType === 'dagger') ? 3 : 2;
+    let sneakMult = 2;
+    if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
+    else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
+
+    // Формула по составным частям (до множителей силовой атаки/рывка/скрытности)
+    let formulaParts = [`${statLabelForFormula} ${statModForFormula >= 0 ? '+' : ''}${statModForFormula}`, `оружие ${baseDmg}`];
+    if (enchantDmgMain) formulaParts.push(`зачарование +${enchantDmgMain}`);
+    if (offhandDmg || offhandEnchantDmg) formulaParts.push(`второе оружие +${offhandDmg}${offhandEnchantDmg ? ' (+' + offhandEnchantDmg + ' зачар.)' : ''}`);
+    const formulaSum = statModForFormula + baseDmg + enchantDmgMain + offhandDmg + offhandEnchantDmg;
 
     let finalHtml = `
         <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
+        <div style="font-size:11px; opacity:.75; margin:2px 0;">Формула: ${formulaParts.join(' + ')} = ${formulaSum}${mode === 'melee' && wepType !== 'unarmed' ? ' (до силовой атаки/бонусов перков)' : ''}</div>
         <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
     `;
+    const weaponEnchantDesc = getEquippedWeaponEnchantDesc(mode === 'melee');
+    if (weaponEnchantDesc) {
+        finalHtml += `<div style="font-size:11px; color:#8a8171;">🔮 ${escHtml(weaponEnchantDesc)}</div>`;
+    }
     if (document.getElementById('chk-sneak-attack').checked) {
         finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
     }
@@ -2776,6 +3250,8 @@
             wepMDmg: document.getElementById('wep-melee-dmg').value,
             wepMType: document.getElementById('wep-melee-type').value,
             wepRName: document.getElementById('wep-ranged-name').value,
+            wepMOffhandName: document.getElementById('wep-melee-offhand-name').value,
+            wepMOffhandDmg: document.getElementById('wep-melee-offhand-dmg').value,
             wepRDmg: document.getElementById('wep-ranged-dmg').value,
             wepRType: document.getElementById('wep-ranged-type').value,
             amName: document.getElementById('ammo-name').value,
@@ -2786,6 +3262,8 @@
             sHelmA: document.getElementById('slot-helm-armor').value,
             sChest: document.getElementById('slot-chest-name').value,
             sChestA: document.getElementById('slot-chest-armor').value,
+            sRobe: document.getElementById('slot-robe-name').value,
+            sRobeA: document.getElementById('slot-robe-armor').value,
             sGloves: document.getElementById('slot-gloves-name').value,
             sGlovesA: document.getElementById('slot-gloves-armor').value,
             sBoots: document.getElementById('slot-boots-name').value,
@@ -2797,7 +3275,12 @@
             sCirclet: document.getElementById('slot-circlet-name').value,
             inventory: playerInventory,
             equippedSlots: equippedSlots,
-            knownIngredientProps: knownIngredientProps
+            knownIngredientProps: knownIngredientProps,
+            activeFoodBuffs: Array.from(document.querySelectorAll('.food-buff:checked')).map(c => c.dataset.name),
+            pouchContents: pouchContents,
+            activeTimedEffects: activeTimedEffects,
+            gameTurn: gameTurn,
+            gameRound: gameRound
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -2874,6 +3357,8 @@
             document.getElementById('wep-melee-name').value = data.wepMName || '';
             document.getElementById('wep-melee-dmg').value = data.wepMDmg || 2;
             document.getElementById('wep-melee-type').value = data.wepMType || 'unarmed';
+            document.getElementById('wep-melee-offhand-name').value = data.wepMOffhandName || '';
+            document.getElementById('wep-melee-offhand-dmg').value = data.wepMOffhandDmg || 0;
             document.getElementById('wep-ranged-name').value = data.wepRName || '';
             document.getElementById('wep-ranged-dmg').value = data.wepRDmg || 10;
             document.getElementById('wep-ranged-type').value = data.wepRType || 'bow';
@@ -2885,6 +3370,8 @@
             document.getElementById('slot-helm-armor').value = data.sHelmA || 0;
             document.getElementById('slot-chest-name').value = data.sChest || '';
             document.getElementById('slot-chest-armor').value = data.sChestA || 0;
+            document.getElementById('slot-robe-name').value = data.sRobe || '';
+            document.getElementById('slot-robe-armor').value = data.sRobeA || 0;
             document.getElementById('slot-gloves-name').value = data.sGloves || '';
             document.getElementById('slot-gloves-armor').value = data.sGlovesA || 0;
             document.getElementById('slot-boots-name').value = data.sBoots || '';
@@ -2894,6 +3381,21 @@
             document.getElementById('slot-ring-name').value = data.sRing || '';
             document.getElementById('slot-neck-name').value = data.sNeck || '';
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
+
+            renderFoodBuffsList();
+            if (Array.isArray(data.activeFoodBuffs)) {
+                data.activeFoodBuffs.forEach(name => {
+                    const chk = document.querySelector(`.food-buff[data-name="${CSS.escape(name)}"]`);
+                    if (chk) chk.checked = true;
+                });
+            }
+
+            pouchContents = Array.isArray(data.pouchContents) ? data.pouchContents : [];
+            activeTimedEffects = Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [];
+            gameTurn = parseInt(data.gameTurn) || 0;
+            gameRound = parseInt(data.gameRound) || 0;
+            renderActiveEffects();
+            updateTurnRoundDisplay();
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
 
@@ -2932,13 +3434,18 @@
                 window._legacyInvToMigrate = null;
             }
             equippedSlots = data.equippedSlots && typeof data.equippedSlots === 'object'
-                ? Object.assign({ helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null }, data.equippedSlots)
-                : { helmet: null, chest: null, gloves: null, boots: null, shield: null, ring: null, neck: null, circlet: null, meleeWeapon: null, rangedWeapon: null };
+                ? Object.assign({ helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null }, data.equippedSlots)
+                : { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
             renderInventoryList();
             renderKitchenPot();
             renderEquipPanel();
             renderStaffList();
             renderEnchantItemSelect();
+            if (equippedSlots.pouch) {
+                const pouchItem = playerInventory.find(i => i.itemId === equippedSlots.pouch);
+                document.getElementById('slot-pouch-name').value = pouchItem ? pouchItem.name : '';
+            }
+            renderPouchPanel();
 
             knownIngredientProps = (data.knownIngredientProps && typeof data.knownIngredientProps === 'object') ? data.knownIngredientProps : {};
             renderAlchEatSelect();
@@ -2990,6 +3497,7 @@
 
     // Первичный запуск
     initSkills();
+    renderFoodBuffsList();
     loadLocalStorage();
     updateAll();
     renderInventoryList();
@@ -3005,6 +3513,9 @@
     renderAlchIngredientSelects();
     renderKnownIngredients();
     renderSellList();
+    renderPouchPanel();
+    renderActiveEffects();
+    updateTurnRoundDisplay();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

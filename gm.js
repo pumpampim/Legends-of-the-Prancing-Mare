@@ -495,6 +495,7 @@
         if (typeof sourceItem.armor === 'number') extra.armorValue = sourceItem.armor;
         if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
         if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
+        if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
 
         db.collection('characters').doc(targetUid).get().then(doc => {

@@ -258,6 +258,18 @@
         .slot-row input {
             width: 60%;
         }
+        .slot-picker {
+            width: auto;
+            max-width: 34px;
+            font-size: 10px;
+            padding: 2px;
+            flex-shrink: 0;
+        }
+        .slot-enchant-info {
+            font-size: 11px;
+            color: #8a8171;
+            margin: -2px 0 6px 4px;
+        }
         .inv-group {
             border-left: 3px solid var(--accent-color);
             padding-left: 8px;

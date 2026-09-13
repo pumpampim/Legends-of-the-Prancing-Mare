@@ -54,7 +54,61 @@
 
         // ==================== КРАСНОРЕЧИЕ (skillIdx = 9) ====================
         "9-0": (step) => ({ merchantPriceBonus: 0.05 * (step + 1) }),
-        "9-1": () => ({ hasCharmPerk: true })
+        "9-1": () => ({ hasCharmPerk: true }),
+
+        // ==================== СТРЕЛЬБА (skillIdx = 2) ====================
+        "2-0": (step) => ({ rangedDamagePercent: 0.20 * step }),
+        "2-2": (step) => ({ criticalShotStrFraction: [0.25, 0.5, 1.0][step - 1] || 0 }),
+        "2-3": (step) => ({ rangedHitBonus: step }),
+
+        // ==================== ШКОЛЫ МАГИИ: скидка 50% на стоимость по рангу заклинания ====================
+        // Разрушение (skillIdx=10)
+        "10-0": () => ({ discountDestr1: true }),
+        "10-2": () => ({ discountDestr2: true }),
+        "10-8": () => ({ discountDestr3: true }),
+        "10-12": () => ({ discountDestr4: true }),
+        // Восстановление (skillIdx=11)
+        "11-0": () => ({ discountRestor1: true }),
+        "11-3": () => ({ discountRestor2: true }),
+        "11-6": () => ({ discountRestor3: true }),
+        "11-9": () => ({ discountRestor4: true }),
+        // Колдовство (skillIdx=12)
+        "12-0": () => ({ discountConj1: true }),
+        "12-4": () => ({ discountConj2: true }),
+        "12-9": () => ({ discountConj3: true }),
+        "12-11": () => ({ discountConj4: true }),
+        // Иллюзия (skillIdx=13)
+        "13-0": () => ({ discountIllus1: true }),
+        "13-3": () => ({ discountIllus2: true }),
+        "13-6": () => ({ discountIllus3: true }),
+        "13-10": () => ({ discountIllus4: true }),
+        // Изменение (skillIdx=14)
+        "14-0": () => ({ discountAlter1: true }),
+        "14-2": () => ({ discountAlter2: true }),
+        "14-5": () => ({ discountAlter3: true }),
+        "14-7": () => ({ discountAlter4: true }),
+
+        // ==================== БЛОКИРОВАНИЕ (skillIdx = 3) ====================
+        "3-0": (step) => ({ shieldArmorBonus: 0.15 + 0.05 * step }),
+
+        // ==================== ТЯЖЁЛАЯ БРОНЯ (skillIdx = 4) ====================
+        "4-0": (step) => ({ heavyArmorBonus: 0.20 * step }),
+        "4-2": () => ({ heavyFullSetBonus1: 0.25 }),
+        "4-6": () => ({ heavyFullSetBonus2: 0.25 }),
+
+        // ==================== ЛЁГКАЯ БРОНЯ (skillIdx = 5) ====================
+        "5-0": (step) => ({ lightArmorBonus: 0.20 * step }),
+        "5-1": () => ({ lightFullSetBonus1: 0.25 }),
+        "5-3": () => ({ lightFullSetSpeedBonus: 5 }),
+        "5-4": () => ({ lightFullSetBonus2: 0.25 }),
+
+        // ==================== СКРЫТНОСТЬ (skillIdx = 6) ====================
+        "6-0": (step) => ({ sneakDetectBonus: step }),
+        "6-2": () => ({ backstabUnlocked: true }),
+        "6-4": () => ({ assassinBladeUnlocked: true }),
+
+        // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
+        "8-4": () => ({ extraCarryWeight: 50 })
     };
 
     window.applyPerks = function() {
@@ -110,7 +164,20 @@
             alchemyHerbalistDouble: false,
             alchemyPoisonResist50: false,
             merchantPriceBonus: 0,
-            hasCharmPerk: false
+            hasCharmPerk: false,
+            rangedDamagePercent: 0,
+            criticalShotStrFraction: 0,
+            rangedHitBonus: 0,
+            discountDestr1: false, discountDestr2: false, discountDestr3: false, discountDestr4: false,
+            discountRestor1: false, discountRestor2: false, discountRestor3: false, discountRestor4: false,
+            discountConj1: false, discountConj2: false, discountConj3: false, discountConj4: false,
+            discountIllus1: false, discountIllus2: false, discountIllus3: false, discountIllus4: false,
+            discountAlter1: false, discountAlter2: false, discountAlter3: false, discountAlter4: false,
+            shieldArmorBonus: 0,
+            heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
+            lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0,
+            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false,
+            extraCarryWeight: 0
         };
 
         // Логируем, что мы нашли в чекбоксах (для отладки)
