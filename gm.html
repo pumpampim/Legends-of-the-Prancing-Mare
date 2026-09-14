@@ -128,6 +128,127 @@
     <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
 </div>
 
+        <!-- ===== СОЗДАНИЕ СВОЕГО ПРЕДМЕТА ===== -->
+        <div class="panel">
+            <h2>🛠️ Создать предмет</h2>
+            <label>Название</label>
+            <input type="text" id="ci-name" placeholder="Название предмета">
+
+            <label>Описание/эффект</label>
+            <textarea id="ci-desc" rows="2" placeholder="Свободный текст описания или эффекта"></textarea>
+
+            <div style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                    <label>Вес</label>
+                    <input type="number" id="ci-weight" value="1" step="0.1">
+                </div>
+                <div style="flex:1;">
+                    <label>Цена</label>
+                    <input type="number" id="ci-price" value="0">
+                </div>
+            </div>
+
+            <label>Категория</label>
+            <select id="ci-category" onchange="updateCustomItemFields()">
+                <option value="weapon">Оружие</option>
+                <option value="armor">Броня</option>
+                <option value="jewelry">Ювелирное изделие</option>
+                <option value="book">Книга/Свиток</option>
+                <option value="potion">Зелье/Яд</option>
+                <option value="misc">Разное</option>
+            </select>
+
+            <div id="ci-weapon-fields">
+                <label>Тип оружия</label>
+                <select id="ci-weapon-type">
+                    <option value="melee">Ближний бой</option>
+                    <option value="ranged">Дальний бой</option>
+                </select>
+                <label>Урон</label>
+                <input type="number" id="ci-damage" value="5">
+            </div>
+
+            <div id="ci-armor-fields" style="display:none;">
+                <label>Слот брони</label>
+                <select id="ci-armor-slot">
+                    <option value="helmet">Шлем</option>
+                    <option value="chest">Кираса</option>
+                    <option value="robe">Одеяние</option>
+                    <option value="gloves">Перчатки</option>
+                    <option value="boots">Сапоги</option>
+                    <option value="shield">Щит</option>
+                </select>
+                <label>Значение брони</label>
+                <input type="number" id="ci-armor-value" value="10">
+            </div>
+
+            <div id="ci-jewelry-fields" style="display:none;">
+                <label>Слот украшения</label>
+                <select id="ci-jewelry-slot">
+                    <option value="ring">Кольцо</option>
+                    <option value="amulet">Амулет/Ожерелье</option>
+                    <option value="circlet">Обруч</option>
+                </select>
+            </div>
+
+            <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+                <input type="checkbox" id="ci-enchanted" onchange="updateCustomItemFields()">
+                Зачаровано
+            </label>
+            <div id="ci-enchant-fields" style="display:none;">
+                <label>Эффект зачарования</label>
+                <select id="ci-enchant-effect"></select>
+                <label>Величина эффекта</label>
+                <input type="number" id="ci-enchant-value" value="10">
+            </div>
+
+            <button class="btn-success" style="width:100%; margin-top:10px;" onclick="createCustomItem()">Создать и сохранить в базу</button>
+            <div id="ci-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
+
+        <!-- ===== ПРОВЕРКА АЛХИМИИ ===== -->
+        <div class="panel">
+            <h2>🧪 Проверить зелье/яд</h2>
+            <p style="font-size:11px; opacity:.75;">Считает по тем же перкам и навыку, что у выбранного игрока (без бонуса от расы и снаряжения — это упрощение для быстрой проверки).</p>
+            <label>Игрок (для навыка/перков)</label>
+            <select id="calc-alch-player"></select>
+            <div id="calc-alch-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+
+            <label>Ингредиент 1</label>
+            <select id="calc-alch-ing1"></select>
+            <label>Ингредиент 2</label>
+            <select id="calc-alch-ing2"></select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="calcAlchemyCheck()">Посчитать</button>
+            <div id="calc-alch-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
+
+        <!-- ===== ПРОВЕРКА ЗАЧАРОВАНИЯ ===== -->
+        <div class="panel">
+            <h2>✨ Проверить зачарование</h2>
+            <p style="font-size:11px; opacity:.75;">Считает по перкам и навыку выбранного игрока (без бонуса от расы).</p>
+            <label>Игрок (для навыка/перков)</label>
+            <select id="calc-ench-player"></select>
+            <div id="calc-ench-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+
+            <label>Тип</label>
+            <select id="calc-ench-type" onchange="renderCalcEnchEffects()">
+                <option value="armor">Броня/украшение</option>
+                <option value="weapon">Оружие</option>
+            </select>
+            <label>Эффект</label>
+            <select id="calc-ench-effect"></select>
+            <label>Камень душ</label>
+            <select id="calc-ench-gem">
+                <option value="Крохотный">Крохотный (25%)</option>
+                <option value="Маленький">Маленький (50%)</option>
+                <option value="Обычный" selected>Обычный (100%)</option>
+                <option value="Большой">Большой (125%)</option>
+                <option value="Великий">Великий (150%)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="calcEnchantCheck()">Посчитать</button>
+            <div id="calc-ench-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
+
         <!-- ===== ОТКРЫТИЕ РЕЦЕПТОВ КУЗНИЦЫ ===== -->
         <div class="panel">
             <h2>⚒️ Открыть рецепты кузницы игроку</h2>
@@ -183,6 +304,8 @@
 <script src="items-data.js"></script>
 <script src="smithing-data.js"></script>
 <script src="cooking-data.js"></script>
+<script src="alchemy-data.js"></script>
+<script src="spell-data.js"></script>
 <script src="gm.js"></script>
 </body>
 </html>

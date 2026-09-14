@@ -14,6 +14,8 @@
     let currentSessionCode = null;
     let unsubSession = null;
     let saveTimer = null;
+    let cloudDataReady = false; // true только после того, как персонаж загружен из облака хотя бы раз —
+                                 // защищает от перезаписи реальных данных дефолтными при входе с нового устройства.
     const SESSION_KEY = 'ttrpg_session_code';
 
     function el(id) { return document.getElementById(id); }
@@ -102,6 +104,7 @@
 
         auth.onAuthStateChanged(user => {
             currentUser = user;
+            cloudDataReady = false;
             updateStatusBar();
             if (user) {
                 showOverlay(false);
@@ -121,14 +124,20 @@
                 window.applyCharacterData(doc.data());
                 if (window.updateAll) window.updateAll();
             }
-        }).catch(e => console.error('Ошибка загрузки персонажа из облака:', e));
+            cloudDataReady = true;
+        }).catch(e => {
+            console.error('Ошибка загрузки персонажа из облака:', e);
+            // Даже при ошибке загрузки разрешаем сохранение — иначе персонаж
+            // навсегда останется нередактируемым при сбое сети.
+            cloudDataReady = true;
+        });
     }
 
     // ---------- Сохранение персонажа (вызывается из saveLocalStorage) ----------
 
     window.CloudSync = {
         saveCharacter: function (data) {
-            if (!currentUser || !db) return;
+            if (!currentUser || !db || !cloudDataReady) return;
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => {
                 db.collection('characters').doc(currentUser.uid).set(data, { merge: true })

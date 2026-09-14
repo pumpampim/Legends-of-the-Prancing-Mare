@@ -963,6 +963,15 @@
             <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
             <div id="smithing-list"></div>
         </div>
+
+        <div class="panel">
+            <h2>🔧 Заточка / Улучшение</h2>
+            <p style="font-size:12px; opacity:.8;">Выбери оружие или броню из инвентаря — система сама определит нужный материал по рецепту, из которого сделан предмет, и спишет 1 шт. Улучшение зависит от навыка Кузнечного дела и профильного перка материала.</p>
+            <select id="temper-item-select" onchange="updateTemperInfo()"></select>
+            <div id="temper-info" style="font-size:12px; margin:6px 0; padding:6px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+            <button class="btn-success" style="width:100%;" onclick="temperItem()">Заточить/Улучшить</button>
+            <div id="temper-result" style="margin-top:8px; font-size:13px;"></div>
+        </div>
     </div>
 
     <!-- ТАБ 8: ЗАЧАРОВАНИЕ -->
@@ -1018,6 +1027,23 @@
 
             <h3 style="margin-top:16px;">Твои посохи</h3>
             <div id="staff-list"></div>
+        </div>
+
+        <div class="panel">
+            <h2>⚡ Зарядить зачарованное оружие</h2>
+            <p style="font-size:12px; opacity:.8;">Заряд оружия истощается со временем. Дни заряда зависят от размера камня душ: Крохотный — 1, Маленький — 3, Обычный — 5, Большой — 7, Великий — 10.</p>
+            <label>Зачарованное оружие</label>
+            <select id="weapon-charge-select"></select>
+            <label>Камень душ для подзарядки</label>
+            <select id="weapon-charge-soulgem">
+                <option value="Крохотный">Крохотный (1 день)</option>
+                <option value="Маленький">Маленький (3 дня)</option>
+                <option value="Обычный" selected>Обычный (5 дней)</option>
+                <option value="Большой">Большой (7 дней)</option>
+                <option value="Великий">Великий (10 дней)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="chargeWeapon()">Зарядить</button>
+            <div id="weapon-charge-result" style="margin-top:8px; font-size:13px;"></div>
         </div>
     </div>
 
@@ -1245,6 +1271,20 @@
     }
 
     // Разрешает отметить перк только если выполнены требования (навык + перк-предок + предыдущая ступень)
+    // Эффективное значение навыка = базовое (вложенное игроком) + расовый бонус.
+    // Именно оно должно использоваться во всех проверках/формулах — это то, что
+    // реально видит и ожидает игрок, глядя на цифру в поле навыка.
+    function getEffectiveSkillValue(skillName) {
+        const idx = skillNames.indexOf(skillName);
+        if (idx === -1) return 0;
+        const input = document.getElementById(`skill-${idx}`);
+        if (!input) return 0;
+        const raw = parseInt(input.getAttribute('data-raw-val')) || 10;
+        const race = document.getElementById('char-race').value;
+        const bonus = (raceSkillBonuses[race] && raceSkillBonuses[race][skillName]) || 0;
+        return raw + bonus;
+    }
+
     function validatePerkCheck(checkbox) {
         if (!checkbox.checked) { updateAll(); saveLocalStorage(); return; }
 
@@ -1267,9 +1307,7 @@
         const req = perk.req;
         if (req) {
             if (req.skill) {
-                const sIdx = skillNames.indexOf(req.skill);
-                const skillInput = sIdx >= 0 ? document.getElementById(`skill-${sIdx}`) : null;
-                const skillVal = skillInput ? (parseInt(skillInput.getAttribute('data-raw-val')) || 0) : 0;
+                const skillVal = getEffectiveSkillValue(req.skill);
                 const needed = req.thresholds[step - 1] || 0;
                 if (skillVal < needed) {
                     checkbox.checked = false;
@@ -1294,8 +1332,14 @@
     window.validatePerkCheck = validatePerkCheck;
 
     function handleSkillChange(input, idx) {
-        // При ручном изменении пользователь вводит базовое значение (без расового бонуса)
-        let raw = parseInt(input.value) || 10;
+        // Поле показывает ЭФФЕКТИВНОЕ значение (базовое + расовый бонус) — раньше тут читалось
+        // то, что игрок видит в поле, и сохранялось КАК БУДТО это базовое значение, из-за чего
+        // расовый бонус накапливался заново при каждой правке. Теперь вычитаем бонус обратно.
+        const skillName = skillNames[idx];
+        const race = document.getElementById('char-race').value;
+        const bonus = (raceSkillBonuses[race] && raceSkillBonuses[race][skillName]) || 0;
+        let typedValue = parseInt(input.value) || 10;
+        let raw = typedValue - bonus;
         if (raw < 10) raw = 10;
         input.setAttribute('data-raw-val', raw);
         updateAll();
@@ -1530,6 +1574,37 @@
 
     const SCHOOL_CODE_TO_SKILL = { destr: 'Разрушение', restor: 'Восстановление', conj: 'Колдовство', illus: 'Иллюзия', alter: 'Изменение' };
 
+    // "Повышение навыка: X" бывает на зачарованной броне (гильемты «») и на зельях/еде
+    // (просто "Повышение навыка: X") — проверяем оба варианта написания.
+    function matchesSkillBoostEnchant(enchantName, skillName) {
+        if (!enchantName) return false;
+        const norm = enchantName.replace(/[«»]/g, '').replace(/навыка:\s*/i, 'навыка: ').replace(/\s+/g, ' ').trim().toLowerCase();
+        return norm === `повышение навыка: ${skillName}`.toLowerCase();
+    }
+
+    function getGearSkillBonusPercent(skillName) {
+        let total = 0;
+        Object.keys(equippedSlots).forEach(slotKey => {
+            const itemId = equippedSlots[slotKey];
+            if (!itemId) return;
+            const item = playerInventory.find(i => i.itemId === itemId);
+            if (item && item.enchantment && matchesSkillBoostEnchant(item.enchantment.name, skillName) && typeof item.enchantment.value === 'number') {
+                total += item.enchantment.value;
+            }
+        });
+        return total;
+    }
+
+    function getPotionSkillBonusPercent(skillName) {
+        let total = 0;
+        activeTimedEffects.forEach(e => {
+            if (matchesSkillBoostEnchant(e.effectName, skillName) && typeof e.value === 'number') {
+                total += e.value;
+            }
+        });
+        return total;
+    }
+
     function castCustomSpell(id) {
         const card = document.getElementById(`card-${id}`);
         if (!card) return;
@@ -1613,6 +1688,9 @@
         return manualSelect ? (parseInt(manualSelect.value) || 1) : 1;
     }
 
+    // Доля баночки чернил на свиток по рангу: новичок 1/4, ученик 2/4, адепт 3/4, эксперт — вся баночка.
+    const SCROLL_INK_FRACTION = { 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0 };
+
     window.craftScrollInSheet = function () {
         const select = document.getElementById('scroll-spell-select');
         const spell = customSpells.find(s => s.id === select.value);
@@ -1621,15 +1699,29 @@
         const tierNames = ['', 'Новичок', 'Ученик', 'Адепт', 'Эксперт'];
         let wis = parseInt(document.getElementById('stat-wis').value) || 10;
         let available = wis - scrollWisdomSpent;
-        if (available >= tier) {
-            scrollWisdomSpent += tier;
-            document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
-            addToInventory('Свиток: ' + spell.name, 'Свиток: ' + spell.name, 1, 0.1, 'Свиток', spell.desc, { scrollTier: tierNames[tier], price: tier * 15 });
-            alert(`Успех! Потрачено ${tier} ед. Мудрости на свиток «${spell.name}». Осталось ${wis - scrollWisdomSpent} ед. Свиток добавлен в инвентарь.`);
-            saveLocalStorage();
-        } else {
+        if (available < tier) {
             alert("Недостаточно свободной Мудрости для начертания этого свитка!");
+            return;
         }
+        const parchmentHave = countInInventory('Пергамент');
+        const inkHave = countInInventory('Чернила');
+        const inkNeeded = SCROLL_INK_FRACTION[tier] || 0.25;
+        if (parchmentHave < 1) {
+            alert('Нужен пергамент (1 шт.) — его нет в инвентаре.');
+            return;
+        }
+        if (inkHave < inkNeeded) {
+            alert(`Нужно ${inkNeeded} баночки чернил (доля от целой) — сейчас в инвентаре ${inkHave}.`);
+            return;
+        }
+        removeFromInventoryByName('Пергамент', 1);
+        removeFromInventoryByName('Чернила', inkNeeded);
+
+        scrollWisdomSpent += tier;
+        document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
+        addToInventory('Свиток: ' + spell.name, 'Свиток: ' + spell.name, 1, 0.1, 'Свиток', spell.desc, { scrollTier: tierNames[tier], price: tier * 15 });
+        alert(`Успех! Потрачено ${tier} ед. Мудрости, 1 пергамент и ${inkNeeded} баночки чернил на свиток «${spell.name}». Осталось ${wis - scrollWisdomSpent} ед. Мудрости. Свиток добавлен в инвентарь.`);
+        saveLocalStorage();
     };
 
     // ========================================================================
@@ -1659,6 +1751,8 @@
         if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
+        if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
+        if (typeof renderTemperSelect === 'function') renderTemperSelect();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
     }
@@ -1683,6 +1777,8 @@
         if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
+        if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
+        if (typeof renderTemperSelect === 'function') renderTemperSelect();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
         saveLocalStorage();
@@ -1989,7 +2085,8 @@
             return;
         }
         el.innerHTML = known.map((r, idx) => {
-            const canMake = r.ingredients.every(i => countInInventory(i.name) >= i.qty);
+            const hasMatPerk = !r.perkHint || isPerkChecked(r.perkHint);
+            const canMake = hasMatPerk && r.ingredients.every(i => countInInventory(i.name) >= i.qty);
             const ingList = r.ingredients.map(i => {
                 const have = countInInventory(i.name);
                 const ok = have >= i.qty;
@@ -2003,9 +2100,11 @@
             } else {
                 statLine = `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`;
             }
+            const perkNote = !hasMatPerk ? `<div style="font-size:11px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : '';
             return `<div class="party-row">
                 <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:11px; opacity:.7;">${escHtml(statLine)}</span></div>
                 <div style="font-size:12px; margin:4px 0;">${ingList}</div>
+                ${perkNote}
                 <button class="btn-success" style="width:100%;" ${canMake ? '' : 'disabled'} onclick="craftSmithingItem(${idx})">Сковать</button>
             </div>`;
         }).join('');
@@ -2021,6 +2120,10 @@
         const known = getAllSmithingRecipes().filter(r => knownSmithingRecipes.includes(r.name));
         const recipe = known[idx];
         if (!recipe) return;
+        if (recipe.perkHint && !isPerkChecked(recipe.perkHint)) {
+            alert(`Нужен перк «${recipe.perkHint}», чтобы ковать этот материал.`);
+            return;
+        }
         const canMake = recipe.ingredients.every(i => countInInventory(i.name) >= i.qty);
         if (!canMake) { alert('Не хватает материалов.'); return; }
         recipe.ingredients.forEach(i => removeFromInventoryByName(i.name, i.qty));
@@ -2048,10 +2151,22 @@
     // ЗАЧАРОВАНИЕ
     // ========================================================================
 
+    // Несмотря на название (осталось для совместимости со старыми вызовами),
+    // теперь возвращает ЭФФЕКТИВНОЕ значение навыка (базовое + расовый бонус) —
+    // именно оно должно участвовать во всех игровых формулах и проверках.
+    // Для расчёта прогресса прокачки (сколько успехов нужно до +1) по-прежнему
+    // используется чистое базовое значение (data-raw-val) напрямую, отдельно.
     function getSkillRawValue(name) {
-        const idx = skillNames.indexOf(name);
-        const input = idx >= 0 ? document.getElementById(`skill-${idx}`) : null;
-        return input ? parseInt(input.getAttribute('data-raw-val') || input.value) || 0 : 0;
+        return getEffectiveSkillValue(name);
+    }
+
+    // Дни заряда зачарованного оружия/посоха зависят от размера камня душ.
+    const SOUL_GEM_CHARGE_DAYS = { 'Крохотный': 1, 'Маленький': 3, 'Обычный': 5, 'Большой': 7, 'Великий': 10 };
+
+    function getChargeDays(soulGem) {
+        const base = getChargeDays(soulGem);
+        const perks = window.perkBonuses || {};
+        return base + (perks.enchantSoulEconomy || 0);
     }
 
     function getEnchantSkill() {
@@ -2129,7 +2244,7 @@
         const soulGem = document.getElementById('enchant-soulgem').value;
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
-        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const calc = window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses);
 
         let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
         if (calc.boolean) {
@@ -2156,7 +2271,7 @@
             return;
         }
         const skill = getEnchantSkill();
-        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const calc = window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses);
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
 
         removeFromInventoryByName(gemKey, 1);
@@ -2168,7 +2283,7 @@
             price: Math.round((item.price || 0) * 1.5) + 50
         });
         delete extra.itemId; delete extra.count;
-        if (isWeaponSlot(item.slot)) extra.chargeDaysLeft = 5;
+        if (isWeaponSlot(item.slot)) extra.chargeDaysLeft = getChargeDays(soulGem);
 
         addToInventory(enchantedName + '#' + Date.now(), enchantedName, 1, item.weight, item.category, desc, extra);
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Зачарование');
@@ -2186,6 +2301,13 @@
         select.innerHTML = effects.map((e, i) => `<option value="${i}">${escHtml(e.name)}</option>`).join('');
     }
 
+    // «Отшельник» (Двуручное) даёт бонус силы зачарования именно для посохов —
+    // складываем его с общим бонусом зачарования только для расчёта посохов.
+    function getStaffEnchantPerks() {
+        const base = window.perkBonuses || {};
+        return Object.assign({}, base, { enchantGeneralBonus: (base.enchantGeneralBonus || 0) + (base.staffEnchantPower || 0) });
+    }
+
     function updateStaffCalc() {
         const resultEl = document.getElementById('staff-calc-result');
         if (!resultEl) return;
@@ -2195,7 +2317,7 @@
         const soulGem = document.getElementById('staff-soulgem').value;
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
-        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const calc = window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks());
         let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
         html += calc.boolean
             ? `<div style="margin-top:6px;">Эффект без числовой величины.</div>`
@@ -2216,13 +2338,13 @@
             return;
         }
         const skill = getEnchantSkill();
-        const calc = window.calcEnchantPower(effect, soulGem, skill);
+        const calc = window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks());
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
         removeFromInventoryByName(gemKey, 1);
         const name = `Посох: ${effect.name}`;
         const gemMult = (window.soulGemPower && window.soulGemPower[soulGem]) || 1;
         addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', desc, {
-            isStaff: true, chargeDaysLeft: 5, slot: 'ranged', price: Math.round(80 * gemMult),
+            isStaff: true, chargeDaysLeft: getChargeDays(soulGem), slot: 'ranged', price: Math.round(80 * gemMult),
             enchantment: { name: effect.name, value: calc.boolean ? null : calc.value, unit: effect.unit, description: desc }
         });
         renderStaffList();
@@ -2264,8 +2386,36 @@
             return;
         }
         removeFromInventoryByName(gemKey, 1);
-        item.chargeDaysLeft = 5;
+        item.chargeDaysLeft = getChargeDays(soulGem);
         renderStaffList();
+        saveLocalStorage();
+    };
+
+    function renderWeaponChargeSelect() {
+        const select = document.getElementById('weapon-charge-select');
+        if (!select) return;
+        const weapons = playerInventory.filter(i => !i.isStaff && i.enchantment && i.hasOwnProperty('chargeDaysLeft'));
+        select.innerHTML = weapons.length
+            ? weapons.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (заряд: ${i.chargeDaysLeft} дн.)</option>`).join('')
+            : '<option value="">Нет зачарованного оружия с зарядом</option>';
+    }
+
+    window.chargeWeapon = function () {
+        const itemId = document.getElementById('weapon-charge-select').value;
+        const resultEl = document.getElementById('weapon-charge-result');
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери оружие.</span>'; return; }
+        const soulGem = document.getElementById('weapon-charge-soulgem').value;
+        const gemKey = soulGem + ' камень душ';
+        if (countInInventory(gemKey) <= 0) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Нет камня душ «${escHtml(soulGem)}» в инвентаре.</span>`;
+            return;
+        }
+        removeFromInventoryByName(gemKey, 1);
+        item.chargeDaysLeft = getChargeDays(soulGem);
+        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ «${escHtml(item.name)}» заряжено на ${item.chargeDaysLeft} дней.</span>`;
+        renderWeaponChargeSelect();
+        renderInventoryList();
         saveLocalStorage();
     };
 
@@ -2527,7 +2677,8 @@
                     description: `${e.name}: ${e.magnitude}${e.unit || ''}${e.duration ? ' (' + e.duration + ' х.)' : ''}`,
                     turnsRemaining: e.duration || 1,
                     hp: isHp ? (e.magnitude || 0) : 0,
-                    mp: isMp ? (e.magnitude || 0) : 0
+                    mp: isMp ? (e.magnitude || 0) : 0,
+                    value: e.magnitude || 0
                 });
             });
         } else {
@@ -2539,7 +2690,8 @@
                 description: item.effect || '',
                 turnsRemaining: duration,
                 hp: (plain && plain.key === 'hp') ? plain.value : 0,
-                mp: (plain && plain.key === 'mp') ? plain.value : 0
+                mp: (plain && plain.key === 'mp') ? plain.value : 0,
+                value: plain ? plain.value : 0
             });
         }
         renderActiveEffects();
@@ -3182,6 +3334,102 @@
         saveLocalStorage();
     };
 
+    // ========================================================================
+    // ЗАТОЧКА / УЛУЧШЕНИЕ (ванильная формула: чем выше навык и есть профильный
+    // перк материала — тем сильнее улучшение; материал — тот же, что и на ковку)
+    // ========================================================================
+
+    function findSmithingRecipeByName(name) {
+        const pools = [window.armorRecipes, window.jewelryRecipes, window.weaponRecipes];
+        for (const pool of pools) {
+            if (!pool) continue;
+            const found = pool.find(r => r.name === name);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    function getPrimaryTemperMaterial(recipe) {
+        if (!recipe || !recipe.ingredients || !recipe.ingredients.length) return null;
+        const priority = recipe.ingredients.find(i => /слиток|кожа|сталгрим/i.test(i.name));
+        return priority || recipe.ingredients[0];
+    }
+
+    function getTemperableItems() {
+        return playerInventory.filter(i => (typeof i.armorValue === 'number' || typeof i.weaponDmg === 'number') && findSmithingRecipeByName(i.name));
+    }
+
+    function renderTemperSelect() {
+        const select = document.getElementById('temper-item-select');
+        if (!select) return;
+        const items = getTemperableItems();
+        select.innerHTML = items.length
+            ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)}</option>`).join('')
+            : '<option value="">Нет подходящих предметов (нужен известный рецепт ковки)</option>';
+        updateTemperInfo();
+    }
+
+    window.updateTemperInfo = function () {
+        const itemId = document.getElementById('temper-item-select').value;
+        const infoEl = document.getElementById('temper-info');
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) { infoEl.innerHTML = ''; return; }
+        const recipe = findSmithingRecipeByName(item.name);
+        const material = getPrimaryTemperMaterial(recipe);
+        const skill = getSkillRawValue('Кузнечное дело');
+        const hasPerk = recipe && recipe.perkHint && typeof isPerkChecked === 'function' && isPerkChecked(recipe.perkHint);
+        const have = material ? countInInventory(material.name) : 0;
+        const isWeapon = typeof item.weaponDmg === 'number';
+        const currentVal = isWeapon ? item.weaponDmg : item.armorValue;
+        infoEl.innerHTML = material
+            ? `Материал: <strong>${escHtml(material.name)}</strong> (есть: ${have}/1)<br>` +
+              `Навык Кузнечного дела: ${skill}${recipe.perkHint ? ` · Профильный перк «${escHtml(recipe.perkHint)}»: ${hasPerk ? 'есть (x2)' : 'нет'}` : ''}<br>` +
+              `Текущее значение (${isWeapon ? 'урон' : 'броня'}): ${currentVal}`
+            : 'Не удалось определить материал для этого предмета.';
+    };
+
+    window.temperItem = function () {
+        const itemId = document.getElementById('temper-item-select').value;
+        const resultEl = document.getElementById('temper-result');
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери предмет.</span>'; return; }
+        const recipe = findSmithingRecipeByName(item.name);
+        const material = getPrimaryTemperMaterial(recipe);
+        if (!material) { resultEl.innerHTML = '<span style="color:#e74c3c;">Не удалось определить материал.</span>'; return; }
+        if (countInInventory(material.name) < 1) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Нужен материал «${escHtml(material.name)}» (1 шт.) — его нет в инвентаре.</span>`;
+            return;
+        }
+        const skill = getSkillRawValue('Кузнечное дело');
+        const hasPerk = recipe.perkHint && typeof isPerkChecked === 'function' && isPerkChecked(recipe.perkHint);
+        const mult = 1 + 0.01 * skill * (hasPerk ? 2 : 1);
+
+        removeFromInventoryByName(material.name, 1);
+        const isWeapon = typeof item.weaponDmg === 'number';
+        if (isWeapon) {
+            const oldVal = item.weaponDmg;
+            item.weaponDmg = Math.max(oldVal + 1, Math.round(oldVal * mult));
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ «${escHtml(item.name)}» улучшен: урон ${oldVal} → ${item.weaponDmg}.</span>`;
+            if (equippedSlots.meleeWeapon === itemId || equippedSlots.rangedWeapon === itemId) {
+                const fieldId = equippedSlots.meleeWeapon === itemId ? 'wep-melee-dmg' : 'wep-ranged-dmg';
+                document.getElementById(fieldId).value = item.weaponDmg;
+            }
+        } else {
+            const oldVal = item.armorValue;
+            item.armorValue = Math.max(oldVal + 1, Math.round(oldVal * mult));
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ «${escHtml(item.name)}» улучшен: броня ${oldVal} → ${item.armorValue}.</span>`;
+            Object.keys(SLOT_FIELD_MAP).forEach(slotKey => {
+                if (equippedSlots[slotKey] === itemId) {
+                    document.getElementById(SLOT_FIELD_MAP[slotKey][1]).value = item.armorValue;
+                }
+            });
+        }
+        renderTemperSelect();
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+    };
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -3309,6 +3557,7 @@
             if (godB.mp) baseMp += godB.mp;
             baseMp += equipBonuses.mp;
             baseMp += activeEffectBonuses.mp;
+            if (perks.restorationManaBonus) baseMp = Math.round(baseMp * (1 + perks.restorationManaBonus));
             document.getElementById('max-mp').value = baseMp;
         }
 
@@ -3412,7 +3661,18 @@
                 if (perks[key]) schoolMult = 0.5;
             }
 
-            finalCostInput.value = Math.round(base * armorMult * schoolMult);
+            // Зачарованная броня и активные зелья с эффектом «Повышение навыка: <школа>»
+            // дополнительно удешевляют заклинания этой школы — 1% скидки за каждый 1% бонуса навыка.
+            let skillBoostMult = 1.0;
+            if (school && SCHOOL_CODE_TO_SKILL[school]) {
+                const skillName = SCHOOL_CODE_TO_SKILL[school];
+                const totalBoostPercent = getGearSkillBonusPercent(skillName) + getPotionSkillBonusPercent(skillName);
+                if (totalBoostPercent > 0) {
+                    skillBoostMult = Math.max(0.1, 1 - totalBoostPercent / 100);
+                }
+            }
+
+            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult);
         });
 
         const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
@@ -3882,6 +4142,8 @@
             renderKitchenPot();
             renderEquipPanel();
             renderStaffList();
+            renderWeaponChargeSelect();
+            renderTemperSelect();
             renderEnchantItemSelect();
             if (equippedSlots.pouch) {
                 const pouchItem = playerInventory.find(i => i.itemId === equippedSlots.pouch);
@@ -3954,6 +4216,8 @@
     renderStaffEffectSelect();
     updateStaffCalc();
     renderStaffList();
+    renderWeaponChargeSelect();
+    renderTemperSelect();
     renderEquipPanel();
     renderScrollSpellSelect();
     renderAlchEatSelect();

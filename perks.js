@@ -69,6 +69,7 @@
         "10-12": () => ({ discountDestr4: true }),
         // Восстановление (skillIdx=11)
         "11-0": () => ({ discountRestor1: true }),
+        "11-4": (step) => ({ restorationManaBonus: [0.25, 0.50][step - 1] || 0 }),
         "11-3": () => ({ discountRestor2: true }),
         "11-6": () => ({ discountRestor3: true }),
         "11-9": () => ({ discountRestor4: true }),
@@ -110,6 +111,15 @@
 
         // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
         "8-4": () => ({ extraCarryWeight: 50 }),
+
+        // ==================== ЗАЧАРОВАНИЕ (skillIdx = 17) ====================
+        "17-0": (step) => ({ enchantGeneralBonus: 0.20 * step }),
+        "17-1": () => ({ enchantSoulEconomy: 2 }),
+        "17-2": () => ({ enchantFireBonus: 0.25 }),
+        "17-4": () => ({ enchantFrostBonus: 0.25 }),
+        "17-5": () => ({ enchantSkillBonus: 0.25 }),
+        "17-6": () => ({ enchantShockBonus: 0.25 }),
+        "17-7": () => ({ enchantLifeBonus: 0.25 }),
 
         // ==================== ВЗЛОМ (skillIdx = 7) ====================
         "7-0": () => ({ lockpickNoviceUnlocked: true }),
@@ -189,6 +199,9 @@
             lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
             sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false,
             extraCarryWeight: 0,
+            enchantGeneralBonus: 0, enchantSoulEconomy: 0, enchantFireBonus: 0,
+            enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,
+            restorationManaBonus: 0,
             lockpickNoviceUnlocked: false, lockpickApprenticeUnlocked: false, lockpickAdeptUnlocked: false, lockpickExpertUnlocked: false,
             lockpickSilent: false, lockpickWaxKey: false, lockpickGoldBonus: false, lockpickTreasureBonus: false
         };

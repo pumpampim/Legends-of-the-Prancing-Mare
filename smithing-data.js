@@ -1166,43 +1166,43 @@ const weaponRecipes = [
     },
     {
         name: "Орочий лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 11, weight: 4.0, price: 150, slot: 'melee', isAmmo: false,
+        damage: 11, weight: 4.0, price: 150, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Орихалковый слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Двемерский лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 13, weight: 7.0, price: 270, slot: 'melee', isAmmo: false,
+        damage: 13, weight: 7.0, price: 270, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Двемерский слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }, { name: "Стальной слиток", qty: 1 }]
     },
     {
         name: "Эльфийский лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 14, weight: 5.0, price: 470, slot: 'melee', isAmmo: false,
+        damage: 14, weight: 5.0, price: 470, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Лунный камень", qty: 2 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
         name: "Нордский лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 14, weight: 5.0, price: 580, slot: 'melee', isAmmo: false,
+        damage: 14, weight: 5.0, price: 580, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
         name: "Эбонитовый лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 18, weight: 6.0, price: 1440, slot: 'melee', isAmmo: false,
+        damage: 18, weight: 6.0, price: 1440, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Эбонитовый слиток", qty: 3 }]
     },
     {
         name: "Стеклянный лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 16, weight: 4.0, price: 820, slot: 'melee', isAmmo: false,
+        damage: 16, weight: 4.0, price: 820, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Стеклянные доспехи",
         ingredients: [{ name: "Малахитовый слиток", qty: 2 }, { name: "Лунный камень", qty: 1 }]
     },
     {
         name: "Сталгримовый лук", category: "Луки", subcat: "Луки (обычные)",
-        damage: 18, weight: 6.0, price: 1800, slot: 'melee', isAmmo: false,
+        damage: 18, weight: 6.0, price: 1800, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 3 }]
     }

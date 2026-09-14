@@ -186,6 +186,7 @@
         renderLog(lastData.combatLog || []);
         populateRecipePlayerSelect();
         populateInvPlayerSelect();
+        populateCalcPlayerSelects();
     }
 
     // ---------- Отряд ----------
@@ -383,6 +384,27 @@
                 name: window.failedDish.name, category: 'Блюдо (кулинария)',
                 weight: window.failedDish.weight || 1, price: window.failedDish.price || 0,
                 armor: null, dmg: null, effect: window.failedDish.effect || '', slot: null
+            });
+        }
+        (window.alchemyPremadePotions || []).forEach(p => {
+            out.push({
+                name: p.name, category: p.category, weight: p.weight, price: p.price,
+                armor: null, dmg: null, effect: p.effect, slot: null
+            });
+        });
+        // Крафтящиеся свитки — все заклинания, которые игрок может выучить и записать сам.
+        const TIER_PRICE = { 1: 15, 2: 30, 3: 45, 4: 60 };
+        if (window.spellsData) {
+            Object.keys(window.spellsData).forEach(school => {
+                [1, 2, 3, 4].forEach(tier => {
+                    (window.spellsData[school][tier] || []).forEach(sp => {
+                        out.push({
+                            name: 'Свиток: ' + sp.name, category: 'Свитки (крафтящиеся)',
+                            weight: 0.1, price: TIER_PRICE[tier], armor: null, dmg: null,
+                            effect: sp.desc || '', slot: null
+                        });
+                    });
+                });
             });
         }
         return out;
@@ -773,5 +795,199 @@
             el('inv-gold-delta').value = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // ---------- Создание своего предмета мастером ----------
+
+    window.updateCustomItemFields = function () {
+        const cat = el('ci-category').value;
+        el('ci-weapon-fields').style.display = cat === 'weapon' ? 'block' : 'none';
+        el('ci-armor-fields').style.display = cat === 'armor' ? 'block' : 'none';
+        el('ci-jewelry-fields').style.display = cat === 'jewelry' ? 'block' : 'none';
+
+        const enchanted = el('ci-enchanted').checked;
+        el('ci-enchant-fields').style.display = enchanted ? 'block' : 'none';
+        if (!enchanted) return;
+
+        const effectSelect = el('ci-enchant-effect');
+        let effects = [];
+        if (cat === 'weapon' && window.enchantWeaponEffects) {
+            effects = window.enchantWeaponEffects;
+        } else if ((cat === 'armor' || cat === 'jewelry') && window.enchantArmorEffects) {
+            const slot = cat === 'armor' ? el('ci-armor-slot').value : el('ci-jewelry-slot').value;
+            const enchantSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' };
+            const wantedSlot = enchantSlotMap[slot] || slot;
+            effects = window.enchantArmorEffects.filter(e => e.slots.includes(wantedSlot));
+        }
+        effectSelect.innerHTML = effects.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join('')
+            || '<option value="">Нет подходящих эффектов для этого слота</option>';
+    };
+
+    window.createCustomItem = function () {
+        if (!db) return;
+        const name = el('ci-name').value.trim();
+        if (!name) { alert('Укажи название предмета.'); return; }
+        const cat = el('ci-category').value;
+        const weight = parseFloat(el('ci-weight').value) || 0;
+        const price = parseInt(el('ci-price').value) || 0;
+        const desc = el('ci-desc').value.trim();
+
+        const catLabels = { weapon: 'Оружие (своё)', armor: 'Броня (своя)', jewelry: 'Ювелирное изделие (своё)', book: 'Книга/Свиток', potion: 'Зелье/Яд', misc: 'Разное' };
+
+        const item = { name, category: catLabels[cat] || 'Разное', weight, price, effect: desc, slot: null };
+
+        if (cat === 'weapon') {
+            item.dmg = parseInt(el('ci-damage').value) || 0;
+            item.slot = el('ci-weapon-type').value; // 'melee' | 'ranged'
+        } else if (cat === 'armor') {
+            item.slot = el('ci-armor-slot').value;
+            item.armor = parseInt(el('ci-armor-value').value) || 0;
+        } else if (cat === 'jewelry') {
+            item.slot = el('ci-jewelry-slot').value;
+        }
+
+        if (el('ci-enchanted').checked) {
+            const effName = el('ci-enchant-effect').value;
+            const effVal = parseFloat(el('ci-enchant-value').value) || 0;
+            if (effName) {
+                const enchDesc = `${effName}: ${effVal}`;
+                item.enchantment = { name: effName, value: effVal, unit: '', description: enchDesc };
+                item.effect = item.effect ? item.effect + '; ' + enchDesc : enchDesc;
+            }
+        }
+
+        const docId = name.replace(/[\/\.\#\$\[\]]/g, '_') + '_custom_' + Date.now();
+        db.collection('items').doc(docId).set(item).then(() => {
+            el('ci-result').innerHTML = `<span style="color:#2ecc71;">✅ Предмет «${escapeHtml(name)}» создан и сохранён в базу.</span>`;
+            el('ci-name').value = '';
+            el('ci-desc').value = '';
+            window.loadGmItems();
+        }).catch(e => {
+            el('ci-result').innerHTML = `<span style="color:#e74c3c;">Ошибка: ${escapeHtml(e.message)}</span>`;
+        });
+    };
+
+    // ---------- Мини-расчёт перков для калькуляторов (без полного perks.js — тут нет DOM игрока) ----------
+
+    function getMaxStepFromStates(perkStates, skillIdx, perkIdx) {
+        let max = 0;
+        for (let s = 1; s <= 5; s++) {
+            if (perkStates && perkStates[`skill${skillIdx}-perk${perkIdx}-step${s}`]) max = s;
+        }
+        return max;
+    }
+
+    function computeAlchemyPerksFor(data) {
+        const ps = data.perkStates || {};
+        const alchemistRank = getMaxStepFromStates(ps, 15, 0);
+        return {
+            alchemistRank: alchemistRank,
+            hasHealer: getMaxStepFromStates(ps, 15, 1) > 0,
+            hasProvisor: getMaxStepFromStates(ps, 15, 2) > 0,
+            hasPoisoner: getMaxStepFromStates(ps, 15, 3) > 0
+        };
+    }
+
+    function computeEnchantPerksFor(data) {
+        const ps = data.perkStates || {};
+        return {
+            enchantGeneralBonus: 0.20 * getMaxStepFromStates(ps, 17, 0),
+            enchantSoulEconomy: getMaxStepFromStates(ps, 17, 1) > 0 ? 2 : 0,
+            enchantFireBonus: getMaxStepFromStates(ps, 17, 2) > 0 ? 0.25 : 0,
+            enchantFrostBonus: getMaxStepFromStates(ps, 17, 4) > 0 ? 0.25 : 0,
+            enchantSkillBonus: getMaxStepFromStates(ps, 17, 5) > 0 ? 0.25 : 0,
+            enchantShockBonus: getMaxStepFromStates(ps, 17, 6) > 0 ? 0.25 : 0,
+            enchantLifeBonus: getMaxStepFromStates(ps, 17, 7) > 0 ? 0.25 : 0
+        };
+    }
+
+    function populateCalcPlayerSelects() {
+        const uids = Object.keys(lastData.participants || {});
+        const opts = '<option value="">— выбери игрока —</option>' +
+            uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
+        ['calc-alch-player', 'calc-ench-player'].forEach(id => {
+            const select = el(id);
+            if (!select) return;
+            const prev = select.value;
+            select.innerHTML = opts;
+            if (uids.includes(prev)) select.value = prev;
+        });
+    }
+
+    // ---------- Калькулятор алхимии ----------
+
+    function renderCalcAlchIngredients() {
+        const names = Object.keys(window.alchemyIngredients || {}).sort();
+        const optsHtml = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+        ['calc-alch-ing1', 'calc-alch-ing2'].forEach(id => {
+            const select = el(id);
+            if (select) select.innerHTML = optsHtml;
+        });
+    }
+
+    window.calcAlchemyCheck = function () {
+        const uid = el('calc-alch-player').value;
+        const resultEl = el('calc-alch-result');
+        if (!uid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери игрока.</span>'; return; }
+        const ing1 = el('calc-alch-ing1').value, ing2 = el('calc-alch-ing2').value;
+        if (!ing1 || !ing2 || ing1 === ing2) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери два разных ингредиента.</span>'; return; }
+
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const skill = (Array.isArray(data.skills) ? data.skills[15] : null) || 10;
+            const perks = computeAlchemyPerksFor(data);
+            el('calc-alch-skill-info').textContent = `Алхимия: ${skill} · Алхимик: ранг ${perks.alchemistRank} · Провизор: ${perks.hasProvisor ? 'да' : 'нет'} · Целитель: ${perks.hasHealer ? 'да' : 'нет'} · Отравитель: ${perks.hasPoisoner ? 'да' : 'нет'}`;
+
+            const p1 = window.alchemyIngredients[ing1].effects, p2 = window.alchemyIngredients[ing2].effects;
+            const shared = p1.filter(e => p2.includes(e));
+            if (!shared.length) {
+                resultEl.innerHTML = '<span style="color:#e74c3c;">⚠ Нет общих свойств — варево не получится.</span>';
+                return;
+            }
+            let html = '';
+            shared.forEach(effName => {
+                const info = window.alchemyBaseEffects[effName];
+                if (!info) return;
+                const magnitude = window.calcAlchemyValue(info.base, skill, perks.alchemistRank, perks.hasProvisor, perks.hasHealer, perks.hasPoisoner, 0, info.polarity, effName);
+                const duration = info.hasDuration ? window.calcAlchemyValue(1, skill, perks.alchemistRank, perks.hasProvisor, perks.hasHealer, perks.hasPoisoner, 0, info.polarity, effName) : null;
+                html += `<div>🧪 <strong>${escapeHtml(effName)}</strong>: ${magnitude === null ? '' : magnitude}${escapeHtml(info.unit || '')}${duration ? ' на ' + duration + ' ход(ов)' : ''}</div>`;
+            });
+            resultEl.innerHTML = html;
+        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+    };
+
+    // ---------- Калькулятор зачарования ----------
+
+    window.renderCalcEnchEffects = function () {
+        const type = el('calc-ench-type').value;
+        const select = el('calc-ench-effect');
+        const effects = type === 'weapon' ? (window.enchantWeaponEffects || []) : (window.enchantArmorEffects || []);
+        select.innerHTML = effects.map((e, i) => `<option value="${i}">${escapeHtml(e.name)}</option>`).join('');
+    };
+
+    window.calcEnchantCheck = function () {
+        const uid = el('calc-ench-player').value;
+        const resultEl = el('calc-ench-result');
+        if (!uid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери игрока.</span>'; return; }
+        const type = el('calc-ench-type').value;
+        const idx = parseInt(el('calc-ench-effect').value) || 0;
+        const effects = type === 'weapon' ? (window.enchantWeaponEffects || []) : (window.enchantArmorEffects || []);
+        const effect = effects[idx];
+        const gem = el('calc-ench-gem').value;
+        if (!effect) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери эффект.</span>'; return; }
+
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const skill = (Array.isArray(data.skills) ? data.skills[17] : null) || 10;
+            const perks = computeEnchantPerksFor(data);
+            el('calc-ench-skill-info').textContent = `Зачарование: ${skill} · Общий бонус: +${Math.round(perks.enchantGeneralBonus * 100)}%`;
+            const calc = window.calcEnchantPower(effect, gem, skill, perks);
+            resultEl.innerHTML = calc.boolean
+                ? `<div>${escapeHtml(effect.description)}</div>`
+                : `<div><strong>${escapeHtml(effect.name)}</strong>: ${calc.value}${escapeHtml(effect.unit)}</div>`;
+        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+    };
+
+    if (typeof renderCalcAlchIngredients === 'function') renderCalcAlchIngredients();
+    if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
 
 })();

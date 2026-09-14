@@ -48,11 +48,22 @@ const enchantWeaponEffects = [
 ];
 
 // Возвращает {value, unit} — величину эффекта при данных камне душ и навыке Зачарования (0-100+).
-function calcEnchantPower(effect, soulGemName, enchantSkill) {
+// perks (необязательно) — объект бонусов зачарования: enchantGeneralBonus (0.2/ранг, макс 1.0),
+// enchantFireBonus/enchantFrostBonus/enchantShockBonus (+0.25 каждый на соотв. стихию),
+// enchantSkillBonus (+0.25 на "Повышение навыка: X"), enchantLifeBonus (+0.25 на здоровье/ману).
+function calcEnchantPower(effect, soulGemName, enchantSkill, perks) {
     if (effect.maxValue === null) return { value: null, unit: effect.unit, boolean: true };
     const gemPct = soulGemPower[soulGemName] || 0;
     const skillFrac = (enchantSkill || 0) / 100;
-    const value = effect.maxValue * gemPct * skillFrac;
+    let mult = 1 + ((perks && perks.enchantGeneralBonus) || 0);
+    if (perks) {
+        if (effect.name === 'Урон огнем' && perks.enchantFireBonus) mult += perks.enchantFireBonus;
+        if (effect.name === 'Урон холодом' && perks.enchantFrostBonus) mult += perks.enchantFrostBonus;
+        if (effect.name === 'Урон электричеством' && perks.enchantShockBonus) mult += perks.enchantShockBonus;
+        if (effect.name.indexOf('Повышение навыка') === 0 && perks.enchantSkillBonus) mult += perks.enchantSkillBonus;
+        if ((effect.name === 'Повышение здоровья' || effect.name === 'Повышение магии') && perks.enchantLifeBonus) mult += perks.enchantLifeBonus;
+    }
+    const value = effect.maxValue * gemPct * skillFrac * mult;
     return { value: Math.round(value * 100) / 100, unit: effect.unit, boolean: false };
 }
 
