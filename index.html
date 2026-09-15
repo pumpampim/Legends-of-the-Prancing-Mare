@@ -381,7 +381,7 @@
         };
     </script>
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -1367,7 +1367,19 @@
 
     // Обработчик ручного изменения характеристики
     function handleStatChange(input) {
-        let raw = parseInt(input.value) || 10;
+        // Поле показывает эффективное значение (база + расовый бонус + бонус знака судьбы) —
+        // как и с навыками, при ручном вводе нужно вычесть эти бонусы обратно, а не
+        // сохранять введённое число как новую базу (иначе бонус накапливается заново).
+        const statKey = input.id.replace('stat-', '');
+        const race = document.getElementById('char-race').value;
+        const sign = document.getElementById('char-sign').value;
+        let bonus = (raceStatBonuses[race] && raceStatBonuses[race][statKey]) || 0;
+        if (sign === 'warrior' && (statKey === 'str' || statKey === 'con')) bonus += 2;
+        if (sign === 'thief' && statKey === 'dex') bonus += 2;
+        if (sign === 'lady' && (statKey === 'wis' || statKey === 'con')) bonus += 2;
+        if (sign === 'steed' && statKey === 'con') bonus += 2;
+        let typedValue = parseInt(input.value) || 10;
+        let raw = typedValue - bonus;
         if (raw < 1) raw = 1;
         input.setAttribute('data-raw-stat', raw);
         updateAll();
@@ -1380,18 +1392,36 @@
         document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         ev.currentTarget.classList.add('active');
+        // Пересчитываем всё заново при каждом переключении вкладки — защита от любых
+        // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка).
+        if (typeof updateAll === 'function') updateAll();
     }
 
     // Аккордеон вкладки «Профессии» — раскрывает одну профессию за раз, остальные сворачивает.
+    // Гарантирует, что разделы профессий скрыты при самой первой отрисовке —
+    // не полагаясь только на внешний CSS (на случай устаревшего кэша style.css).
+    function initProfessionAccordion() {
+        document.querySelectorAll('.profession-body').forEach(el => {
+            el.classList.remove('open');
+            el.style.display = 'none';
+        });
+    }
+
     window.toggleProfession = function (id) {
         const body = document.getElementById('prof-body-' + id);
         const chevron = document.getElementById('prof-chevron-' + id);
         if (!body) return;
         const willOpen = !body.classList.contains('open');
-        document.querySelectorAll('.profession-body').forEach(el => el.classList.remove('open'));
+        // Инлайн-стиль ставим напрямую (не только через CSS-класс) — так переключение
+        // работает даже если внешний style.css почему-то не подгрузился/закэшировался старым.
+        document.querySelectorAll('.profession-body').forEach(el => {
+            el.classList.remove('open');
+            el.style.display = 'none';
+        });
         document.querySelectorAll('[id^="prof-chevron-"]').forEach(el => el.textContent = '▸');
         if (willOpen) {
             body.classList.add('open');
+            body.style.display = 'block';
             if (chevron) chevron.textContent = '▾';
         }
     };
@@ -4392,6 +4422,7 @@
     renderMagicStaffSpellSelect();
     renderMagicStaffList();
     renderQuestList();
+    initProfessionAccordion();
     renderEquipPanel();
     renderScrollSpellSelect();
     renderAlchEatSelect();
