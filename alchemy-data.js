@@ -160,7 +160,14 @@ const alchemyBaseEffects = {
     "Повышение навыка: Одноручное оружие": { base: 5, hasDuration: true, unit: "", polarity: "positive", priceBase: 8 },
     "Повышение навыка: Разрушение": { base: 5, hasDuration: true, unit: "", polarity: "positive", priceBase: 8 },
     "Повышение навыка: Скрытность": { base: 5, hasDuration: true, unit: "", polarity: "positive", priceBase: 8 },
-    "Повышение навыка: Тяжелая броня": { base: 5, hasDuration: true, unit: "", polarity: "positive", priceBase: 8 }
+    "Повышение навыка: Тяжелая броня": { base: 5, hasDuration: true, unit: "", polarity: "positive", priceBase: 8 },
+    "Сопротивление крикам": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 5 },
+    "Исцеление ядов": { base: null, hasDuration: false, unit: "", polarity: "positive", priceBase: 150 },
+    "Сопротивление болезням": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 5 },
+    "Повышение урона от стихий": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 8 },
+    "Повышение урона от ядов": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 8 },
+    "Повышение урона от магии": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 8 },
+    "Усиление магии": { base: 6, hasDuration: true, unit: "%", polarity: "positive", priceBase: 8 }
 };
 
 // ----------------------------------------------------------------------------

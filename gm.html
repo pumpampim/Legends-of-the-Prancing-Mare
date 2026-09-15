@@ -215,7 +215,7 @@
         <!-- ===== ПРОВЕРКА АЛХИМИИ ===== -->
         <div class="panel">
             <h2>🧪 Проверить зелье/яд</h2>
-            <p style="font-size:11px; opacity:.75;">Считает по тем же перкам и навыку, что у выбранного игрока (без бонуса от расы и снаряжения — это упрощение для быстрой проверки).</p>
+            <p style="font-size:11px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам — как на 2, так и на 3 ингредиента, как у игроков. Снаряжение (гир-бонус) не учитывается.</p>
             <label>Игрок (для навыка/перков)</label>
             <select id="calc-alch-player"></select>
             <div id="calc-alch-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
@@ -224,6 +224,8 @@
             <select id="calc-alch-ing1"></select>
             <label>Ингредиент 2</label>
             <select id="calc-alch-ing2"></select>
+            <label>Ингредиент 3 (необязательно)</label>
+            <select id="calc-alch-ing3"></select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="calcAlchemyCheck()">Посчитать</button>
             <div id="calc-alch-result" style="margin-top:8px; font-size:12px;"></div>
         </div>
@@ -231,7 +233,7 @@
         <!-- ===== ПРОВЕРКА ЗАЧАРОВАНИЯ ===== -->
         <div class="panel">
             <h2>✨ Проверить зачарование</h2>
-            <p style="font-size:11px; opacity:.75;">Считает по перкам и навыку выбранного игрока (без бонуса от расы).</p>
+            <p style="font-size:11px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам.</p>
             <label>Игрок (для навыка/перков)</label>
             <select id="calc-ench-player"></select>
             <div id="calc-ench-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>

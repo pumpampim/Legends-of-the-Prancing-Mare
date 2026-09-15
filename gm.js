@@ -947,6 +947,29 @@
 
     // ---------- Мини-расчёт перков для калькуляторов (без полного perks.js — тут нет DOM игрока) ----------
 
+    const RACE_SKILL_BONUSES = {
+        nord: { "Двуручное оружие": 10, "Красноречие": 5, "Легкая броня": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
+        altmer: { "Иллюзия": 10, "Колдовство": 5, "Разрушение": 5, "Изменение": 5, "Восстановление": 5, "Зачарование": 5 },
+        breton: { "Колдовство": 10, "Иллюзия": 5, "Алхимия": 5, "Красноречие": 5, "Восстановление": 5, "Изменение": 5 },
+        orc: { "Тяжелая броня": 10, "Зачарование": 5, "Двуручное оружие": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
+        khajiit: { "Скрытность": 10, "Взлом": 5, "Алхимия": 5, "Карманные кражи": 5, "Стрельба": 5, "Одноручное оружие": 5 },
+        redguard: { "Одноручное оружие": 10, "Разрушение": 5, "Изменение": 5, "Блокирование": 5, "Кузнечное дело": 5, "Стрельба": 5 },
+        argonian: { "Взлом": 10, "Восстановление": 5, "Изменение": 5, "Легкая броня": 5, "Скрытность": 5, "Карманные кражи": 5 },
+        bosmer: { "Стрельба": 10, "Взлом": 5, "Алхимия": 5, "Легкая броня": 5, "Скрытность": 5, "Карманные кражи": 5 },
+        dunmer: { "Разрушение": 15, "Иллюзия": 5, "Алхимия": 5, "Легкая броня": 5, "Скрытность": 5, "Изменение": 5 },
+        imperial: { "Восстановление": 10, "Разрушение": 5, "Зачарование": 5, "Тяжелая броня": 5, "Блокирование": 5, "Одноручное оружие": 5 }
+    };
+    const SKILL_NAMES_BY_IDX = ["Одноручное оружие", "Двуручное оружие", "Стрельба", "Блокирование", "Тяжелая броня",
+        "Легкая броня", "Скрытность", "Взлом", "Карманные кражи", "Красноречие", "Разрушение", "Восстановление",
+        "Колдовство", "Иллюзия", "Изменение", "Алхимия", "Кузнечное дело", "Зачарование", "Кулинария"];
+
+    function getEffectiveSkillFromData(data, skillIdx) {
+        const raw = (Array.isArray(data.skills) ? parseInt(data.skills[skillIdx]) : null) || 10;
+        const skillName = SKILL_NAMES_BY_IDX[skillIdx];
+        const bonus = (RACE_SKILL_BONUSES[data.race] && RACE_SKILL_BONUSES[data.race][skillName]) || 0;
+        return raw + bonus;
+    }
+
     function getMaxStepFromStates(perkStates, skillIdx, perkIdx) {
         let max = 0;
         for (let s = 1; s <= 5; s++) {
@@ -997,9 +1020,9 @@
     function renderCalcAlchIngredients() {
         const names = Object.keys(window.alchemyIngredients || {}).sort();
         const optsHtml = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-        ['calc-alch-ing1', 'calc-alch-ing2'].forEach(id => {
+        ['calc-alch-ing1', 'calc-alch-ing2', 'calc-alch-ing3'].forEach(id => {
             const select = el(id);
-            if (select) select.innerHTML = optsHtml;
+            if (select) select.innerHTML = (id === 'calc-alch-ing3' ? '<option value="">— не использовать —</option>' : '') + optsHtml;
         });
     }
 
@@ -1007,17 +1030,23 @@
         const uid = el('calc-alch-player').value;
         const resultEl = el('calc-alch-result');
         if (!uid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери игрока.</span>'; return; }
-        const ing1 = el('calc-alch-ing1').value, ing2 = el('calc-alch-ing2').value;
-        if (!ing1 || !ing2 || ing1 === ing2) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери два разных ингредиента.</span>'; return; }
+        const ing1 = el('calc-alch-ing1').value, ing2 = el('calc-alch-ing2').value, ing3 = el('calc-alch-ing3').value;
+        if (!ing1 || !ing2 || ing1 === ing2) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери минимум два разных ингредиента.</span>'; return; }
 
         db.collection('characters').doc(uid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const skill = (Array.isArray(data.skills) ? data.skills[15] : null) || 10;
+            const skill = getEffectiveSkillFromData(data, 15);
             const perks = computeAlchemyPerksFor(data);
-            el('calc-alch-skill-info').textContent = `Алхимия: ${skill} · Алхимик: ранг ${perks.alchemistRank} · Провизор: ${perks.hasProvisor ? 'да' : 'нет'} · Целитель: ${perks.hasHealer ? 'да' : 'нет'} · Отравитель: ${perks.hasPoisoner ? 'да' : 'нет'}`;
+            el('calc-alch-skill-info').textContent = `Алхимия: ${skill} (с расой) · Алхимик: ранг ${perks.alchemistRank} · Провизор: ${perks.hasProvisor ? 'да' : 'нет'} · Целитель: ${perks.hasHealer ? 'да' : 'нет'} · Отравитель: ${perks.hasPoisoner ? 'да' : 'нет'}`;
 
             const p1 = window.alchemyIngredients[ing1].effects, p2 = window.alchemyIngredients[ing2].effects;
-            const shared = p1.filter(e => p2.includes(e));
+            const sharedSet = new Set(p1.filter(e => p2.includes(e)));
+            if (ing3 && ing3 !== ing1 && ing3 !== ing2 && window.alchemyIngredients[ing3]) {
+                const p3 = window.alchemyIngredients[ing3].effects;
+                const firstTwo = new Set([...p1, ...p2]);
+                p3.forEach(e => { if (firstTwo.has(e)) sharedSet.add(e); });
+            }
+            const shared = Array.from(sharedSet);
             if (!shared.length) {
                 resultEl.innerHTML = '<span style="color:#e74c3c;">⚠ Нет общих свойств — варево не получится.</span>';
                 return;
@@ -1056,9 +1085,9 @@
 
         db.collection('characters').doc(uid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const skill = (Array.isArray(data.skills) ? data.skills[17] : null) || 10;
+            const skill = getEffectiveSkillFromData(data, 17);
             const perks = computeEnchantPerksFor(data);
-            el('calc-ench-skill-info').textContent = `Зачарование: ${skill} · Общий бонус: +${Math.round(perks.enchantGeneralBonus * 100)}%`;
+            el('calc-ench-skill-info').textContent = `Зачарование: ${skill} (с расой) · Общий бонус: +${Math.round(perks.enchantGeneralBonus * 100)}%`;
             const calc = window.calcEnchantPower(effect, gem, skill, perks);
             resultEl.innerHTML = calc.boolean
                 ? `<div>${escapeHtml(effect.description)}</div>`

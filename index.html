@@ -439,9 +439,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
         <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
-        <button class="tab-link" onclick="openTab(event, 'tab7')">⚒️ Кузница</button>
-        <button class="tab-link" onclick="openTab(event, 'tab8')">✨ Зачарование</button>
-        <button class="tab-link" onclick="openTab(event, 'tab9')">🧪 Алхимия</button>
+        <button class="tab-link" onclick="openTab(event, 'tab7')">🛠️ Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')">🎲 Проверка</button>
     </div>
 
@@ -901,21 +899,6 @@
             </div>
         </div>
 
-        <!-- КУХНЯ -->
-        <div class="panel">
-                <h2>🍲 Кухня</h2>
-                <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
-                <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
-                    <p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>
-                </div>
-                <div id="kitchen-alchemy-block" style="display:none; margin-bottom:8px;">
-                    <label style="font-size:12px;">🧪 «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
-                    <input type="text" id="kitchen-alchemy-note" placeholder="Например: Белянка — уязвимость к холоду">
-                </div>
-                <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
-                <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
-            </div>
-
         <!-- КВЕСТЫ -->
         <div class="panel">
             <h2>📜 Активные квесты</h2>
@@ -963,147 +946,157 @@
         </div>
     </div>
 
-    <!-- ТАБ 7: КУЗНИЦА -->
+    <!-- ТАБ 7: ПРОФЕССИИ (Кулинария/Зачарование/Алхимия/Кузнечное дело — сворачиваемые разделы) -->
     <div id="tab7" class="tab-content">
         <div class="panel">
-            <h2>⚒️ Кузница</h2>
-            <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
-            <div id="smithing-list"></div>
-        </div>
+            <div class="profession-header" onclick="toggleProfession('cooking')">
+                <span>🍲 Кулинария</span><span id="prof-chevron-cooking">▸</span>
+            </div>
+            <div class="profession-body" id="prof-body-cooking">
+                <h2>🍲 Кухня</h2>
+                <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
+                <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
+                    <p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>
+                </div>
+                <div id="kitchen-alchemy-block" style="display:none; margin-bottom:8px;">
+                    <label style="font-size:12px;">🧪 «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
+                    <input type="text" id="kitchen-alchemy-note" placeholder="Например: Белянка — уязвимость к холоду">
+                </div>
+                <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
+                <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
+            </div>
 
-        <div class="panel">
-            <h2>🔧 Заточка / Улучшение</h2>
-            <p style="font-size:12px; opacity:.8;">Выбери оружие или броню из инвентаря — система сама определит нужный материал по рецепту, из которого сделан предмет, и спишет 1 шт. Улучшение зависит от навыка Кузнечного дела и профильного перка материала.</p>
-            <select id="temper-item-select" onchange="updateTemperInfo()"></select>
-            <div id="temper-info" style="font-size:12px; margin:6px 0; padding:6px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
-            <button class="btn-success" style="width:100%;" onclick="temperItem()">Заточить/Улучшить</button>
-            <div id="temper-result" style="margin-top:8px; font-size:13px;"></div>
-        </div>
-    </div>
+            <div class="profession-header" onclick="toggleProfession('smithing')">
+                <span>⚒️ Кузнечное дело</span><span id="prof-chevron-smithing">▸</span>
+            </div>
+            <div class="profession-body" id="prof-body-smithing">
+                <h2>⚒️ Кузница</h2>
+                <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+                <div id="smithing-list"></div>
 
-    <!-- ТАБ 8: ЗАЧАРОВАНИЕ -->
-    <div id="tab8" class="tab-content">
-        <div class="panel">
-            <h2>✨ Зачарование брони и оружия</h2>
-            <p style="font-size:12px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
+                <h3 style="margin-top:16px;">🔧 Заточка / Улучшение</h3>
+                <p style="font-size:12px; opacity:.8;">Выбери оружие или броню из инвентаря — система сама определит нужный материал по рецепту, из которого сделан предмет, и спишет 1 шт. Улучшение зависит от навыка Кузнечного дела и профильного перка материала.</p>
+                <select id="temper-item-select" onchange="updateTemperInfo()"></select>
+                <div id="temper-info" style="font-size:12px; margin:6px 0; padding:6px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+                <button class="btn-success" style="width:100%;" onclick="temperItem()">Заточить/Улучшить</button>
+                <div id="temper-result" style="margin-top:8px; font-size:13px;"></div>
+            </div>
 
-            <label>Незачарованный предмет из инвентаря (броня, украшение или оружие)</label>
-            <select id="enchant-item-select" onchange="onEnchantItemPicked()"></select>
-            <div id="enchant-item-info" style="font-size:11px; opacity:.7; margin:4px 0 8px;"></div>
+            <div class="profession-header" onclick="toggleProfession('enchanting')">
+                <span>✨ Зачарование</span><span id="prof-chevron-enchanting">▸</span>
+            </div>
+            <div class="profession-body" id="prof-body-enchanting">
+                <h2>✨ Зачарование брони и оружия</h2>
+                <p style="font-size:12px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
 
-            <label>Эффект</label>
-            <select id="enchant-effect" onchange="updateEnchantCalc()"></select>
+                <label>Незачарованный предмет из инвентаря (броня, украшение или оружие)</label>
+                <select id="enchant-item-select" onchange="onEnchantItemPicked()"></select>
+                <div id="enchant-item-info" style="font-size:11px; opacity:.7; margin:4px 0 8px;"></div>
 
-            <label>Камень душ (нужен в инвентаре)</label>
-            <select id="enchant-soulgem" onchange="updateEnchantCalc()">
-                <option value="Крохотный">Крохотный (25%)</option>
-                <option value="Маленький">Маленький (50%)</option>
-                <option value="Обычный" selected>Обычный (100%)</option>
-                <option value="Большой">Большой (125%)</option>
-                <option value="Великий">Великий (150%)</option>
-            </select>
+                <label>Эффект</label>
+                <select id="enchant-effect" onchange="updateEnchantCalc()"></select>
 
-            <label>Навык «Зачарование» (берётся с вкладки навыков, можно поправить)</label>
-            <input type="number" id="enchant-skill-override" placeholder="Авто с вкладки навыков" onchange="updateEnchantCalc()">
+                <label>Камень душ (нужен в инвентаре)</label>
+                <select id="enchant-soulgem" onchange="updateEnchantCalc()">
+                    <option value="Крохотный">Крохотный (25%)</option>
+                    <option value="Маленький">Маленький (50%)</option>
+                    <option value="Обычный" selected>Обычный (100%)</option>
+                    <option value="Большой">Большой (125%)</option>
+                    <option value="Великий">Великий (150%)</option>
+                </select>
 
-            <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <label>Навык «Зачарование» (берётся с вкладки навыков, можно поправить)</label>
+                <input type="number" id="enchant-skill-override" placeholder="Авто с вкладки навыков" onchange="updateEnchantCalc()">
 
-            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
-            <div id="enchant-result" style="margin-top:10px; font-size:13px;"></div>
-        </div>
+                <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
 
-        <div class="panel">
-            <h2>🪄 Посохи</h2>
-            <p style="font-size:12px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
+                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
+                <div id="enchant-result" style="margin-top:10px; font-size:13px;"></div>
 
-            <label>Эффект нового посоха</label>
-            <select id="staff-effect" onchange="updateStaffCalc()"></select>
+                <h3 style="margin-top:16px;">🪄 Посохи</h3>
+                <p style="font-size:12px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
 
-            <label>Камень душ</label>
-            <select id="staff-soulgem" onchange="updateStaffCalc()">
-                <option value="Крохотный">Крохотный (25%)</option>
-                <option value="Маленький">Маленький (50%)</option>
-                <option value="Обычный" selected>Обычный (100%)</option>
-                <option value="Большой">Большой (125%)</option>
-                <option value="Великий">Великий (150%)</option>
-            </select>
+                <label>Эффект нового посоха</label>
+                <select id="staff-effect" onchange="updateStaffCalc()"></select>
 
-            <div id="staff-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <label>Камень душ</label>
+                <select id="staff-soulgem" onchange="updateStaffCalc()">
+                    <option value="Крохотный">Крохотный (25%)</option>
+                    <option value="Маленький">Маленький (50%)</option>
+                    <option value="Обычный" selected>Обычный (100%)</option>
+                    <option value="Большой">Большой (125%)</option>
+                    <option value="Великий">Великий (150%)</option>
+                </select>
 
-            <button class="btn-success" style="width:100%;" onclick="createStaff()">Создать новый посох</button>
+                <div id="staff-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
 
-            <h3 style="margin-top:16px;">Твои посохи</h3>
-            <div id="staff-list"></div>
-        </div>
+                <button class="btn-success" style="width:100%;" onclick="createStaff()">Создать новый посох</button>
 
-        <div class="panel">
-            <h2>🪄 Магические посохи (посох-заклинатель)</h2>
-            <p style="font-size:12px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
-            <label>Заклинание (из выученных)</label>
-            <select id="magic-staff-spell-select"></select>
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="createMagicStaff()">Создать посох-заклинатель</button>
-            <div id="magic-staff-create-result" style="margin-top:8px; font-size:12px;"></div>
+                <h4 style="margin-top:16px;">Твои посохи</h4>
+                <div id="staff-list"></div>
 
-            <h3 style="margin-top:14px;">Твои посохи-заклинатели</h3>
-            <label>Способ подзарядки</label>
-            <select id="magic-staff-recharge-method">
-                <option value="one">1 заполненный (Обычный/Большой/Великий)</option>
-                <option value="two-small">2 заполненных Маленьких</option>
-                <option value="four-tiny">4 заполненных Крохотных</option>
-            </select>
-            <div id="magic-staff-list" style="margin-top:6px;"></div>
-        </div>
+                <h3 style="margin-top:16px;">🪄 Магические посохи (посох-заклинатель)</h3>
+                <p style="font-size:12px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
+                <label>Заклинание (из выученных)</label>
+                <select id="magic-staff-spell-select"></select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="createMagicStaff()">Создать посох-заклинатель</button>
+                <div id="magic-staff-create-result" style="margin-top:8px; font-size:12px;"></div>
 
-        <div class="panel">
-            <h2>⚡ Зарядить зачарованное оружие</h2>
-            <p style="font-size:12px; opacity:.8;">Заряд оружия истощается со временем. Дни заряда зависят от размера камня душ: Крохотный — 1, Маленький — 3, Обычный — 5, Большой — 7, Великий — 10.</p>
-            <label>Зачарованное оружие</label>
-            <select id="weapon-charge-select"></select>
-            <label>Камень душ для подзарядки</label>
-            <select id="weapon-charge-soulgem">
-                <option value="Крохотный">Крохотный (1 день)</option>
-                <option value="Маленький">Маленький (3 дня)</option>
-                <option value="Обычный" selected>Обычный (5 дней)</option>
-                <option value="Большой">Большой (7 дней)</option>
-                <option value="Великий">Великий (10 дней)</option>
-            </select>
-            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="chargeWeapon()">Зарядить</button>
-            <div id="weapon-charge-result" style="margin-top:8px; font-size:13px;"></div>
-        </div>
-    </div>
+                <h4 style="margin-top:14px;">Твои посохи-заклинатели</h4>
+                <label>Способ подзарядки</label>
+                <select id="magic-staff-recharge-method">
+                    <option value="one">1 заполненный (Обычный/Большой/Великий)</option>
+                    <option value="two-small">2 заполненных Маленьких</option>
+                    <option value="four-tiny">4 заполненных Крохотных</option>
+                </select>
+                <div id="magic-staff-list" style="margin-top:6px;"></div>
 
-    <!-- ТАБ 9: АЛХИМИЯ -->
-    <div id="tab9" class="tab-content">
-        <div class="panel">
-            <h2>🍽️ Съесть ингредиент</h2>
-            <p style="font-size:12px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
-            <select id="alch-eat-select" style="width:100%;"></select>
-            <div id="alch-eat-info" style="font-size:12px; opacity:.85; margin:6px 0;"></div>
-            <button class="btn-success" style="width:100%;" onclick="eatIngredient()">Съесть</button>
-            <div id="alch-eat-result" style="margin-top:8px; font-size:13px;"></div>
-        </div>
+                <h3 style="margin-top:16px;">⚡ Зарядить зачарованное оружие</h3>
+                <p style="font-size:12px; opacity:.8;">Заряд оружия истощается со временем. Дни заряда зависят от размера камня душ: Крохотный — 1, Маленький — 3, Обычный — 5, Большой — 7, Великий — 10.</p>
+                <label>Зачарованное оружие</label>
+                <select id="weapon-charge-select"></select>
+                <label>Камень душ для подзарядки</label>
+                <select id="weapon-charge-soulgem">
+                    <option value="Крохотный">Крохотный (1 день)</option>
+                    <option value="Маленький">Маленький (3 дня)</option>
+                    <option value="Обычный" selected>Обычный (5 дней)</option>
+                    <option value="Большой">Большой (7 дней)</option>
+                    <option value="Великий">Великий (10 дней)</option>
+                </select>
+                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="chargeWeapon()">Зарядить</button>
+                <div id="weapon-charge-result" style="margin-top:8px; font-size:13px;"></div>
+            </div>
 
-        <div class="panel">
-            <h2>⚗️ Варка зелья / яда</h2>
-            <p style="font-size:12px; opacity:.8;">Выбери 2 или 3 ингредиента из инвентаря. Если у них нет общих свойств — варево не получится (ингредиенты всё равно расходуются). Новые совпавшие свойства сразу становятся известны.</p>
-            <label>Ингредиент 1</label>
-            <select id="alch-ing-0" onchange="updateBrewPreview()"></select>
-            <label>Ингредиент 2</label>
-            <select id="alch-ing-1" onchange="updateBrewPreview()"></select>
-            <label>Ингредиент 3 (необязательно)</label>
-            <select id="alch-ing-2" onchange="updateBrewPreview()"></select>
+            <div class="profession-header" onclick="toggleProfession('alchemy')">
+                <span>🧪 Алхимия</span><span id="prof-chevron-alchemy">▸</span>
+            </div>
+            <div class="profession-body" id="prof-body-alchemy">
+                <h2>🍽️ Съесть ингредиент</h2>
+                <p style="font-size:12px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
+                <select id="alch-eat-select" style="width:100%;"></select>
+                <div id="alch-eat-info" style="font-size:12px; opacity:.85; margin:6px 0;"></div>
+                <button class="btn-success" style="width:100%;" onclick="eatIngredient()">Съесть</button>
+                <div id="alch-eat-result" style="margin-top:8px; font-size:13px;"></div>
 
-            <div id="alch-gear-info" style="font-size:11px; opacity:.7; margin-top:6px;"></div>
-            <div id="alch-brew-preview" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <h3 style="margin-top:16px;">⚗️ Варка зелья / яда</h3>
+                <p style="font-size:12px; opacity:.8;">Выбери 2 или 3 ингредиента из инвентаря. Если у них нет общих свойств — варево не получится (ингредиенты всё равно расходуются). Новые совпавшие свойства сразу становятся известны.</p>
+                <label>Ингредиент 1</label>
+                <select id="alch-ing-0" onchange="updateBrewPreview()"></select>
+                <label>Ингредиент 2</label>
+                <select id="alch-ing-1" onchange="updateBrewPreview()"></select>
+                <label>Ингредиент 3 (необязательно)</label>
+                <select id="alch-ing-2" onchange="updateBrewPreview()"></select>
 
-            <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
-            <div id="alch-brew-result" style="margin-top:10px; font-size:13px;"></div>
-        </div>
+                <div id="alch-gear-info" style="font-size:11px; opacity:.7; margin-top:6px;"></div>
+                <div id="alch-brew-preview" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
 
-        <div class="panel">
-            <h2>📖 Известные свойства ингредиентов</h2>
-            <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
-            <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
+                <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
+                <div id="alch-brew-result" style="margin-top:10px; font-size:13px;"></div>
+
+                <h3 style="margin-top:16px;">📖 Известные свойства ингредиентов</h3>
+                <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
+                <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
+            </div>
         </div>
     </div>
 
@@ -1388,6 +1381,20 @@
         document.getElementById(tabId).classList.add('active');
         ev.currentTarget.classList.add('active');
     }
+
+    // Аккордеон вкладки «Профессии» — раскрывает одну профессию за раз, остальные сворачивает.
+    window.toggleProfession = function (id) {
+        const body = document.getElementById('prof-body-' + id);
+        const chevron = document.getElementById('prof-chevron-' + id);
+        if (!body) return;
+        const willOpen = !body.classList.contains('open');
+        document.querySelectorAll('.profession-body').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('[id^="prof-chevron-"]').forEach(el => el.textContent = '▸');
+        if (willOpen) {
+            body.classList.add('open');
+            if (chevron) chevron.textContent = '▾';
+        }
+    };
 
     // Ограничение сытости (не более двух блюд за раз)
     // Полный список блюд с баффами — генерируется из cooking-data.js (раньше был статичный
@@ -2947,13 +2954,31 @@
         }
         removeFromInventoryByName(name, 1);
 
+        // Помимо изучения свойства, само первое (основное) свойство ингредиента срабатывает
+        // на съевшем — на базовой силе (как один ингредиент без пары, без бонуса от сочетания).
+        const firstEffectName = data.effects[0];
+        const effInfo = window.alchemyBaseEffects[firstEffectName];
+        let effectNote = '';
+        if (effInfo) {
+            const skill = getSkillRawValue('Алхимия');
+            const magnitude = window.calcAlchemyValue(effInfo.base, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, 0, effInfo.polarity, firstEffectName);
+            const duration = effInfo.hasDuration ? window.calcAlchemyValue(1, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, 0, effInfo.polarity, firstEffectName) : 1;
+            activateTimedEffectFromItem({
+                name: `${name} (сырой)`,
+                effect: `${firstEffectName}: ${magnitude}${effInfo.unit || ''} на ${duration} ход(ов)`,
+                alchemyEffects: [{ name: firstEffectName, magnitude, unit: effInfo.unit, duration }]
+            });
+            effectNote = `<div style="opacity:.8; margin-top:2px;">⚡ Сработало основное свойство: ${escHtml(firstEffectName)} ${magnitude}${escHtml(effInfo.unit || '')} на ${duration} ход(ов).</div>`;
+        }
+
         if (revealed.length) {
-            resultEl.innerHTML = `<div style="color:#2ecc71;">Съел «${escHtml(name)}». Узнал: ${revealed.map(escHtml).join(', ')}</div>`;
+            resultEl.innerHTML = `<div style="color:#2ecc71;">Съел «${escHtml(name)}». Узнал: ${revealed.map(escHtml).join(', ')}</div>${effectNote}`;
         } else {
-            resultEl.innerHTML = `<div style="opacity:.8;">Съел «${escHtml(name)}». Все свойства этого ингредиента уже были известны.</div>`;
+            resultEl.innerHTML = `<div style="opacity:.8;">Съел «${escHtml(name)}». Все свойства этого ингредиента уже были известны.</div>${effectNote}`;
         }
         renderAlchEatSelect();
         renderKnownIngredients();
+        updateAll();
         saveLocalStorage();
     };
 
@@ -3325,12 +3350,14 @@
         const el = document.getElementById('skill-progress-list');
         if (!el) return;
         el.innerHTML = skillNames.map((name, idx) => {
+            // Читаем то же самое отображаемое значение поля навыка (skill-N.value), что видно
+            // на вкладке «Ветки перков» — гарантирует, что два места всегда показывают одно число.
             const skillInput = document.getElementById('skill-' + idx);
-            const skillVal = skillInput ? (parseInt(skillInput.getAttribute('data-raw-val')) || 10) : 10;
-            const needed = getSuccessesNeededForSkill(skillVal);
+            const effVal = skillInput ? (parseInt(skillInput.value) || getEffectiveSkillValue(name)) : getEffectiveSkillValue(name);
+            const needed = getSuccessesNeededForSkill(effVal);
             const progress = skillProgress[idx] || 0;
             return `<div class="party-row">
-                <div class="row-name"><span>${escHtml(name)} (${skillVal})</span><span>${progress} / ${needed}</span></div>
+                <div class="row-name"><span>${escHtml(name)} (${effVal})</span><span>${progress} / ${needed}</span></div>
                 <button style="width:100%; margin-top:2px;" onclick="logSkillSuccess(${idx})">+1 успех</button>
             </div>`;
         }).join('');
@@ -3347,17 +3374,18 @@
     window.logSkillSuccess = function (skillIdx) {
         const skillInput = document.getElementById('skill-' + skillIdx);
         if (!skillInput) return;
-        let skillVal = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
-        const needed = getSuccessesNeededForSkill(skillVal);
+        const skillName = skillNames[skillIdx];
+        const effVal = getEffectiveSkillValue(skillName);
+        const needed = getSuccessesNeededForSkill(effVal);
         skillProgress[skillIdx] = (skillProgress[skillIdx] || 0) + 1;
 
         if (skillProgress[skillIdx] >= needed) {
             skillProgress[skillIdx] = 0;
-            skillVal += 1;
-            skillInput.value = skillVal;
-            skillInput.setAttribute('data-raw-val', skillVal);
+            let raw = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
+            raw += 1;
+            skillInput.setAttribute('data-raw-val', raw);
             levelUpProgress += 1;
-            alert(`Навык «${skillNames[skillIdx]}» вырос до ${skillVal}!`);
+            alert(`Навык «${skillName}» вырос до ${getEffectiveSkillValue(skillName)}!`);
         }
 
         // Проверяем, не готов ли левел-ап

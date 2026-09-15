@@ -276,6 +276,35 @@
             color: #8a8171;
             margin: -2px 0 6px 4px;
         }
+        .profession-header {
+            cursor: pointer;
+            padding: 12px 14px;
+            background: var(--panel-sub);
+            border: 1px solid #363025;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .profession-header:hover {
+            border-color: var(--accent-color);
+        }
+        .profession-body {
+            display: none;
+            padding: 4px 2px 14px;
+            border-bottom: 1px solid #363025;
+            margin-bottom: 10px;
+        }
+        .profession-body.open {
+            display: block;
+        }
+        .profession-body h2:first-child {
+            margin-top: 0;
+        }
         .inv-group {
             border-left: 3px solid var(--accent-color);
             padding-left: 8px;
