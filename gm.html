@@ -65,6 +65,12 @@
                 <h2>👹 Противники</h2>
                 <div id="gm-enemies-list"></div>
                 <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
+                    <label>Быстро из базы (Враги.xlsx)</label>
+                    <select id="enemy-db-select" onchange="onEnemyDbPicked()">
+                        <option value="">— выбрать готового противника —</option>
+                    </select>
+                    <div id="enemy-db-info" style="font-size:11px; opacity:.75; margin:4px 0;"></div>
+
                     <label>Имя противника</label>
                     <input type="text" id="enemy-name-input" placeholder="Например: Волк">
                     <div class="grid-2">
@@ -297,6 +303,42 @@
                 <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
             </div>
         </div>
+
+        <!-- ===== ВЫДАЧА КВЕСТОВ ===== -->
+        <div class="panel">
+            <h2>📜 Выдать квест</h2>
+            <label>Кому</label>
+            <select id="quest-target-player">
+                <option value="all">Всей группе</option>
+            </select>
+            <label>Название</label>
+            <input type="text" id="quest-title-input" placeholder="Например: Пропавший торговец">
+            <label>Описание</label>
+            <textarea id="quest-desc-input" rows="2" placeholder="Что происходит"></textarea>
+            <label>Что нужно сделать</label>
+            <input type="text" id="quest-req-input" placeholder="Например: найти и вернуть амулет">
+            <label>Награда</label>
+            <input type="text" id="quest-reward-input" placeholder="Например: 200 септимов и зелье здоровья">
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantQuest()">Выдать квест</button>
+            <div id="quest-grant-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
+
+        <!-- ===== НАГРАДА НА ВСЮ ГРУППУ ===== -->
+        <div class="panel">
+            <h2>🎁 Награда на всю группу</h2>
+            <p style="font-size:11px; opacity:.75;">Выдаёт золото и/или один предмет сразу всем участникам сессии — без выбора по одному.</p>
+            <label>Золото каждому</label>
+            <input type="number" id="party-reward-gold" placeholder="0" value="0">
+            <label>Предмет (необязательно, ищи по названию)</label>
+            <input type="text" id="party-reward-item-search" placeholder="Начни печатать название..." oninput="filterPartyRewardItems()">
+            <select id="party-reward-item-select">
+                <option value="">— без предмета —</option>
+            </select>
+            <label>Количество предмета каждому</label>
+            <input type="number" id="party-reward-item-qty" value="1" min="1">
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantPartyReward()">Выдать всей группе</button>
+            <div id="party-reward-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
     </div>
 </div>
 
@@ -306,6 +348,7 @@
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>
 <script src="spell-data.js"></script>
+<script src="enemies-data.js"></script>
 <script src="gm.js"></script>
 </body>
 </html>

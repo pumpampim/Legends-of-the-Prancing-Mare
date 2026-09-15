@@ -915,6 +915,13 @@
                 <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
                 <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
             </div>
+
+        <!-- КВЕСТЫ -->
+        <div class="panel">
+            <h2>📜 Активные квесты</h2>
+            <p style="font-size:11px; opacity:.75;">Квесты выдаёт мастер. Отмечай выполненные — мастер увидит статус и сможет выдать награду.</p>
+            <div id="quest-list"></div>
+        </div>
     </div>
 
     <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
@@ -1027,6 +1034,24 @@
 
             <h3 style="margin-top:16px;">Твои посохи</h3>
             <div id="staff-list"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🪄 Магические посохи (посох-заклинатель)</h2>
+            <p style="font-size:12px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
+            <label>Заклинание (из выученных)</label>
+            <select id="magic-staff-spell-select"></select>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="createMagicStaff()">Создать посох-заклинатель</button>
+            <div id="magic-staff-create-result" style="margin-top:8px; font-size:12px;"></div>
+
+            <h3 style="margin-top:14px;">Твои посохи-заклинатели</h3>
+            <label>Способ подзарядки</label>
+            <select id="magic-staff-recharge-method">
+                <option value="one">1 заполненный (Обычный/Большой/Великий)</option>
+                <option value="two-small">2 заполненных Маленьких</option>
+                <option value="four-tiny">4 заполненных Крохотных</option>
+            </select>
+            <div id="magic-staff-list" style="margin-top:6px;"></div>
         </div>
 
         <div class="panel">
@@ -1189,6 +1214,7 @@
     let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
+    let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
     let gameTurn = 0, gameRound = 0;
     let characterLevel = 1;
@@ -1753,6 +1779,7 @@
         if (typeof renderSellList === 'function') renderSellList();
         if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
         if (typeof renderTemperSelect === 'function') renderTemperSelect();
+        if (typeof renderMagicStaffList === 'function') renderMagicStaffList();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
     }
@@ -1779,6 +1806,7 @@
         if (typeof renderSellList === 'function') renderSellList();
         if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
         if (typeof renderTemperSelect === 'function') renderTemperSelect();
+        if (typeof renderMagicStaffList === 'function') renderMagicStaffList();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
         updateAll();
         saveLocalStorage();
@@ -2590,6 +2618,35 @@
         const item = playerInventory.find(i => i.itemId === itemId);
         return item ? (item.capacity || 0) : 0;
     }
+
+    // ========================================================================
+    // КВЕСТЫ (выдаются мастером, отмечаются игроком)
+    // ========================================================================
+
+    function renderQuestList() {
+        const el = document.getElementById('quest-list');
+        if (!el) return;
+        if (!playerQuests.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Пока нет активных квестов.</p>';
+            return;
+        }
+        el.innerHTML = playerQuests.map(q => `
+            <div class="party-row" style="opacity:${q.status === 'done' ? 0.6 : 1};">
+                <div class="row-name"><strong>${escHtml(q.title)}</strong><span>${q.status === 'done' ? '✅ Выполнен' : '⏳ Активен'}</span></div>
+                <div style="font-size:12px; margin:2px 0;">${escHtml(q.desc || '')}</div>
+                ${q.requirement ? `<div style="font-size:11px; opacity:.8;">🎯 Нужно: ${escHtml(q.requirement)}</div>` : ''}
+                ${q.reward ? `<div style="font-size:11px; opacity:.8;">🎁 Награда: ${escHtml(q.reward)}</div>` : ''}
+                ${q.status !== 'done' ? `<button style="width:100%; margin-top:4px;" onclick="markQuestDone('${escHtml(q.id)}')">Отметить выполненным</button>` : ''}
+            </div>`).join('');
+    }
+
+    window.markQuestDone = function (id) {
+        const q = playerQuests.find(x => x.id === id);
+        if (!q) return;
+        q.status = 'done';
+        renderQuestList();
+        saveLocalStorage();
+    };
 
     function renderPouchPanel() {
         const capEl = document.getElementById('pouch-capacity-info');
@@ -3430,6 +3487,87 @@
         saveLocalStorage();
     };
 
+    // ========================================================================
+    // МАГИЧЕСКИЕ ПОСОХИ-ЗАКЛИНАТЕЛИ (хранят заклинание, не зачарование оружия)
+    // ========================================================================
+
+    const MAGIC_STAFF_MAX_USES = { 1: 10, 2: 7, 3: 5, 4: 3 };
+
+    function renderMagicStaffSpellSelect() {
+        const select = document.getElementById('magic-staff-spell-select');
+        if (!select) return;
+        select.innerHTML = customSpells.length
+            ? customSpells.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)} (${escHtml(s.school)})</option>`).join('')
+            : '<option value="">Сначала выучи заклинание на вкладке «Книга заклинаний»</option>';
+    }
+
+    window.createMagicStaff = function () {
+        const select = document.getElementById('magic-staff-spell-select');
+        const spell = customSpells.find(s => s.id === select.value);
+        const resultEl = document.getElementById('magic-staff-create-result');
+        if (!spell) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери заклинание.</span>'; return; }
+        const tier = getSpellTier(spell.school, spell.name) || 1;
+        const maxUses = MAGIC_STAFF_MAX_USES[tier] || 5;
+        const name = `Посох-заклинатель: ${spell.name}`;
+        addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', spell.desc, {
+            isMagicStaff: true, spellName: spell.name, usesLeft: maxUses, maxUses: maxUses, slot: 'ranged', price: 60 + tier * 40
+        });
+        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Создан «${escHtml(name)}» (${maxUses} применений).</span>`;
+        renderMagicStaffList();
+        saveLocalStorage();
+    };
+
+    function renderMagicStaffList() {
+        const el = document.getElementById('magic-staff-list');
+        if (!el) return;
+        const staves = playerInventory.filter(i => i.isMagicStaff);
+        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Посохов-заклинателей пока нет.</p>'; return; }
+        el.innerHTML = staves.map(s => `
+            <div class="party-row">
+                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:11px;">Заряды: ${s.usesLeft} / ${s.maxUses}</span></div>
+                <div style="font-size:12px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-success" style="flex:1;" onclick="useMagicStaff('${escHtml(s.itemId)}')" ${s.usesLeft <= 0 ? 'disabled' : ''}>Использовать</button>
+                    <button style="flex:1;" onclick="rechargeMagicStaff('${escHtml(s.itemId)}')" ${s.usesLeft >= s.maxUses ? 'disabled' : ''}>Зарядить</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.useMagicStaff = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.usesLeft <= 0) return;
+        item.usesLeft -= 1;
+        renderMagicStaffList();
+        saveLocalStorage();
+        alert(`Использован «${item.name}»: ${item.effect}\nОсталось зарядов: ${item.usesLeft}/${item.maxUses}`);
+    };
+
+    window.rechargeMagicStaff = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        const method = document.getElementById('magic-staff-recharge-method').value;
+        let gemName;
+        if (method === 'one') {
+            const options = ['Заполненный обычный камень душ', 'Заполненный большой камень душ', 'Заполненный великий камень душ'];
+            gemName = options.find(n => countInInventory(n) >= 1);
+            if (!gemName) { alert('Нет ни одного заполненного Обычного/Большого/Великого камня душ.'); return; }
+            removeFromInventoryByName(gemName, 1);
+        } else if (method === 'two-small') {
+            gemName = 'Заполненный маленький камень душ';
+            if (countInInventory(gemName) < 2) { alert('Нужно 2 заполненных Маленьких камня душ.'); return; }
+            removeFromInventoryByName(gemName, 2);
+        } else {
+            gemName = 'Заполненный крохотный камень душ';
+            if (countInInventory(gemName) < 4) { alert('Нужно 4 заполненных Крохотных камня душ.'); return; }
+            removeFromInventoryByName(gemName, 4);
+        }
+        item.usesLeft = item.maxUses;
+        renderMagicStaffList();
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -3977,7 +4115,8 @@
             characterLevel: characterLevel,
             levelUpProgress: levelUpProgress,
             perkPointsAvailable: perkPointsAvailable,
-            skillProgress: skillProgress
+            skillProgress: skillProgress,
+            playerQuests: playerQuests
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -4098,6 +4237,8 @@
             levelUpProgress = parseInt(data.levelUpProgress) || 0;
             perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
+            playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
+            renderQuestList();
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
 
@@ -4144,6 +4285,8 @@
             renderStaffList();
             renderWeaponChargeSelect();
             renderTemperSelect();
+            renderMagicStaffSpellSelect();
+            renderMagicStaffList();
             renderEnchantItemSelect();
             if (equippedSlots.pouch) {
                 const pouchItem = playerInventory.find(i => i.itemId === equippedSlots.pouch);
@@ -4218,6 +4361,9 @@
     renderStaffList();
     renderWeaponChargeSelect();
     renderTemperSelect();
+    renderMagicStaffSpellSelect();
+    renderMagicStaffList();
+    renderQuestList();
     renderEquipPanel();
     renderScrollSpellSelect();
     renderAlchEatSelect();

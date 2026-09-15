@@ -187,6 +187,7 @@
         populateRecipePlayerSelect();
         populateInvPlayerSelect();
         populateCalcPlayerSelects();
+        populateQuestTargetSelect();
     }
 
     // ---------- Отряд ----------
@@ -220,10 +221,28 @@
         const target = el('gm-enemies-list');
         if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Противников нет.</p>'; return; }
         target.innerHTML = enemies.map(e => {
+            const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
+            const resistLine = resistEntries.length
+                ? '<div style="font-size:11px; opacity:.75;">Резист: ' + resistEntries.map(([k, v]) => escapeHtml(k) + ' ' + v + '%').join(', ') + '</div>' : '';
+            const dmgLine = e.weaponDmg ? '<div style="font-size:11px; opacity:.75;">Урон оружием: ' + e.weaponDmg + (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' : '';
+            const spellsLine = (e.spells && e.spells.length)
+                ? '<div style="font-size:11px; opacity:.75;">Заклинания: ' + e.spells.map(s => escapeHtml(s.name) + ' (' + s.dmg + ' урона / ' + s.cost + ' МП)').join(', ') + '</div>' : '';
+            const shoutsHtml = (e.shouts && e.shouts.length)
+                ? e.shouts.map((s, si) => {
+                    const cdKey = 'shoutCd_' + si;
+                    const cdLeft = (e[cdKey] || 0);
+                    return '<div style="font-size:11px; margin-top:2px; padding:3px; background:var(--input-bg); border-radius:3px;">' +
+                        '<strong>🗣️ ' + escapeHtml(s.name) + '</strong> (КД ' + s.cooldown + ' х.): ' + escapeHtml(s.effect) +
+                        '<div style="display:flex; gap:4px; align-items:center; margin-top:2px;">' +
+                        '<span>Осталось КД: ' + cdLeft + '</span>' +
+                        '<button style="width:auto; padding:1px 6px; font-size:10px;" onclick="useShout(\'' + e.id + '\',' + si + ',' + s.cooldown + ')" ' + (cdLeft > 0 ? 'disabled' : '') + '>Крикнуть</button>' +
+                        '</div></div>';
+                }).join('') : '';
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span>' + escapeHtml(e.name || '?') + '</span>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:11px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                '<div class="grid-2" style="gap:6px;">' +
+                dmgLine + resistLine + spellsLine + shoutsHtml +
+                '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:11px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
                 '<div><label style="font-size:11px;">MP (' + (e.maxMp || 0) + ' макс.)</label>' +
@@ -232,15 +251,62 @@
         }).join('');
     }
 
+    window.useShout = function (enemyId, shoutIdx, cooldown) {
+        const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? { ...e, ['shoutCd_' + shoutIdx]: cooldown } : e);
+        db.collection('sessions').doc(currentCode).update({ enemies }).catch(err => console.error(err));
+        const enemy = enemies.find(e => e.id === enemyId);
+        const shout = enemy && enemy.shouts && enemy.shouts[shoutIdx];
+        if (shout) gmPostLogEntryText(`🗣️ ${enemy.name} кричит «${shout.name}»: ${shout.effect}`);
+    };
+
+    let currentEnemyDbPick = null;
+
+    function populateEnemyDbSelect() {
+        const select = el('enemy-db-select');
+        if (!select || !window.enemiesData) return;
+        select.innerHTML = '<option value="">— выбрать готового противника —</option>' +
+            window.enemiesData.map((e, i) => `<option value="${i}">${escapeHtml(e.name)} (${e.category}, ${e.hp} HP)</option>`).join('');
+    }
+
+    window.onEnemyDbPicked = function () {
+        const idx = el('enemy-db-select').value;
+        const infoEl = el('enemy-db-info');
+        if (idx === '') { currentEnemyDbPick = null; infoEl.innerHTML = ''; return; }
+        const e = window.enemiesData[parseInt(idx)];
+        currentEnemyDbPick = e;
+        el('enemy-name-input').value = e.name;
+        el('enemy-hp-input').value = e.hp;
+        const totalMana = e.spells && e.spells.length ? Math.max(...e.spells.map(s => s.cost)) * 3 : 0;
+        el('enemy-mp-input').value = totalMana;
+        let info = '';
+        if (e.weaponDmg) info += `Урон: ${e.weaponDmg}${e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : ''}<br>`;
+        if (Object.keys(e.resist).length) info += `Резист: ${Object.entries(e.resist).map(([k, v]) => k + ' ' + v + '%').join(', ')}<br>`;
+        if (e.spells.length) info += `Заклинания: ${e.spells.map(s => s.name + ' (' + s.dmg + '/' + s.cost + ')').join(', ')}<br>`;
+        if (e.shouts.length) info += `Крики: ${e.shouts.map(s => s.name).join(', ')}<br>`;
+        if (e.loot) info += `Лут: ${escapeHtml(e.loot)}`;
+        infoEl.innerHTML = info;
+    };
+
     window.addEnemy = function () {
         const name = el('enemy-name-input').value.trim();
         if (!name) return;
         const maxHp = Number(el('enemy-hp-input').value) || 0;
         const maxMp = Number(el('enemy-mp-input').value) || 0;
         const enemies = (lastData.enemies || []).slice();
-        enemies.push({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp });
+        const extra = {};
+        if (currentEnemyDbPick && currentEnemyDbPick.name === name) {
+            if (currentEnemyDbPick.weaponDmg) extra.weaponDmg = currentEnemyDbPick.weaponDmg;
+            if (currentEnemyDbPick.weaponNote) extra.weaponNote = currentEnemyDbPick.weaponNote;
+            if (Object.keys(currentEnemyDbPick.resist || {}).length) extra.resist = currentEnemyDbPick.resist;
+            if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
+            if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
+        }
+        enemies.push(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra));
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             el('enemy-name-input').value = '';
+            el('enemy-db-select').value = '';
+            el('enemy-db-info').innerHTML = '';
+            currentEnemyDbPick = null;
         }).catch(e => console.error(e));
     };
 
@@ -298,13 +364,19 @@
         target.scrollTop = target.scrollHeight;
     }
 
-    window.gmPostLogEntry = function () {
-        const input = el('gm-log-input');
-        const text = (input.value || '').trim();
+    function gmPostLogEntryText(text) {
         if (!text || !currentCode) return;
         db.collection('sessions').doc(currentCode).update({
             combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: text })
-        }).then(() => { input.value = ''; }).catch(e => console.error(e));
+        }).catch(e => console.error(e));
+    }
+
+    window.gmPostLogEntry = function () {
+        const input = el('gm-log-input');
+        const text = (input.value || '').trim();
+        if (!text) return;
+        gmPostLogEntryText(text);
+        input.value = '';
     };
 
     window.clearLog = function () {
@@ -540,6 +612,7 @@
             return db.collection('characters').doc(targetUid).update({ inventory: inv });
         }).then(() => {
             alert(`Предмет "${sourceItem.name}" передан игроку ${playerList[idx].name}!`);
+            gmPostLogEntryText(`📦 Мастер выдал «${sourceItem.name}» (×${numCount}) игроку ${playerList[idx].name}.`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
         // ---------- Импорт всех предметов в Firestore ----------
@@ -726,9 +799,11 @@
         const statLabels = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
         const statOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
         const statPos = statOrder.indexOf(statKey);
+        let newLevelForLog = null;
         db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const newLevel = (parseInt(data.characterLevel) || 1) + 1;
+            newLevelForLog = newLevel;
             const newPerkPoints = (parseInt(data.perkPointsAvailable) || 0) + 1;
             const stats = Array.isArray(data.stats) ? data.stats.slice() : [10, 10, 10, 10, 10, 10];
             stats[statPos] = (parseInt(stats[statPos]) || 10) + 1;
@@ -740,6 +815,8 @@
             });
         }).then(() => {
             alert(`Уровень начислен! Новый уровень + 1 очко перка + 1 к характеристике «${statLabels[statKey]}».`);
+            const pname = (lastData.participants[currentInvPlayerUid] || {}).name || currentInvPlayerUid;
+            gmPostLogEntryText(`🎓 Мастер начислил уровень ${newLevelForLog} игроку ${pname} (+1 «${statLabels[statKey]}», +1 очко перка).`);
             window.loadPlayerInventoryForGm();
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -793,6 +870,8 @@
             currentPlayerInvData.gold = newGold;
             el('inv-gold-current').textContent = newGold;
             el('inv-gold-delta').value = '';
+            const pname = (lastData.participants[currentInvPlayerUid] || {}).name || currentInvPlayerUid;
+            gmPostLogEntryText(`💰 Мастер ${sign > 0 ? 'выдал' : 'списал'} ${amount} золота игроку ${pname}.`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -988,6 +1067,123 @@
     };
 
     if (typeof renderCalcAlchIngredients === 'function') renderCalcAlchIngredients();
+    if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();
     if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
+
+    // ---------- Выдача квестов ----------
+
+    function populateQuestTargetSelect() {
+        const select = el('quest-target-player');
+        if (!select) return;
+        const uids = Object.keys(lastData.participants || {});
+        const prev = select.value;
+        select.innerHTML = '<option value="all">Всей группе</option>' +
+            uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
+        if (prev === 'all' || uids.includes(prev)) select.value = prev;
+    }
+
+    function genQuestId() { return 'q-' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+    async function grantQuestToUid(uid, quest) {
+        const ref = db.collection('characters').doc(uid);
+        const doc = await ref.get();
+        const data = doc.exists ? doc.data() : {};
+        const quests = Array.isArray(data.playerQuests) ? data.playerQuests.slice() : [];
+        quests.push(quest);
+        await ref.set({ playerQuests: quests }, { merge: true });
+    }
+
+    window.grantQuest = function () {
+        const title = el('quest-title-input').value.trim();
+        if (!title) { alert('Укажи название квеста.'); return; }
+        const quest = {
+            id: genQuestId(),
+            title: title,
+            desc: el('quest-desc-input').value.trim(),
+            requirement: el('quest-req-input').value.trim(),
+            reward: el('quest-reward-input').value.trim(),
+            status: 'active'
+        };
+        const target = el('quest-target-player').value;
+        const resultEl = el('quest-grant-result');
+        let uids;
+        if (target === 'all') {
+            uids = Object.keys(lastData.participants || {});
+            if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
+        } else {
+            if (!target) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери получателя.</span>'; return; }
+            uids = [target];
+        }
+        Promise.all(uids.map(uid => grantQuestToUid(uid, quest))).then(() => {
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Квест «${escapeHtml(title)}» выдан (${uids.length} игрок(ов)).</span>`;
+            gmPostLogEntryText(`📜 Мастер выдал квест «${title}» (${target === 'all' ? 'всей группе' : ((lastData.participants[target] || {}).name || target)}).`);
+            el('quest-title-input').value = '';
+            el('quest-desc-input').value = '';
+            el('quest-req-input').value = '';
+            el('quest-reward-input').value = '';
+        }).catch(e => {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>';
+        });
+    };
+
+    // ---------- Награда на всю группу ----------
+
+    window.filterPartyRewardItems = function () {
+        const query = (el('party-reward-item-search').value || '').toLowerCase();
+        const select = el('party-reward-item-select');
+        if (!select) return;
+        if (!query) { select.innerHTML = '<option value="">— без предмета —</option>'; return; }
+        const matches = (gmAllItems || []).filter(i => (i.name || '').toLowerCase().includes(query)).slice(0, 30);
+        select.innerHTML = '<option value="">— без предмета —</option>' +
+            matches.map((i, idx) => `<option value="${escapeHtml(i.id || i.name)}">${escapeHtml(i.name)} (${escapeHtml(i.category || '')})</option>`).join('');
+    };
+
+    window.grantPartyReward = function () {
+        const gold = parseInt(el('party-reward-gold').value) || 0;
+        const itemId = el('party-reward-item-select').value;
+        const itemQty = parseInt(el('party-reward-item-qty').value) || 1;
+        const resultEl = el('party-reward-result');
+        const uids = Object.keys(lastData.participants || {});
+        if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
+        if (!gold && !itemId) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи золото или предмет.</span>'; return; }
+
+        const sourceItem = itemId ? (gmAllItems || []).find(i => (i.id || i.name) === itemId) : null;
+        const itemExtra = {};
+        if (sourceItem) {
+            if (sourceItem.slot) itemExtra.slot = sourceItem.slot;
+            if (typeof sourceItem.armor === 'number') itemExtra.armorValue = sourceItem.armor;
+            if (typeof sourceItem.dmg === 'number') itemExtra.weaponDmg = sourceItem.dmg;
+            if (typeof sourceItem.price === 'number') itemExtra.price = sourceItem.price;
+            if (typeof sourceItem.capacity === 'number') itemExtra.capacity = sourceItem.capacity;
+        }
+
+        Promise.all(uids.map(uid =>
+            db.collection('characters').doc(uid).get().then(doc => {
+                const data = doc.exists ? doc.data() : {};
+                const update = {};
+                if (gold) update.gold = (parseInt(data.gold) || 0) + gold;
+                if (sourceItem) {
+                    const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+                    const existing = inv.find(i => i.itemId === itemId);
+                    if (existing) {
+                        existing.count += itemQty;
+                        Object.assign(existing, itemExtra);
+                    } else {
+                        inv.push(Object.assign({ itemId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
+                    }
+                    update.inventory = inv;
+                }
+                return db.collection('characters').doc(uid).update(update);
+            })
+        )).then(() => {
+            const parts = [];
+            if (gold) parts.push(`${gold} золота`);
+            if (sourceItem) parts.push(`${itemQty}× «${sourceItem.name}»`);
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Выдано всем (${uids.length}): ${parts.join(' + ')}.</span>`;
+            gmPostLogEntryText(`🎁 Мастер выдал всей группе: ${parts.join(' + ')}.`);
+        }).catch(e => {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>';
+        });
+    };
 
 })();
