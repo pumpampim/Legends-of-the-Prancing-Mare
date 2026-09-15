@@ -82,6 +82,22 @@
             </div>
         </div>
 
+        <div class="panel">
+            <h2>⚔️ Разрешить атаку (НПС → игрок)</h2>
+            <p style="font-size:11px; opacity:.75;">Выбери, кто из текущих противников атакует и кого из игроков — сайт бросит кубы и посчитает урон (оружие или заклинание/крик противника). Применение — отдельная кнопка.</p>
+            <label>Атакующий (противник)</label>
+            <select id="gm-attack-attacker-select" onchange="onGmAttackAttackerPicked()"></select>
+            <label>Цель (игрок)</label>
+            <select id="gm-attack-target-select"></select>
+            <label>Чем атакует</label>
+            <select id="gm-attack-action-select"></select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()">🎲 Бросить</button>
+            <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
+                <div id="gm-attack-roll-text"></div>
+                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="applyGmAttackDamage()">✅ Применить урон к игроку</button>
+            </div>
+        </div>
+
         <div class="grid-2">
             <div class="panel">
                 <h2>🎯 Инициатива</h2>

@@ -188,6 +188,7 @@
         populateInvPlayerSelect();
         populateCalcPlayerSelects();
         populateQuestTargetSelect();
+        populateGmAttackSelects();
     }
 
     // ---------- Отряд ----------
@@ -1213,6 +1214,119 @@
         }).catch(e => {
             resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>';
         });
+    };
+
+    // ---------- Разрешить атаку (НПС → игрок) ----------
+
+    let pendingGmAttack = null; // { targetUid, dmg, logText }
+
+    function parseSpellDamageForGm(desc) {
+        if (!desc) return null;
+        const m = desc.match(/наносящ\w*\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
+                  desc.match(/наносит\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
+                  desc.match(/(\d+)\s*(?:ед\.?\s*)?урон/i);
+        return m ? parseInt(m[1]) : null;
+    }
+
+    function populateGmAttackSelects() {
+        const attackerSelect = el('gm-attack-attacker-select');
+        const targetSelect = el('gm-attack-target-select');
+        if (!attackerSelect || !targetSelect) return;
+        const enemies = (lastData.enemies || []).filter(e => (e.curHp || 0) > 0);
+        const prevAtk = attackerSelect.value;
+        attackerSelect.innerHTML = enemies.length
+            ? enemies.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (HP ${e.curHp}/${e.maxHp})</option>`).join('')
+            : '<option value="">Нет живых противников</option>';
+        if (enemies.some(e => e.id === prevAtk)) attackerSelect.value = prevAtk;
+
+        const uids = Object.keys(lastData.participants || {});
+        const prevTgt = targetSelect.value;
+        targetSelect.innerHTML = uids.length
+            ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
+            : '<option value="">Нет игроков в сессии</option>';
+        if (uids.includes(prevTgt)) targetSelect.value = prevTgt;
+
+        onGmAttackAttackerPicked();
+    }
+
+    window.onGmAttackAttackerPicked = function () {
+        const attackerId = el('gm-attack-attacker-select').value;
+        const actionSelect = el('gm-attack-action-select');
+        if (!actionSelect) return;
+        const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
+        if (!enemy) { actionSelect.innerHTML = '<option value="">—</option>'; return; }
+        let opts = '';
+        if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemy.weaponDmg} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
+        (enemy.spells || []).forEach((s, i) => {
+            opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${s.dmg} урона / ${s.cost} МП)</option>`;
+        });
+        (enemy.shouts || []).forEach((s, i) => {
+            opts += `<option value="shout:${i}">🗣️ ${escapeHtml(s.name)} (эффект, без прямого урона)</option>`;
+        });
+        actionSelect.innerHTML = opts || '<option value="">У этого противника нет известных действий — впиши урон вручную в журнал</option>';
+    };
+
+    window.rollGmAttack = function () {
+        const attackerId = el('gm-attack-attacker-select').value;
+        const targetUid = el('gm-attack-target-select').value;
+        const actionVal = el('gm-attack-action-select').value;
+        const resultBox = el('gm-attack-roll-result');
+        const textEl = el('gm-attack-roll-text');
+        const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
+        const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
+        if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
+
+        let dmg = 0, actionLabel = '';
+        if (actionVal === 'weapon') {
+            dmg = enemy.weaponDmg || 0;
+            actionLabel = 'оружием';
+        } else if (actionVal.indexOf('spell:') === 0) {
+            const s = enemy.spells[parseInt(actionVal.slice(6))];
+            dmg = s ? s.dmg : 0;
+            actionLabel = `заклинанием «${s ? s.name : '?'}»`;
+        } else if (actionVal.indexOf('shout:') === 0) {
+            const s = enemy.shouts[parseInt(actionVal.slice(6))];
+            dmg = 0;
+            actionLabel = `криком «${s ? s.name : '?'}» (${s ? s.effect : ''})`;
+        }
+        const roll = Math.floor(Math.random() * 20) + 1;
+
+        pendingGmAttack = {
+            targetUid, dmg,
+            logText: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: к20=${roll}${dmg ? ', урон ' + dmg : ''}.`
+        };
+        textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
+            `Бросок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${roll}</strong><br>` +
+            (dmg ? `Урон при попадании: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед.` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
+        resultBox.style.display = 'block';
+    };
+
+    window.applyGmAttackDamage = function () {
+        if (!pendingGmAttack) return;
+        const { targetUid, dmg, logText } = pendingGmAttack;
+        if (!dmg) {
+            // Просто логируем эффект без урона (крики и т.п.)
+            gmPostLogEntryText(logText);
+            pendingGmAttack = null;
+            el('gm-attack-roll-result').style.display = 'none';
+            return;
+        }
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
+            const newHp = Math.max(0, (parseInt(vitals[0]) || 0) - dmg);
+            vitals[0] = newHp;
+            return db.collection('characters').doc(targetUid).update({ vitals }).then(() => newHp);
+        }).then(newHp => {
+            const patch = {};
+            patch['participants.' + targetUid + '.curHp'] = newHp;
+            return db.collection('sessions').doc(currentCode).update(patch);
+        }).then(() => {
+            gmPostLogEntryText(logText);
+            alert('Урон применён игроку.');
+            pendingGmAttack = null;
+            el('gm-attack-roll-result').style.display = 'none';
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
 
 })();

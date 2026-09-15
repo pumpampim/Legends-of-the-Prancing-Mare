@@ -636,11 +636,34 @@
                         <input type="checkbox" id="chk-sprint-attack" onchange="updateAll(); saveLocalStorage();">
                         <label for="chk-sprint-attack">Рывок-атака на бегу, дистанция подходит (перки «Рывок»/«Великий рывок», урон х2 вместо обычной силовой атаки)</label>
                     </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-defensive-stance" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-defensive-stance">🛡️ Защитная стойка (щит работает как щит — даёт бонус от перков блокирования; без стойки щит даёт только голую броню)</label>
+                    </div>
                 </div>
 
                 <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px; border:1px solid var(--border-color);">
                     <h3 style="margin-top:0;">Расчет текущей боевой готовности</h3>
                     <div id="combat-results" style="font-size:12px; line-height:1.4; color:var(--text-color);"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>⚔️ Разрешить атаку</h2>
+                <p style="font-size:12px; opacity:.8;">Атакуй противника из активной сессии мастера напрямую: сайт бросит кубы, посчитает урон (оружие или заклинание) и покажет результат. Применение урона к цели — отдельная кнопка, жми только когда попадание подтверждено за столом.</p>
+
+                <label>Цель</label>
+                <select id="attack-target-select"></select>
+
+                <label>Чем атаковать</label>
+                <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
+                <div id="attack-action-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+
+                <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()">🎲 Бросить</button>
+
+                <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
+                    <div id="attack-roll-text"></div>
+                    <button class="btn-success" style="width:100%; margin-top:8px;" id="attack-apply-btn" onclick="applyPlayerAttackDamage()">✅ Применить урон к цели</button>
                 </div>
             </div>
 
@@ -711,42 +734,68 @@
                 Записывайте любые заклинания, выученные в Коллегии. Вы можете вручную изменять как базовую, так и текущую стоимость каста заклинания!
             </p>
 
-            <div class="grid-2">
-                <!-- Школа Разрушения -->
-                <div class="panel" style="background:var(--panel-sub); border-color:#94291f;">
-                    <h3 style="color:#e74c3c;">🔥 Школа Разрушения</h3>
+            <div class="panel">
+                <div class="profession-header" onclick="toggleAccordion('magic','destr')">
+                    <span style="color:#e74c3c;">🔥 Школа Разрушения</span><span id="magic-chevron-destr">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-destr">
                     <div id="spells-destr-list"></div>
                     <button class="btn" style="background:#94291f; color:white; font-size:11px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
                 </div>
 
-                <!-- Школа Восстановления -->
-                <div class="panel" style="background:var(--panel-sub); border-color:#1e8449;">
-                    <h3 style="color:#2ecc71;">☀️ Школа Восстановления</h3>
+                <div class="profession-header" onclick="toggleAccordion('magic','restor')">
+                    <span style="color:#2ecc71;">☀️ Школа Восстановления</span><span id="magic-chevron-restor">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-restor">
                     <div id="spells-restor-list"></div>
                     <button class="btn" style="background:#1e8449; color:white; font-size:11px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
                 </div>
 
-                <!-- Школа Изменения -->
-                <div class="panel" style="background:var(--panel-sub); border-color:#f1c40f;">
-                    <h3 style="color:#f1c40f;">🍃 Школа Изменения</h3>
+                <div class="profession-header" onclick="toggleAccordion('magic','alter')">
+                    <span style="color:#f1c40f;">🍃 Школа Изменения</span><span id="magic-chevron-alter">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-alter">
                     <div id="spells-alter-list"></div>
                     <button class="btn" style="background:#f39c12; color:white; font-size:11px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
                 </div>
 
-                <!-- Школа Иллюзии -->
-                <div class="panel" style="background:var(--panel-sub); border-color:#8e44ad;">
-                    <h3 style="color:#9b59b6;">👁️ Школа Иллюзии</h3>
+                <div class="profession-header" onclick="toggleAccordion('magic','illus')">
+                    <span style="color:#9b59b6;">👁️ Школа Иллюзии</span><span id="magic-chevron-illus">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-illus">
                     <div id="spells-illus-list"></div>
                     <button class="btn" style="background:#8e44ad; color:white; font-size:11px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
                 </div>
 
-                <!-- Школа Колдовства -->
-                <div class="panel" style="background:var(--panel-sub); border-color:#34495e;">
-                    <h3 style="color:#5d6d7e;">💀 Школа Колдовства</h3>
+                <div class="profession-header" onclick="toggleAccordion('magic','conj')">
+                    <span style="color:#5d6d7e;">💀 Школа Колдовства</span><span id="magic-chevron-conj">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-conj">
                     <div id="spells-conj-list"></div>
                     <button class="btn" style="background:#34495e; color:white; font-size:11px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
                 </div>
 
+                <div class="profession-header" onclick="toggleAccordion('magic','summons')">
+                    <span>🐺 Призванные существа</span><span id="magic-chevron-summons">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-summons">
+                    <p style="font-size:11px; opacity:.75;">Существа-оружие/зомби/питомец/атронахи держатся по ходам, как обычные баффы — тикают на «Следующий ход»/«Следующий круг» на вкладке «Проверка». Скелет-компаньон — исключение: призывается навсегда за «Кучку костей» и не истекает по времени.</p>
+                    <label>Кого призвать</label>
+                    <select id="summon-template-select" onchange="updateSummonTemplateInfo()"></select>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px;">
+                        <input type="checkbox" id="summon-enhanced-check" onchange="updateSummonTemplateInfo()">
+                        Усиленный вариант (если доступен для этого заклинания)
+                    </label>
+                    <div id="summon-template-info" style="font-size:11px; opacity:.8; margin:4px 0 8px;"></div>
+                    <button class="btn-success" style="width:100%;" onclick="summonCreature()">Призвать</button>
+                    <div id="summon-create-result" style="margin-top:6px; font-size:12px;"></div>
+
+                    <h3 style="margin-top:14px;">Активные существа</h3>
+                    <div id="active-summons-list"></div>
+                </div>
+            </div>
+
+            <div class="grid-2">
                 <!-- Лаборатория писца -->
                 <div class="panel" style="background:#111; border-color:var(--accent-color);">
                     <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
@@ -1208,6 +1257,28 @@
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
+    let activeSummons = []; // [{ id, category, name, curHp, maxHp, dmg, dmgType, speed, turnsRemaining, permanent }]
+
+    // Шаблоны призываемых/поднимаемых существ. Урон/хп/длительность оружия и трупов —
+    // цифры прямо из описаний заклинаний (магия.xlsx). Атронахи в файлах даны только
+    // качественно ("сильнее", без цифр) — их хп/урон я оценил по общеизвестным ванильным
+    // значениям Skyrim, это явно помечено ниже как оценка.
+    const summonTemplates = [
+        { category: 'weapon', name: 'Призванный меч', dmgBase: 13, dmgEnh: 17, dmgType: 'физический', durBase: 10, durEnh: 15, spellName: 'Призванный меч' },
+        { category: 'weapon', name: 'Призванный кинжал', dmgBase: 8, dmgEnh: 14, dmgType: 'физический', durBase: 10, durEnh: 15, spellName: 'Призванный кинжал' },
+        { category: 'weapon', name: 'Призванная секира', dmgBase: 17, dmgEnh: 22, dmgType: 'физический', durBase: 12, durEnh: 17, spellName: 'Призванная секира' },
+        { category: 'weapon', name: 'Призванный лук', dmgBase: 20, dmgEnh: 27, dmgType: 'физический', durBase: 14, durEnh: 20, spellName: 'Призванный лук' },
+        { category: 'corpse', name: 'Слабый мертвец', hpBase: 100, hpEnh: 120, dmgBase: 20, dmgEnh: 25, dmgType: 'физический', durBase: 10, durEnh: 15, spellName: 'Оживление зомби' },
+        { category: 'corpse', name: 'Мертвец (ур.7)', hpBase: 140, hpEnh: 160, dmgBase: 35, dmgEnh: 40, dmgType: 'физический', durBase: 10, durEnh: 16, spellName: 'Оживление трупа' },
+        { category: 'corpse', name: 'Призрак (ур.13)', hpBase: 180, hpEnh: 200, dmgBase: 45, dmgEnh: 50, dmgType: 'физический', durBase: 11, durEnh: 18, spellName: 'Призрак' },
+        { category: 'corpse', name: 'Ужасный зомби (ур.17)', hpBase: 200, hpEnh: 200, dmgBase: 55, dmgEnh: 65, dmgType: 'физический', durBase: 20, durEnh: 24, spellName: 'Ужасный зомби' },
+        { category: 'wolf', name: 'Огненный волк', hpBase: 80, dmgBase: 20, dmgType: 'физический', durBase: 6, durEnh: 6, note: 'При истечении времени взрывается: 30/50 урона огнём в большом радиусе', spellName: 'Огненный питомец' },
+        { category: 'atronach', name: 'Огненный атронах', hpBase: 180, dmgBase: 20, dmgType: 'огонь', durBase: 15, durEnh: 18, enhCount: 2, estimated: true, spellName: 'Вызов огненного атронаха' },
+        { category: 'atronach', name: 'Ледяной атронах', hpBase: 240, dmgBase: 15, dmgType: 'холод', durBase: 16, durEnh: 20, enhCount: 2, estimated: true, note: 'Замедляет цель', spellName: 'Вызов ледяного атронаха' },
+        { category: 'atronach', name: 'Грозовой атронах', hpBase: 250, dmgBase: 25, dmgType: 'электричество', durBase: 20, durEnh: 24, enhCount: 2, estimated: true, spellName: 'Вызов грозового атронаха' },
+        { category: 'skeleton', name: 'Скелет-компаньон', hpBase: 50, dmgBase: 12, dmgType: 'физический', speed: 30, permanent: true, requiresItem: 'Кучка костей' }
+    ];
+
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
     let gameTurn = 0, gameRound = 0;
     let characterLevel = 1;
@@ -1398,7 +1469,26 @@
     }
 
     // Аккордеон вкладки «Профессии» — раскрывает одну профессию за раз, остальные сворачивает.
-    // Гарантирует, что разделы профессий скрыты при самой первой отрисовке —
+    // Универсальный аккордеон: groupId разделяет независимые группы разделов (профессии/школы магии),
+    // чтобы открытие одной группы не сворачивало другую на другой вкладке.
+    window.toggleAccordion = function (groupId, itemId) {
+        const body = document.getElementById(groupId + '-body-' + itemId);
+        const chevron = document.getElementById(groupId + '-chevron-' + itemId);
+        if (!body) return;
+        const willOpen = !body.classList.contains('open');
+        document.querySelectorAll('.profession-body[id^="' + groupId + '-body-"]').forEach(el => {
+            el.classList.remove('open');
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('[id^="' + groupId + '-chevron-"]').forEach(el => el.textContent = '▸');
+        if (willOpen) {
+            body.classList.add('open');
+            body.style.display = 'block';
+            if (chevron) chevron.textContent = '▾';
+        }
+    };
+
+    // Гарантирует, что разделы аккордеона скрыты при самой первой отрисовке —
     // не полагаясь только на внешний CSS (на случай устаревшего кэша style.css).
     function initProfessionAccordion() {
         document.querySelectorAll('.profession-body').forEach(el => {
@@ -1408,22 +1498,7 @@
     }
 
     window.toggleProfession = function (id) {
-        const body = document.getElementById('prof-body-' + id);
-        const chevron = document.getElementById('prof-chevron-' + id);
-        if (!body) return;
-        const willOpen = !body.classList.contains('open');
-        // Инлайн-стиль ставим напрямую (не только через CSS-класс) — так переключение
-        // работает даже если внешний style.css почему-то не подгрузился/закэшировался старым.
-        document.querySelectorAll('.profession-body').forEach(el => {
-            el.classList.remove('open');
-            el.style.display = 'none';
-        });
-        document.querySelectorAll('[id^="prof-chevron-"]').forEach(el => el.textContent = '▸');
-        if (willOpen) {
-            body.classList.add('open');
-            body.style.display = 'block';
-            if (chevron) chevron.textContent = '▾';
-        }
+        window.toggleAccordion('prof', id);
     };
 
     // Ограничение сытости (не более двух блюд за раз)
@@ -1562,6 +1637,9 @@
                 </div>
                 <input type="text" value="${escHtml(name)}" class="spell-name-custom" placeholder="Название заклинания..." style="width:100%; font-weight:bold; padding:2px; margin-bottom:4px; display:${isCustomName || !name ? 'block' : 'none'};" onchange="saveSpellsAndRefresh()">
                 <textarea class="spell-desc" rows="2" style="font-size:11px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
+                <select class="spell-target-select" style="width:100%; font-size:11px; margin-bottom:4px; padding:2px;" onfocus="populateSpellTargetSelect(this)">
+                    <option value="self">Цель: на себя</option>
+                </select>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
                     <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
                     <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}')">Каст</button>
@@ -1627,6 +1705,8 @@
         });
         localStorage.setItem('skyrim_custom_spells_v3_5', JSON.stringify(customSpells));
         renderScrollSpellSelect();
+        if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
+        if (typeof renderMagicStaffSpellSelect === 'function') renderMagicStaffSpellSelect();
         updateAll();
     }
 
@@ -1668,6 +1748,26 @@
         return total;
     }
 
+    // Заполняет список целей заклинания при открытии: себя, союзники из активной сессии,
+    // собственные активные призванные существа. Пока это просто выбор + запись в журнал —
+    // автоматическое применение конкретного эффекта на цель не наложенное (см. чат).
+    window.populateSpellTargetSelect = function (selectEl) {
+        if (selectEl.dataset.populated) return;
+        selectEl.dataset.populated = '1';
+        let opts = '<option value="self">Цель: на себя</option>';
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        if (session && session.participants) {
+            const myName = document.getElementById('char-name').value;
+            Object.entries(session.participants).forEach(([uid, p]) => {
+                if (p.name && p.name !== myName) opts += `<option value="ally:${escHtml(p.name)}">Цель: ${escHtml(p.name)} (союзник)</option>`;
+            });
+        }
+        (activeSummons || []).forEach(s => {
+            opts += `<option value="summon:${escHtml(s.id)}">Цель: ${escHtml(s.name)} (моё существо)</option>`;
+        });
+        selectEl.innerHTML = opts;
+    };
+
     function castCustomSpell(id) {
         const card = document.getElementById(`card-${id}`);
         if (!card) return;
@@ -1675,7 +1775,20 @@
         let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
         if (curMp >= finalCost) {
             document.getElementById('cur-mp').value = curMp - finalCost;
-            alert("Заклинание прочитано! Мана успешно списана.");
+            const targetSelect = card.querySelector('.spell-target-select');
+            const targetVal = targetSelect ? targetSelect.value : 'self';
+            const spellName = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
+            let targetLabel = 'на себя';
+            if (targetVal.indexOf('ally:') === 0) targetLabel = 'на ' + targetVal.slice(5) + ' (союзник)';
+            else if (targetVal.indexOf('summon:') === 0) {
+                const s = activeSummons.find(x => x.id === targetVal.slice(7));
+                targetLabel = 'на ' + (s ? s.name : 'своё существо') + ' (существо)';
+            }
+            alert(`Заклинание «${spellName}» прочитано ${targetLabel}! Мана успешно списана.`);
+            if (targetVal !== 'self' && window.CloudSync) {
+                const myName = document.getElementById('char-name').value;
+                window.CloudSync.postCombatLog(`✨ ${myName} кастует «${spellName}» ${targetLabel}.`, myName);
+            }
             const container = card.closest('[id^="spells-"]');
             const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
             if (school && SCHOOL_CODE_TO_SKILL[school] && typeof logSkillSuccessByName === 'function') {
@@ -2685,6 +2798,110 @@
         saveLocalStorage();
     };
 
+    // ========================================================================
+    // ПРИЗВАННЫЕ/ПОДНЯТЫЕ СУЩЕСТВА
+    // ========================================================================
+
+    function renderSummonTemplateSelect() {
+        const select = document.getElementById('summon-template-select');
+        if (!select) return;
+        const catLabels = { weapon: 'Оружие', corpse: 'Труп/зомби', wolf: 'Питомец', atronach: 'Атронах', skeleton: 'Скелет (постоянный)' };
+        select.innerHTML = summonTemplates.map((t, i) => `<option value="${i}">${escHtml(t.name)} (${catLabels[t.category]})</option>`).join('');
+        updateSummonTemplateInfo();
+    }
+
+    window.updateSummonTemplateInfo = function () {
+        const idx = parseInt(document.getElementById('summon-template-select').value) || 0;
+        const t = summonTemplates[idx];
+        const infoEl = document.getElementById('summon-template-info');
+        if (!t || !infoEl) return;
+        let html = '';
+        if (t.hpBase) html += `ХП: ${t.hpBase}${t.hpEnh && t.hpEnh !== t.hpBase ? ' (усилен: ' + t.hpEnh + ')' : ''} · `;
+        html += `Урон: ${t.dmgBase} (${t.dmgType})${t.dmgEnh ? ', усилен: ' + t.dmgEnh : ''}<br>`;
+        if (t.permanent) {
+            html += `Длительность: <strong>навсегда</strong> — требует предмет «${t.requiresItem}» (расходуется, возвращается при роспуске)`;
+        } else {
+            html += `Длительность: ${t.durBase} ходов${t.durEnh ? ' (усилен: ' + t.durEnh + ')' : ''}${t.enhCount ? ` · усиленный вариант призывает ${t.enhCount}` : ''}`;
+        }
+        if (t.estimated) html += `<br><span style="color:#e67e22;">⚠ ХП и урон — оценка по общим значениям Skyrim (в таблицах не прописаны). Длительность (ходы) — реальное число из описания заклинания призыва.</span>`;
+        if (t.note) html += `<br><span style="opacity:.8;">${escHtml(t.note)}</span>`;
+        infoEl.innerHTML = html;
+    };
+
+    window.summonCreature = function () {
+        const idx = parseInt(document.getElementById('summon-template-select').value) || 0;
+        const t = summonTemplates[idx];
+        const resultEl = document.getElementById('summon-create-result');
+        if (!t) return;
+
+        if (t.permanent) {
+            if (countInInventory(t.requiresItem) <= 0) {
+                resultEl.innerHTML = `<span style="color:#e74c3c;">Нужен предмет «${escHtml(t.requiresItem)}» в инвентаре.</span>`;
+                return;
+            }
+            removeFromInventoryByName(t.requiresItem, 1);
+        }
+
+        const enhanced = document.getElementById('summon-enhanced-check') && document.getElementById('summon-enhanced-check').checked;
+        activeSummons.push({
+            id: 'sum-' + Date.now() + Math.random().toString(36).slice(2, 6),
+            category: t.category, name: t.name,
+            curHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
+            maxHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
+            dmg: enhanced && t.dmgEnh ? t.dmgEnh : t.dmgBase,
+            dmgType: t.dmgType,
+            speed: t.speed || 30,
+            turnsRemaining: t.permanent ? null : (enhanced && t.durEnh ? t.durEnh : t.durBase),
+            permanent: !!t.permanent
+        });
+        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Призван(а) «${escHtml(t.name)}».</span>`;
+        renderActiveSummonsList();
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
+    function renderActiveSummonsList() {
+        const el = document.getElementById('active-summons-list');
+        if (!el) return;
+        if (!activeSummons.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных существ.</p>'; return; }
+        el.innerHTML = activeSummons.map(s => `
+            <div class="party-row">
+                <div class="row-name"><strong>${escHtml(s.name)}</strong><span>${s.permanent ? 'навсегда' : s.turnsRemaining + ' х. осталось'}</span></div>
+                <div style="font-size:12px; margin:2px 0;">
+                    ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:60px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
+                    Урон: ${s.dmg} (${escHtml(s.dmgType)}) · Скорость: ${s.speed} фт.
+                </div>
+                <button style="width:100%; margin-top:2px;" onclick="dismissSummon('${s.id}')">Развеять/Отпустить</button>
+            </div>`).join('');
+    }
+
+    window.setSummonHp = function (id, value) {
+        const s = activeSummons.find(x => x.id === id);
+        if (!s) return;
+        s.curHp = Math.max(0, parseInt(value) || 0);
+        saveLocalStorage();
+    };
+
+    window.dismissSummon = function (id) {
+        const idx = activeSummons.findIndex(x => x.id === id);
+        if (idx === -1) return;
+        const s = activeSummons[idx];
+        if (s.permanent) {
+            addToInventory('Кучка костей', 'Кучка костей', 1, 1, 'Бытовые предметы', '', {});
+            renderInventoryList();
+        }
+        activeSummons.splice(idx, 1);
+        renderActiveSummonsList();
+        saveLocalStorage();
+    };
+
+    // Тикает вместе с обычными активными эффектами по нажатию «Следующий ход»/«Следующий круг».
+    function tickActiveSummons() {
+        activeSummons.forEach(s => { if (!s.permanent) s.turnsRemaining -= 1; });
+        activeSummons = activeSummons.filter(s => s.permanent || s.turnsRemaining > 0);
+        renderActiveSummonsList();
+    }
+
     function renderPouchPanel() {
         const capEl = document.getElementById('pouch-capacity-info');
         const loadSelect = document.getElementById('pouch-load-select');
@@ -2824,6 +3041,7 @@
         activeTimedEffects.forEach(e => { e.turnsRemaining -= 1; });
         activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0);
         renderActiveEffects();
+        if (typeof tickActiveSummons === 'function') tickActiveSummons();
         updateAll();
     }
 
@@ -3626,6 +3844,122 @@
         saveLocalStorage();
     };
 
+    // ========================================================================
+    // РАЗРЕШИТЬ АТАКУ (игрок атакует цель из активной сессии мастера)
+    // ========================================================================
+
+    let pendingPlayerAttack = null; // { targetId, dmg, logText }
+
+    // Достаёт число урона из описания заклинания (в тексте почти всегда явно
+    // указано "наносит N урона" — берём первое такое совпадение).
+    function parseSpellDamageFromDesc(desc) {
+        if (!desc) return null;
+        const m = desc.match(/наносящ\w*\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
+                  desc.match(/наносит\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
+                  desc.match(/(\d+)\s*(?:ед\.?\s*)?урон/i);
+        return m ? parseInt(m[1]) : null;
+    }
+
+    window.renderAttackTargetSelect = function () {
+        const select = document.getElementById('attack-target-select');
+        if (!select) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const enemies = (session && session.enemies) || [];
+        const alive = enemies.filter(e => (e.curHp || 0) > 0);
+        const prev = select.value;
+        select.innerHTML = alive.length
+            ? alive.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)} (HP ${e.curHp}/${e.maxHp})</option>`).join('')
+            : '<option value="">Нет активных целей (зайди в сессию мастера на вкладке «Сессия»)</option>';
+        if (alive.some(e => e.id === prev)) select.value = prev;
+    };
+
+    function renderAttackActionSelect() {
+        const select = document.getElementById('attack-action-select');
+        if (!select) return;
+        let opts = '<option value="melee">Оружие ближнего боя</option><option value="ranged">Оружие дальнего боя</option>';
+        (customSpells || []).forEach(s => {
+            const dmg = parseSpellDamageFromDesc(s.desc);
+            if (dmg) opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)} (заклинание, ~${dmg} урона)</option>`;
+        });
+        select.innerHTML = opts;
+        updateAttackActionInfo();
+    }
+
+    window.updateAttackActionInfo = function () {
+        const val = document.getElementById('attack-action-select').value;
+        const infoEl = document.getElementById('attack-action-info');
+        if (!infoEl) return;
+        if (val === 'melee' || val === 'ranged') {
+            infoEl.textContent = 'Считается по текущей экипировке (как в блоке «Расчёт боевой готовности» выше).';
+        } else if (val && val.indexOf('spell:') === 0) {
+            const spell = customSpells.find(s => s.id === val.slice(6));
+            const dmg = spell ? parseSpellDamageFromDesc(spell.desc) : null;
+            infoEl.textContent = spell ? `Базовый урон из описания заклинания: ${dmg}. Бросок — 1d20 + модификатор характеристики школы.` : '';
+        } else {
+            infoEl.textContent = '';
+        }
+    };
+
+    window.rollPlayerAttack = function () {
+        const targetId = document.getElementById('attack-target-select').value;
+        const actionVal = document.getElementById('attack-action-select').value;
+        const resultBox = document.getElementById('attack-roll-result');
+        const textEl = document.getElementById('attack-roll-text');
+        if (!targetId) { alert('Выбери цель.'); return; }
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const target = session && (session.enemies || []).find(e => e.id === targetId);
+        if (!target) { alert('Цель не найдена — обнови список.'); return; }
+
+        let dmg = 0, roll = 0, mod = 0, rollTotal = 0, actionLabel = '';
+
+        if (actionVal === 'melee' || actionVal === 'ranged') {
+            document.getElementById('active-combat-weapon').value = actionVal;
+            updateCombat();
+            const calc = window.lastWeaponCombatCalc || { totalDmg: 0, hitModifier: 0 };
+            roll = Math.floor(Math.random() * 20) + 1;
+            mod = calc.hitModifier;
+            rollTotal = roll + mod;
+            dmg = calc.totalDmg;
+            actionLabel = actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием';
+        } else if (actionVal.indexOf('spell:') === 0) {
+            const spell = customSpells.find(s => s.id === actionVal.slice(6));
+            if (!spell) { alert('Заклинание не найдено.'); return; }
+            dmg = parseSpellDamageFromDesc(spell.desc) || 0;
+            const skillName = SCHOOL_CODE_TO_SKILL[spell.school] || null;
+            const statKey = skillName ? SKILL_TO_STAT[skillName] : null;
+            const statInput = statKey ? document.getElementById('stat-' + statKey) : null;
+            const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
+            mod = calcAbilityMod(rawStat);
+            roll = Math.floor(Math.random() * 20) + 1;
+            rollTotal = roll + mod;
+            actionLabel = `заклинанием «${spell.name}»`;
+        } else {
+            alert('Выбери способ атаки.');
+            return;
+        }
+
+        pendingPlayerAttack = {
+            targetId, dmg,
+            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: бросок ${rollTotal} (к20 ${roll}${mod >= 0 ? '+' : ''}${mod}), урон ${dmg}.`
+        };
+        textEl.innerHTML = `<strong>Бросок:</strong> 1d20 (${roll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${rollTotal}</strong><br>` +
+            `<strong>Урон при попадании:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
+        resultBox.style.display = 'block';
+    };
+
+    window.applyPlayerAttackDamage = function () {
+        if (!pendingPlayerAttack || !window.CloudSync) return;
+        const playerName = document.getElementById('char-name') ? document.getElementById('char-name').value : 'Игрок';
+        window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText)
+            .then(res => {
+                alert(`Урон применён! «${res.enemyName}»: осталось ${res.newHp} HP.`);
+                pendingPlayerAttack = null;
+                document.getElementById('attack-roll-result').style.display = 'none';
+                window.renderAttackTargetSelect();
+            })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
+
     function restoreAll() {
         let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
         let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
@@ -3779,7 +4113,12 @@
         }
 
         const bodyArmorBase = helmArmorVal + chestArmorVal + glovesArmorVal + bootsArmorVal;
-        const shieldArmorBonused = Math.round(shieldArmorVal * (1 + (perks.shieldArmorBonus || 0)));
+        // Без активной защитной стойки щит даёт только голую броню — бонусы перков
+        // блокирования (Щитоносец и т.п.) применяются, только когда реально блокируешь им.
+        const inDefensiveStance = document.getElementById('chk-defensive-stance').checked;
+        const shieldArmorBonused = inDefensiveStance
+            ? Math.round(shieldArmorVal * (1 + (perks.shieldArmorBonus || 0)))
+            : shieldArmorVal;
 
         let totalArmor = Math.round(bodyArmorBase * (1 + armorPercentBonus)) + shieldArmorBonused +
                          (parseInt(document.getElementById('armor-buff').value) || 0);
@@ -4080,6 +4419,9 @@
 
     document.getElementById('combat-results').innerHTML = finalHtml;
     document.getElementById('main-panel-dmg').value = totalDmg;
+
+    // Экспонируем последний расчёт наружу — читает инструмент «Разрешить атаку».
+    window.lastWeaponCombatCalc = { totalDmg, hitModifier, dieSize: 20, mode, wepType, sneakMult };
 }
     
     // Сохранение всех параметров листа в LocalStorage
@@ -4141,6 +4483,11 @@
             wepRName: document.getElementById('wep-ranged-name').value,
             wepMOffhandName: document.getElementById('wep-melee-offhand-name').value,
             wepMOffhandDmg: document.getElementById('wep-melee-offhand-dmg').value,
+            chkDualWield: document.getElementById('chk-dual-wield').checked,
+            chkSprintAttack: document.getElementById('chk-sprint-attack').checked,
+            chkFrostRegion: document.getElementById('chk-frost-region').checked,
+            chkSneakAttack: document.getElementById('chk-sneak-attack').checked,
+            chkDefensiveStance: document.getElementById('chk-defensive-stance').checked,
             wepRDmg: document.getElementById('wep-ranged-dmg').value,
             wepRType: document.getElementById('wep-ranged-type').value,
             amName: document.getElementById('ammo-name').value,
@@ -4174,7 +4521,8 @@
             levelUpProgress: levelUpProgress,
             perkPointsAvailable: perkPointsAvailable,
             skillProgress: skillProgress,
-            playerQuests: playerQuests
+            playerQuests: playerQuests,
+            activeSummons: activeSummons
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -4253,6 +4601,11 @@
             document.getElementById('wep-melee-type').value = data.wepMType || 'unarmed';
             document.getElementById('wep-melee-offhand-name').value = data.wepMOffhandName || '';
             document.getElementById('wep-melee-offhand-dmg').value = data.wepMOffhandDmg || 0;
+            document.getElementById('chk-dual-wield').checked = !!data.chkDualWield;
+            document.getElementById('chk-sprint-attack').checked = !!data.chkSprintAttack;
+            document.getElementById('chk-frost-region').checked = !!data.chkFrostRegion;
+            document.getElementById('chk-sneak-attack').checked = !!data.chkSneakAttack;
+            document.getElementById('chk-defensive-stance').checked = !!data.chkDefensiveStance;
             document.getElementById('wep-ranged-name').value = data.wepRName || '';
             document.getElementById('wep-ranged-dmg').value = data.wepRDmg || 10;
             document.getElementById('wep-ranged-type').value = data.wepRType || 'bow';
@@ -4296,6 +4649,8 @@
             perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
             playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
+            activeSummons = Array.isArray(data.activeSummons) ? data.activeSummons : [];
+            renderActiveSummonsList();
             renderQuestList();
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
@@ -4422,6 +4777,8 @@
     renderMagicStaffSpellSelect();
     renderMagicStaffList();
     renderQuestList();
+    renderSummonTemplateSelect();
+    renderActiveSummonsList();
     initProfessionAccordion();
     renderEquipPanel();
     renderScrollSpellSelect();
@@ -4435,6 +4792,8 @@
     renderDiceSkillSelect();
     updateLockInfo();
     renderLevelPanel();
+    renderAttackActionSelect();
+    if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

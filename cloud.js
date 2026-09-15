@@ -135,6 +135,8 @@
 
     // ---------- Сохранение персонажа (вызывается из saveLocalStorage) ----------
 
+    let lastSessionData = null;
+
     window.CloudSync = {
         saveCharacter: function (data) {
             if (!currentUser || !db || !cloudDataReady) return;
@@ -155,6 +157,41 @@
                         .catch(e => console.error('Ошибка синхронизации с сессией:', e));
                 }
             }, 800);
+        },
+
+        // Текущие данные активной сессии (враги/группа/инициатива/журнал), как последний раз
+        // пришли из Firestore. null, если игрок не в сессии.
+        getSessionData: function () {
+            return lastSessionData;
+        },
+
+        // Списывает урон с конкретного противника в сессии и пишет запись в общий боевой журнал.
+        // Возвращает Promise. isPlayerAction=true подписывает запись именем игрока, а не "Мастер".
+        applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
+                const newHp = Math.max(0, (enemies[idx].curHp || 0) - dmgAmount);
+                enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
+                const update = { enemies: enemies };
+                if (logText) {
+                    update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText });
+                }
+                return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name }));
+            });
+        },
+
+        // Пишет произвольную запись в общий боевой журнал сессии от имени игрока.
+        postCombatLog: function (text, authorName) {
+            if (!currentSessionCode || !db || !text) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: text })
+            });
         }
     };
 
@@ -235,10 +272,12 @@
     }
 
     function renderSession(data) {
+        lastSessionData = data;
         renderParty(data.participants || {});
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
         renderLog(data.combatLog || []);
+        if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
     }
 
     function barRow(name, curHp, maxHp, curMp, maxMp) {
