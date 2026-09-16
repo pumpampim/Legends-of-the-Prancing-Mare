@@ -54,69 +54,36 @@ body {
     overflow-x: hidden;
 }
 
-/* ---------- АНИМИРОВАННОЕ СЕВЕРНОЕ НЕБО ---------- */
-
-/* Слой 1: ночное небо + северное сияние */
 body::before {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -2;
-    background:
-        radial-gradient(ellipse 80% 60% at 20% 15%, rgba(90, 200, 160, 0.22) 0%, transparent 60%),
-        radial-gradient(ellipse 70% 50% at 75% 25%, rgba(150, 110, 220, 0.18) 0%, transparent 55%),
-        radial-gradient(ellipse 90% 40% at 50% 80%, rgba(60, 130, 190, 0.15) 0%, transparent 65%),
-        linear-gradient(180deg, #0a1428 0%, #060b1a 45%, #030610 100%);
-    animation: auroraShift 28s ease-in-out infinite alternate;
+    /* Твоя картинка как основной фон */
+    background-image: url('skyrim-bg.gif');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    /* Слегка затемняем, чтобы текст поверх читался */
+    filter: brightness(0.75) saturate(0.9);
 }
 
-/* Слой 2: звёзды */
 body::after {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -1;
-    background-image:
-        radial-gradient(1px 1px at 12% 8%,  rgba(255,255,255,0.9), transparent 60%),
-        radial-gradient(1px 1px at 27% 22%, rgba(255,255,255,0.7), transparent 60%),
-        radial-gradient(1.5px 1.5px at 41% 12%, rgba(240,200,122,0.85), transparent 60%),
-        radial-gradient(1px 1px at 58% 6%,  rgba(255,255,255,0.65), transparent 60%),
-        radial-gradient(1px 1px at 73% 19%, rgba(255,255,255,0.8), transparent 60%),
-        radial-gradient(1.5px 1.5px at 88% 9%, rgba(200,220,255,0.9), transparent 60%),
-        radial-gradient(1px 1px at 15% 41%, rgba(255,255,255,0.6), transparent 60%),
-        radial-gradient(1px 1px at 35% 55%, rgba(255,255,255,0.5), transparent 60%),
-        radial-gradient(1.5px 1.5px at 52% 34%, rgba(255,255,255,0.85), transparent 60%),
-        radial-gradient(1px 1px at 68% 48%, rgba(255,255,255,0.55), transparent 60%),
-        radial-gradient(1px 1px at 82% 38%, rgba(240,200,122,0.7), transparent 60%),
-        radial-gradient(1px 1px at 8%  72%, rgba(255,255,255,0.5), transparent 60%),
-        radial-gradient(1px 1px at 47% 82%, rgba(255,255,255,0.6), transparent 60%),
-        radial-gradient(1.5px 1.5px at 92% 68%, rgba(200,220,255,0.75), transparent 60%);
-    background-size: 100% 100%;
-    animation: starTwinkle 7s ease-in-out infinite;
-    opacity: 0.85;
+    background:
+        radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%);
+    animation: bgPulse 12s ease-in-out infinite alternate;
 }
 
-@keyframes auroraShift {
-    0% {
-        background-position: 0% 0%, 0% 0%, 0% 0%, 0 0;
-        filter: hue-rotate(0deg);
-    }
-    50% {
-        background-position: 6% 4%, -8% 6%, 4% -3%, 0 0;
-        filter: hue-rotate(12deg);
-    }
-    100% {
-        background-position: -6% 3%, 6% -4%, -4% 5%, 0 0;
-        filter: hue-rotate(-10deg);
-    }
-}
-
-@keyframes starTwinkle {
-    0%, 100% { opacity: 0.85; }
-    45%      { opacity: 0.55; }
-    60%      { opacity: 1; }
+@keyframes bgPulse {
+    0%   { opacity: 0.9; }
+    100% { opacity: 1.0; }
 }
 
 /* ---------- КОНТЕЙНЕР ---------- */
