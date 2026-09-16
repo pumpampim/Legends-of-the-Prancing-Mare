@@ -326,7 +326,7 @@
     function renderEnemies(enemies) {
         const target = el('enemies-list');
         if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Противников нет.</p>'; return; }
-        target.innerHTML = enemies.map(e => barRow(e.name || '?', e.curHp || 0, e.maxHp || 0, e.curMp || 0, e.maxMp || 0)).join('');
+        target.innerHTML = enemies.map(e => barRow(e.name || '?', e.curHp || 0, e.maxHp || 0, e.curMp || 0, e.maxMp || 0, enemyAvatarData(e))).join('');
     }
 
     function renderInitiative(list) {

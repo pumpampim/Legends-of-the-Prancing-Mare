@@ -1276,8 +1276,17 @@
         { category: 'atronach', name: 'Огненный атронах', hpBase: 180, dmgBase: 20, dmgType: 'огонь', durBase: 15, durEnh: 18, enhCount: 2, estimated: true, spellName: 'Вызов огненного атронаха' },
         { category: 'atronach', name: 'Ледяной атронах', hpBase: 240, dmgBase: 15, dmgType: 'холод', durBase: 16, durEnh: 20, enhCount: 2, estimated: true, note: 'Замедляет цель', spellName: 'Вызов ледяного атронаха' },
         { category: 'atronach', name: 'Грозовой атронах', hpBase: 250, dmgBase: 25, dmgType: 'электричество', durBase: 20, durEnh: 24, enhCount: 2, estimated: true, spellName: 'Вызов грозового атронаха' },
-        { category: 'skeleton', name: 'Скелет-компаньон', hpBase: 50, dmgBase: 12, dmgType: 'физический', speed: 30, permanent: true, requiresItem: 'Кучка костей' }
+        { category: 'skeleton', name: 'Скелет-компаньон', hpBase: 50, dmgBase: 12, dmgType: 'физический', speed: 30, permanent: true, requiresItem: 'Кучка костей' },
+        // «Плоть» — временная броня поверх кирасы (слот «Одеяние» не трогается).
+        { category: 'armor', name: 'Дубовая плоть', armorBase: 40, armorEnh: 120, durBase: 9, durEnh: 13, spellName: 'Дубовая плоть' },
+        { category: 'armor', name: 'Каменная плоть', armorBase: 60, armorEnh: 180, durBase: 9, durEnh: 12, spellName: 'Каменная плоть' },
+        { category: 'armor', name: 'Железная плоть', armorBase: 80, armorEnh: 240, durBase: 12, durEnh: 15, spellName: 'Железная плоть' },
+        { category: 'armor', name: 'Эбонитовая плоть', armorBase: 120, armorEnh: 300, durBase: 12, durEnh: 18, spellName: 'Эбонитовая плоть' }
     ];
+
+    function findSummonTemplateBySpellName(name) {
+        return summonTemplates.find(t => t.spellName === name);
+    }
 
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
     let gameTurn = 0, gameRound = 0;
@@ -1768,6 +1777,58 @@
         selectEl.innerHTML = opts;
     };
 
+    // Общая логика "что происходит при успешном чтении заклинания" — используется и при
+    // обычном касте (тратит ману), и при использовании свитка (бесплатно, isFree=true).
+    // Возвращает {message, logText} для показа игроку/записи в журнал.
+    function resolveSpellEffect(spellName, desc, school, targetVal, isFree) {
+        let targetLabel = 'на себя';
+        if (targetVal.indexOf('ally:') === 0) targetLabel = 'на ' + targetVal.slice(5) + ' (союзник)';
+        else if (targetVal.indexOf('summon:') === 0) {
+            const s = activeSummons.find(x => x.id === targetVal.slice(7));
+            targetLabel = 'на ' + (s ? s.name : 'своё существо') + ' (существо)';
+        }
+
+        let extraMsg = '';
+        const template = findSummonTemplateBySpellName(spellName);
+        if (template) {
+            const res = performSummon(template, false);
+            extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
+        } else if (targetVal === 'self') {
+            // Обычный баф/лечение на себя — применяем как активный эффект (как у зелий).
+            const duration = parseDurationTurns(desc);
+            const plain = parsePlainEffectBonus(desc);
+            if (plain) {
+                activeTimedEffects.push({
+                    id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                    name: spellName, effectName: spellName, description: desc || '',
+                    turnsRemaining: duration,
+                    hp: plain.key === 'hp' ? plain.value : 0,
+                    mp: plain.key === 'mp' ? plain.value : 0,
+                    value: plain.value
+                });
+                renderActiveEffects();
+                extraMsg = ' Эффект применён на себя и тикает по ходам.';
+            }
+        } else if (targetVal.indexOf('summon:') === 0) {
+            // Лечение/бафф собственного существа — если получилось распарсить "+N хп", лечим напрямую.
+            const s = activeSummons.find(x => x.id === targetVal.slice(7));
+            const plain = parsePlainEffectBonus(desc);
+            if (s && plain && plain.key === 'hp' && s.maxHp) {
+                s.curHp = Math.min(s.maxHp, s.curHp + plain.value);
+                renderActiveSummonsList();
+                extraMsg = ` «${s.name}» восстановлено ${plain.value} ХП (сейчас ${s.curHp}/${s.maxHp}).`;
+            }
+        }
+        // targetVal.indexOf('ally:') === 0 — применить эффект на ЧУЖОГО игрока напрямую
+        // сайт пока не умеет, только фиксирует факт каста в общем боевом журнале ниже.
+
+        return {
+            message: `Заклинание «${spellName}» прочитано ${targetLabel}!${isFree ? ' (бесплатно, со свитка)' : ' Мана успешно списана.'}${extraMsg}`,
+            logText: `✨ кастует «${spellName}» ${targetLabel}.${extraMsg}`,
+            targetVal
+        };
+    }
+
     function castCustomSpell(id) {
         const card = document.getElementById(`card-${id}`);
         if (!card) return;
@@ -1778,19 +1839,16 @@
             const targetSelect = card.querySelector('.spell-target-select');
             const targetVal = targetSelect ? targetSelect.value : 'self';
             const spellName = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
-            let targetLabel = 'на себя';
-            if (targetVal.indexOf('ally:') === 0) targetLabel = 'на ' + targetVal.slice(5) + ' (союзник)';
-            else if (targetVal.indexOf('summon:') === 0) {
-                const s = activeSummons.find(x => x.id === targetVal.slice(7));
-                targetLabel = 'на ' + (s ? s.name : 'своё существо') + ' (существо)';
-            }
-            alert(`Заклинание «${spellName}» прочитано ${targetLabel}! Мана успешно списана.`);
-            if (targetVal !== 'self' && window.CloudSync) {
-                const myName = document.getElementById('char-name').value;
-                window.CloudSync.postCombatLog(`✨ ${myName} кастует «${spellName}» ${targetLabel}.`, myName);
-            }
+            const desc = card.querySelector('.spell-desc').value;
             const container = card.closest('[id^="spells-"]');
             const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
+
+            const result = resolveSpellEffect(spellName, desc, school, targetVal, false);
+            alert(result.message);
+            if (targetVal !== 'self' && window.CloudSync) {
+                const myName = document.getElementById('char-name').value;
+                window.CloudSync.postCombatLog(myName + ' ' + result.logText, myName);
+            }
             if (school && SCHOOL_CODE_TO_SKILL[school] && typeof logSkillSuccessByName === 'function') {
                 logSkillSuccessByName(SCHOOL_CODE_TO_SKILL[school]);
             }
@@ -1800,6 +1858,22 @@
             alert("Недостаточно маны (MP) для этого каста!");
         }
     }
+
+    // Свиток — одноразовое бесплатное чтение заклинания (не тратит ману, тратит сам свиток).
+    window.useScrollItem = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.count <= 0) return;
+        const spellName = item.scrollSpellName || item.name.replace(/^Свиток:\s*/, '');
+        const result = resolveSpellEffect(spellName, item.effect || '', item.scrollSchool || null, 'self', true);
+        removeFromInventoryByName(itemId, 1);
+        alert(result.message);
+        if (item.scrollSchool && SCHOOL_CODE_TO_SKILL[item.scrollSchool] && typeof logSkillSuccessByName === 'function') {
+            logSkillSuccessByName(SCHOOL_CODE_TO_SKILL[item.scrollSchool]);
+        }
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+    };
 
     // Лаборатория свитков
     function isPerTurnSpell(desc) {
@@ -1895,7 +1969,7 @@
 
         scrollWisdomSpent += tier;
         document.getElementById('val-scrolls').innerText = wis - scrollWisdomSpent;
-        addToInventory('Свиток: ' + spell.name, 'Свиток: ' + spell.name, 1, 0.1, 'Свиток', spell.desc, { scrollTier: tierNames[tier], price: tier * 15 });
+        addToInventory('Свиток: ' + spell.name, 'Свиток: ' + spell.name, 1, 0.1, 'Свиток', spell.desc, { scrollTier: tierNames[tier], price: tier * 15, scrollSchool: spell.school, scrollSpellName: spell.name });
         alert(`Успех! Потрачено ${tier} ед. Мудрости, 1 пергамент и ${inkNeeded} баночки чернил на свиток «${spell.name}». Осталось ${wis - scrollWisdomSpent} ед. Мудрости. Свиток добавлен в инвентарь.`);
         saveLocalStorage();
     };
@@ -2122,6 +2196,7 @@
                 </span>
                 <span style="display:flex; gap:4px; flex-shrink:0;">
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
+                    ${item.category === 'Свиток' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
                 </span>
@@ -2828,36 +2903,77 @@
         infoEl.innerHTML = html;
     };
 
+    function isSpellKnownOrScrolled(spellName) {
+        const known = customSpells.some(s => s.name === spellName);
+        const hasScroll = countInInventory('Свиток: ' + spellName) > 0;
+        return known || hasScroll;
+    }
+
+    // Призванное оружие занимает слот оружия (ближний/дальний в зависимости от типа),
+    // призванная/наколдованная "плоть"-броня занимает кирасу — в обоих случаях старое
+    // снаряжение запоминается и возвращается при роспуске/истечении времени. Одеяние не трогается.
+    function performSummon(t, enhanced) {
+        if (t.permanent) {
+            if (countInInventory(t.requiresItem) <= 0) return { ok: false, message: `Нужен предмет «${t.requiresItem}» в инвентаре.` };
+            removeFromInventoryByName(t.requiresItem, 1);
+        }
+        const entry = {
+            id: 'sum-' + Date.now() + Math.random().toString(36).slice(2, 6),
+            category: t.category, name: t.name,
+            curHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
+            maxHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
+            dmg: (t.dmgBase !== undefined) ? (enhanced && t.dmgEnh ? t.dmgEnh : t.dmgBase) : null,
+            dmgType: t.dmgType || null,
+            speed: t.speed || 30,
+            turnsRemaining: t.permanent ? null : (enhanced && t.durEnh ? t.durEnh : t.durBase),
+            permanent: !!t.permanent
+        };
+        if (t.category === 'weapon') {
+            const isBow = t.spellName === 'Призванный лук';
+            entry.equipSlot = isBow ? 'ranged' : 'melee';
+            const prefix = isBow ? 'wep-ranged' : 'wep-melee';
+            entry.savedWeaponName = document.getElementById(prefix + '-name').value;
+            entry.savedWeaponDmg = document.getElementById(prefix + '-dmg').value;
+            document.getElementById(prefix + '-name').value = t.name;
+            document.getElementById(prefix + '-dmg').value = entry.dmg;
+        } else if (t.category === 'armor') {
+            entry.savedArmorName = document.getElementById('slot-chest-name').value;
+            entry.savedArmorValue = document.getElementById('slot-chest-armor').value;
+            document.getElementById('slot-chest-name').value = t.name;
+            document.getElementById('slot-chest-armor').value = enhanced && t.armorEnh ? t.armorEnh : t.armorBase;
+        }
+        activeSummons.push(entry);
+        renderActiveSummonsList();
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+        return { ok: true, message: `Призвано/наложено: «${t.name}».` };
+    }
+
+    function restoreSummonGear(s) {
+        if (s.equipSlot) {
+            const prefix = s.equipSlot === 'ranged' ? 'wep-ranged' : 'wep-melee';
+            document.getElementById(prefix + '-name').value = s.savedWeaponName || '';
+            document.getElementById(prefix + '-dmg').value = s.savedWeaponDmg || 0;
+        }
+        if (s.category === 'armor') {
+            document.getElementById('slot-chest-name').value = s.savedArmorName || '';
+            document.getElementById('slot-chest-armor').value = s.savedArmorValue || 0;
+        }
+    }
+
     window.summonCreature = function () {
         const idx = parseInt(document.getElementById('summon-template-select').value) || 0;
         const t = summonTemplates[idx];
         const resultEl = document.getElementById('summon-create-result');
         if (!t) return;
-
-        if (t.permanent) {
-            if (countInInventory(t.requiresItem) <= 0) {
-                resultEl.innerHTML = `<span style="color:#e74c3c;">Нужен предмет «${escHtml(t.requiresItem)}» в инвентаре.</span>`;
-                return;
-            }
-            removeFromInventoryByName(t.requiresItem, 1);
+        if (t.spellName && !isSpellKnownOrScrolled(t.spellName)) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Нужно знать заклинание «${escHtml(t.spellName)}» (выучено или есть свиток).</span>`;
+            return;
         }
-
         const enhanced = document.getElementById('summon-enhanced-check') && document.getElementById('summon-enhanced-check').checked;
-        activeSummons.push({
-            id: 'sum-' + Date.now() + Math.random().toString(36).slice(2, 6),
-            category: t.category, name: t.name,
-            curHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
-            maxHp: t.hpBase ? (enhanced && t.hpEnh ? t.hpEnh : t.hpBase) : null,
-            dmg: enhanced && t.dmgEnh ? t.dmgEnh : t.dmgBase,
-            dmgType: t.dmgType,
-            speed: t.speed || 30,
-            turnsRemaining: t.permanent ? null : (enhanced && t.durEnh ? t.durEnh : t.durBase),
-            permanent: !!t.permanent
-        });
-        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Призван(а) «${escHtml(t.name)}».</span>`;
-        renderActiveSummonsList();
-        renderInventoryList();
-        saveLocalStorage();
+        const res = performSummon(t, enhanced);
+        resultEl.innerHTML = res.ok ? `<span style="color:#2ecc71;">✅ ${escHtml(res.message)}</span>` : `<span style="color:#e74c3c;">${escHtml(res.message)}</span>`;
     };
 
     function renderActiveSummonsList() {
@@ -2869,7 +2985,7 @@
                 <div class="row-name"><strong>${escHtml(s.name)}</strong><span>${s.permanent ? 'навсегда' : s.turnsRemaining + ' х. осталось'}</span></div>
                 <div style="font-size:12px; margin:2px 0;">
                     ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:60px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
-                    Урон: ${s.dmg} (${escHtml(s.dmgType)}) · Скорость: ${s.speed} фт.
+                    ${s.dmg !== null ? `Урон: ${s.dmg} (${escHtml(s.dmgType || '')}) · ` : ''}${s.equipSlot ? '⚔️ занимает слот оружия · ' : ''}${s.category === 'armor' ? '🛡️ занимает кирасу · ' : ''}Скорость: ${s.speed} фт.
                 </div>
                 <button style="width:100%; margin-top:2px;" onclick="dismissSummon('${s.id}')">Развеять/Отпустить</button>
             </div>`).join('');
@@ -2890,16 +3006,21 @@
             addToInventory('Кучка костей', 'Кучка костей', 1, 1, 'Бытовые предметы', '', {});
             renderInventoryList();
         }
+        restoreSummonGear(s);
         activeSummons.splice(idx, 1);
         renderActiveSummonsList();
+        updateAll();
         saveLocalStorage();
     };
 
     // Тикает вместе с обычными активными эффектами по нажатию «Следующий ход»/«Следующий круг».
     function tickActiveSummons() {
         activeSummons.forEach(s => { if (!s.permanent) s.turnsRemaining -= 1; });
+        const expired = activeSummons.filter(s => !s.permanent && s.turnsRemaining <= 0);
+        expired.forEach(restoreSummonGear);
         activeSummons = activeSummons.filter(s => s.permanent || s.turnsRemaining > 0);
         renderActiveSummonsList();
+        if (expired.length) updateAll();
     }
 
     function renderPouchPanel() {
@@ -3910,17 +4031,18 @@
         const target = session && (session.enemies || []).find(e => e.id === targetId);
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
 
-        let dmg = 0, roll = 0, mod = 0, rollTotal = 0, actionLabel = '';
+        let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null;
 
         if (actionVal === 'melee' || actionVal === 'ranged') {
             document.getElementById('active-combat-weapon').value = actionVal;
             updateCombat();
             const calc = window.lastWeaponCombatCalc || { totalDmg: 0, hitModifier: 0 };
-            roll = Math.floor(Math.random() * 20) + 1;
             mod = calc.hitModifier;
-            rollTotal = roll + mod;
             dmg = calc.totalDmg;
             actionLabel = actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием';
+            skillNameForProgress = actionVal === 'melee'
+                ? (calc.wepType === 'twohand_sword' || calc.wepType === 'twohand_axe' || calc.wepType === 'twohand_hammer' ? 'Двуручное оружие' : 'Одноручное оружие')
+                : 'Стрельба';
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
@@ -3930,21 +4052,49 @@
             const statInput = statKey ? document.getElementById('stat-' + statKey) : null;
             const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
             mod = calcAbilityMod(rawStat);
-            roll = Math.floor(Math.random() * 20) + 1;
-            rollTotal = roll + mod;
             actionLabel = `заклинанием «${spell.name}»`;
+            skillNameForProgress = skillName;
         } else {
             alert('Выбери способ атаки.');
             return;
         }
 
-        pendingPlayerAttack = {
+        // Опозный бросок: игрок 1к20+модификатор против мастера "голым" 1к20 (без модификаторов).
+        // Ничья = перекид обеих костей (не провал и не успех — просто бросаем заново),
+        // и такой перекинутый результат не идёт в прокачку навыка.
+        let playerRoll, playerTotal, gmRoll, rerolls = 0;
+        do {
+            playerRoll = Math.floor(Math.random() * 20) + 1;
+            playerTotal = playerRoll + mod;
+            gmRoll = Math.floor(Math.random() * 20) + 1;
+            if (playerTotal !== gmRoll) break;
+            rerolls++;
+        } while (rerolls < 20);
+
+        const hit = playerTotal > gmRoll;
+        if (skillNameForProgress && typeof logSkillSuccessByName === 'function') {
+            logSkillSuccessByName(skillNameForProgress);
+        }
+
+        pendingPlayerAttack = hit ? {
             targetId, dmg,
-            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: бросок ${rollTotal} (к20 ${roll}${mod >= 0 ? '+' : ''}${mod}), урон ${dmg}.`
-        };
-        textEl.innerHTML = `<strong>Бросок:</strong> 1d20 (${roll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${rollTotal}</strong><br>` +
-            `<strong>Урон при попадании:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
+            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
+        } : null;
+
+        let html = `<strong>Игрок:</strong> 1d20 (${playerRoll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${playerTotal}</strong><br>` +
+            `<strong>Мастер:</strong> 1d20 = <strong style="color:var(--accent-color);">${gmRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>`;
+        if (hit) {
+            html += `<strong style="color:#2ecc71;">✅ Попадание!</strong> Урон: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
+        } else {
+            html += `<strong style="color:#e74c3c;">❌ Промах.</strong>`;
+        }
+        textEl.innerHTML = html;
+        document.getElementById('attack-apply-btn').style.display = hit ? 'block' : 'none';
         resultBox.style.display = 'block';
+        if (!hit && window.CloudSync) {
+            const myName = document.getElementById('char-name').value;
+            window.CloudSync.postCombatLog(`⚔️ ${myName} атакует «${target.name}» ${actionLabel}: ${playerTotal} vs ${gmRoll} — промах.`, myName);
+        }
     };
 
     window.applyPlayerAttackDamage = function () {
