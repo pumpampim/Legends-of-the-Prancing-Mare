@@ -439,8 +439,8 @@
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
         <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
-        <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
-        <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
+        <button class="tab-link" onclick="openTab(event, 'tab7')">🛠️ Профессии</button>
+        <button class="tab-link" onclick="openTab(event, 'tab10')">🎲 Проверка</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -649,7 +649,7 @@
             </div>
 
             <div class="panel">
-                <h2><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку</h2>
+                <h2>⚔️ Разрешить атаку</h2>
                 <p style="font-size:12px; opacity:.8;">Атакуй противника из активной сессии мастера напрямую: сайт бросит кубы, посчитает урон (оружие или заклинание) и покажет результат. Применение урона к цели — отдельная кнопка, жми только когда попадание подтверждено за столом.</p>
 
                 <label>Цель</label>
@@ -659,7 +659,7 @@
                 <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
                 <div id="attack-action-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
 
-                <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
+                <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()">🎲 Бросить</button>
 
                 <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
                     <div id="attack-roll-text"></div>
@@ -847,21 +847,21 @@
                     <div class="alert-box" id="overweight-alert">ВНИМАНИЕ: ПЕРЕГРУЗ! Помеха на скорость (падает до 5 фт).</div>
                 </div>
 
-                <label style="margin-top:10px; font-size:13px;"><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Золотые септимы</label>
+                <label style="margin-top:10px; font-size:13px;">💰 Золотые септимы</label>
                 <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
             </div>
 
             <!-- ПРОДАЖА ПРЕДМЕТОВ -->
             <div class="panel">
-                <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
+                <h2>💰 Продать вещи</h2>
                 <p style="font-size:11px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле.</p>
 
                 <label>Кому продаём</label>
                 <select id="sell-merchant-type" onchange="renderSellList()">
                     <option value="food">🍲 Продавец еды (еда, напитки)</option>
-                    <option value="blacksmith"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузнец (броня, оружие, боеприпасы)</option>
-                    <option value="alchemist"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимик (зелья, яды, ингредиенты)</option>
-                    <option value="mage"><span class="skyrim-icon icon-book" aria-hidden="true"></span> Колдун (книги, одеяния, свитки, камни душ)</option>
+                    <option value="blacksmith">⚒️ Кузнец (броня, оружие, боеприпасы)</option>
+                    <option value="alchemist">🧪 Алхимик (зелья, яды, ингредиенты)</option>
+                    <option value="mage">✨ Колдун (книги, одеяния, свитки, камни душ)</option>
                     <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
                 </select>
 
@@ -959,7 +959,7 @@
     <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
     <div id="tab6" class="tab-content">
         <div class="panel">
-            <h2><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Сессия</h2>
+            <h2>🎲 Сессия</h2>
 
             <div id="session-join-block">
                 <p style="font-size:13px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
@@ -976,16 +976,16 @@
                     <button class="btn-danger" onclick="leaveSession()">Покинуть сессию</button>
                 </div>
 
-                <h3 style="margin-top:16px;"><span class="skyrim-icon icon-shield" aria-hidden="true"></span> Отряд</h3>
+                <h3 style="margin-top:16px;">⚔️ Отряд</h3>
                 <div id="party-list"></div>
 
-                <h3><span class="skyrim-icon icon-skull" aria-hidden="true"></span> Противники</h3>
+                <h3>👹 Противники</h3>
                 <div id="enemies-list"></div>
 
-                <h3><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Инициатива</h3>
+                <h3>🎯 Инициатива</h3>
                 <div id="initiative-list"></div>
 
-                <h3><span class="skyrim-icon icon-book" aria-hidden="true"></span> Боевой журнал</h3>
+                <h3>📖 Боевой журнал</h3>
                 <div id="combat-log" class="combat-log"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <input type="text" id="log-input" placeholder="Написать в журнал (например: Атакую волка на 12 урона)..." style="flex:1;">
@@ -999,16 +999,16 @@
     <div id="tab7" class="tab-content">
         <div class="panel">
             <div class="profession-header" onclick="toggleProfession('cooking')">
-                <span><span class="skyrim-icon icon-pot" aria-hidden="true"></span> Кулинария</span><span id="prof-chevron-cooking">▸</span>
+                <span>🍲 Кулинария</span><span id="prof-chevron-cooking">▸</span>
             </div>
             <div class="profession-body" id="prof-body-cooking">
-                <h2><span class="skyrim-icon icon-pot" aria-hidden="true"></span> Кухня</h2>
+                <h2>🍲 Кухня</h2>
                 <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
                 <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
                     <p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>
                 </div>
                 <div id="kitchen-alchemy-block" style="display:none; margin-bottom:8px;">
-                    <label style="font-size:12px;"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
+                    <label style="font-size:12px;">🧪 «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
                     <input type="text" id="kitchen-alchemy-note" placeholder="Например: Белянка — уязвимость к холоду">
                 </div>
                 <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
@@ -1016,10 +1016,10 @@
             </div>
 
             <div class="profession-header" onclick="toggleProfession('smithing')">
-                <span><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузнечное дело</span><span id="prof-chevron-smithing">▸</span>
+                <span>⚒️ Кузнечное дело</span><span id="prof-chevron-smithing">▸</span>
             </div>
             <div class="profession-body" id="prof-body-smithing">
-                <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
+                <h2>⚒️ Кузница</h2>
                 <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
                 <div id="smithing-list"></div>
 
@@ -1032,10 +1032,10 @@
             </div>
 
             <div class="profession-header" onclick="toggleProfession('enchanting')">
-                <span><span class="skyrim-icon icon-gem" aria-hidden="true"></span> Зачарование</span><span id="prof-chevron-enchanting">▸</span>
+                <span>✨ Зачарование</span><span id="prof-chevron-enchanting">▸</span>
             </div>
             <div class="profession-body" id="prof-body-enchanting">
-                <h2><span class="skyrim-icon icon-gem" aria-hidden="true"></span> Зачарование брони и оружия</h2>
+                <h2>✨ Зачарование брони и оружия</h2>
                 <p style="font-size:12px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
 
                 <label>Незачарованный предмет из инвентаря (броня, украшение или оружие)</label>
@@ -1117,7 +1117,7 @@
             </div>
 
             <div class="profession-header" onclick="toggleProfession('alchemy')">
-                <span><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимия</span><span id="prof-chevron-alchemy">▸</span>
+                <span>🧪 Алхимия</span><span id="prof-chevron-alchemy">▸</span>
             </div>
             <div class="profession-body" id="prof-body-alchemy">
                 <h2>🍽️ Съесть ингредиент</h2>
@@ -1142,7 +1142,7 @@
                 <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
                 <div id="alch-brew-result" style="margin-top:10px; font-size:13px;"></div>
 
-                <h3 style="margin-top:16px;"><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Известные свойства ингредиентов</h3>
+                <h3 style="margin-top:16px;">📖 Известные свойства ингредиентов</h3>
                 <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
                 <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
             </div>
@@ -1152,7 +1152,7 @@
     <!-- ТАБ 10: ПРОВЕРКА КУБОВ -->
     <div id="tab10" class="tab-content">
         <div class="panel">
-            <h2><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросок кубов</h2>
+            <h2>🎲 Бросок кубов</h2>
             <p style="font-size:12px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
 
             <label>Навык проверки</label>
@@ -1183,7 +1183,7 @@
             <label>Сложность проверки (Сложность/DC, необязательно)</label>
             <input type="number" id="dice-dc" placeholder="Например: 15">
 
-            <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
+            <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()">🎲 Бросить</button>
 
             <div id="dice-result" style="margin-top:14px; padding:12px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
                 <div style="font-size:32px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
