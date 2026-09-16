@@ -1,439 +1,1439 @@
-        :root {
-            --bg-color: #151511;
-            --panel-bg: #24241d;
-            --panel-sub: #1b1b16;
-            --border-color: #4e4537;
-            --text-color: #decfae;
-            --accent-color: #bf944b;
-            --danger-color: #94291f;
-            --success-color: #1e8449;
-            --input-bg: #0d0d0a;
-        }
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Georgia', serif;
-            margin: 0;
-            padding: 12px;
-            line-height: 1.35;
-        }
-        h1, h2, h3 {
-            color: var(--accent-color);
-            text-align: center;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 3px;
-            margin-top: 8px;
-        }
-        h1 { font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
-        h2 { font-size: 17px; margin-bottom: 10px; }
-        h3 { font-size: 14px; border-bottom: 1px solid var(--border-color); margin-bottom: 8px; }
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-        .grid-3 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 12px;
-        }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 12px;
-        }
-        .panel {
-            background-color: var(--panel-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 5px rgba(0,0,0,0.6);
-        }
-        label {
-            display: block;
-            margin: 5px 0 2px;
-            font-weight: bold;
-            font-size: 12px;
-            color: #c4baa9;
-        }
-        input[type="text"], input[type="number"], select, textarea {
-            width: 100%;
-            padding: 5px;
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 13px;
-            font-family: 'Georgia', serif;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--accent-color);
-            outline: none;
-        }
-        .stat-block {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            background: var(--panel-sub);
-            padding: 3px 8px;
-            border-radius: 4px;
-            border: 1px solid #363025;
-        }
-        .stat-block input {
-            width: 50px;
-            text-align: center;
-        }
-        .mod-indicator {
-            color: var(--accent-color);
-            font-weight: bold;
-            min-width: 60px;
-            text-align: center;
-            font-size: 12px;
-        }
-        .vital-bar {
-            background: var(--input-bg);
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color);
-        }
-        .vital-inputs {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 2px;
-        }
-        .vital-inputs input {
-            width: 65px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .perks-list {
-            max-height: 140px;
-            overflow-y: auto;
-            background: var(--input-bg);
-            padding: 5px;
-            border: 1px solid #363025;
-            border-radius: 4px;
-            margin-top: 5px;
-        }
-        .perk-item {
-            display: flex;
-            flex-direction: column;
-            font-size: 12px;
-            margin: 4px 0;
-            padding: 3px 4px;
-            background: #151511;
-            border-radius: 3px;
-        }
-        .perk-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .perk-desc {
-            font-size: 10.5px;
-            color: #8a8171;
-            line-height: 1.35;
-            margin: 2px 2px 1px 2px;
-        }
-        .perk-left {
-            display: flex;
-            align-items: center;
-        }
-        .perk-left input {
-            margin-right: 6px;
-            cursor: pointer;
-        }
-        .perk-steps {
-            font-size: 11px;
-            color: var(--accent-color);
-            font-weight: bold;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px;
-        }
-        .perk-steps input[type="checkbox"] {
-            margin: 0;
-            cursor: pointer;
-        }
-        .alert-box {
-            background-color: var(--danger-color);
-            color: #fff;
-            padding: 6px;
-            text-align: center;
-            font-weight: bold;
-            border-radius: 4px;
-            margin-top: 8px;
-            font-size: 11px;
-            display: none;
-        }
-        .btn {
-            background-color: var(--accent-color);
-            color: #151511;
-            border: none;
-            padding: 6px 10px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 6px;
-            font-family: 'Georgia', serif;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        .btn:hover { background-color: #cca454; }
-        .btn-danger { background-color: var(--danger-color); color: white; }
-        .btn-danger:hover { background-color: #af3227; }
-        .btn-success { background-color: var(--success-color); color: white; }
-        .btn-success:hover { background-color: #239b55; }
-        .shw-hint {
-            font-size: 11px;
-            color: #948b78;
-            margin-top: 1px;
-            font-style: italic;
-        }
-        .nav-tabs {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 12px;
-            border-bottom: 2px solid var(--border-color);
-            flex-wrap: wrap;
-        }
-        .tab-link {
-            background: #24241d;
-            color: var(--text-color);
-            border: 2px solid var(--border-color);
-            border-bottom: none;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 1px;
-            font-size: 12px;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-        }
-        .tab-link.active {
-            background: var(--accent-color);
-            color: #151511;
-            border-color: var(--accent-color);
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin: 4px 0;
-            font-size: 12px;
-        }
-        .checkbox-group input {
-            margin-right: 6px;
-            cursor: pointer;
-        }
-        .spell-card {
-            background: var(--panel-sub);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 6px;
-            margin-bottom: 6px;
-        }
-        .slot-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-bottom: 4px;
-            background: var(--panel-sub);
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #363025;
-        }
-        .slot-row span {
-            font-weight: bold;
-            color: var(--accent-color);
-            width: 35%;
-            font-size: 12px;
-        }
-        .slot-row input {
-            width: 60%;
-        }
-        .slot-picker {
-            width: 80px;
-            min-width: 80px;
-            font-size: 10px;
-            padding: 2px;
-            flex-shrink: 0;
-            background: var(--accent-color);
-            color: #1a1712;
-            border-radius: 3px;
-            font-weight: bold;
-        }
-        .slot-enchant-info {
-            font-size: 11px;
-            color: #8a8171;
-            margin: -2px 0 6px 4px;
-        }
-        .profession-header {
-            cursor: pointer;
-            padding: 12px 14px;
-            background: var(--panel-sub);
-            border: 1px solid #363025;
-            border-radius: 6px;
-            margin-bottom: 6px;
-            font-weight: bold;
-            font-size: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-        }
-        .profession-header:hover {
-            border-color: var(--accent-color);
-        }
-        .profession-body {
-            display: none;
-            padding: 4px 2px 14px;
-            border-bottom: 1px solid #363025;
-            margin-bottom: 10px;
-        }
-        .profession-body.open {
-            display: block;
-        }
-        .profession-body h2:first-child {
-            margin-top: 0;
-        }
-        .inv-group {
-            border-left: 3px solid var(--accent-color);
-            padding-left: 8px;
-            margin-top: 8px;
-        }
-        .inv-group h4 {
-            font-size: 12px;
-            color: var(--accent-color);
-            margin: 4px 0;
-            border-bottom: 1px dashed #363025;
-        }
-        .rest-btn {
-            display: flex;
-            gap: 6px;
-        }
-        .rest-btn .btn {
-            flex: 1;
-        }
-        .inline-label {
-            display: inline;
-            font-weight: normal;
-            font-size: 12px;
-        }
-        .weight-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .weight-row input[type="number"] {
-            width: 70px;
-            padding: 3px;
-        }
-        .weight-row label {
-            margin: 0;
-        }
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&display=swap');
 
-/* ===== Добавлено для облачной синхронизации (Firebase) ===== */
+
+:root {
+    /* Основная палитра */
+    --bg-color: #050810;
+    --night-top: #0a1020;
+    --night-bottom: #030610;
+
+    --panel-bg: #1c1912;
+    --panel-bg-2: #221e15;
+    --panel-sub: #16130d;
+
+    --border-color: #5c4a2c;
+    --border-bright: #8a6f3f;
+
+    --text-color: #d6c9ae;
+    --text-dim: #9c8f76;
+    --text-bright: #f2e8cf;
+
+    --accent-color: #c8a566;
+    --accent-bright: #f0c87a;
+    --accent-deep: #7a5f2e;
+
+    --danger-color: #8c2f22;
+    --danger-bright: #c84534;
+    --success-color: #3c7a3f;
+    --success-bright: #56a55a;
+
+    --input-bg: #0d0a05;
+    --input-bg-hover: #14100a;
+
+    --glow-blue: rgba(110, 160, 220, 0.55);
+    --glow-green: rgba(90, 200, 160, 0.35);
+    --glow-purple: rgba(150, 110, 220, 0.35);
+}
+
+/* ---------- БАЗА ---------- */
+
+* { box-sizing: border-box; }
+
+html, body {
+    min-height: 100%;
+}
+
+body {
+    position: relative;
+    z-index: 0;
+    background: var(--night-bottom);
+    color: var(--text-color);
+    font-family: 'EB Garamond', Georgia, 'Palatino Linotype', serif;
+    margin: 0;
+    padding: 16px;
+    line-height: 1.4;
+    letter-spacing: 0.2px;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    /* Твоя картинка как основной фон */
+    background-image: url('skyrim-bg.gif');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    /* Слегка затемняем, чтобы текст поверх читался */
+    filter: brightness(0.75) saturate(0.9);
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+        radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%);
+    opacity: .95;
+}
+
+
+/* ---------- КОНТЕЙНЕР ---------- */
+
+.container {
+    max-width: 1120px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* ---------- ЗАГОЛОВКИ ---------- */
+
+h1, h2, h3 {
+    color: var(--accent-color);
+    text-align: center;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 6px;
+    margin-top: 12px;
+    text-shadow: 0 0 8px rgba(200, 165, 102, 0.25), 0 1px 0 #000;
+    font-weight: normal;
+    letter-spacing: 1px;
+}
+
+h1 {
+    font-size: 22px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    padding-left: 36px;
+    padding-right: 36px;
+}
+
+h1::before, h1::after {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-55%);
+    font-size: 22px;
+    color: var(--accent-deep);
+    text-shadow: 0 0 6px rgba(200, 165, 102, 0.4);
+    font-family: 'Cinzel', Georgia, serif;
+}
+h1::before { content: 'ᛟ'; left: 4px; }
+h1::after  { content: 'ᛟ'; right: 4px; }
+
+h2 {
+    font-size: 17px;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+    letter-spacing: 0.8px;
+}
+h2::before { content: '◆ '; color: var(--accent-deep); font-size: 11px; }
+h2::after  { content: ' ◆'; color: var(--accent-deep); font-size: 11px; }
+
+h3 {
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+    letter-spacing: 0.6px;
+    color: var(--accent-bright);
+}
+
+/* ---------- ПАНЕЛИ (КАМЕННЫЕ ПЛИТЫ С РУННЫМИ УГОЛКАМИ) ---------- */
+
+.panel {
+    position: relative;
+    background:
+        linear-gradient(160deg, var(--panel-bg-2) 0%, var(--panel-bg) 55%, #16130d 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    box-shadow:
+        0 6px 14px rgba(0, 0, 0, 0.7),
+        inset 0 0 0 1px rgba(140, 110, 60, 0.15),
+        inset 0 1px 0 rgba(200, 165, 102, 0.08);
+}
+
+/* Золотые рунные уголки (по диагонали) */
+.panel::before,
+.panel::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    opacity: 0.85;
+}
+.panel::before {
+    top: -1px; left: -1px;
+    border-top: 2px solid var(--accent-color);
+    border-left: 2px solid var(--accent-color);
+    border-top-left-radius: 3px;
+}
+.panel::after {
+    bottom: -1px; right: -1px;
+    border-bottom: 2px solid var(--accent-color);
+    border-right: 2px solid var(--accent-color);
+    border-bottom-right-radius: 3px;
+}
+
+/* Вложенные панели — чуть темнее и без своих уголков,
+   чтобы не плодить визуальный шум */
+.panel .panel::before,
+.panel .panel::after {
+    display: none;
+}
+.panel .panel {
+    background: linear-gradient(160deg, #1a1710 0%, #14110b 100%);
+    box-shadow:
+        inset 0 0 0 1px rgba(120, 95, 50, 0.15),
+        inset 0 1px 0 rgba(200, 165, 102, 0.05);
+}
+
+/* ---------- МЕТКИ И ПОЛЯ ВВОДА ---------- */
+
+label {
+    display: block;
+    margin: 6px 0 2px;
+    font-weight: bold;
+    font-size: 12px;
+    color: #b8a888;
+    letter-spacing: 0.4px;
+    text-shadow: 0 1px 0 #000;
+}
+
+input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 6px 8px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-color);
+    box-sizing: border-box;
+    font-size: 13px;
+    font-family: 'Cinzel', Georgia, serif;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.7),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+    border-color: var(--accent-color);
+    background-color: var(--input-bg-hover);
+    outline: none;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.7),
+        0 0 0 2px rgba(200, 165, 102, 0.25),
+        0 0 12px rgba(200, 165, 102, 0.15);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+select {
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
+        linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
+    background-position:
+        calc(100% - 16px) calc(50% - 2px),
+        calc(100% - 11px) calc(50% - 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+}
+
+/* ---------- СТАТ-БЛОКИ ---------- */
+
+.stat-block {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    background: linear-gradient(180deg, #1a1710 0%, #100d08 100%);
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid #3a2f1c;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.05);
+}
+
+.stat-block input {
+    width: 50px;
+    text-align: center;
+}
+
+.mod-indicator {
+    color: var(--accent-bright);
+    font-weight: bold;
+    min-width: 60px;
+    text-align: center;
+    font-size: 12px;
+    text-shadow: 0 0 6px rgba(200, 165, 102, 0.3);
+}
+
+/* ---------- ЖИЗНЬ / МАНА / УРОН ---------- */
+
+.vital-bar {
+    background: linear-gradient(180deg, #0d0a05 0%, #080610 100%);
+    padding: 8px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.vital-inputs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.vital-inputs input {
+    width: 65px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-bright);
+}
+
+/* ---------- ПЕРКИ ---------- */
+
+.perks-list {
+    max-height: 160px;
+    overflow-y: auto;
+    background: var(--input-bg);
+    padding: 6px;
+    border: 1px solid #3a2f1c;
+    border-radius: 3px;
+    margin-top: 6px;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.perk-item {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    margin: 5px 0;
+    padding: 5px 6px;
+    background: linear-gradient(180deg, #18140d 0%, #100d08 100%);
+    border-left: 2px solid var(--accent-deep);
+    border-radius: 2px;
+}
+
+.perk-item:hover {
+    border-left-color: var(--accent-color);
+}
+
+.perk-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.perk-desc {
+    font-size: 10.5px;
+    color: #8a7f68;
+    line-height: 1.35;
+    margin: 3px 2px 1px 2px;
+    font-style: italic;
+}
+
+.perk-left {
+    display: flex;
+    align-items: center;
+}
+
+.perk-left input {
+    margin-right: 6px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+}
+
+.perk-steps {
+    font-size: 11px;
+    color: var(--accent-color);
+    font-weight: bold;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.perk-steps input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent-bright);
+}
+
+/* ---------- КНОПКИ ---------- */
+
+.btn {
+    position: relative;
+    background: linear-gradient(180deg, #3c2f1a 0%, #261d0f 55%, #1a1308 100%);
+    color: var(--accent-bright);
+    border: 1px solid var(--border-bright);
+    padding: 7px 12px;
+    font-weight: bold;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 6px;
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow:
+        inset 0 1px 0 rgba(240, 200, 122, 0.15),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+    transition: all 0.15s ease;
+    text-shadow: 0 1px 0 #000;
+}
+
+.btn:hover {
+    background: linear-gradient(180deg, #4e3e23 0%, #33280f 55%, #241a08 100%);
+    color: #ffe4a3;
+    border-color: var(--accent-bright);
+    box-shadow:
+        inset 0 1px 0 rgba(240, 200, 122, 0.3),
+        0 0 14px rgba(200, 165, 102, 0.35),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.btn:active {
+    transform: translateY(1px);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.7),
+        0 0 6px rgba(200, 165, 102, 0.25);
+}
+
+.btn-danger {
+    background: linear-gradient(180deg, #6a2418 0%, #4a1810 55%, #32100a 100%);
+    color: #ffd8cf;
+    border-color: #7a2a1c;
+}
+.btn-danger:hover {
+    background: linear-gradient(180deg, #8a2f1f 0%, #5a1d12 55%, #40140b 100%);
+    border-color: var(--danger-bright);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 200, 180, 0.25),
+        0 0 14px rgba(200, 70, 50, 0.45),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.btn-success {
+    background: linear-gradient(180deg, #2c5a30 0%, #1c3d20 55%, #122813 100%);
+    color: #c8f0c8;
+    border-color: #3a6a3c;
+}
+.btn-success:hover {
+    background: linear-gradient(180deg, #3e7a42 0%, #2a522d 55%, #1a341c 100%);
+    border-color: var(--success-bright);
+    color: #e8ffe8;
+    box-shadow:
+        inset 0 1px 0 rgba(200, 255, 200, 0.25),
+        0 0 14px rgba(80, 180, 90, 0.4),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.btn-sm {
+    width: auto;
+    padding: 3px 10px;
+    font-size: 10px;
+    margin-top: 0;
+    letter-spacing: 0.5px;
+}
+
+/* ---------- ПОДСКАЗКИ ---------- */
+
+.shw-hint {
+    font-size: 11px;
+    color: #8a7f68;
+    margin-top: 3px;
+    font-style: italic;
+    border-left: 2px solid var(--accent-deep);
+    padding-left: 6px;
+}
+
+/* ---------- ТРЕВОЖНЫЕ БЛОКИ ---------- */
+
+.alert-box {
+    background: linear-gradient(180deg, #7a2014 0%, #4a120c 100%);
+    color: #ffd8c8;
+    padding: 8px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 3px;
+    margin-top: 10px;
+    font-size: 11px;
+    display: none;
+    border: 1px solid var(--danger-bright);
+    letter-spacing: 1px;
+    box-shadow: 0 0 12px rgba(200, 70, 50, 0.35);
+    text-shadow: 0 1px 0 #000;
+}
+
+/* ---------- ВКЛАДКИ (ДЕРЕВЯННЫЕ ТАБЛИЧКИ) ---------- */
+
+.nav-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+    border-bottom: 2px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 3px;
+    padding-bottom: 2px;
+}
+
+.tab-link {
+    background: linear-gradient(180deg, #241c11 0%, #161009 100%);
+    color: var(--text-dim);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 0;
+    font-size: 12px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    letter-spacing: 0.5px;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.08);
+    transition: all 0.15s ease;
+    position: relative;
+    text-shadow: 0 1px 0 #000;
+}
+
+.tab-link:hover {
+    color: var(--accent-bright);
+    background: linear-gradient(180deg, #2c2214 0%, #1c150b 100%);
+    border-color: var(--border-bright);
+}
+
+.tab-link.active {
+    background: linear-gradient(180deg, var(--accent-deep) 0%, #4a3819 100%);
+    color: #ffeec3;
+    border-color: var(--accent-color);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 240, 180, 0.4),
+        0 -2px 10px rgba(200, 165, 102, 0.4);
+    text-shadow: 0 0 6px rgba(255, 220, 140, 0.5);
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ---------- ГАЛОЧКИ ---------- */
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.checkbox-group input {
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+    width: auto;
+}
+
+/* ---------- КАРТОЧКИ ЗАКЛИНАНИЙ ---------- */
+
+.spell-card {
+    background: linear-gradient(180deg, #1a1710 0%, #110e08 100%);
+    border: 1px solid #3a2f1c;
+    border-radius: 3px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.05);
+}
+
+/* ---------- СЛОТЫ ЭКИПИРОВКИ ---------- */
+
+.slot-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 4px;
+    background: linear-gradient(180deg, #1a1710 0%, #100d08 100%);
+    padding: 5px 8px;
+    border-radius: 3px;
+    border: 1px solid #3a2f1c;
+}
+
+.slot-row span {
+    font-weight: bold;
+    color: var(--accent-color);
+    width: 35%;
+    font-size: 12px;
+}
+
+.slot-row input {
+    width: 60%;
+}
+
+.slot-picker {
+    width: 80px;
+    min-width: 80px;
+    font-size: 10px;
+    padding: 3px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #4a3819 0%, #2e2410 100%);
+    color: var(--accent-bright);
+    border-radius: 3px;
+    font-weight: bold;
+    border: 1px solid var(--accent-deep);
+    letter-spacing: 0.3px;
+}
+
+.slot-enchant-info {
+    font-size: 11px;
+    color: #9b8f75;
+    margin: -2px 0 6px 6px;
+    font-style: italic;
+}
+
+/* ---------- АККОРДЕОН ПРОФЕССИЙ ---------- */
+
+.profession-header {
+    cursor: pointer;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, #241c11 0%, #14100a 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-weight: bold;
+    font-size: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    letter-spacing: 0.8px;
+    color: var(--accent-bright);
+    text-shadow: 0 1px 0 #000;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.1);
+    transition: all 0.2s ease;
+}
+
+.profession-header:hover {
+    border-color: var(--accent-color);
+    background: linear-gradient(180deg, #2c2214 0%, #1c150b 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(240, 200, 122, 0.15),
+        0 0 12px rgba(200, 165, 102, 0.2);
+}
+
+.profession-body {
+    display: none;
+    padding: 6px 4px 16px;
+    border-bottom: 1px solid #2a2214;
+    margin-bottom: 10px;
+}
+
+.profession-body.open {
+    display: block;
+}
+
+.profession-body h2:first-child {
+    margin-top: 0;
+}
+
+/* ---------- ИНВЕНТАРЬ ---------- */
+
+.inv-group {
+    border-left: 3px solid var(--accent-deep);
+    padding-left: 10px;
+    margin-top: 10px;
+}
+
+.inv-group h4 {
+    font-size: 12px;
+    color: var(--accent-color);
+    margin: 5px 0;
+    border-bottom: 1px dashed #3a2f1c;
+    letter-spacing: 0.5px;
+}
+
+/* ---------- КНОПКИ ОТДЫХА И СБРОСА ---------- */
+
+.rest-btn {
+    display: flex;
+    gap: 8px;
+}
+.rest-btn .btn {
+    flex: 1;
+}
+
+/* ---------- МЕЛОЧИ ---------- */
+
+.inline-label {
+    display: inline;
+    font-weight: normal;
+    font-size: 12px;
+}
+
+.weight-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.weight-row input[type="number"] {
+    width: 70px;
+    padding: 4px;
+}
+.weight-row label {
+    margin: 0;
+}
+
+/* ---------- АВТОРИЗАЦИЯ ---------- */
+
 .auth-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10,10,8,0.92);
+    background:
+        radial-gradient(ellipse at center, rgba(20, 15, 10, 0.9) 0%, rgba(5, 4, 3, 0.97) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 16px;
+    backdrop-filter: blur(2px);
 }
+
 .auth-box {
-    background: var(--panel-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 380px;
-    width: 100%;
-}
-.auth-box label { margin-top: 8px; }
-.auth-error {
-    background: var(--danger-color);
-    color: #fff;
-    padding: 6px 8px;
+    position: relative;
+    background: linear-gradient(160deg, #221e15 0%, #1a160e 60%, #100d08 100%);
+    border: 1px solid var(--border-bright);
     border-radius: 4px;
-    font-size: 12px;
-    margin-top: 8px;
+    padding: 26px 24px 22px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.9),
+        0 0 30px rgba(200, 165, 102, 0.15),
+        inset 0 1px 0 rgba(200, 165, 102, 0.15);
 }
+
+.auth-box::before,
+.auth-box::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+}
+.auth-box::before {
+    top: 6px; left: 6px;
+    border-top: 2px solid var(--accent-color);
+    border-left: 2px solid var(--accent-color);
+}
+.auth-box::after {
+    bottom: 6px; right: 6px;
+    border-bottom: 2px solid var(--accent-color);
+    border-right: 2px solid var(--accent-color);
+}
+
+.auth-box label { margin-top: 10px; }
+
+.auth-error {
+    background: linear-gradient(180deg, #6a1e14 0%, #3c1109 100%);
+    color: #ffd8cf;
+    padding: 8px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-top: 10px;
+    border: 1px solid #8a2a1c;
+    text-shadow: 0 1px 0 #000;
+}
+
+/* ---------- СТАТУС-БАР ОБЛАКА ---------- */
+
 .cloud-status-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--panel-sub);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 6px 10px;
+    background: linear-gradient(180deg, #1a1710 0%, #0f0c07 100%);
+    border: 1px solid #3a2f1c;
+    border-radius: 3px;
+    padding: 8px 12px;
     font-size: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.06);
 }
-.cloud-status-bar button { width: auto; margin: 0; padding: 4px 10px; font-size: 12px; }
+
+.cloud-status-bar button {
+    width: auto;
+    margin: 0;
+    padding: 4px 12px;
+    font-size: 11px;
+}
+
+/* ---------- БЕЙДЖ КОДА СЕССИИ ---------- */
+
 .session-code-badge {
     background: var(--input-bg);
     border: 1px solid var(--accent-color);
-    color: var(--accent-color);
-    padding: 2px 10px;
-    border-radius: 4px;
+    color: var(--accent-bright);
+    padding: 3px 12px;
+    border-radius: 3px;
     font-weight: bold;
-    letter-spacing: 2px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 8px rgba(240, 200, 122, 0.5);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 0 10px rgba(200, 165, 102, 0.2);
 }
+
+/* ---------- ОТРЯД / ПРОТИВНИКИ ---------- */
+
 .party-row, .enemy-row {
-    background: var(--panel-sub);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 6px 8px;
-    margin-bottom: 6px;
+    background: linear-gradient(180deg, #1a1710 0%, #100d08 100%);
+    border: 1px solid #3a2f1c;
+    border-left: 3px solid var(--accent-deep);
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.04);
+    transition: border-left-color 0.2s;
 }
+
+.party-row:hover, .enemy-row:hover {
+    border-left-color: var(--accent-color);
+}
+
 .party-row .row-name, .enemy-row .row-name {
     display: flex;
     justify-content: space-between;
     font-size: 13px;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
+    color: var(--text-bright);
 }
+
+/* ---------- ПОЛОСЫ HP / MP ---------- */
+
 .bar-track {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 3px;
+    background: #08060a;
+    border: 1px solid #3a2f1c;
+    border-radius: 2px;
     height: 10px;
     overflow: hidden;
     margin-bottom: 3px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
 }
-.bar-fill-hp { background: var(--danger-color); height: 100%; }
-.bar-fill-mp { background: #2e6f9e; height: 100%; }
+
+.bar-fill-hp {
+    background: linear-gradient(180deg, #c84534 0%, #6a1e14 100%);
+    height: 100%;
+    box-shadow: 0 0 8px rgba(200, 70, 50, 0.5) inset;
+    transition: width 0.4s ease;
+}
+
+.bar-fill-mp {
+    background: linear-gradient(180deg, #4a90c8 0%, #1e4468 100%);
+    height: 100%;
+    box-shadow: 0 0 8px rgba(80, 160, 220, 0.5) inset;
+    transition: width 0.4s ease;
+}
+
+/* ---------- ИНИЦИАТИВА ---------- */
+
 .initiative-row {
     display: flex;
     justify-content: space-between;
-    background: var(--panel-sub);
+    background: linear-gradient(180deg, #1a1710 0%, #100d08 100%);
     border-left: 3px solid var(--accent-color);
-    padding: 4px 8px;
-    margin-bottom: 4px;
+    padding: 5px 10px;
+    margin-bottom: 5px;
     font-size: 13px;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 0 rgba(200, 165, 102, 0.06);
 }
+
+/* ---------- БОЕВОЙ ЖУРНАЛ ---------- */
+
 .combat-log {
-    max-height: 220px;
+    max-height: 240px;
     overflow-y: auto;
     background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    padding: 8px;
-    border-radius: 4px;
+    border: 1px solid #3a2f1c;
+    padding: 10px;
+    border-radius: 3px;
     font-size: 13px;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
 }
-.log-entry { margin-bottom: 4px; line-height: 1.4; }
-.log-entry .log-author { color: var(--accent-color); font-weight: bold; }
-.log-entry .log-time { opacity: .6; font-size: 11px; margin-right: 4px; }
+
+.log-entry {
+    margin-bottom: 5px;
+    line-height: 1.45;
+    border-bottom: 1px dashed #221c0f;
+    padding-bottom: 4px;
+}
+
+.log-entry .log-author {
+    color: var(--accent-bright);
+    font-weight: bold;
+    text-shadow: 0 0 4px rgba(200, 165, 102, 0.3);
+}
+
+.log-entry .log-time {
+    opacity: 0.55;
+    font-size: 11px;
+    margin-right: 6px;
+    color: var(--text-dim);
+}
+
+
+/* ---------- SKYRIM UI 2.0: ЖИВЫЕ ПРЕДМЕТНЫЕ ИКОНКИ ---------- */
+.skyrim-icon {
+    display:inline-block; width:22px; height:22px; vertical-align:-6px; margin-right:5px;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    filter: drop-shadow(0 1px 2px #000) drop-shadow(0 0 3px rgba(200,165,102,.25));
+}
+.skyrim-icon.icon-sword{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTQ4IDZMMjAgMzRsMTAgMTAtMjIgMTRMMjIgMzZsMjgtMzB6IiBmaWxsPSIjYzlhZjY0IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xNiA0MGw4IDhsLTggOGMtMy0zLTItNSAwLTgiIGZpbGw9IiM3MDUwMjgiIHN0cm9rZT0iIzIxMTkxMiIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-shield{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDVMMTAgMTN2MTljMCAxNCA5IDIyIDIyIDI3IDEzLTUgMjItMTMgMjItMjdWMTN6IiBmaWxsPSIjNmE1NjM2IiBzdHJva2U9IiNjOWFmNjQiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxNmwxMiA2LTEyIDZjLTQgMC04LTIuNS04LTZ6IiBmaWxsPSIjYzlhZjY0Ii8+PC9zdmc+");}
+.skyrim-icon.icon-anvil{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTcgNDZoNTB2OWg3djRINHYtNHoiIGZpbGw9IiM3MDUwMjgiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTIyIDQ2VjM0aDI0bDUtMTJIMzJsLTctOWgtOWwxMSAxOWg0bC00IDE0eiIgZmlsbD0iI2QxYjE0ZiIgc3Ryb2tlPSIjMjExOTEyIiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=");}
+.skyrim-icon.icon-potion{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTI2IDZ2MTBoMTJWNkgyeiIgZmlsbD0iI2QxYjE0ZiIgc3Ryb2tlPSIjMjExOTEyIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMjAgMTZoMjRsMTEgMTJ2MjRjMCA2LTUgOS0xMSA5SDI0Yy02IDAtMTEtMy0xMS05VjI4eiIgZmlsbD0iIzQ2NjE0YSIgc3Ryb2tlPSIjZDViOTc1IiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMjAgMzFoMjR2OGgtMjR6IiBmaWxsPSIjYzkxZjY2Ii8+PC9zdmc+");}
+.skyrim-icon.icon-book{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDEwQzIwIDYgMTEgOSAxMCAxN3YzOGMyLTYgMTItOCAyMi0yIDEwLTYgMjAtNCAyMiAyVjE3YzAtOC05LTExLTIyLTd6IiBmaWxsPSIjNmY0YzI5IiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxMXYzOWM2LTUgMTItNiAyMC0zIiBmaWxsPSJub25lIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjwvc3ZnPg==");}
+.skyrim-icon.icon-scroll{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTIwIDl2NDZsMjQtNnYtNDR6IiBmaWxsPSIjYzY5YzY1IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0yNyAxOWgxMXY0SDI3em0wIDloMTV2NEgyN3ptMCA5aDE1djRIMjd6IiBmaWxsPSIjNzA1MDI4Ii8+PC9zdmc+");}
+.skyrim-icon.icon-dice{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDdMNTEgMTh2MjhMMzIgNTcgMTMgNDZWMTh6IiBmaWxsPSIjN2M2NDQyIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iMjciIHI9IjMiIGZpbGw9IiNkMWIxNGYiLz48Y2lyY2xlIGN4PSIzOCIgY3k9IjM3IiByPSIzIiBmaWxsPSIjZDViOTc1Ii8+PC9zdmc+");}
+.skyrim-icon.icon-coin{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjIiIGZpbGw9IiNkMWIxNGYiIHN0cm9rZT0iIzcwNTAyOCIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTQwIDIxYy0xMC01LTIwIDQtMTYgMTFzMjAgMyAxNiAxMGMtNCA3LTE0IDEyLTIyIDMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzcwNTAyOCIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-pot{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTkgMjRoNDZsLTUgMjVIMTR6IiBmaWxsPSIjNTY0NTMwIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0yMCAyNGM2LTExIDE4LTExIDI0IDBIMjB6IiBmaWxsPSIjNmE1NjM2IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxNXYtN0g0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZDViOTc1IiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=");}
+.skyrim-icon.icon-gem{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDZsMjAgMTgtMjAgMzQtMjAtMzR6IiBmaWxsPSIjN2E2ZTk1IiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMiAyNGg0MGwtMjAtMTgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q1Yjk3NSIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-chest{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTkgMjNoNDZ2MjZIOXoiIGZpbGw9IiM2MTQ2MmQiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTkgMjN2LTVoNDZ2NWgtN3YtOGgtMzJ2OHoiIGZpbGw9IiM4NzcxNDQiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-skull{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDdoMjBjMTAgMTAgOSAyNiAwIDMySDQwdjEwaC0xNlYtOGgtNGMtOS02LTEwLTIyIDItMzR6IiBmaWxsPSIjYjc5ZjgxIiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjI0IiBjeT0iMzAiIHI9IjQiIGZpbGw9IiMyMTE5MTIiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjMwIiByPSI0IiBmaWxsPSIjMjExOTEyIi8+PC9zdmc+");}
+.skyrim-icon.icon-arrow{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTggMzJoMzgiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSI1Ii8+PHBhdGggZD0iTTM0IDE4bDE4IDE0LTE4IDE0IiBmaWxsPSJub25lIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0PSI1Ii8+PC9zdmc+");}
+
+/* ---------- ПОРТРЕТЫ ПРОТИВНИКОВ ---------- */
+.name-with-avatar{display:inline-flex;align-items:center;gap:8px;min-width:0;}
+.enemy-avatar{width:48px;height:48px;flex:0 0 48px;border-radius:50%;object-fit:cover;background:#17130e;border:2px solid var(--accent-color);box-shadow:0 2px 8px rgba(0,0,0,.75), inset 0 0 0 1px rgba(255,230,170,.18);}
+.enemy-portrait-row .row-name{align-items:center;min-height:50px;}
+.enemy-row{padding:9px 11px;background:linear-gradient(135deg,rgba(45,39,28,.96),rgba(16,13,9,.98));}
+.enemy-row:hover .enemy-avatar{border-color:var(--accent-bright);box-shadow:0 0 12px rgba(200,165,102,.28);}
+
+/* ---------- ВКЛАДКИ: МЕНЮ КАК ДЕРЕВЯННЫЕ/ЖЕЛЕЗНЫЕ ТАБЛИЧКИ ---------- */
+.nav-tabs{gap:5px;border-bottom:2px solid #765d35;padding:0 4px 4px;}
+.tab-link{font-family:'Cinzel',Georgia,serif;font-size:11px;text-transform:none;letter-spacing:.25px;padding:9px 13px;border-radius:2px;clip-path:polygon(3% 0,97% 0,100% 18%,100% 82%,97% 100%,3% 100%,0 82%,0 18%);}
+.tab-link.active{background:linear-gradient(180deg,#6b5430,#3b2d19);}
+
+/* ---------- КАЖДАЯ ВКЛАДКА ИМЕЕТ СВОЁ НАСТРОЕНИЕ ---------- */
+.tab-content{position:relative;padding:10px 8px 18px;border:1px solid rgba(125,98,55,.35);background-color:rgba(7,8,12,.52);box-shadow:0 12px 35px rgba(0,0,0,.22);}
+#tab1{background:linear-gradient(rgba(13,20,28,.66),rgba(5,8,12,.76)),url('skyrim-bg.gif') center/cover fixed;}
+#tab2{background:linear-gradient(rgba(31,24,13,.78),rgba(8,7,5,.84)),radial-gradient(circle at 50% 0,#695331,transparent 60%);}
+#tab3{background:linear-gradient(rgba(22,17,14,.68),rgba(5,7,10,.86)),url('skyrim-bg.gif') 20% center/cover fixed;}
+#tab4{background:linear-gradient(rgba(22,26,36,.78),rgba(5,7,12,.88)),radial-gradient(circle at 50% 15%,#52627b,transparent 55%);}
+#tab5{background:linear-gradient(rgba(19,28,20,.72),rgba(5,8,7,.88)),radial-gradient(circle at 20% 10%,#506347,transparent 52%);}
+#tab6{background:linear-gradient(rgba(28,24,17,.72),rgba(6,7,8,.9)),url('skyrim-bg.gif') 80% center/cover fixed;}
+#tab7{background:linear-gradient(rgba(33,25,15,.74),rgba(8,7,5,.9)),radial-gradient(circle at 70% 15%,#795d35,transparent 48%);}
+#tab10{background:linear-gradient(rgba(21,19,28,.74),rgba(5,6,10,.9)),radial-gradient(circle at 50% 15%,#625477,transparent 50%);}
+
+/* ---------- ТИПОГРАФИКА ---------- */
+h1,h2,h3,.tab-link,.profession-header{font-family:'Cinzel',Georgia,serif;}
+p,label,input,select,textarea,button{font-family:'EB Garamond',Georgia,serif;}
+h1{font-weight:600;letter-spacing:2.2px;}
+h2{font-weight:600;letter-spacing:1px;}
+.panel{backdrop-filter:blur(1.5px);}
+
+/* ---------- СКРОЛЛБАРЫ (В ТЕМУ) ---------- */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: #0a0805;
+    border-radius: 2px;
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #4a3819 0%, #2a2110 100%);
+    border-radius: 2px;
+    border: 1px solid #3a2f1c;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6a5028 0%, #3a2d17 100%);
+}
+
+/* Firefox */
+* {
+    scrollbar-color: #4a3819 #0a0805;
+    scrollbar-width: thin;
+}
+
+/* ---------- ПЛАВНЫЕ ПЕРЕХОДЫ ВЕЗДЕ ---------- */
+
+button, input, select, textarea, .tab-link, .panel, .profession-header {
+    transition-timing-function: ease-out;
+}
+
+/* ---------- МОБИЛЬНАЯ АДАПТАЦИЯ ---------- */
+
+@media (max-width: 700px) {
+    body { padding: 8px; }
+    h1 { font-size: 17px; padding-left: 26px; padding-right: 26px; }
+    h1::before, h1::after { font-size: 16px; }
+    .tab-link { padding: 6px 8px; font-size: 11px; }
+    .slot-row span { width: 100%; }
+    .slot-row input { width: 100%; }
+    .slot-picker { width: 100%; }
+}
+
+/* ==========================================================
+   SKYRIM MENU — FINAL VISUAL OVERRIDE
+   Inspired by the in-game pause/menu UI: black glass panels,
+   pale silver text, angular frames and ornamental corners.
+   ========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Cinzel:wght@500;600;700&display=swap');
+
+:root {
+    --sk-text: #e7e7e2;
+    --sk-text-dim: #a7aaa6;
+    --sk-text-muted: #7d817e;
+    --sk-line: #aeb3af;
+    --sk-line-dim: rgba(174,179,175,.52);
+    --sk-panel: rgba(3, 5, 6, .72);
+    --sk-panel-deep: rgba(0, 0, 0, .82);
+    --sk-hover: rgba(205, 211, 207, .13);
+    --sk-active: rgba(220, 224, 220, .20);
+}
+
+html, body {
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+}
+
+body {
+    padding: 22px;
+    color: var(--sk-text);
+    background: #080b0c;
+    letter-spacing: .15px;
+}
+
+/* The reference has a blurred world behind the menu. */
+body::before {
+    background-image: url('skyrim-bg.gif');
+    background-size: cover;
+    background-position: center;
+    filter: blur(1.2px) brightness(.58) saturate(.72);
+    transform: scale(1.025);
+}
+
+body::after {
+    background:
+        radial-gradient(ellipse at center, rgba(0,0,0,.05) 0%, rgba(0,0,0,.55) 100%),
+        linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.32));
+    opacity: 1;
+}
+
+.container {
+    max-width: 1180px;
+}
+
+/* ---------- Skyrim-style top navigation ---------- */
+.nav-tabs {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0;
+    margin: 8px auto 18px;
+    padding: 0 38px;
+    min-height: 56px;
+    border: 1px solid var(--sk-line-dim);
+    border-bottom: 2px solid rgba(174,179,175,.72);
+    background: linear-gradient(180deg, rgba(10,13,14,.86), rgba(0,0,0,.76));
+    box-shadow: 0 7px 24px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08);
+    clip-path: polygon(0 22%, 2.2% 0, 97.8% 0, 100% 22%, 100% 78%, 97.8% 100%, 2.2% 100%, 0 78%);
+}
+
+.nav-tabs::before,
+.nav-tabs::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    width: 30px;
+    opacity: .9;
+    background:
+        linear-gradient(45deg, transparent 43%, var(--sk-line) 44%, var(--sk-line) 49%, transparent 50%) 0 50% / 18px 18px no-repeat,
+        linear-gradient(-45deg, transparent 43%, var(--sk-line) 44%, var(--sk-line) 49%, transparent 50%) 8px 50% / 18px 18px no-repeat;
+}
+.nav-tabs::before { left: 7px; border-left: 2px solid var(--sk-line-dim); }
+.nav-tabs::after  { right: 7px; border-right: 2px solid var(--sk-line-dim); transform: scaleX(-1); }
+
+.tab-link {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 54px;
+    max-width: 220px;
+    padding: 15px 18px 13px;
+    margin: 0;
+    border: 0;
+    border-left: 1px solid rgba(174,179,175,.18);
+    border-right: 1px solid rgba(174,179,175,.12);
+    border-radius: 0;
+    clip-path: none;
+    background: transparent;
+    color: var(--sk-text-dim);
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    text-shadow: 0 2px 3px #000;
+}
+
+.tab-link::before,
+.tab-link::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    border-top: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    opacity: .9;
+}
+.tab-link::before { left: 8px; transform: translateY(-50%) rotate(-135deg); }
+.tab-link::after  { right: 8px; transform: translateY(-50%) rotate(45deg); }
+
+.tab-link:hover {
+    color: #f0f0eb;
+    background: linear-gradient(180deg, rgba(210,215,212,.09), rgba(210,215,212,.025));
+    border-color: rgba(205,210,207,.28);
+    box-shadow: none;
+}
+
+.tab-link.active {
+    color: #f4f4ef;
+    background: linear-gradient(180deg, rgba(210,215,212,.17), rgba(210,215,212,.05));
+    border-color: rgba(220,224,220,.38);
+    box-shadow: inset 0 -2px 0 rgba(225,228,225,.78), inset 0 1px 0 rgba(255,255,255,.08);
+    text-shadow: 0 0 8px rgba(235,238,235,.22), 0 2px 3px #000;
+}
+
+/* ---------- Main Skyrim menu frame ---------- */
+.panel,
+.tab-content {
+    position: relative;
+    background: linear-gradient(180deg, rgba(4,6,7,.68), rgba(0,0,0,.79));
+    border: 1px solid rgba(184,189,185,.62);
+    border-radius: 0;
+    box-shadow:
+        0 14px 38px rgba(0,0,0,.65),
+        inset 0 0 0 1px rgba(255,255,255,.035),
+        inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter: blur(2px);
+    clip-path: polygon(
+        0 30px, 30px 0,
+        calc(100% - 30px) 0, 100% 30px,
+        100% calc(100% - 24px), calc(100% - 24px) 100%,
+        24px 100%, 0 calc(100% - 24px)
+    );
+}
+
+.panel {
+    padding: 20px 22px 18px;
+}
+
+.tab-content {
+    padding: 16px 14px 22px;
+    border-color: rgba(184,189,185,.58);
+    box-shadow: 0 18px 50px rgba(0,0,0,.48), inset 0 0 0 1px rgba(255,255,255,.025);
+}
+
+/* Decorative angular corner ornaments. */
+.panel::before,
+.panel::after,
+.tab-content::before,
+.tab-content::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    pointer-events: none;
+    opacity: .9;
+    background:
+        linear-gradient(45deg, transparent 43%, rgba(194,198,194,.9) 44%, rgba(194,198,194,.9) 48%, transparent 49%) 0 0 / 18px 18px no-repeat,
+        linear-gradient(135deg, transparent 43%, rgba(194,198,194,.62) 44%, rgba(194,198,194,.62) 48%, transparent 49%) 9px 9px / 18px 18px no-repeat;
+}
+
+.panel::before,
+.tab-content::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid rgba(204,208,204,.82);
+    border-left: 2px solid rgba(204,208,204,.82);
+}
+.panel::after,
+.tab-content::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 2px solid rgba(204,208,204,.82);
+    border-bottom: 2px solid rgba(204,208,204,.82);
+    transform: scaleX(-1) scaleY(-1);
+}
+
+.panel .panel::before,
+.panel .panel::after {
+    opacity: .42;
+}
+
+.panel .panel {
+    background: rgba(0,0,0,.45);
+    border-color: rgba(174,179,175,.36);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+}
+
+/* ---------- Typography: narrow, pale, high-contrast ---------- */
+h1, h2, h3,
+.tab-link,
+.profession-header,
+label, input, select, textarea, button, p {
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+}
+
+h1, h2, h3 {
+    color: var(--sk-text);
+    border-bottom: 1px solid rgba(190,194,191,.45);
+    text-shadow: 0 2px 4px #000;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+}
+
+h1 {
+    font-size: 25px;
+    padding: 7px 48px 9px;
+}
+
+h1::before,
+h1::after {
+    color: var(--sk-line);
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    text-shadow: 0 2px 3px #000;
+}
+
+h1::before { content: '◇'; }
+h1::after  { content: '◇'; }
+
+h2 {
+    font-size: 20px;
+    padding-bottom: 7px;
+    margin-bottom: 13px;
+}
+
+h2::before,
+h2::after {
+    color: var(--sk-line);
+    font-size: 12px;
+}
+
+h2::before { content: '— '; }
+h2::after  { content: ' —'; }
+
+h3 {
+    color: #d8dad7;
+    font-size: 17px;
+    border-bottom-color: rgba(174,179,175,.28);
+}
+
+label {
+    color: #c5c8c5;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: .35px;
+    text-shadow: 0 2px 3px #000;
+}
+
+p,
+.shw-hint,
+.perk-desc,
+.slot-enchant-info {
+    color: #b7bbb8;
+}
+
+/* ---------- Inputs and controls ---------- */
+input[type="text"], input[type="number"], select, textarea {
+    background: rgba(0,0,0,.64);
+    border: 1px solid rgba(169,174,171,.45);
+    border-radius: 0;
+    color: #e1e3df;
+    font-size: 14px;
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.75);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    border-color: rgba(220,224,220,.8);
+    background: rgba(0,0,0,.76);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.75), 0 0 0 1px rgba(220,224,220,.18);
+}
+
+/* ---------- Skyrim list rows ---------- */
+.stat-block,
+.perk-item,
+.spell-card,
+.slot-row,
+.party-row,
+.enemy-row,
+.initiative-row {
+    background: linear-gradient(90deg, rgba(0,0,0,.60), rgba(30,32,31,.14), rgba(0,0,0,.55));
+    border: 0;
+    border-bottom: 1px solid rgba(170,175,172,.17);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.stat-block:hover,
+.perk-item:hover,
+.spell-card:hover,
+.slot-row:hover,
+.party-row:hover,
+.enemy-row:hover,
+.initiative-row:hover {
+    background: linear-gradient(90deg, rgba(215,219,216,.12), rgba(215,219,216,.04), rgba(215,219,216,.10));
+}
+
+.btn {
+    background: linear-gradient(180deg, rgba(145,149,146,.22), rgba(0,0,0,.58));
+    color: #e2e4e1;
+    border: 1px solid rgba(181,185,182,.62);
+    border-radius: 0;
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    font-size: 14px;
+    letter-spacing: .8px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 3px 8px rgba(0,0,0,.45);
+}
+
+.btn:hover {
+    background: linear-gradient(180deg, rgba(205,210,207,.22), rgba(0,0,0,.50));
+    color: #fff;
+    border-color: rgba(225,228,225,.9);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 0 14px rgba(220,224,220,.10);
+}
+
+.btn-danger {
+    background: linear-gradient(180deg, rgba(105,30,25,.50), rgba(25,5,4,.72));
+    color: #e6d5d1;
+    border-color: rgba(170,105,98,.58);
+}
+
+.btn-success {
+    background: linear-gradient(180deg, rgba(54,78,61,.48), rgba(5,12,7,.72));
+    color: #dbe5dc;
+    border-color: rgba(130,156,136,.58);
+}
+
+/* ---------- Bars: understated Skyrim HUD ---------- */
+.bar-track,
+.vital-bar {
+    background: rgba(0,0,0,.68);
+    border: 1px solid rgba(174,179,175,.48);
+    border-radius: 0;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.8);
+}
+
+/* ---------- Scrollbars: silver angular UI ---------- */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background:
+        linear-gradient(90deg, transparent 0 4px, rgba(174,179,175,.16) 4px 5px, transparent 5px 7px, rgba(174,179,175,.10) 7px 8px, transparent 8px),
+        rgba(0,0,0,.68);
+    border-left: 1px solid rgba(174,179,175,.32);
+    border-right: 1px solid rgba(174,179,175,.12);
+    border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb {
+    background:
+        linear-gradient(135deg, transparent 0 32%, rgba(220,224,220,.82) 33% 38%, transparent 39% 61%, rgba(220,224,220,.48) 62% 67%, transparent 68%),
+        linear-gradient(90deg, #555957, #969b97 48%, #4b4f4d);
+    border: 1px solid #c0c4c1;
+    border-radius: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.65);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background:
+        linear-gradient(135deg, transparent 0 32%, #f1f2ef 33% 38%, transparent 39% 61%, rgba(241,242,239,.70) 62% 67%, transparent 68%),
+        linear-gradient(90deg, #686c69, #b7bbb8 48%, #5b5f5d);
+}
+
+::-webkit-scrollbar-corner { background: #050606; }
+
+* {
+    scrollbar-color: #858a87 #090b0b;
+    scrollbar-width: thin;
+}
+
+/* ---------- Enemy portraits: metal-framed rather than MOBA-glossy ---------- */
+.enemy-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 0;
+    border: 1px solid rgba(202,206,203,.75);
+    padding: 2px;
+    background: rgba(0,0,0,.72);
+    box-shadow: 0 3px 8px rgba(0,0,0,.75), inset 0 0 0 1px rgba(255,255,255,.08);
+    clip-path: polygon(15% 0,85% 0,100% 15%,100% 85%,85% 100%,15% 100%,0 85%,0 15%);
+}
+
+.enemy-row:hover .enemy-avatar {
+    border-color: #eceeea;
+    box-shadow: 0 0 12px rgba(220,224,220,.18), 0 3px 8px rgba(0,0,0,.8);
+}
+
+/* Keep the original icon system, but make it monochrome/silver like Skyrim menu glyphs. */
+.skyrim-icon {
+    filter: grayscale(1) brightness(1.35) contrast(.85) drop-shadow(0 2px 3px #000);
+}
+
+/* Profession headers / accordion */
+.profession-header {
+    background: linear-gradient(180deg, rgba(135,139,136,.15), rgba(0,0,0,.62));
+    border: 1px solid rgba(174,179,175,.46);
+    border-radius: 0;
+    color: #dfe1de;
+    font-size: 17px;
+    letter-spacing: .5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 3px 9px rgba(0,0,0,.4);
+}
+
+/* Avoid warm/golden remnants from the previous theme. */
+.session-code-badge,
+.slot-picker {
+    background: rgba(0,0,0,.68);
+    color: #e0e2df;
+    border-color: rgba(174,179,175,.52);
+    border-radius: 0;
+}
+
+/* Small screen */
+@media (max-width: 700px) {
+    body { padding: 9px; }
+    .nav-tabs { padding: 0 23px; min-height: 48px; }
+    .tab-link { min-height: 46px; padding: 12px 8px; font-size: 13px; }
+    .tab-link::before { left: 3px; }
+    .tab-link::after { right: 3px; }
+    .panel { padding: 15px 14px 13px; }
+    h1 { font-size: 21px; }
+}
