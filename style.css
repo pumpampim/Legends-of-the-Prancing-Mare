@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&display=swap');
+
 
 :root {
     /* Основная палитра */
@@ -46,7 +48,7 @@ body {
     z-index: 0;
     background: var(--night-bottom);
     color: var(--text-color);
-    font-family: 'Georgia', 'Palatino Linotype', serif;
+    font-family: 'EB Garamond', Georgia, 'Palatino Linotype', serif;
     margin: 0;
     padding: 16px;
     line-height: 1.4;
@@ -78,13 +80,9 @@ body::after {
     z-index: -1;
     background:
         radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%);
-    animation: bgPulse 12s ease-in-out infinite alternate;
+    opacity: .95;
 }
 
-@keyframes bgPulse {
-    0%   { opacity: 0.9; }
-    100% { opacity: 1.0; }
-}
 
 /* ---------- КОНТЕЙНЕР ---------- */
 
@@ -123,7 +121,7 @@ h1::before, h1::after {
     font-size: 22px;
     color: var(--accent-deep);
     text-shadow: 0 0 6px rgba(200, 165, 102, 0.4);
-    font-family: 'Georgia', serif;
+    font-family: 'Cinzel', Georgia, serif;
 }
 h1::before { content: 'ᛟ'; left: 4px; }
 h1::after  { content: 'ᛟ'; right: 4px; }
@@ -218,7 +216,7 @@ input[type="text"], input[type="number"], select, textarea {
     color: var(--text-color);
     box-sizing: border-box;
     font-size: 13px;
-    font-family: 'Georgia', serif;
+    font-family: 'Cinzel', Georgia, serif;
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.7),
         inset 0 0 0 1px rgba(0, 0, 0, 0.5);
@@ -387,7 +385,7 @@ select {
     cursor: pointer;
     width: 100%;
     margin-top: 6px;
-    font-family: 'Georgia', serif;
+    font-family: 'Cinzel', Georgia, serif;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -895,6 +893,57 @@ select {
     margin-right: 6px;
     color: var(--text-dim);
 }
+
+
+/* ---------- SKYRIM UI 2.0: ЖИВЫЕ ПРЕДМЕТНЫЕ ИКОНКИ ---------- */
+.skyrim-icon {
+    display:inline-block; width:22px; height:22px; vertical-align:-6px; margin-right:5px;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    filter: drop-shadow(0 1px 2px #000) drop-shadow(0 0 3px rgba(200,165,102,.25));
+}
+.skyrim-icon.icon-sword{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTQ4IDZMMjAgMzRsMTAgMTAtMjIgMTRMMjIgMzZsMjgtMzB6IiBmaWxsPSIjYzlhZjY0IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xNiA0MGw4IDhsLTggOGMtMy0zLTItNSAwLTgiIGZpbGw9IiM3MDUwMjgiIHN0cm9rZT0iIzIxMTkxMiIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-shield{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDVMMTAgMTN2MTljMCAxNCA5IDIyIDIyIDI3IDEzLTUgMjItMTMgMjItMjdWMTN6IiBmaWxsPSIjNmE1NjM2IiBzdHJva2U9IiNjOWFmNjQiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxNmwxMiA2LTEyIDZjLTQgMC04LTIuNS04LTZ6IiBmaWxsPSIjYzlhZjY0Ii8+PC9zdmc+");}
+.skyrim-icon.icon-anvil{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTcgNDZoNTB2OWg3djRINHYtNHoiIGZpbGw9IiM3MDUwMjgiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTIyIDQ2VjM0aDI0bDUtMTJIMzJsLTctOWgtOWwxMSAxOWg0bC00IDE0eiIgZmlsbD0iI2QxYjE0ZiIgc3Ryb2tlPSIjMjExOTEyIiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=");}
+.skyrim-icon.icon-potion{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTI2IDZ2MTBoMTJWNkgyeiIgZmlsbD0iI2QxYjE0ZiIgc3Ryb2tlPSIjMjExOTEyIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMjAgMTZoMjRsMTEgMTJ2MjRjMCA2LTUgOS0xMSA5SDI0Yy02IDAtMTEtMy0xMS05VjI4eiIgZmlsbD0iIzQ2NjE0YSIgc3Ryb2tlPSIjZDViOTc1IiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMjAgMzFoMjR2OGgtMjR6IiBmaWxsPSIjYzkxZjY2Ii8+PC9zdmc+");}
+.skyrim-icon.icon-book{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDEwQzIwIDYgMTEgOSAxMCAxN3YzOGMyLTYgMTItOCAyMi0yIDEwLTYgMjAtNCAyMiAyVjE3YzAtOC05LTExLTIyLTd6IiBmaWxsPSIjNmY0YzI5IiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxMXYzOWM2LTUgMTItNiAyMC0zIiBmaWxsPSJub25lIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjwvc3ZnPg==");}
+.skyrim-icon.icon-scroll{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTIwIDl2NDZsMjQtNnYtNDR6IiBmaWxsPSIjYzY5YzY1IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0yNyAxOWgxMXY0SDI3em0wIDloMTV2NEgyN3ptMCA5aDE1djRIMjd6IiBmaWxsPSIjNzA1MDI4Ii8+PC9zdmc+");}
+.skyrim-icon.icon-dice{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDdMNTEgMTh2MjhMMzIgNTcgMTMgNDZWMTh6IiBmaWxsPSIjN2M2NDQyIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iMjciIHI9IjMiIGZpbGw9IiNkMWIxNGYiLz48Y2lyY2xlIGN4PSIzOCIgY3k9IjM3IiByPSIzIiBmaWxsPSIjZDViOTc1Ii8+PC9zdmc+");}
+.skyrim-icon.icon-coin{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjIiIGZpbGw9IiNkMWIxNGYiIHN0cm9rZT0iIzcwNTAyOCIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTQwIDIxYy0xMC01LTIwIDQtMTYgMTFzMjAgMyAxNiAxMGMtNCA3LTE0IDEyLTIyIDMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzcwNTAyOCIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-pot{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTkgMjRoNDZsLTUgMjVIMTR6IiBmaWxsPSIjNTY0NTMwIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0yMCAyNGM2LTExIDE4LTExIDI0IDBIMjB6IiBmaWxsPSIjNmE1NjM2IiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMiAxNXYtN0g0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZDViOTc1IiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=");}
+.skyrim-icon.icon-gem{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDZsMjAgMTgtMjAgMzQtMjAtMzR6IiBmaWxsPSIjN2E2ZTk1IiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMiAyNGg0MGwtMjAtMTgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q1Yjk3NSIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-chest{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTkgMjNoNDZ2MjZIOXoiIGZpbGw9IiM2MTQ2MmQiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTkgMjN2LTVoNDZ2NWgtN3YtOGgtMzJ2OHoiIGZpbGw9IiM4NzcxNDQiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+");}
+.skyrim-icon.icon-skull{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDdoMjBjMTAgMTAgOSAyNiAwIDMySDQwdjEwaC0xNlYtOGgtNGMtOS02LTEwLTIyIDItMzR6IiBmaWxsPSIjYjc5ZjgxIiBzdHJva2U9IiMyMTE5MTIiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjI0IiBjeT0iMzAiIHI9IjQiIGZpbGw9IiMyMTE5MTIiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjMwIiByPSI0IiBmaWxsPSIjMjExOTEyIi8+PC9zdmc+");}
+.skyrim-icon.icon-arrow{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTggMzJoMzgiIHN0cm9rZT0iI2QxYjE0ZiIgc3Ryb2tlLXdpZHRoPSI1Ii8+PHBhdGggZD0iTTM0IDE4bDE4IDE0LTE4IDE0IiBmaWxsPSJub25lIiBzdHJva2U9IiNkMWIxNGYiIHN0cm9rZS13aWR0PSI1Ii8+PC9zdmc+");}
+
+/* ---------- ПОРТРЕТЫ ПРОТИВНИКОВ ---------- */
+.name-with-avatar{display:inline-flex;align-items:center;gap:8px;min-width:0;}
+.enemy-avatar{width:48px;height:48px;flex:0 0 48px;border-radius:50%;object-fit:cover;background:#17130e;border:2px solid var(--accent-color);box-shadow:0 2px 8px rgba(0,0,0,.75), inset 0 0 0 1px rgba(255,230,170,.18);}
+.enemy-portrait-row .row-name{align-items:center;min-height:50px;}
+.enemy-row{padding:9px 11px;background:linear-gradient(135deg,rgba(45,39,28,.96),rgba(16,13,9,.98));}
+.enemy-row:hover .enemy-avatar{border-color:var(--accent-bright);box-shadow:0 0 12px rgba(200,165,102,.28);}
+
+/* ---------- ВКЛАДКИ: МЕНЮ КАК ДЕРЕВЯННЫЕ/ЖЕЛЕЗНЫЕ ТАБЛИЧКИ ---------- */
+.nav-tabs{gap:5px;border-bottom:2px solid #765d35;padding:0 4px 4px;}
+.tab-link{font-family:'Cinzel',Georgia,serif;font-size:11px;text-transform:none;letter-spacing:.25px;padding:9px 13px;border-radius:2px;clip-path:polygon(3% 0,97% 0,100% 18%,100% 82%,97% 100%,3% 100%,0 82%,0 18%);}
+.tab-link.active{background:linear-gradient(180deg,#6b5430,#3b2d19);}
+
+/* ---------- КАЖДАЯ ВКЛАДКА ИМЕЕТ СВОЁ НАСТРОЕНИЕ ---------- */
+.tab-content{position:relative;padding:10px 8px 18px;border:1px solid rgba(125,98,55,.35);background-color:rgba(7,8,12,.52);box-shadow:0 12px 35px rgba(0,0,0,.22);}
+#tab1{background:linear-gradient(rgba(13,20,28,.66),rgba(5,8,12,.76)),url('skyrim-bg.gif') center/cover fixed;}
+#tab2{background:linear-gradient(rgba(31,24,13,.78),rgba(8,7,5,.84)),radial-gradient(circle at 50% 0,#695331,transparent 60%);}
+#tab3{background:linear-gradient(rgba(22,17,14,.68),rgba(5,7,10,.86)),url('skyrim-bg.gif') 20% center/cover fixed;}
+#tab4{background:linear-gradient(rgba(22,26,36,.78),rgba(5,7,12,.88)),radial-gradient(circle at 50% 15%,#52627b,transparent 55%);}
+#tab5{background:linear-gradient(rgba(19,28,20,.72),rgba(5,8,7,.88)),radial-gradient(circle at 20% 10%,#506347,transparent 52%);}
+#tab6{background:linear-gradient(rgba(28,24,17,.72),rgba(6,7,8,.9)),url('skyrim-bg.gif') 80% center/cover fixed;}
+#tab7{background:linear-gradient(rgba(33,25,15,.74),rgba(8,7,5,.9)),radial-gradient(circle at 70% 15%,#795d35,transparent 48%);}
+#tab10{background:linear-gradient(rgba(21,19,28,.74),rgba(5,6,10,.9)),radial-gradient(circle at 50% 15%,#625477,transparent 50%);}
+
+/* ---------- ТИПОГРАФИКА ---------- */
+h1,h2,h3,.tab-link,.profession-header{font-family:'Cinzel',Georgia,serif;}
+p,label,input,select,textarea,button{font-family:'EB Garamond',Georgia,serif;}
+h1{font-weight:600;letter-spacing:2.2px;}
+h2{font-weight:600;letter-spacing:1px;}
+.panel{backdrop-filter:blur(1.5px);}
 
 /* ---------- СКРОЛЛБАРЫ (В ТЕМУ) ---------- */
 
