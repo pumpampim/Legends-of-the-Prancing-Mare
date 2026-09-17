@@ -2204,6 +2204,14 @@ window.toggleSkillPanel = function (idx) {
         alert(`Продано: ${item.name} ×${qty} → ${MERCHANT_LABELS[merchantType]} заплатил ${total} септимов.`);
     };
 
+    function isFoodItem(item) {
+    if (!item) return false;
+    const cat = (item.category || '').toLowerCase();
+    const type = (item.type || '').toLowerCase();
+    if (type === 'food' || type === 'drink') return true;
+    const foodKeywords = ['еда', 'продукт', 'блюдо', 'напит', 'готов', 'провал готовки', 'сырое', 'мясо'];
+    return foodKeywords.some(k => cat.includes(k));
+}
     function renderInventoryList() {
         const el = document.getElementById('player-inventory-list');
         if (!el) return;
