@@ -1437,3 +1437,129 @@ textarea:focus {
     .panel { padding: 15px 14px 13px; }
     h1 { font-size: 21px; }
 }
+.section-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: color .15s ease;
+    margin-bottom: 6px !important;
+}
+
+.section-header:hover {
+    color: var(--accent-bright, #f0c87a);
+}
+
+.section-title {
+    flex: 1;
+    text-align: left;
+}
+
+.section-chevron {
+    font-size: 14px;
+    color: var(--accent-color, #c8a566);
+    flex-shrink: 0;
+    transition: transform .15s ease;
+}
+
+.section-body {
+    /* по умолчанию раскрыт; при инициализации может быть свёрнут */
+    margin-top: 4px;
+}
+
+/* ============================================================================
+   ВЕТКИ ПЕРКОВ: шторки по каждому навыку
+   ============================================================================ */
+
+.skill-panel {
+    background: var(--panel-sub, #16130d);
+    border: 1px solid #363025;
+    padding: 8px 10px !important;
+    margin-bottom: 6px !important;
+}
+
+.skill-panel .skill-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+}
+
+.skill-panel .skill-header:hover .skill-title {
+    color: var(--accent-bright, #f0c87a);
+}
+
+.skill-panel .skill-title {
+    flex: 1;
+    font-weight: bold;
+    font-size: 14px;
+    color: var(--accent-color, #c8a566);
+    transition: color .15s ease;
+}
+
+.skill-panel .skill-value-input {
+    width: 52px;
+    text-align: center;
+    font-size: 13px;
+    padding: 3px 4px;
+}
+
+.skill-panel .skill-chevron {
+    font-size: 13px;
+    color: var(--accent-color, #c8a566);
+    flex-shrink: 0;
+    min-width: 14px;
+    text-align: center;
+}
+
+.skill-panel .skill-body {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #2a2214;
+}
+
+/* ============================================================================
+   ДАТА И ГОЛОД
+   ============================================================================ */
+
+.date-display {
+    display: inline-block;
+    background: rgba(0, 0, 0, .55);
+    border: 1px solid var(--border-color, #5c4a2c);
+    border-radius: 3px;
+    padding: 4px 12px;
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 13px;
+    color: var(--accent-bright, #f0c87a);
+    letter-spacing: .5px;
+    text-shadow: 0 0 6px rgba(200, 165, 102, .35);
+}
+
+.hunger-warning {
+    background: linear-gradient(180deg, #7a2014 0%, #4a120c 100%);
+    color: #ffd8c8;
+    padding: 6px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid var(--danger-bright, #c84534);
+    box-shadow: 0 0 10px rgba(200, 70, 50, .3);
+    margin-top: 6px;
+    text-shadow: 0 1px 0 #000;
+}
+
+.day-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    background: var(--input-bg, #0d0a05);
+    border: 1px solid var(--border-color, #5c4a2c);
+    border-radius: 4px;
+    margin-top: 8px;
+}
