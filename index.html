@@ -2208,9 +2208,22 @@ window.toggleSkillPanel = function (idx) {
     if (!item) return false;
     const cat = (item.category || '').toLowerCase();
     const type = (item.type || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+
+    // Точное совпадение типа из items-data.js
     if (type === 'food' || type === 'drink') return true;
-    const foodKeywords = ['еда', 'продукт', 'блюдо', 'напит', 'готов', 'провал готовки', 'сырое', 'мясо'];
-    return foodKeywords.some(k => cat.includes(k));
+
+    // Категория
+    const catKeywords = ['еда', 'продукт', 'блюдо', 'напит', 'готов', 'сырое', 'провал готовки'];
+    if (catKeywords.some(k => cat.includes(k))) return true;
+
+    // Название (на случай, если предмет добавлен без категории/типа)
+    const nameKeywords = ['яблоко', 'хлеб', 'сыр', 'мясо', 'рыба', 'суп', 'похлёбка', 'пирог',
+                          'печенье', 'мёд', 'вино', 'морковь', 'картоф', 'капуста', 'помидор',
+                          'лук', 'тыква', 'молоко', 'батат', 'рулет', 'орех'];
+    if (nameKeywords.some(k => name.includes(k))) return true;
+
+    return false;
 }
     function renderInventoryList() {
         const el = document.getElementById('player-inventory-list');
