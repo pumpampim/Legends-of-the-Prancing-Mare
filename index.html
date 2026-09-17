@@ -728,6 +728,11 @@
                     <p style="font-size:10px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
                     <div id="active-timed-effects-list" style="margin-top:8px;"></div>
                 </div>
+
+                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <div id="weather-display" style="font-size:13px; margin-bottom:6px;">🕐 День · Погоду и регион задаёт мастер</div>
+                    <p style="font-size:10px; opacity:.6;">Бонусы/штрафы от погоды — справочные, применяются вручную при бросках (мастер или ты сам решаете, когда они действуют).</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1129,7 +1134,12 @@
                 <span><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимия</span><span id="prof-chevron-alchemy">▸</span>
             </div>
             <div class="profession-body" id="prof-body-alchemy">
-                <h2>🍽️ Съесть ингредиент</h2>
+                <h2>🌿 Собрать ингредиенты</h2>
+                <p style="font-size:12px; opacity:.8;">Находит 1-3 ингредиента в зависимости от региона, погоды и времени суток, которые задал мастер (вкладка «Сессия»). Некоторые ингредиенты (части монстров, трофеи) при сборе не попадаются — их можно получить только с трупов врагов.</p>
+                <button class="btn-success" style="width:100%;" onclick="gatherIngredients()">🌿 Собрать</button>
+                <div id="gather-result" style="margin-top:8px; font-size:13px;"></div>
+
+                <h2 style="margin-top:16px;">🍽️ Съесть ингредиент</h2>
                 <p style="font-size:12px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
                 <select id="alch-eat-select" style="width:100%;"></select>
                 <div id="alch-eat-info" style="font-size:12px; opacity:.85; margin:6px 0;"></div>
@@ -1299,6 +1309,56 @@
 
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
     let gameTurn = 0, gameRound = 0;
+
+    // ==================== ВРЕМЯ СУТОК / ПОГОДА / СБОР ИНГРЕДИЕНТОВ ====================
+    const TIME_PERIODS = ['Утро', 'День', 'Вечер', 'Ночь'];
+    let timePeriodIdx = 1; // 0=Утро,1=День,2=Вечер,3=Ночь
+
+    const WEATHER_TYPES = {
+        clear: { name: '☀️ Ясно', effect: '' },
+        cloudy: { name: '☁️ Облачно', effect: '' },
+        rain: { name: '🌧️ Дождь', effect: '−2 к дальнему бою (Стрельба), +2 к Скрытности — дождь маскирует шаги' },
+        storm: { name: '⛈️ Гроза', effect: '−4 к дальнему бою, вспышки молний иногда выдают позицию (−2 к Скрытности при ударе)' },
+        snow: { name: '🌨️ Снегопад', effect: '−5 фт. скорости, +2 к Скрытности — снег глушит шаги' },
+        blizzard: { name: '🌬️ Метель', effect: '−10 фт. скорости, −4 к дальнему бою, видимость почти нулевая' },
+        fog: { name: '🌫️ Туман', effect: '+4 к Скрытности, −4 к дальнему бою — плохая видимость' }
+    };
+    const GAME_REGIONS = ['Лес', 'Болото', 'Горы', 'Побережье', 'Равнина', 'Подземелье'];
+    const REGION_WEATHER_POOL = {
+        'Лес': ['clear', 'cloudy', 'rain', 'fog'],
+        'Болото': ['cloudy', 'rain', 'fog', 'storm'],
+        'Горы': ['snow', 'blizzard', 'clear', 'cloudy'],
+        'Побережье': ['clear', 'cloudy', 'rain', 'storm', 'fog'],
+        'Равнина': ['clear', 'cloudy', 'rain'],
+        'Подземелье': ['clear']
+    };
+
+    // Ингредиенты, которых нет в дикой природе — только с трупов/добычи существ.
+    const INGREDIENT_CORPSE_ONLY = new Set([
+        'Глаз саблезуба', 'Жир тролля', 'Зубы ледяного привидения', 'Икра рыбы-убийцы',
+        'Клешня грязевого краба', 'Клык саблезуба', 'Коготь ворожеи', 'Кровавый венец',
+        'Медвежьи когти', 'Паучье яйцо', 'Перья ворожеи', 'Прах вампира', 'Сердце даэдра',
+        'Ухо фалмера', 'Хвост злокрыся', 'Человеческое сердце', 'Человечье мясо',
+        'Эльфийское ухо', 'Язык дракона', 'Чешуя рыбы-убийцы', 'Толченый бивень мамонта',
+        'Эктоплазма', 'Прах Берита', 'Жареная злокрысья кожа'
+    ]);
+    // Ингредиенты, которые логично находить чаще в определённом регионе (доп. вес при сборе).
+    const INGREDIENT_REGION_TAGS = {
+        'Лес': ['Лаванда', 'Пчела', 'Медовые соты', 'Пчелиное гнездо', 'Ягоды можжевельника', 'Чеснок',
+                 'Голубой горноцвет', 'Красный горноцвет', 'Лиловый горноцвет', 'Большие рога', 'Маленькие рога',
+                 'Клюв ястреба', 'Перья ястреба', 'Древесина горелого сприггана', 'Живица сприггана'],
+        'Болото': ['Болотный стручок', 'Бесовский гриб', 'Мора тапинелла', 'Гниль Намиры', 'Ядовитый колокольчик',
+                    'Паслен', 'Бородатый мох', 'Стержневой корень', 'Собачий корень', 'Ползучая лоза', 'Травяной стручок'],
+        'Горы': ['Морозная мириам', 'Морозная соль', 'Снежные ягоды', 'Огненная соль', 'Соль пустоты'],
+        'Побережье': ['Морской желудь', 'Сиродильский лопатохвост', 'Хисткарп', 'Абесинский окунь',
+                       'Серебристый окунь', 'Бойцовая рыбка', 'Жемчужина', 'Маленькая жемчужина'],
+        'Равнина': ['Пшеница', 'Соль', 'Куриное яйцо', 'Вересковое сердце']
+    };
+    // Собираются только ночью.
+    const NIGHT_ONLY_INGREDIENTS = new Set([
+        'Мухомор', 'Светящийся гриб', 'Лунный сахар', 'Крыло лунного мотылька', 'Паслен', 'Светящаяся пыль'
+    ]);
+
     let characterLevel = 1;
     let levelUpProgress = 0; // очков навыков накоплено к следующему уровню
     let perkPointsAvailable = 0; // свободные очки перков от левел-апов (справочно, не блокирует существующие перки)
@@ -1827,7 +1887,29 @@ window.toggleSkillPanel = function (idx) {
 
         let extraMsg = '';
         const template = findSummonTemplateBySpellName(spellName);
-        if (template) {
+        if (template && template.category === 'corpse') {
+            // Если в активной сессии мастера есть конкретный поднимаемый труп (например,
+            // сгенерированный бандит) — поднимаем именно его, с его настоящими ХП/уроном,
+            // а не общий шаблон по рангу заклинания.
+            const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+            const corpse = session && (session.enemies || []).find(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised);
+            if (corpse) {
+                const specificTemplate = Object.assign({}, template, {
+                    name: (corpse.name || template.name) + ' (поднят)',
+                    hpBase: corpse.maxHp || template.hpBase, hpEnh: corpse.maxHp || template.hpBase,
+                    dmgBase: corpse.weaponDmg || template.dmgBase, dmgEnh: corpse.weaponDmg || template.dmgBase,
+                    dmgType: 'физический'
+                });
+                const res = performSummon(specificTemplate, false);
+                extraMsg = res.ok ? ` ${res.message} (использованы настоящие ХП/урон трупа «${corpse.name}»)` : ` ⚠ ${res.message}`;
+                if (res.ok && window.CloudSync) {
+                    window.CloudSync.markCorpseRaised(corpse.id);
+                }
+            } else {
+                const res = performSummon(template, false);
+                extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
+            }
+        } else if (template) {
             const res = performSummon(template, false);
             extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
         } else if (targetVal === 'self') {
@@ -2262,13 +2344,7 @@ window.toggleSkillPanel = function (idx) {
                 </span>
                                <span style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
-                    ${(function(){
-                        const cat = (item.category || '').toLowerCase();
-                        const isFood = cat.includes('еда') || cat.includes('блюдо') || cat.includes('напит') ||
-                                       cat.includes('провал готовки') || cat.includes('готов') ||
-                                       item.type === 'food' || item.type === 'drink';
-                        return isFood ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : '';
-                    })()}
+                    ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${item.category === 'Свиток' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
@@ -3378,6 +3454,38 @@ window.toggleSkillPanel = function (idx) {
     };
     document.getElementById('alch-eat-select') && document.getElementById('alch-eat-select').addEventListener('change', window.updateAlchEatInfo);
 
+    // Собирает 1-3 ингредиента с учётом региона/погоды/времени суток, заданных мастером.
+    // Ингредиенты-трофеи (части монстров) в дикой природе не попадаются — только с трупов.
+    window.gatherIngredients = function () {
+        const resultEl = document.getElementById('gather-result');
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const region = (session && session.currentRegion) || null;
+        const period = (session && session.timePeriod) || 'День';
+        const regionTags = region ? (INGREDIENT_REGION_TAGS[region] || []) : [];
+
+        const allNames = Object.keys(window.alchemyIngredients || {}).filter(n => !INGREDIENT_CORPSE_ONLY.has(n));
+        const weighted = [];
+        allNames.forEach(n => {
+            if (NIGHT_ONLY_INGREDIENTS.has(n) && period !== 'Ночь') return; // ночные не попадаются днём
+            const weight = regionTags.includes(n) ? 3 : 1;
+            for (let i = 0; i < weight; i++) weighted.push(n);
+        });
+        if (!weighted.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет доступных ингредиентов для сбора сейчас.</span>'; return; }
+
+        const count = Math.floor(Math.random() * 3) + 1; // 1-3
+        const found = [];
+        for (let i = 0; i < count; i++) {
+            const name = weighted[Math.floor(Math.random() * weighted.length)];
+            const info = window.alchemyIngredients[name];
+            addToInventory(name, name, 1, info.weight || 0.1, 'Ингредиенты для алхимии', '', { price: info.price || 1 });
+            found.push(name);
+        }
+        const locLabel = region ? `${period}, ${region}` : `${period} (регион мастер ещё не задал — сбор общий)`;
+        resultEl.innerHTML = `<strong>Найдено (${escHtml(locLabel)}):</strong> ${found.map(escHtml).join(', ')}`;
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
     window.eatIngredient = function () {
         const select = document.getElementById('alch-eat-select');
         const name = select.value;
@@ -4067,6 +4175,23 @@ window.toggleSkillPanel = function (idx) {
         if (alive.some(e => e.id === prev)) select.value = prev;
     };
 
+    // Читает регион/погоду/время суток, заданные мастером в сессии, и показывает их игроку.
+    window.updateWeatherDisplay = function () {
+        const el = document.getElementById('weather-display');
+        if (!el) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        if (!session || !session.currentRegion) {
+            el.textContent = '🕐 Время суток и погода ещё не заданы мастером.';
+            return;
+        }
+        const period = session.timePeriod || 'День';
+        const weatherKey = session.currentWeather || 'clear';
+        const weather = WEATHER_TYPES[weatherKey] || WEATHER_TYPES.clear;
+        let html = `🕐 <strong>${escHtml(period)}</strong> · 📍 ${escHtml(session.currentRegion)} · ${weather.name}`;
+        if (weather.effect) html += `<div style="font-size:11px; opacity:.75; margin-top:2px;">${escHtml(weather.effect)}</div>`;
+        el.innerHTML = html;
+    };
+
     function renderAttackActionSelect() {
         const select = document.getElementById('attack-action-select');
         if (!select) return;
@@ -4188,13 +4313,10 @@ window.eatAnyFood = function (itemId) {
     const item = playerInventory.find(i => i.itemId === itemId);
     if (!item || item.count <= 0) return;
 
-    // Считаем «едой» всё, что помечено категориями еды/питья/блюда
-    const cat = (item.category || '').toLowerCase();
-    const isFood = cat.includes('еда') || cat.includes('блюдо') || cat.includes('напит') ||
-                   cat.includes('провал готовки') || cat.includes('готов') ||
-                   (item.type === 'food' || item.type === 'drink');
-
-    if (!isFood) {
+    // Раньше тут была узкая проверка по категории (без "Сырые продукты"), из-за которой
+    // сырую еду нельзя было съесть — теперь используем ту же полную проверку isFoodItem(),
+    // что уже была написана ниже, но не подключена сюда.
+    if (!isFoodItem(item)) {
         alert('Это не еда.');
         return;
     }

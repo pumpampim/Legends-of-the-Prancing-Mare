@@ -119,6 +119,32 @@
                 </div>
                 <button style="margin-top:6px; width:100%;" onclick="clearLog()">Очистить журнал</button>
             </div>
+
+            <div class="panel">
+                <h2>🌤️ Время суток и погода</h2>
+                <p style="font-size:11px; opacity:.75;">Задаёт мастер — видят все игроки в сессии. Погода подбирается случайно из пула, подходящего региону.</p>
+                <label>Время суток</label>
+                <select id="weather-time-select">
+                    <option value="Утро">Утро</option>
+                    <option value="День" selected>День</option>
+                    <option value="Вечер">Вечер</option>
+                    <option value="Ночь">Ночь</option>
+                </select>
+                <label>Регион</label>
+                <select id="weather-region-select">
+                    <option value="Лес">Лес</option>
+                    <option value="Болото">Болото</option>
+                    <option value="Горы">Горы</option>
+                    <option value="Побережье">Побережье</option>
+                    <option value="Равнина">Равнина</option>
+                    <option value="Подземелье">Подземелье</option>
+                </select>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn-success" style="flex:1;" onclick="rollWeatherForRegion()">🎲 Погода по региону</button>
+                    <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
+                </div>
+                <div id="weather-gm-result" style="margin-top:6px; font-size:12px;"></div>
+            </div>
         </div>
 
         <!-- ===== НОВЫЙ БЛОК: БАЗА ПРЕДМЕТОВ ===== -->
@@ -315,6 +341,14 @@
                 </select>
                 <button class="btn-success" style="width:100%; margin-top:6px;" onclick="grantLevelUp()">Начислить уровень (+1 перк, +1 характеристика)</button>
                 <button style="width:100%; margin-top:4px;" onclick="grantPerkPointOnly()">Начислить только 1 очко перка</button>
+                <button class="btn-danger" style="width:100%; margin-top:4px;" onclick="revokeLevelUp()">Понизить уровень (−1, без отмены уже взятых перков/характеристик)</button>
+
+                <label style="font-size:12px; margin-top:8px;">Понизить конкретный навык</label>
+                <select id="inv-skill-decrease-select"></select>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <input type="number" id="inv-skill-decrease-amount" value="1" min="1" style="flex:1;">
+                    <button class="btn-danger" style="width:auto;" onclick="decreasePlayerSkill()">Понизить</button>
+                </div>
             </div>
 
             <div id="inv-items-list" style="max-height:400px; overflow-y:auto;">
@@ -356,6 +390,33 @@
             <input type="number" id="party-reward-item-qty" value="1" min="1">
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantPartyReward()">Выдать всей группе</button>
             <div id="party-reward-result" style="margin-top:8px; font-size:12px;"></div>
+        </div>
+
+        <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
+        <div class="panel">
+            <h2>📦 Генератор лута (сундук)</h2>
+            <label>Уровень сундука (примерно под уровень группы)</label>
+            <select id="loot-tier-select">
+                <option value="poor">Бедный (ур. 1-3)</option>
+                <option value="common" selected>Обычный (ур. 4-7)</option>
+                <option value="rich">Богатый (ур. 8-12)</option>
+                <option value="legendary">Легендарный (ур. 13+)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="generateChestLoot()">🎲 Сгенерировать</button>
+            <div id="loot-gen-result" style="margin-top:8px; font-size:12px;"></div>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <select id="loot-gen-target-player" style="flex:1;"></select>
+                <button style="width:auto;" onclick="grantGeneratedLoot()">Выдать</button>
+            </div>
+        </div>
+
+        <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
+        <div class="panel">
+            <h2>🗡️ Генератор бандита</h2>
+            <p style="font-size:11px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь). ХП и урон оружием считаются по-настоящему и идут в бой. После смерти труп можно поднять заклинанием или обыскать на добычу (кнопки появятся у противника в списке выше, когда его ХП дойдут до 0).</p>
+            <button class="btn-success" style="width:100%;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
+            <div id="bandit-gen-result" style="margin-top:8px; font-size:12px; line-height:1.5;"></div>
+            <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
         </div>
     </div>
 </div>

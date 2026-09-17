@@ -189,6 +189,7 @@
         populateCalcPlayerSelects();
         populateQuestTargetSelect();
         populateGmAttackSelects();
+        populateLootTargetSelect();
     }
 
     // ---------- Отряд ----------
@@ -271,7 +272,15 @@
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
                 '<div><label style="font-size:11px;">MP (' + (e.maxMp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curMp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curMp\',this.value)"></div>' +
-                '</div></div>';
+                '</div>' +
+                (e.isRaisable && (e.curHp || 0) <= 0
+                    ? '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:11px;">' +
+                      '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
+                      (e.corpseLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>' : '<div style="opacity:.6;">Уже обыскан.</div>') +
+                      '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' +
+                      '</div>'
+                    : '') +
+                '</div>';
         }).join('');
     }
 
@@ -857,6 +866,42 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Понижает уровень персонажа на 1 (минимум 1). Уже взятые перки и полученные ранее
+    // характеристики НЕ отменяются автоматически — это на усмотрение мастера/игрока за столом.
+    window.revokeLevelUp = function () {
+        if (!currentInvPlayerUid) return;
+        if (!confirm('Понизить уровень на 1? Уже взятые перки и характеристики останутся как есть.')) return;
+        db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const newLevel = Math.max(1, (parseInt(data.characterLevel) || 1) - 1);
+            return db.collection('characters').doc(currentInvPlayerUid).update({ characterLevel: newLevel, levelUpProgress: 0 });
+        }).then(() => {
+            alert('Уровень понижен.');
+            window.loadPlayerInventoryForGm();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function populateSkillDecreaseSelect() {
+        const select = el('inv-skill-decrease-select');
+        if (!select) return;
+        select.innerHTML = SKILL_NAMES_BY_IDX.map((name, i) => `<option value="${i}">${escapeHtml(name)}</option>`).join('');
+    }
+
+    window.decreasePlayerSkill = function () {
+        if (!currentInvPlayerUid) return;
+        const skillIdx = parseInt(el('inv-skill-decrease-select').value) || 0;
+        const amount = parseInt(el('inv-skill-decrease-amount').value) || 1;
+        db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const skills = Array.isArray(data.skills) ? data.skills.slice() : [];
+            const current = parseInt(skills[skillIdx]) || 10;
+            skills[skillIdx] = Math.max(10, current - amount);
+            return db.collection('characters').doc(currentInvPlayerUid).update({ skills: skills });
+        }).then(() => {
+            alert(`Навык «${SKILL_NAMES_BY_IDX[skillIdx]}» понижен на ${amount}.`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     function renderGmPlayerInventory() {
         const target = el('inv-items-list');
         const items = currentPlayerInvData.inventory;
@@ -1120,6 +1165,7 @@
     };
 
     if (typeof renderCalcAlchIngredients === 'function') renderCalcAlchIngredients();
+    if (typeof populateSkillDecreaseSelect === 'function') populateSkillDecreaseSelect();
     if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();
     if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
 
@@ -1349,6 +1395,243 @@
             alert('Урон применён игроку.');
             pendingGmAttack = null;
             el('gm-attack-roll-result').style.display = 'none';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Генератор лута сундуков ----------
+
+    const LOOT_TIERS = {
+        poor: { label: 'Бедный', gold: [5, 40], priceMin: 1, priceMax: 30, itemCount: [1, 2] },
+        common: { label: 'Обычный', gold: [30, 150], priceMin: 20, priceMax: 150, itemCount: [2, 3] },
+        rich: { label: 'Богатый', gold: [150, 600], priceMin: 100, priceMax: 800, itemCount: [2, 4] },
+        legendary: { label: 'Легендарный', gold: [500, 2000], priceMin: 500, priceMax: 6935, itemCount: [1, 3] }
+    };
+    const LOOT_EXCLUDE_CATEGORIES = ['Ингредиенты для алхимии', 'Кузнечные ингредиенты', 'Шкуры', 'Двемерские детали'];
+
+    let lastGeneratedLoot = null;
+
+    function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    window.generateChestLoot = function () {
+        const tierKey = el('loot-tier-select').value;
+        const tier = LOOT_TIERS[tierKey];
+        const resultEl = el('loot-gen-result');
+        const pool = (gmAllItems || []).filter(i =>
+            typeof i.price === 'number' && i.price >= tier.priceMin && i.price <= tier.priceMax &&
+            !LOOT_EXCLUDE_CATEGORIES.includes(i.category)
+        );
+        if (!pool.length) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">В базе нет предметов в этом ценовом диапазоне.</span>';
+            return;
+        }
+        const gold = randInt(tier.gold[0], tier.gold[1]);
+        const count = randInt(tier.itemCount[0], tier.itemCount[1]);
+        const items = [];
+        for (let i = 0; i < count; i++) {
+            items.push(pool[Math.floor(Math.random() * pool.length)]);
+        }
+        lastGeneratedLoot = { tier: tier.label, gold, items };
+
+        let html = `<strong>${tier.label} сундук:</strong><br>💰 ${gold} септимов<br>`;
+        items.forEach(it => { html += `• ${escapeHtml(it.name)} (${escapeHtml(it.category || '')}, ${it.price} септимов)<br>`; });
+        resultEl.innerHTML = html;
+    };
+
+    window.grantGeneratedLoot = function () {
+        if (!lastGeneratedLoot) { alert('Сначала сгенерируй лут.'); return; }
+        const targetUid = el('loot-gen-target-player').value;
+        if (!targetUid) { alert('Выбери игрока.'); return; }
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+            lastGeneratedLoot.items.forEach(it => {
+                const itemId = it.id || it.name;
+                const existing = inv.find(x => x.itemId === itemId);
+                const extra = {};
+                if (it.slot) extra.slot = it.slot;
+                if (typeof it.armor === 'number') extra.armorValue = it.armor;
+                if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
+                if (typeof it.price === 'number') extra.price = it.price;
+                if (existing) { existing.count += 1; Object.assign(existing, extra); }
+                else inv.push(Object.assign({ itemId, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, extra));
+            });
+            const newGold = (parseInt(data.gold) || 0) + lastGeneratedLoot.gold;
+            return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
+        }).then(() => {
+            const pname = (lastData.participants[targetUid] || {}).name || targetUid;
+            alert(`Лут (${lastGeneratedLoot.tier} сундук) выдан игроку ${pname}.`);
+            gmPostLogEntryText(`📦 ${pname} нашёл(а) ${lastGeneratedLoot.tier.toLowerCase()} сундук: ${lastGeneratedLoot.gold} золота + ${lastGeneratedLoot.items.map(i => i.name).join(', ')}.`);
+            lastGeneratedLoot = null;
+            el('loot-gen-result').innerHTML = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function populateLootTargetSelect() {
+        const select = el('loot-gen-target-player');
+        if (!select) return;
+        const uids = Object.keys(lastData.participants || {});
+        const prev = select.value;
+        select.innerHTML = uids.length
+            ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
+            : '<option value="">Нет игроков</option>';
+        if (uids.includes(prev)) select.value = prev;
+    }
+
+    // ---------- Генератор бандитов ----------
+
+    const BANDIT_RACES = ['Норд', 'Имперец', 'Редгард', 'Бретонец', 'Данмер', 'Орк', 'Каджит'];
+    const BANDIT_SIGNS = ['Воин', 'Вор', 'Маг', 'Госпожа', 'Конь', 'Атронах', 'Тень'];
+    const BANDIT_GODS = [
+        { name: 'Талос', blessing: '5% урона топорами и секирами, 10% сопротивление электричеству' },
+        { name: 'Мара', blessing: '25% сопротивления ядам и болезням, +5% пробития брони ближним оружием' },
+        { name: 'Боэтия', blessing: '10% урону стрелковым оружием, +5 футов передвижения' },
+        { name: 'Малакат', blessing: '+25 хп, +10% урона оружием ближнего боя' },
+        { name: 'Сангвин', blessing: 'Почти не пьянеет; после выпивки +10% физ.урона на 20 ходов' },
+        { name: '— без веры —', blessing: '' }
+    ];
+    const BANDIT_WEAPON_MATERIAL = /^(Железн|Кожан|Стальн)/i;
+    const BANDIT_ARMOR_SLOT_MAP = { 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' };
+
+    function getBanditGearPool() {
+        const weapons = (window.weaponRecipes || []).filter(w => BANDIT_WEAPON_MATERIAL.test(w.name));
+        const armors = (window.armorRecipes || []).filter(a => BANDIT_WEAPON_MATERIAL.test(a.name));
+        return { weapons, armors };
+    }
+
+    let lastGeneratedBandit = null;
+
+    window.generateBandit = function () {
+        const resultEl = el('bandit-gen-result');
+        const pool = getBanditGearPool();
+        if (!pool.weapons.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных об оружии — проверь, что smithing-data.js подключён.</span>'; return; }
+
+        const race = BANDIT_RACES[Math.floor(Math.random() * BANDIT_RACES.length)];
+        const sign = BANDIT_SIGNS[Math.floor(Math.random() * BANDIT_SIGNS.length)];
+        const god = BANDIT_GODS[Math.floor(Math.random() * BANDIT_GODS.length)];
+        const weapon = pool.weapons[Math.floor(Math.random() * pool.weapons.length)];
+
+        const slots = { helmet: null, chest: null, gloves: null, boots: null, shield: null };
+        const bySlot = {};
+        pool.armors.forEach(a => {
+            const key = BANDIT_ARMOR_SLOT_MAP[a.slot];
+            if (!key) return;
+            (bySlot[key] = bySlot[key] || []).push(a);
+        });
+        let totalArmor = 0;
+        Object.keys(slots).forEach(key => {
+            if (key === 'shield' && Math.random() > 0.3) return;
+            if (key !== 'shield' && Math.random() > 0.7) return;
+            const options = bySlot[key];
+            if (options && options.length) {
+                const picked = options[Math.floor(Math.random() * options.length)];
+                slots[key] = picked;
+                totalArmor += picked.resistance || 0;
+            }
+        });
+
+        const gold = randInt(5, 80);
+        const hasTrinket = Math.random() < 0.3;
+        const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' || (i.slot === 'ring' || i.slot === 'amulet'));
+        const trinket = hasTrinket && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
+
+        const hp = randInt(40, 90);
+
+        const lootItems = [{ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' }];
+        Object.values(slots).forEach(a => { if (a) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: BANDIT_ARMOR_SLOT_MAP[a.slot], category: 'Броня (с трупа)' }); });
+        if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
+
+        lastGeneratedBandit = {
+            name: 'Бандит', race, sign, god: god.name, hp, weaponDmg: weapon.damage, weaponNote: weapon.name,
+            armor: totalArmor, gold, lootItems, isRaisable: true
+        };
+
+        let html = `<strong>${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
+        if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
+        html += `ХП: ${hp} · Оружие: ${escapeHtml(weapon.name)} (${weapon.damage} урона) · Броня: ${totalArmor}<br>`;
+        html += `Лут: 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
+        resultEl.innerHTML = html;
+    };
+
+    window.addGeneratedBanditToCombat = function () {
+        if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
+        const b = lastGeneratedBandit;
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push({
+            id: genId('e'), name: b.name + ' (' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: 0, curMp: 0,
+            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, resist: {},
+            isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+        });
+        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+            lastGeneratedBandit = null;
+            el('bandit-gen-result').innerHTML = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.lootCorpse = function (enemyId) {
+        const enemy = (lastData.enemies || []).find(e => e.id === enemyId);
+        if (!enemy || !enemy.corpseLoot) { alert('У этого противника нет привязанного лута.'); return; }
+        const targetUid = el('loot-gen-target-player').value;
+        if (!targetUid) { alert('Выбери игрока (внизу, в генераторе лута) — ему уйдёт добыча.'); return; }
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+            (enemy.corpseLoot.items || []).forEach(it => {
+                const itemId = it.name;
+                const existing = inv.find(x => x.itemId === itemId);
+                const extra = {};
+                if (it.slot) extra.slot = it.slot;
+                if (typeof it.armor === 'number') extra.armorValue = it.armor;
+                if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
+                if (typeof it.price === 'number') extra.price = it.price;
+                if (existing) { existing.count += 1; Object.assign(existing, extra); }
+                else inv.push(Object.assign({ itemId, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect: '' }, extra));
+            });
+            const newGold = (parseInt(data.gold) || 0) + (enemy.corpseLoot.gold || 0);
+            return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
+        }).then(() => {
+            const pname = (lastData.participants[targetUid] || {}).name || targetUid;
+            const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? Object.assign({}, e, { corpseLoot: null, looted: true }) : e);
+            return db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+                alert(`Добыча с трупа «${enemy.name}» выдана игроку ${pname}.`);
+                gmPostLogEntryText(`💀 ${pname} обыскал(а) труп «${enemy.name}» и забрал(а) добычу.`);
+            });
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Время суток и погода ----------
+
+    const REGION_WEATHER_POOL = {
+        'Лес': ['clear', 'cloudy', 'rain', 'fog'],
+        'Болото': ['cloudy', 'rain', 'fog', 'storm'],
+        'Горы': ['snow', 'blizzard', 'clear', 'cloudy'],
+        'Побережье': ['clear', 'cloudy', 'rain', 'storm', 'fog'],
+        'Равнина': ['clear', 'cloudy', 'rain'],
+        'Подземелье': ['clear']
+    };
+    const WEATHER_LABELS = {
+        clear: '☀️ Ясно', cloudy: '☁️ Облачно', rain: '🌧️ Дождь', storm: '⛈️ Гроза',
+        snow: '🌨️ Снегопад', blizzard: '🌬️ Метель', fog: '🌫️ Туман'
+    };
+
+    let pendingWeatherKey = null;
+
+    window.rollWeatherForRegion = function () {
+        const region = el('weather-region-select').value;
+        const pool = REGION_WEATHER_POOL[region] || ['clear'];
+        pendingWeatherKey = pool[Math.floor(Math.random() * pool.length)];
+        el('weather-gm-result').innerHTML = `Выпало: <strong>${WEATHER_LABELS[pendingWeatherKey]}</strong> — жми «Применить», чтобы сообщить игрокам.`;
+    };
+
+    window.setSessionTimeWeather = function () {
+        const region = el('weather-region-select').value;
+        const period = el('weather-time-select').value;
+        const weatherKey = pendingWeatherKey || 'clear';
+        db.collection('sessions').doc(currentCode).update({
+            currentRegion: region, timePeriod: period, currentWeather: weatherKey
+        }).then(() => {
+            el('weather-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Применено: ${period}, ${region}, ${WEATHER_LABELS[weatherKey]}.</span>`;
+            gmPostLogEntryText(`🌤️ ${period}, ${region}: ${WEATHER_LABELS[weatherKey]}.`);
+            pendingWeatherKey = null;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 

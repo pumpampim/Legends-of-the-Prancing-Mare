@@ -192,6 +192,22 @@
             return db.collection('sessions').doc(currentSessionCode).update({
                 combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: text })
             });
+        },
+
+        // Помечает труп в сессии как уже поднятый заклинанием — чтобы его нельзя было
+        // поднять второй раз, и чтобы у мастера это тоже было видно.
+        markCorpseRaised: function (enemyId) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) return;
+                enemies[idx] = Object.assign({}, enemies[idx], { raised: true });
+                return ref.update({ enemies: enemies });
+            });
         }
     };
 
@@ -278,6 +294,7 @@
         renderInitiative(data.initiative || []);
         renderLog(data.combatLog || []);
         if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
+        if (typeof window.updateWeatherDisplay === 'function') window.updateWeatherDisplay();
     }
 
     function enemyAvatarData(enemy) {
