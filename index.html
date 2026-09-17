@@ -552,6 +552,12 @@
                 <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
                 <div>Затраты Мудрости на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span> ед.</div>
             </div>
+           <div class="day-controls">
+                <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
+                <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
+            </div>
+            <div id="hunger-status" class="hunger-warning" style="display:none;"></div>
+
             <div class="rest-btn" style="margin-top:8px;">
                 <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
                 <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс персонажа</button>
@@ -879,7 +885,10 @@
                 <h2>Выживание и Пантеон Богов</h2>
                 
                 <label>Голодание (Пропущено дней без еды)</label>
-                <input type="number" id="food-starve" value="0" min="0" max="10" onchange="updateAll(); saveLocalStorage();">
+                <label>Голод (дней без еды)</label>
+<input type="number" id="food-starve" value="0" min="0" readonly
+       style="background:#080604; color:#c8a566; cursor:not-allowed;"
+       title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
 
                 <label>Активные кулинарные эффекты (Лимит: 2 блюда)</label>
                 <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 160px; overflow-y: auto;">
@@ -1294,63 +1303,91 @@
     let levelUpProgress = 0; // очков навыков накоплено к следующему уровню
     let perkPointsAvailable = 0; // свободные очки перков от левел-апов (справочно, не блокирует существующие перки)
     let skillProgress = {}; // { skillIdx: успехов накоплено к следующей ступени навыка }
+    const MONTH_NAMES = [
+    "Утренней звезды", "Восхода солнца", "Первого зерна", "Руки дождя",
+    "Второго зерна", "Середины года", "Высокого солнца", "Последнего зерна",
+    "Огня очага", "Начала морозов", "Заката солнца", "Вечерней звезды"
+];
+let gameYear = 201;
+let gameMonth = 6;      // 0-based; 6 = Высокое солнце
+let gameDayNum = 10;    // 10-е число
+let daysWithoutFood = 0;
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
-    function initSkills() {
-        const container = document.getElementById('skills-container');
-        if (!container) return;
-        container.innerHTML = "";
-        
-        skillNames.forEach((name, idx) => {
-            let pList = fullPerksManifest[name] || [];
-            
-            // Генерация чекбоксов для перков с учетом их ступеней (от 1 до steps)
-            let perksHtml = pList.map((p, pItemIdx) => {
-                let stepsHtml = "";
-                for (let s = 1; s <= p.steps; s++) {
-                    let checkboxId = `perk-${idx}-${pItemIdx}-${s}`;
-                    stepsHtml += `
-                        <input type="checkbox" 
-                               id="${checkboxId}" 
-                               class="perk-checkbox" 
-                               data-skillidx="${idx}" 
-                               data-perkidx="${pItemIdx}" 
-                               data-step="${s}" 
-                               onchange="validatePerkCheck(this);">
-                    `;
-                }
-                return `
-                    <div class="perk-item">
-                        <div class="perk-row">
-                            <div class="perk-left">
-                                <span style="color:#cfc5b6; font-size:12px;">${p.name}</span>
-                            </div>
-                            <div class="perk-steps">
-                                ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:10px; opacity:0.6;">(1-${p.steps})</span>` : ''}
-                            </div>
-                        </div>
-                        ${p.desc ? `<div class="perk-desc">${p.desc}</div>` : ''}
-                    </div>
+   function initSkills() {
+    const container = document.getElementById('skills-container');
+    if (!container) return;
+    // Сбрасываем грид-3 в контейнере, шторки лучше смотрятся в один столбец
+    container.classList.remove('grid-3');
+    container.innerHTML = "";
+
+    skillNames.forEach((name, idx) => {
+        let pList = fullPerksManifest[name] || [];
+
+        let perksHtml = pList.map((p, pItemIdx) => {
+            let stepsHtml = "";
+            for (let s = 1; s <= p.steps; s++) {
+                let checkboxId = `perk-${idx}-${pItemIdx}-${s}`;
+                stepsHtml += `
+                    <input type="checkbox" 
+                           id="${checkboxId}" 
+                           class="perk-checkbox" 
+                           data-skillidx="${idx}" 
+                           data-perkidx="${pItemIdx}" 
+                           data-step="${s}" 
+                           onchange="validatePerkCheck(this);">
                 `;
-            }).join('');
-
-            // Подсказки для некоторых навыков
-            let hint = "";
-            if(name === "Взлом") hint = `<div class="shw-hint">Замки: Новичок 9 (-2), Ученик 12 (-3), Адепт 15 (-4), Эксперт 17 (-5)</div>`;
-            if(name === "Блокирование") hint = `<div class="shw-hint">Не щитом: -3 к проверке атак. Щит эффективнее. Удар плашмя: дает врагу -1.</div>`;
-
-            container.innerHTML += `
-                <div class="panel" style="background:var(--panel-sub); margin-bottom:8px; padding:8px; border:1px solid #363025;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-weight:bold; font-size:13px; width:70%; color:var(--accent-color);">${name}</span>
-                        <input type="number" id="skill-${idx}" value="10" min="10" style="width:48px; text-align:center;" data-raw-val="10" onchange="handleSkillChange(this, ${idx})">
+            }
+            return `
+                <div class="perk-item">
+                    <div class="perk-row">
+                        <div class="perk-left">
+                            <span style="color:#cfc5b6; font-size:12px;">${p.name}</span>
+                        </div>
+                        <div class="perk-steps">
+                            ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:10px; opacity:0.6;">(1-${p.steps})</span>` : ''}
+                        </div>
                     </div>
-                    ${hint}
-                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : ''}
+                    ${p.desc ? `<div class="perk-desc">${p.desc}</div>` : ''}
                 </div>
             `;
-        });
-    }
+        }).join('');
+
+        let hint = "";
+        if (name === "Взлом") hint = `<div class="shw-hint">Замки: Новичок 9 (-2), Ученик 12 (-3), Адепт 15 (-4), Эксперт 17 (-5)</div>`;
+        if (name === "Блокирование") hint = `<div class="shw-hint">Не щитом: -3 к проверке атак. Щит эффективнее. Удар плашмя: дает врагу -1.</div>`;
+
+        container.innerHTML += `
+            <div class="panel skill-panel" id="skill-panel-${idx}">
+                <div class="skill-header" onclick="toggleSkillPanel(${idx})">
+                    <span class="skill-title">${name}</span>
+                    <input type="number" 
+                           id="skill-${idx}" 
+                           value="10" min="10" 
+                           class="skill-value-input"
+                           data-raw-val="10" 
+                           onclick="event.stopPropagation()"
+                           onchange="handleSkillChange(this, ${idx})">
+                    <span class="skill-chevron" id="skill-chevron-${idx}">▸</span>
+                </div>
+                <div class="skill-body" id="skill-body-${idx}" style="display:none;">
+                    ${hint}
+                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : '<p style="font-size:12px;opacity:.6;">У этого навыка нет ветки перков.</p>'}
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Открывает/закрывает один навык в ветках перков
+window.toggleSkillPanel = function (idx) {
+    const body = document.getElementById('skill-body-' + idx);
+    const chev = document.getElementById('skill-chevron-' + idx);
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chev) chev.textContent = isOpen ? '▸' : '▾';
+};
 
     // Обработчик ручного изменения навыка
     // Проверяет, отмечена ли хоть одна ступень перка с данным именем (в любом навыке)
@@ -2194,8 +2231,15 @@
                     ${priceInfo}
                     ${item.effect ? `<br><span style="font-size:11px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
                 </span>
-                <span style="display:flex; gap:4px; flex-shrink:0;">
+                               <span style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
+                    ${(function(){
+                        const cat = (item.category || '').toLowerCase();
+                        const isFood = cat.includes('еда') || cat.includes('блюдо') || cat.includes('напит') ||
+                                       cat.includes('провал готовки') || cat.includes('готов') ||
+                                       item.type === 'food' || item.type === 'drink';
+                        return isFood ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : '';
+                    })()}
                     ${item.category === 'Свиток' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
@@ -4004,8 +4048,154 @@
         });
         select.innerHTML = opts;
         updateAttackActionInfo();
+        initSectionAccordions();
     }
 
+    function initSectionAccordions() {
+    const tabs = ['tab3', 'tab5'];
+    tabs.forEach(tabId => {
+        const tab = document.getElementById(tabId);
+        if (!tab) return;
+        // Собираем все «верхние» панели: прямые дети вкладки и дети .grid-2/.grid-3 внутри вкладки
+        const panels = new Set();
+        tab.querySelectorAll(':scope > .panel').forEach(p => panels.add(p));
+        tab.querySelectorAll(':scope > .grid-2 > .panel').forEach(p => panels.add(p));
+        tab.querySelectorAll(':scope > .grid-3 > .panel').forEach(p => panels.add(p));
+
+        let counter = 0;
+        panels.forEach(panel => {
+            const h2 = panel.querySelector(':scope > h2');
+            if (!h2) return;
+            const panelId = tabId + '-sec-' + (counter++);
+            panel.dataset.secId = panelId;
+
+            const body = document.createElement('div');
+            body.className = 'section-body';
+            body.id = panelId + '-body';
+
+            // Переносим всё, что идёт после h2 (сам h2 остаётся в панели)
+            const kids = Array.from(panel.children);
+            let afterH2 = false;
+            kids.forEach(ch => {
+                if (ch === h2) { afterH2 = true; return; }
+                if (afterH2) body.appendChild(ch);
+            });
+            panel.appendChild(body);
+
+            // Навешиваем клик на h2
+            h2.classList.add('section-header');
+            h2.innerHTML = `<span class="section-title">${h2.innerHTML}</span><span class="section-chevron">▾</span>`;
+            h2.addEventListener('click', () => toggleSectionById(panelId));
+        });
+    });
+}
+
+window.toggleSectionById = function (panelId) {
+    const panel = document.querySelector(`[data-sec-id="${panelId}"]`);
+    if (!panel) return;
+    const body = document.getElementById(panelId + '-body');
+    const chev = panel.querySelector('.section-chevron');
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chev) chev.textContent = isOpen ? '▸' : '▾';
+};
+function updateDateDisplay() {
+    const el = document.getElementById('date-display');
+    if (el) {
+        el.textContent = `📅 ${gameDayNum} ${MONTH_NAMES[gameMonth]}, 4Э ${gameYear}`;
+    }
+    const hungerEl = document.getElementById('hunger-status');
+    if (hungerEl) {
+        if (daysWithoutFood === 0) {
+            hungerEl.style.display = 'none';
+        } else {
+            hungerEl.style.display = 'block';
+            hungerEl.innerHTML = `🍖 Голод: <strong>${daysWithoutFood} дн.</strong> без еды · <strong>−${daysWithoutFood * 2} к кубам</strong> (поешь, чтобы сбросить)`;
+        }
+    }
+    const starveInput = document.getElementById('food-starve');
+    if (starveInput) starveInput.value = daysWithoutFood;
+}
+
+window.nextDay = function () {
+    // Прокатываем дату
+    gameDayNum++;
+    if (gameDayNum > 30) {
+        gameDayNum = 1;
+        gameMonth++;
+        if (gameMonth > 11) { gameMonth = 0; gameYear++; }
+    }
+
+    // Тик дней заряда оружия и посохов
+    playerInventory.forEach(i => {
+        if (Object.prototype.hasOwnProperty.call(i, 'chargeDaysLeft') && i.chargeDaysLeft > 0) {
+            i.chargeDaysLeft--;
+        }
+    });
+
+    // Тик длительности по ходам НЕ происходит — ходы и дни раздельны.
+    // Но если хочешь, чтобы «раз в день» способности обнулялись, здесь это место.
+
+    // Голод: если сегодня не ели — счётчик растёт
+    daysWithoutFood += 1;
+
+    renderStaffList();
+    renderWeaponChargeSelect();
+    renderInventoryList();
+    updateDateDisplay();
+    updateAll();
+    saveLocalStorage();
+
+    // Лёгкое уведомление
+    const nowFood = daysWithoutFood;
+    if (nowFood > 0) {
+        setTimeout(() => alert(`Прошёл день: ${gameDayNum} ${MONTH_NAMES[gameMonth]} 4Э ${gameYear}.\nДней без еды: ${nowFood} (−${nowFood*2} к кубам).`), 50);
+    }
+};
+
+// Съесть что угодно из инвентаря, сбросить голод и применить бафф (если есть)
+window.eatAnyFood = function (itemId) {
+    const item = playerInventory.find(i => i.itemId === itemId);
+    if (!item || item.count <= 0) return;
+
+    // Считаем «едой» всё, что помечено категориями еды/питья/блюда
+    const cat = (item.category || '').toLowerCase();
+    const isFood = cat.includes('еда') || cat.includes('блюдо') || cat.includes('напит') ||
+                   cat.includes('провал готовки') || cat.includes('готов') ||
+                   (item.type === 'food' || item.type === 'drink');
+
+    if (!isFood) {
+        alert('Это не еда.');
+        return;
+    }
+
+    // Если это блюдо с баффом — активируем как обычный таймэффект (по ходам)
+    if (item.alchemyEffects && item.alchemyEffects.length) {
+        activateTimedEffectFromItem(item);
+    } else if (item.effect) {
+        // Для простых блюд с текстовым эффектом — попробуем разобрать "+N хп" и т.д.
+        const plain = parsePlainEffectBonus(item.effect);
+        if (plain && plain.key === 'hp') {
+            const cur = parseInt(document.getElementById('cur-hp').value) || 0;
+            const max = parseInt(document.getElementById('max-hp').value) || 0;
+            document.getElementById('cur-hp').value = Math.min(max, cur + plain.value);
+        }
+    }
+
+    removeFromInventoryByName(itemId, 1);
+    daysWithoutFood = 0; // еда сбрасывает голод ВСЕГДА, даже алкоголь
+    renderInventoryList();
+    updateDateDisplay();
+    updateAll();
+    saveLocalStorage();
+};
+
+function updateHungerPenalty() {
+    // Сейчас штраф применяется в updateCombat через starve. Оставим это там.
+    // Здесь просто обновляем интерфейс.
+    updateDateDisplay();
+}    
     window.updateAttackActionInfo = function () {
         const val = document.getElementById('attack-action-select').value;
         const infoEl = document.getElementById('attack-action-info');
@@ -4540,7 +4730,7 @@
         if (perks.rangedHitBonus) hitModifier += perks.rangedHitBonus;
     }
 
-    hitModifier -= starve;
+    hitModifier -= starve * 2;
     let sneakMult = 2;
     if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
     else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
@@ -4667,6 +4857,10 @@
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
             gameRound: gameRound,
+            gameYear: gameYear,
+            gameMonth: gameMonth,
+            gameDayNum: gameDayNum,
+            daysWithoutFood: daysWithoutFood,
             characterLevel: characterLevel,
             levelUpProgress: levelUpProgress,
             perkPointsAvailable: perkPointsAvailable,
@@ -4791,6 +4985,12 @@
             activeTimedEffects = Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [];
             gameTurn = parseInt(data.gameTurn) || 0;
             gameRound = parseInt(data.gameRound) || 0;
+            gameYear = parseInt(data.gameYear) || 201;
+            gameMonth = parseInt(data.gameMonth);
+            if (isNaN(gameMonth)) gameMonth = 6;
+            gameDayNum = parseInt(data.gameDayNum) || 10;
+            daysWithoutFood = parseInt(data.daysWithoutFood) || 0;
+            updateDateDisplay();
             renderActiveEffects();
             updateTurnRoundDisplay();
 
@@ -4913,6 +5113,7 @@
     // Первичный запуск
     initSkills();
     renderFoodBuffsList();
+    updateDateDisplay();
     loadLocalStorage();
     updateAll();
     renderInventoryList();
