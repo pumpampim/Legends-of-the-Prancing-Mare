@@ -149,6 +149,20 @@
                     <option value="Равнина">Равнина</option>
                     <option value="Подземелье">Подземелье</option>
                 </select>
+                <label>Владение (для сбора ингредиентов алхимиками — необязательно)</label>
+                <select id="weather-hold-select">
+                    <option value="">— не указано —</option>
+                    <option value="Вайтран">Вайтран</option>
+                    <option value="Винтерхолд">Винтерхолд</option>
+                    <option value="Рифт">Рифт</option>
+                    <option value="Фолкрит">Фолкрит</option>
+                    <option value="Солитьюд (Хаафингар)">Солитьюд (Хаафингар)</option>
+                    <option value="Хьялмарк (Морфал)">Хьялмарк (Морфал)</option>
+                    <option value="Истмарк (Виндхельм)">Истмарк (Виндхельм)</option>
+                    <option value="Белый берег (Данстар)">Белый берег (Данстар)</option>
+                    <option value="Маркарт (Предел)">Маркарт (Предел)</option>
+                    <option value="Схолстейм">Схолстейм</option>
+                </select>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn-success" style="flex:1;" onclick="rollWeatherForRegion()">🎲 Погода по региону</button>
                     <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
@@ -423,8 +437,10 @@
         <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
         <div class="panel">
             <h2>🗡️ Генератор бандита</h2>
-            <p style="font-size:11px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь). ХП и урон оружием считаются по-настоящему и идут в бой. После смерти труп можно поднять заклинанием или обыскать на добычу (кнопки появятся у противника в списке выше, когда его ХП дойдут до 0).</p>
-            <button class="btn-success" style="width:100%;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
+            <p style="font-size:11px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь, иногда лук со стрелами или заклинания вместо оружия). ХП/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает, часть могла быть повреждена в бою.</p>
+            <label>Средний уровень группы</label>
+            <input type="number" id="bandit-avg-level" value="5" min="1" max="50">
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
             <div id="bandit-gen-result" style="margin-top:8px; font-size:12px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
         </div>

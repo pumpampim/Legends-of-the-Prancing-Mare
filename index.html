@@ -498,12 +498,14 @@
             <!-- Характеристики -->
             <div class="panel">
                 <h2>Характеристики и Модификаторы проверки d20</h2>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                 <div class="stat-block"><label>Сила (Сил)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-str">Мод: 0</span><input type="number" id="stat-str" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Ловкость (Лов)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-dex">Мод: 0</span><input type="number" id="stat-dex" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Телосложение (Тел)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-con">Мод: 0</span><input type="number" id="stat-con" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Интеллект (Инт)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-int">Мод: 0</span><input type="number" id="stat-int" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Мудрость (Муд)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-wis">Мод: 0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Харизма (Хар)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-cha">Мод: 0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
+                </div>
             </div>
         </div>
 
@@ -654,25 +656,6 @@
                 </div>
             </div>
 
-            <div class="panel">
-                <h2><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку</h2>
-                <p style="font-size:12px; opacity:.8;">Атакуй противника из активной сессии мастера напрямую: сайт бросит кубы, посчитает урон (оружие или заклинание) и покажет результат. Применение урона к цели — отдельная кнопка, жми только когда попадание подтверждено за столом.</p>
-
-                <label>Цель</label>
-                <select id="attack-target-select"></select>
-
-                <label>Чем атаковать</label>
-                <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
-                <div id="attack-action-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
-
-                <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
-
-                <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
-                    <div id="attack-roll-text"></div>
-                    <button class="btn-success" style="width:100%; margin-top:8px;" id="attack-apply-btn" onclick="applyPlayerAttackDamage()">✅ Применить урон к цели</button>
-                </div>
-            </div>
-
             <!-- Детальные слоты Брони -->
             <div class="panel">
                 <h2>Слоты защитной экипировки и Украшений</h2>
@@ -801,6 +784,12 @@
                     <button class="btn-success" style="width:100%;" onclick="summonCreature()">Призвать</button>
                     <div id="summon-create-result" style="margin-top:6px; font-size:12px;"></div>
 
+                    <label style="margin-top:10px;">Какой труп поднять (для «Оживление зомби»/«Оживление трупа»/«Призрак»/«Ужасный зомби»)</label>
+                    <select id="corpse-raise-target-select">
+                        <option value="">— автоматически (первый доступный) —</option>
+                    </select>
+                    <p style="font-size:10px; opacity:.6;">Список — трупы гуманоидов (бандитов), сгенерированных мастером, убитые за последние 5 ходов и ещё не поднятые/не обысканные. Действует для каста через кнопку «Каст» на карточке заклинания в книге заклинаний.</p>
+
                     <h3 style="margin-top:14px;">Активные существа</h3>
                     <div id="active-summons-list"></div>
                 </div>
@@ -885,23 +874,16 @@
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
             </div>
 
-            <!-- ПЕРЕДАЧА ПРЕДМЕТОВ/ДЕНЕГ ДРУГОМУ ИГРОКУ -->
+            <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
             <div class="panel">
                 <h2>🤝 Передать союзнику</h2>
-                <p style="font-size:11px; opacity:.75;">Работает только внутри активной сессии мастера (вкладка «Сессия»). Передача уходит напрямую другому игроку.</p>
+                <p style="font-size:11px; opacity:.75;">Работает только внутри активной сессии мастера. Выбери, кому передавать, — этот же выбор используется и для кнопки «→» у предметов в инвентаре ниже.</p>
                 <label>Кому</label>
-                <select id="trade-target-select"></select>
+                <select id="trade-target-select" onchange="renderInventoryList()"></select>
 
                 <label>Золото</label>
                 <input type="number" id="trade-gold-amount" placeholder="0" value="0" min="0">
                 <button class="btn-success" style="width:100%; margin-top:4px;" onclick="tradeGoldToPlayer()">Передать золото</button>
-
-                <label style="margin-top:10px;">Предмет из инвентаря</label>
-                <select id="trade-item-select"></select>
-                <div style="display:flex; gap:6px; margin-top:4px;">
-                    <input type="number" id="trade-item-qty" value="1" min="1" style="flex:1;">
-                    <button class="btn-success" style="flex:2;" onclick="tradeItemToPlayer()">Передать предмет</button>
-                </div>
                 <div id="trade-result" style="margin-top:8px; font-size:12px;"></div>
             </div>
 
@@ -915,11 +897,6 @@
        style="background:#080604; color:#c8a566; cursor:not-allowed;"
        title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
 
-                <label>Активные кулинарные эффекты (Лимит: 2 блюда)</label>
-                <div style="background:var(--panel-sub); padding:6px; border-radius:4px; border:1px solid #363025; max-height: 160px; overflow-y: auto;">
-                    <div id="food-buffs-list"></div>
-                </div>
-                
                 <div class="checkbox-group" style="margin-top:10px;">
                     <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
                     <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
@@ -1015,6 +992,21 @@
 
                 <h3><span class="skyrim-icon icon-skull" aria-hidden="true"></span> Противники</h3>
                 <div id="enemies-list"></div>
+
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <h4 style="margin:0 0 6px;"><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку</h4>
+                    <p style="font-size:11px; opacity:.75;">Атакуй противника напрямую: сайт бросит кубы, посчитает урон (оружие/заклинание/существо) и покажет результат. Применение урона — отдельная кнопка.</p>
+                    <label>Цель</label>
+                    <select id="attack-target-select"></select>
+                    <label>Чем атаковать</label>
+                    <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
+                    <div id="attack-action-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                    <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
+                    <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
+                        <div id="attack-roll-text"></div>
+                        <button class="btn-success" style="width:100%; margin-top:8px;" id="attack-apply-btn" onclick="applyPlayerAttackDamage()">✅ Применить урон к цели</button>
+                    </div>
+                </div>
 
                 <h3><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Инициатива</h3>
                 <div id="initiative-list"></div>
@@ -1344,6 +1336,8 @@
         fog: { name: '🌫️ Туман', effect: '+4 к Скрытности, −4 к дальнему бою — плохая видимость' }
     };
     const GAME_REGIONS = ['Лес', 'Болото', 'Горы', 'Побережье', 'Равнина', 'Подземелье'];
+    const GAME_HOLDS = ['Вайтран', 'Винтерхолд', 'Рифт', 'Фолкрит', 'Солитьюд (Хаафингар)', 'Хьялмарк (Морфал)',
+        'Истмарк (Виндхельм)', 'Белый берег (Данстар)', 'Маркарт (Предел)', 'Схолстейм'];
     const REGION_WEATHER_POOL = {
         'Лес': ['clear', 'cloudy', 'rain', 'fog'],
         'Болото': ['cloudy', 'rain', 'fog', 'storm'],
@@ -1373,6 +1367,20 @@
         'Побережье': ['Морской желудь', 'Сиродильский лопатохвост', 'Хисткарп', 'Абесинский окунь',
                        'Серебристый окунь', 'Бойцовая рыбка', 'Жемчужина', 'Маленькая жемчужина'],
         'Равнина': ['Пшеница', 'Соль', 'Куриное яйцо', 'Вересковое сердце']
+    };
+    // Доп. вес по конкретному владению (поверх регионального) — свои "фирменные" ингредиенты
+    // для каждой локации, по общему лору Skyrim (детальных данных по флоре в файлах нет).
+    const INGREDIENT_HOLD_TAGS = {
+        'Вайтран': ['Пшеница', 'Куриное яйцо', 'Соль'],
+        'Винтерхолд': ['Морозная мириам', 'Морозная соль', 'Снежные ягоды', 'Соль пустоты'],
+        'Рифт': ['Ягоды можжевельника', 'Медовые соты', 'Пчелиное гнездо', 'Бледная плеть'],
+        'Фолкрит': ['Гниль Намиры', 'Паслен', 'Бородатый мох'],
+        'Солитьюд (Хаафингар)': ['Морской желудь', 'Хисткарп', 'Жемчужина'],
+        'Хьялмарк (Морфал)': ['Болотный стручок', 'Бесовский гриб', 'Ползучая лоза', 'Мора тапинелла'],
+        'Истмарк (Виндхельм)': ['Морозная соль', 'Снежные ягоды'],
+        'Белый берег (Данстар)': ['Серебристый окунь', 'Абесинский окунь', 'Соль пустоты'],
+        'Маркарт (Предел)': ['Огненная соль', 'Голубой горноцвет', 'Красный горноцвет'],
+        'Схолстейм': ['Пепельная слизь гриба', 'Раздутая шляпка', 'Огненная соль']
     };
     // Собираются только ночью.
     const NIGHT_ONLY_INGREDIENTS = new Set([
@@ -1627,46 +1635,6 @@ window.toggleSkillPanel = function (idx) {
         window.toggleAccordion('prof', id);
     };
 
-    // Ограничение сытости (не более двух блюд за раз)
-    // Полный список блюд с баффами — генерируется из cooking-data.js (раньше был статичный
-    // список из 5 названий, не совпадавший с реальными 21 рецептом).
-    function parseFoodBuffAttrs(effectText) {
-        const attrs = {};
-        let m = effectText.match(/\+\s*(\d+)\s*хп/i);
-        if (m) attrs.hp = m[1];
-        m = effectText.match(/\+\s*(\d+)\s*мп(?=\s|$)/i);
-        if (m) attrs.mp = m[1];
-        m = effectText.match(/маги[а-я]*\s+увеличен\w*\s+на\s+(\d+)/i);
-        if (m) attrs.mp = m[1];
-        return attrs;
-    }
-
-    function isFoodBuffChecked(dishName) {
-        return !!document.querySelector(`.food-buff[data-name="${CSS.escape(dishName)}"]:checked`);
-    }
-
-    function renderFoodBuffsList() {
-        const container = document.getElementById('food-buffs-list');
-        if (!container) return;
-        const dishes = [...(window.recipes || [])];
-        if (window.failedDish) dishes.push(window.failedDish);
-        container.innerHTML = dishes.map((d, idx) => {
-            const attrs = parseFoodBuffAttrs(d.effect || '');
-            const attrStr = Object.keys(attrs).map(k => `data-${k}="${attrs[k]}"`).join(' ');
-            const id = `food-${idx}`;
-            return `<div class="checkbox-group"><input type="checkbox" class="food-buff" id="${id}" data-name="${escHtml(d.name)}" ${attrStr} onchange="checkFoodLimit(this); updateAll(); saveLocalStorage();"><label for="${id}">${escHtml(d.name)} (${escHtml(d.effect || '')})</label></div>`;
-        }).join('');
-    }
-
-    function checkFoodLimit(chk) {
-        let checked = document.querySelectorAll('.food-buff:checked');
-        if (checked.length > 2) {
-            chk.checked = false;
-            alert("Лимит превышен! Одновременно могут действовать баффы максимум от двух блюд!");
-        }
-        updateAll();
-    }
-
     // Проверка перка "Боевой маг" в ветке Тяжелой брони (индекс 7)
     function hasBattleMagePerk() {
         let checkboxes = document.querySelectorAll('.perk-checkbox');
@@ -1768,7 +1736,8 @@ window.toggleSkillPanel = function (idx) {
                 </select>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
                     <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
-                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}')">Каст</button>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>
                     <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:10px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
                 </div>
             </div>
@@ -1897,7 +1866,7 @@ window.toggleSkillPanel = function (idx) {
     // Общая логика "что происходит при успешном чтении заклинания" — используется и при
     // обычном касте (тратит ману), и при использовании свитка (бесплатно, isFree=true).
     // Возвращает {message, logText} для показа игроку/записи в журнал.
-    function resolveSpellEffect(spellName, desc, school, targetVal, isFree) {
+    function resolveSpellEffect(spellName, desc, school, targetVal, isFree, enhanced) {
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         let targetLabel = 'на себя';
         let allyUid = null, allyName = null;
@@ -1915,8 +1884,16 @@ window.toggleSkillPanel = function (idx) {
         if (template && template.category === 'corpse') {
             // Если в активной сессии мастера есть конкретный поднимаемый труп (например,
             // сгенерированный бандит) — поднимаем именно его, с его настоящими ХП/уроном,
-            // а не общий шаблон по рангу заклинания.
-            const corpse = session && (session.enemies || []).find(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised);
+            // а не общий шаблон по рангу заклинания. Игрок может явно выбрать труп в панели
+            // призыва (corpse-raise-target-select); если не выбрал — берём первый подходящий.
+            const currentTurn = (session && session.sessionTurnCounter) || 0;
+            const eligible = session ? (session.enemies || []).filter(e =>
+                e.isRaisable && (e.curHp || 0) <= 0 && !e.raised &&
+                (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5)
+            ) : [];
+            const pickerEl = document.getElementById('corpse-raise-target-select');
+            const pickedId = pickerEl ? pickerEl.value : '';
+            const corpse = (pickedId && eligible.find(e => e.id === pickedId)) || eligible[0];
             if (corpse) {
                 const specificTemplate = Object.assign({}, template, {
                     name: (corpse.name || template.name) + ' (поднят)',
@@ -1924,20 +1901,20 @@ window.toggleSkillPanel = function (idx) {
                     dmgBase: corpse.weaponDmg || template.dmgBase, dmgEnh: corpse.weaponDmg || template.dmgBase,
                     dmgType: 'физический'
                 });
-                const res = performSummon(specificTemplate, false);
+                const res = performSummon(specificTemplate, enhanced);
                 extraMsg = res.ok ? ` ${res.message} (использованы настоящие ХП/урон трупа «${corpse.name}»)` : ` ⚠ ${res.message}`;
                 if (res.ok && window.CloudSync) {
                     window.CloudSync.markCorpseRaised(corpse.id);
                 }
             } else {
-                const res = performSummon(template, false);
+                const res = performSummon(template, enhanced);
                 extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
             }
         } else if (template && template.category === 'armor') {
-            const res = castFleshSpell(template, false);
+            const res = castFleshSpell(template, enhanced);
             extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
         } else if (template) {
-            const res = performSummon(template, false);
+            const res = performSummon(template, enhanced);
             extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
         } else if (targetVal === 'self') {
             // Сначала пробуем разовое лечение ("восстанавливает N здоровья/маны") — применяется
@@ -2022,22 +1999,34 @@ window.toggleSkillPanel = function (idx) {
         };
     }
 
-    function castCustomSpell(id) {
+    // Делит текст описания заклинания на базовую и усиленную часть по маркеру "Усиленный эффект".
+    // Если маркера нет (заклинание без усиленной версии), enhanced просто дублирует base.
+    function splitSpellDescByEnhancement(text) {
+        if (!text) return { base: '', enhanced: '' };
+        const idx = text.indexOf('Усиленный эффект');
+        if (idx === -1) return { base: text, enhanced: text };
+        return { base: text.slice(0, idx), enhanced: text.slice(idx + 'Усиленный эффект'.length) };
+    }
+
+    function castCustomSpell(id, enhanced) {
         const card = document.getElementById(`card-${id}`);
         if (!card) return;
-        const finalCost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
+        const baseFinalCost = parseInt(card.querySelector('.spell-final-cost').value) || 0;
+        const finalCost = enhanced ? baseFinalCost * 2 : baseFinalCost;
         let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
         if (curMp >= finalCost) {
             document.getElementById('cur-mp').value = curMp - finalCost;
             const targetSelect = card.querySelector('.spell-target-select');
             const targetVal = targetSelect ? targetSelect.value : 'self';
             const spellName = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
-            const desc = card.querySelector('.spell-desc').value;
+            const fullDesc = card.querySelector('.spell-desc').value;
+            const parts = splitSpellDescByEnhancement(fullDesc);
+            const desc = enhanced ? parts.enhanced : parts.base;
             const container = card.closest('[id^="spells-"]');
             const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
 
-            const result = resolveSpellEffect(spellName, desc, school, targetVal, false);
-            alert(result.message);
+            const result = resolveSpellEffect(spellName, desc, school, targetVal, false, !!enhanced);
+            alert((enhanced ? '⚡ Усиленный каст! ' : '') + result.message);
             if (targetVal !== 'self' && window.CloudSync) {
                 const myName = document.getElementById('char-name').value;
                 window.CloudSync.postCombatLog(myName + ' ' + result.logText, myName);
@@ -2406,6 +2395,8 @@ window.toggleSkillPanel = function (idx) {
             el.innerHTML = '<p style="opacity:.6; font-size:12px;">Инвентарь пуст.</p>';
             return;
         }
+        const tradeTargetEl = document.getElementById('trade-target-select');
+        const hasTradeTarget = tradeTargetEl && tradeTargetEl.value;
         el.innerHTML = playerInventory.map(item => {
             const priceInfo = item.price
                 ? `<span style="color:var(--accent-color); font-size:11px;"> · ${getDisplayPrice(item.price)} септ. <span style="opacity:.5;">(база ${item.price})</span></span>`
@@ -2422,6 +2413,7 @@ window.toggleSkillPanel = function (idx) {
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${item.category === 'Свиток' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
+                    ${hasTradeTarget ? `<button style="width:auto; padding:2px 8px; font-size:11px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку">→</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                     <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
                 </span>
@@ -3177,10 +3169,18 @@ window.toggleSkillPanel = function (idx) {
             const isBow = t.spellName === 'Призванный лук';
             entry.equipSlot = isBow ? 'ranged' : 'melee';
             const prefix = isBow ? 'wep-ranged' : 'wep-melee';
+            const typeField = document.getElementById(prefix + '-type');
             entry.savedWeaponName = document.getElementById(prefix + '-name').value;
             entry.savedWeaponDmg = document.getElementById(prefix + '-dmg').value;
+            entry.savedWeaponType = typeField ? typeField.value : null;
             document.getElementById(prefix + '-name').value = t.name;
             document.getElementById(prefix + '-dmg').value = entry.dmg;
+            // Тип оружия влияет на формулу боя (крит кинжала, бонус Силы и т.д.) — раньше при
+            // призыве не выставлялся, из-за чего использовался тип от прошлого оружия.
+            if (typeField) {
+                const typeMap = { 'Призванный кинжал': 'dagger', 'Призванный меч': 'onehand', 'Призванная секира': 'onehand', 'Призванный лук': 'bow' };
+                typeField.value = typeMap[t.spellName] || (isBow ? 'bow' : 'onehand');
+            }
         }
         activeSummons.push(entry);
         renderActiveSummonsList();
@@ -3220,6 +3220,8 @@ window.toggleSkillPanel = function (idx) {
             const prefix = s.equipSlot === 'ranged' ? 'wep-ranged' : 'wep-melee';
             document.getElementById(prefix + '-name').value = s.savedWeaponName || '';
             document.getElementById(prefix + '-dmg').value = s.savedWeaponDmg || 0;
+            const typeField = document.getElementById(prefix + '-type');
+            if (typeField && s.savedWeaponType) typeField.value = s.savedWeaponType;
         }
     }
 
@@ -3382,6 +3384,7 @@ window.toggleSkillPanel = function (idx) {
         } else {
             const duration = parseDurationTurns(item.effect);
             const plain = parsePlainEffectBonus(item.effect);
+            const percentEffects = (typeof parsePercentEffects === 'function') ? parsePercentEffects(item.effect) : [];
             activeTimedEffects.push({
                 id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                 name: item.name, effectName: item.name,
@@ -3389,7 +3392,10 @@ window.toggleSkillPanel = function (idx) {
                 turnsRemaining: duration,
                 hp: (plain && plain.key === 'hp') ? plain.value : 0,
                 mp: (plain && plain.key === 'mp') ? plain.value : 0,
-                value: plain ? plain.value : 0
+                speed: (plain && plain.key === 'speed') ? plain.value : 0,
+                armor: (plain && plain.key === 'armor') ? plain.value : 0,
+                value: plain ? plain.value : 0,
+                percentEffects: percentEffects
             });
         }
         renderActiveEffects();
@@ -3453,9 +3459,9 @@ window.toggleSkillPanel = function (idx) {
     };
 
     function getActiveEffectBonuses() {
-        let hp = 0, mp = 0, armor = 0;
-        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; });
-        return { hp, mp, armor };
+        let hp = 0, mp = 0, armor = 0, speed = 0;
+        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; speed += e.speed || 0; });
+        return { hp, mp, armor, speed };
     }
 
     function tickActiveEffects() {
@@ -3464,6 +3470,11 @@ window.toggleSkillPanel = function (idx) {
         renderActiveEffects();
         if (typeof tickActiveSummons === 'function') tickActiveSummons();
         updateAll();
+        // Общий счётчик ходов в сессии — нужен, чтобы знать, сколько ходов прошло с момента
+        // смерти врага (труп поднимаемый только первые 5 ходов после смерти).
+        if (window.CloudSync && typeof window.CloudSync.bumpSessionTurnCounter === 'function') {
+            window.CloudSync.bumpSessionTurnCounter();
+        }
     }
 
     function updateTurnRoundDisplay() {
@@ -3499,13 +3510,14 @@ window.toggleSkillPanel = function (idx) {
     // и часть уникальных предметов пишут именно так, без знака "+").
     function parsePlainEffectBonus(text) {
         if (!text) return null;
-        let m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*)/i);
+        let m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*|скорост\w*)/i);
         if (m) {
             const value = parseInt(m[1]);
             const word = m[2].toLowerCase();
             if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
             if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
             if (word.startsWith('вес')) return { key: 'weight', value };
+            if (word.startsWith('скорост')) return { key: 'speed', value };
             return null;
         }
         m = text.match(/(хп|здоровь\w*|мана\w*|магии|маги\w*|вес\w*)[а-я\s]{0,15}?(?:увеличен\w*|повышен\w*|возраста\w*)\s+на\s+(\d+)/i);
@@ -3552,12 +3564,15 @@ window.toggleSkillPanel = function (idx) {
         m = text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?урон[а-я]*\s+оружия[^.]*?на\s+(\d+)\s*%/i) ||
             text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?физ[а-я]*\s+урон[а-я]*[^.]*?на\s+(\d+)\s*%/i);
         if (m) found.push({ type: 'weaponDamagePercent', value: parseInt(m[1]) });
+        // "Аура - Сила": "повышает пробивание брони на N" (плоское число, не %).
+        m = text.match(/пробивани[ея]\s+брон[а-я]*\s+на\s+(\d+)/i);
+        if (m) found.push({ type: 'armorPenetrationFlat', value: parseInt(m[1]) });
         return found;
     }
 
     // Суммирует процентные/скоростные бонусы от всех активных эффектов игрока.
     function getActivePercentBonuses() {
-        const totals = { spellPower: 0, spellCostReduction: 0, resistElemental: 0, resistPoisonDiseaseShout: 0, speed: 0, weaponDamagePercent: 0 };
+        const totals = { spellPower: 0, spellCostReduction: 0, resistElemental: 0, resistPoisonDiseaseShout: 0, speed: 0, weaponDamagePercent: 0, armorPenetrationFlat: 0 };
         (activeTimedEffects || []).forEach(e => {
             (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
         });
@@ -3709,14 +3724,20 @@ window.toggleSkillPanel = function (idx) {
         const resultEl = document.getElementById('gather-result');
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const region = (session && session.currentRegion) || null;
+        const hold = (session && session.currentHold) || null;
         const period = (session && session.timePeriod) || 'День';
         const regionTags = region ? (INGREDIENT_REGION_TAGS[region] || []) : [];
+        const holdTags = hold ? (INGREDIENT_HOLD_TAGS[hold] || []) : [];
 
         const allNames = Object.keys(window.alchemyIngredients || {}).filter(n => !INGREDIENT_CORPSE_ONLY.has(n));
         const weighted = [];
         allNames.forEach(n => {
             if (NIGHT_ONLY_INGREDIENTS.has(n) && period !== 'Ночь') return; // ночные не попадаются днём
-            const weight = regionTags.includes(n) ? 3 : 1;
+            // Вес от региона и владения складывается — "фирменный" ингредиент своего владения
+            // в подходящем регионе попадается ещё чаще.
+            let weight = 1;
+            if (regionTags.includes(n)) weight += 2;
+            if (holdTags.includes(n)) weight += 2;
             for (let i = 0; i < weight; i++) weighted.push(n);
         });
         if (!weighted.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет доступных ингредиентов для сбора сейчас.</span>'; return; }
@@ -3729,7 +3750,7 @@ window.toggleSkillPanel = function (idx) {
             addToInventory(name, name, 1, info.weight || 0.1, 'Ингредиенты для алхимии', '', { price: info.price || 1 });
             found.push(name);
         }
-        const locLabel = region ? `${period}, ${region}` : `${period} (регион мастер ещё не задал — сбор общий)`;
+        const locLabel = region ? `${period}, ${region}${hold ? ', ' + hold : ''}` : `${period} (регион мастер ещё не задал — сбор общий)`;
         resultEl.innerHTML = `<strong>Найдено (${escHtml(locLabel)}):</strong> ${found.map(escHtml).join(', ')}`;
         renderInventoryList();
         saveLocalStorage();
@@ -4428,19 +4449,19 @@ window.toggleSkillPanel = function (idx) {
 
     function renderTradeSelects() {
         const targetSelect = document.getElementById('trade-target-select');
-        const itemSelect = document.getElementById('trade-item-select');
-        if (!targetSelect || !itemSelect) return;
+        if (!targetSelect) return;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const myName = document.getElementById('char-name').value;
         const participants = (session && session.participants) || {};
         const others = Object.entries(participants).filter(([uid, p]) => p.name && p.name !== myName);
+        const prev = targetSelect.value;
         targetSelect.innerHTML = others.length
             ? others.map(([uid, p]) => `<option value="${uid}">${escHtml(p.name)}</option>`).join('')
             : '<option value="">Нет других игроков в сессии</option>';
-
-        itemSelect.innerHTML = playerInventory.length
-            ? playerInventory.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
-            : '<option value="">Инвентарь пуст</option>';
+        if (others.some(([uid]) => uid === prev)) targetSelect.value = prev;
+        // Кнопки "→" у предметов в инвентаре появляются/пропадают в зависимости от того,
+        // выбран ли получатель — перерисовываем список.
+        if (typeof renderInventoryList === 'function') renderInventoryList();
     }
     window.renderTradeSelects = renderTradeSelects;
 
@@ -4468,30 +4489,28 @@ window.toggleSkillPanel = function (idx) {
         }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
     };
 
-    window.tradeItemToPlayer = function () {
+    window.tradeItemToPlayer = function (itemId, qty) {
         const targetUid = document.getElementById('trade-target-select').value;
-        const itemId = document.getElementById('trade-item-select').value;
-        const qty = parseInt(document.getElementById('trade-item-qty').value) || 1;
+        qty = qty || 1;
         const resultEl = document.getElementById('trade-result');
-        if (!targetUid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери, кому передать.</span>'; return; }
+        if (!targetUid) { alert('Сначала выбери получателя вверху панели «Передать союзнику».'); return; }
         const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item) { resultEl.innerHTML = '<span style="color:#e74c3c;">Предмет не найден.</span>'; return; }
-        if (item.count < qty) { resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
+        if (!item) { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">Предмет не найден.</span>'; return; }
+        if (item.count < qty) { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
 
         const itemData = Object.assign({}, item, { count: qty });
         window.CloudSync.transferItemToPlayer(targetUid, itemData).then(() => {
             removeFromInventoryByName(itemId, qty);
             const session = window.CloudSync.getSessionData();
             const pname = (session.participants[targetUid] || {}).name || targetUid;
-            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано «${escHtml(item.name)}» ×${qty} игроку ${escHtml(pname)}.</span>`;
+            if (resultEl) resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано «${escHtml(item.name)}» ×${qty} игроку ${escHtml(pname)}.</span>`;
             if (window.CloudSync.postCombatLog) {
                 const myName = document.getElementById('char-name').value;
                 window.CloudSync.postCombatLog(`🤝 ${myName} передал(а) «${item.name}» ×${qty} игроку ${pname}.`, myName);
             }
             renderInventoryList();
-            renderTradeSelects();
             saveLocalStorage();
-        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
+        }).catch(e => { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
     };
 
     window.renderAttackTargetSelect = function () {
@@ -4519,9 +4538,26 @@ window.toggleSkillPanel = function (idx) {
         const period = session.timePeriod || 'День';
         const weatherKey = session.currentWeather || 'clear';
         const weather = WEATHER_TYPES[weatherKey] || WEATHER_TYPES.clear;
-        let html = `🕐 <strong>${escHtml(period)}</strong> · 📍 ${escHtml(session.currentRegion)} · ${weather.name}`;
+        let html = `🕐 <strong>${escHtml(period)}</strong> · 📍 ${escHtml(session.currentRegion)}${session.currentHold ? ' (' + escHtml(session.currentHold) + ')' : ''} · ${weather.name}`;
         if (weather.effect) html += `<div style="font-size:11px; opacity:.75; margin-top:2px;">${escHtml(weather.effect)}</div>`;
         el.innerHTML = html;
+    };
+
+    // Список трупов, доступных для подъёма прямо сейчас: гуманоиды (isRaisable, только сгенерированные
+    // мастером бандиты), мёртвые, не поднятые ранее, убитые не больше 5 ходов назад.
+    window.renderCorpseRaiseSelect = function () {
+        const select = document.getElementById('corpse-raise-target-select');
+        if (!select) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const currentTurn = (session && session.sessionTurnCounter) || 0;
+        const eligible = session ? (session.enemies || []).filter(e =>
+            e.isRaisable && (e.curHp || 0) <= 0 && !e.raised &&
+            (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5)
+        ) : [];
+        const prev = select.value;
+        select.innerHTML = '<option value="">— автоматически (первый доступный) —</option>' +
+            eligible.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)} (умер ${e.diedAtTurn !== undefined ? (currentTurn - e.diedAtTurn) + ' х. назад' : 'недавно'})</option>`).join('');
+        if (eligible.some(e => e.id === prev)) select.value = prev;
     };
 
     // ========================================================================
@@ -4534,6 +4570,10 @@ window.toggleSkillPanel = function (idx) {
         if (!select) return;
         let opts = '<option value="melee">Оружие ближнего боя</option><option value="ranged">Оружие дальнего боя</option>';
         (customSpells || []).forEach(s => {
+            // Заклинания призыва/подъёма (плоть, оружие, зомби, атронахи) НЕ прямые атаки — их числа
+            // в описании описывают призываемое существо/предмет, а не урон по цели. Кастуются через
+            // обычную кнопку "Каст" на карточке заклинания, не через этот инструмент.
+            if (findSummonTemplateBySpellName(s.name)) return;
             const dmg = parseSpellDamageFromDesc(s.desc);
             if (dmg) opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)} (заклинание, ~${dmg} урона)</option>`;
         });
@@ -4546,7 +4586,7 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function initSectionAccordions() {
-    const tabs = ['tab3', 'tab5'];
+    const tabs = ['tab1', 'tab3', 'tab5', 'tab6'];
     tabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (!tab) return;
@@ -4558,6 +4598,7 @@ window.toggleSkillPanel = function (idx) {
 
         let counter = 0;
         panels.forEach(panel => {
+            if (panel.dataset.secId) return; // уже обработана — не оборачиваем повторно
             const h2 = panel.querySelector(':scope > h2');
             if (!h2) return;
             const panelId = tabId + '-sec-' + (counter++);
@@ -4903,9 +4944,6 @@ function updateHungerPenalty() {
         if (!document.getElementById('manual-hp-lock').checked) {
             let baseHp = con * 10;
             if (race === 'nord') { baseHp += 10 + (5 * (lvl - 1)); }
-            document.querySelectorAll('.food-buff:checked').forEach(f => {
-                if(f.dataset.hp) baseHp += parseInt(f.dataset.hp);
-            });
             if (godB.hp) baseHp += godB.hp;
             baseHp += equipBonuses.hp;
             baseHp += activeEffectBonuses.hp;
@@ -4917,9 +4955,6 @@ function updateHungerPenalty() {
             if (race === 'altmer') { baseMp += 20; }
             if (sign === 'atronach') { baseMp += 20 + (20 * (lvl - 1)); }
             if (sign === 'apprentice') { baseMp += 10 + (10 * (lvl - 1)); }
-            document.querySelectorAll('.food-buff:checked').forEach(f => {
-                if(f.dataset.mp) baseMp += parseInt(f.dataset.mp);
-            });
             if (godB.mp) baseMp += godB.mp;
             baseMp += equipBonuses.mp;
             baseMp += activeEffectBonuses.mp;
@@ -4993,7 +5028,7 @@ function updateHungerPenalty() {
             if (document.getElementById('chk-frost-region').checked) {
                 speed -= (armorType === 'heavy') ? 15 : 10;
             }
-            if (isFoodBuffChecked('Похлёбка из оленины')) speed += 5;
+            speed += activeEffectBonuses.speed || 0;
             if (godB.speed) speed += godB.speed;
             speed += (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().speed : 0;
             if (isOverweight) {
@@ -5362,7 +5397,6 @@ function updateHungerPenalty() {
             inventory: playerInventory,
             equippedSlots: equippedSlots,
             knownIngredientProps: knownIngredientProps,
-            activeFoodBuffs: Array.from(document.querySelectorAll('.food-buff:checked')).map(c => c.dataset.name),
             pouchContents: pouchContents,
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
@@ -5483,14 +5517,6 @@ function updateHungerPenalty() {
             document.getElementById('slot-ring-name').value = data.sRing || '';
             document.getElementById('slot-neck-name').value = data.sNeck || '';
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
-
-            renderFoodBuffsList();
-            if (Array.isArray(data.activeFoodBuffs)) {
-                data.activeFoodBuffs.forEach(name => {
-                    const chk = document.querySelector(`.food-buff[data-name="${CSS.escape(name)}"]`);
-                    if (chk) chk.checked = true;
-                });
-            }
 
             pouchContents = Array.isArray(data.pouchContents) ? data.pouchContents : [];
             activeTimedEffects = Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [];
@@ -5623,7 +5649,6 @@ function updateHungerPenalty() {
 
     // Первичный запуск
     initSkills();
-    renderFoodBuffsList();
     updateDateDisplay();
     loadLocalStorage();
     updateAll();

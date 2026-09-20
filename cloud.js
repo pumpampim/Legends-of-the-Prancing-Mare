@@ -179,10 +179,15 @@
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
+                const wasAlive = (enemies[idx].curHp || 0) > 0;
                 const resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
                 const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
                 const newHp = Math.max(0, (enemies[idx].curHp || 0) - finalDmg);
-                enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
+                const patch = { curHp: newHp };
+                // Штампуем момент смерти (номер общего счётчика ходов сессии) — труп поднимаемый
+                // заклинанием только первые 5 ходов после этого.
+                if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
+                enemies[idx] = Object.assign({}, enemies[idx], patch);
                 const update = { enemies: enemies };
                 const finalLogText = (logText && resist) ? logText.replace(/урон (\d+)/, `урон ${finalDmg} (резист ${resist}%, было бы $1)`) : logText;
                 if (finalLogText) {
@@ -190,6 +195,15 @@
                 }
                 return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name, finalDmg, resist }));
             });
+        },
+
+        // Увеличивает общий счётчик ходов сессии на 1 — вызывается при "Следующий ход"/"Следующий
+        // круг" у любого игрока. Нужен для окна "поднять труп можно только 5 ходов после смерти".
+        bumpSessionTurnCounter: function () {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                sessionTurnCounter: firebase.firestore.FieldValue.increment(1)
+            }).catch(e => console.error('Ошибка счётчика ходов сессии:', e));
         },
 
         // Пишет произвольную запись в общий боевой журнал сессии от имени игрока.
@@ -340,6 +354,7 @@
         renderLog(data.combatLog || []);
         if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
         if (typeof window.updateWeatherDisplay === 'function') window.updateWeatherDisplay();
+        if (typeof window.renderCorpseRaiseSelect === 'function') window.renderCorpseRaiseSelect();
         if (typeof window.renderTradeSelects === 'function') window.renderTradeSelects();
 
         // Мастер мог наложить статус-эффект (паралич/страх и т.п.) атакой — он приходит через

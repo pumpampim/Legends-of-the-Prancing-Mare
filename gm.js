@@ -1448,7 +1448,12 @@
         rich: { label: 'Богатый', gold: [150, 600], priceMin: 100, priceMax: 800, itemCount: [2, 4] },
         legendary: { label: 'Легендарный', gold: [500, 2000], priceMin: 500, priceMax: 6935, itemCount: [1, 3] }
     };
-    const LOOT_EXCLUDE_CATEGORIES = ['Ингредиенты для алхимии', 'Кузнечные ингредиенты', 'Шкуры', 'Двемерские детали'];
+    const LOOT_EXCLUDE_CATEGORIES = [
+        'Ингредиенты для алхимии', 'Кузнечные ингредиенты', 'Шкуры', 'Двемерские детали',
+        // Уникальные предметы/артефакты не должны падать из случайного сундука.
+        'Уникальная броня', 'Уникальные щиты', 'Даэдрические артефакты', 'Артефакты Азидала',
+        'Маски жрецов', 'Магические одеяния'
+    ];
 
     let lastGeneratedLoot = null;
 
@@ -1472,6 +1477,16 @@
         for (let i = 0; i < count; i++) {
             items.push(pool[Math.floor(Math.random() * pool.length)]);
         }
+
+        // Гарантированная "мелочёвка" сундука — не заменяет обычный лут, добавляется поверх.
+        const foodPool = (gmAllItems || []).filter(i => i.category === 'Готовые продукты' || i.category === 'Сырые продукты');
+        const soulGemPool = (gmAllItems || []).filter(i => i.category === 'Камни душ');
+        const gemPool = (gmAllItems || []).filter(i => i.category === 'Драгоценные камни');
+        if (foodPool.length && Math.random() < 0.6) items.push(foodPool[Math.floor(Math.random() * foodPool.length)]);
+        if (Math.random() < 0.4) items.push({ name: 'Отмычка', category: 'Инструменты', price: 5, weight: 0.1 });
+        if (soulGemPool.length && Math.random() < 0.3) items.push(soulGemPool[Math.floor(Math.random() * soulGemPool.length)]);
+        if (gemPool.length && Math.random() < 0.25) items.push(gemPool[Math.floor(Math.random() * gemPool.length)]);
+
         lastGeneratedLoot = { tier: tier.label, gold, items };
 
         let html = `<strong>${tier.label} сундук:</strong><br>💰 ${gold} септимов<br>`;
@@ -1533,11 +1548,20 @@
     ];
     const BANDIT_WEAPON_MATERIAL = /^(Железн|Кожан|Стальн)/i;
     const BANDIT_ARMOR_SLOT_MAP = { 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' };
+    // В базе кузни нет железных/кожаных/стальных луков вообще (самый дешёвый — орочий) —
+    // используем его как "простой" лук бандита, раз других низкоуровневых нет.
+    const BANDIT_BOW_NAME = 'Орочий лук';
+    const BANDIT_SPELLS = [
+        { name: 'Искры', dmg: 15, cost: 17 },
+        { name: 'Обморожение', dmg: 15, cost: 15 },
+        { name: 'Ледяной шип', dmg: 22, cost: 22 }
+    ];
 
     function getBanditGearPool() {
-        const weapons = (window.weaponRecipes || []).filter(w => BANDIT_WEAPON_MATERIAL.test(w.name));
+        const weapons = (window.weaponRecipes || []).filter(w => BANDIT_WEAPON_MATERIAL.test(w.name) && !/лук/i.test(w.name));
         const armors = (window.armorRecipes || []).filter(a => BANDIT_WEAPON_MATERIAL.test(a.name));
-        return { weapons, armors };
+        const bow = (window.weaponRecipes || []).find(w => w.name === BANDIT_BOW_NAME);
+        return { weapons, armors, bow };
     }
 
     let lastGeneratedBandit = null;
@@ -1547,9 +1571,16 @@
         const pool = getBanditGearPool();
         if (!pool.weapons.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных об оружии — проверь, что smithing-data.js подключён.</span>'; return; }
 
+        // Уровень бандита: средний уровень группы (задаётся вручную) ± разброс от -1 до +2, максимум 50.
+        const avgLevel = parseInt(el('bandit-avg-level').value) || 5;
+        const level = Math.max(1, Math.min(50, avgLevel + (Math.floor(Math.random() * 4) - 1)));
+
         const race = BANDIT_RACES[Math.floor(Math.random() * BANDIT_RACES.length)];
         const sign = BANDIT_SIGNS[Math.floor(Math.random() * BANDIT_SIGNS.length)];
         const god = BANDIT_GODS[Math.floor(Math.random() * BANDIT_GODS.length)];
+
+        const isRanged = Math.random() < 0.25 && pool.bow;
+        const isMage = !isRanged && Math.random() < 0.2;
         const weapon = pool.weapons[Math.floor(Math.random() * pool.weapons.length)];
 
         const slots = { helmet: null, chest: null, gloves: null, boots: null, shield: null };
@@ -1561,7 +1592,7 @@
         });
         let totalArmor = 0;
         Object.keys(slots).forEach(key => {
-            if (key === 'shield' && Math.random() > 0.3) return;
+            if (key === 'shield' && (isRanged || isMage || Math.random() > 0.3)) return; // лучники/маги без щита
             if (key !== 'shield' && Math.random() > 0.7) return;
             const options = bySlot[key];
             if (options && options.length) {
@@ -1571,26 +1602,56 @@
             }
         });
 
-        const gold = randInt(5, 80);
+        // Урон и ХП растут с уровнем (грубая, но предсказуемая шкала).
+        const levelDmgMult = 1 + (level - 1) * 0.06;
+        const levelHpMult = 1 + (level - 1) * 0.08;
+        const weaponDmg = isRanged ? Math.round((pool.bow.damage || 10) * levelDmgMult) : Math.round(weapon.damage * levelDmgMult);
+        const hp = Math.round(randInt(40, 90) * levelHpMult);
+
+        const spells = [];
+        if (isMage) {
+            const count = 1 + (Math.random() < 0.4 ? 1 : 0);
+            const pickedSpells = [];
+            while (pickedSpells.length < count && pickedSpells.length < BANDIT_SPELLS.length) {
+                const s = BANDIT_SPELLS[Math.floor(Math.random() * BANDIT_SPELLS.length)];
+                if (!pickedSpells.includes(s)) pickedSpells.push(s);
+            }
+            pickedSpells.forEach(s => spells.push({ name: s.name, dmg: Math.round(s.dmg * levelDmgMult), cost: s.cost }));
+        }
+
+        const gold = Math.round(randInt(5, 80) * (1 + (level - 1) * 0.1));
         const hasTrinket = Math.random() < 0.3;
         const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' || (i.slot === 'ring' || i.slot === 'amulet'));
         const trinket = hasTrinket && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
+        const foodPool = (gmAllItems || []).filter(i => i.category === 'Готовые продукты' || i.category === 'Сырые продукты');
+        const foodItem = foodPool.length ? foodPool[Math.floor(Math.random() * foodPool.length)] : null;
+        const hasLockpick = Math.random() < 0.5;
 
-        const hp = randInt(40, 90);
-
-        const lootItems = [{ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' }];
-        Object.values(slots).forEach(a => { if (a) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: BANDIT_ARMOR_SLOT_MAP[a.slot], category: 'Броня (с трупа)' }); });
+        // Лут: часть брони НЕ выпадает при обыске (потрёпана в бою) — у каждого предмета
+        // (включая оружие) свой отдельный шанс попасть в добычу, не 100%.
+        const lootItems = [];
+        if (Math.random() < 0.8) {
+            if (isRanged) lootItems.push({ name: pool.bow.name, price: pool.bow.price || 0, weight: pool.bow.weight, dmg: weaponDmg, slot: 'ranged', category: 'Оружие (с трупа)' });
+            else if (!isMage) lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weaponDmg, slot: weapon.slot, category: 'Оружие (с трупа)' });
+        }
+        if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
+        Object.values(slots).forEach(a => {
+            if (a && Math.random() < 0.6) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: BANDIT_ARMOR_SLOT_MAP[a.slot], category: 'Броня (с трупа)' });
+        });
         if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
+        if (foodItem && Math.random() < 0.5) lootItems.push({ name: foodItem.name, price: foodItem.price || 0, weight: foodItem.weight || 0.5, category: foodItem.category, effect: foodItem.effect || '' });
+        if (hasLockpick) lootItems.push({ name: 'Отмычка', price: 5, weight: 0.1, category: 'Инструменты' });
 
         lastGeneratedBandit = {
-            name: 'Бандит', race, sign, god: god.name, hp, weaponDmg: weapon.damage, weaponNote: weapon.name,
+            name: 'Бандит', race, sign, god: god.name, level, hp,
+            weaponDmg, weaponNote: isRanged ? pool.bow.name : weapon.name, isRanged, isMage, spells,
             armor: totalArmor, gold, lootItems, isRaisable: true
         };
 
-        let html = `<strong>${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
+        let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
-        html += `ХП: ${hp} · Оружие: ${escapeHtml(weapon.name)} (${weapon.damage} урона) · Броня: ${totalArmor}<br>`;
-        html += `Лут: 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
+        html += `ХП: ${hp} · ${isRanged ? 'Лук' : (isMage ? 'Заклинания' : 'Оружие')}: ${isRanged ? pool.bow.name + ' (' + weaponDmg + ' урона)' : (isMage ? spells.map(s => `${s.name} (${s.dmg}/${s.cost})`).join(', ') : weapon.name + ' (' + weaponDmg + ' урона)')} · Броня: ${totalArmor}<br>`;
+        html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
 
@@ -1598,9 +1659,10 @@
         if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
         const b = lastGeneratedBandit;
         const enemies = (lastData.enemies || []).slice();
+        const maxMp = b.isMage ? 50 + b.level * 5 : 0;
         enemies.push({
-            id: genId('e'), name: b.name + ' (' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: 0, curMp: 0,
-            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, resist: {},
+            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp, curMp: maxMp,
+            weaponDmg: b.isMage ? 0 : b.weaponDmg, weaponNote: b.weaponNote, resist: {}, spells: b.spells || [],
             isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
@@ -1666,13 +1728,14 @@
 
     window.setSessionTimeWeather = function () {
         const region = el('weather-region-select').value;
+        const hold = el('weather-hold-select').value;
         const period = el('weather-time-select').value;
         const weatherKey = pendingWeatherKey || 'clear';
         db.collection('sessions').doc(currentCode).update({
-            currentRegion: region, timePeriod: period, currentWeather: weatherKey
+            currentRegion: region, currentHold: hold, timePeriod: period, currentWeather: weatherKey
         }).then(() => {
-            el('weather-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Применено: ${period}, ${region}, ${WEATHER_LABELS[weatherKey]}.</span>`;
-            gmPostLogEntryText(`🌤️ ${period}, ${region}: ${WEATHER_LABELS[weatherKey]}.`);
+            el('weather-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Применено: ${period}, ${region}${hold ? ' (' + hold + ')' : ''}, ${WEATHER_LABELS[weatherKey]}.</span>`;
+            gmPostLogEntryText(`🌤️ ${period}, ${region}${hold ? ' (' + hold + ')' : ''}: ${WEATHER_LABELS[weatherKey]}.`);
             pendingWeatherKey = null;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
