@@ -40,6 +40,7 @@
     </div>
 
     <h1><span class="skyrim-icon icon-dice" aria-hidden="true"></span> ЭКРАН МАСТЕРА — «СКУРИМ»</h1>
+    <p style="margin-top:-8px;"><a href="holds.html" target="_blank" style="color:var(--accent-color); font-size:14px;">🏰 Открыть справочник Владений (города, жители, подземелья)</a></p>
 
     <div id="no-session-block" class="panel" style="display:none;">
         <h2>Начать сессию</h2>
@@ -91,10 +92,19 @@
             <select id="gm-attack-target-select"></select>
             <label>Чем атакует</label>
             <select id="gm-attack-action-select"></select>
+            <label>Дополнительный статус-эффект (необязательно)</label>
+            <select id="gm-attack-status-select">
+                <option value="">— нет —</option>
+                <option value="paralyze">Паралич (1 ход)</option>
+                <option value="fear">Страх (1 ход)</option>
+                <option value="frenzy">Бешенство (1 ход)</option>
+                <option value="slow">Замедление (3 хода)</option>
+                <option value="weakened">Ослабление (2 хода)</option>
+            </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
             <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
                 <div id="gm-attack-roll-text"></div>
-                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="applyGmAttackDamage()">✅ Применить урон к игроку</button>
+                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="applyGmAttackDamage()">✅ Применить к игроку</button>
             </div>
         </div>
 

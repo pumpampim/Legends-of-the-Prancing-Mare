@@ -33,5 +33,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+
+    // Справочник владений: данжи (описание/враги/лут/особенности), которые
+    // мастер заполняет и дополняет сам на странице holds.html. Читает кто
+    // угодно из группы, пишет тоже — как и везде здесь, это упрощение для
+    // закрытой группы друзей.
+    match /holds_dungeons/{holdId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
   }
 }

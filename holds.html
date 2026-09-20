@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Владения — справочник мастера — «Скурим» TTRPG</title>
+    <link rel="stylesheet" href="style.css?v=2">
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+    <style>
+        .hold-header {
+            cursor: pointer;
+            padding: 14px 16px;
+            background: var(--panel-sub, #1a1712);
+            border: 1px solid #363025;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 17px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hold-header:hover { border-color: var(--accent-color); }
+        .hold-body { display: none; padding: 4px 2px 18px; }
+        .hold-body.open { display: block; }
+        .npc-card, .loc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .npc-card strong, .loc-card strong { color: var(--accent-color); }
+        .loc-meta { font-size: 12px; margin-top: 4px; line-height: 1.5; }
+        .loc-meta .lbl { opacity: .7; }
+        .section-sub-header {
+            font-size: 14px;
+            margin: 14px 0 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .empty-hold { opacity: .6; font-size: 13px; padding: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container" style="max-width: 900px; margin: 0 auto; padding: 16px;">
+    <h1 style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <span>🏰 Владения Скайрима — справочник мастера</span>
+        <a href="gm.html" style="font-size:13px; color:var(--accent-color);">← Назад к экрану мастера</a>
+    </h1>
+    <p style="font-size:13px; opacity:.8;">Города, жители (с ролями/профессиями) и подземелья/точки интереса каждого владения. Данные о жителях и названиях мест — из исходной таблицы владений; описания подземелий (враги, награда, особенности вроде рудных жил или кузни внутри) мастер дополняет сам по ходу подготовки — большинство пока пустые, заполняй перед сессией.</p>
+
+    <input type="text" id="hold-search" placeholder="Поиск по имени NPC или локации во всех владениях..." style="margin-bottom:16px;">
+
+    <div id="holds-container"></div>
+</div>
+
+<script src="holds-data.js"></script>
+<script>
+    function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function toggleHold(name) {
+        const body = document.getElementById('hold-body-' + name);
+        const chevron = document.getElementById('hold-chevron-' + name);
+        if (!body) return;
+        const willOpen = !body.classList.contains('open');
+        document.querySelectorAll('.hold-body').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('[id^="hold-chevron-"]').forEach(el => el.textContent = '▸');
+        if (willOpen) {
+            body.classList.add('open');
+            if (chevron) chevron.textContent = '▾';
+        }
+    }
+    window.toggleHold = toggleHold;
+
+    function renderHoldBody(holdName, data) {
+        if (!data || (!data.npcs.length && !data.locations.length)) {
+            return '<div class="empty-hold">Это владение ещё не заполнено — появится в одной из следующих партий.</div>';
+        }
+        let html = '';
+        if (data.npcs.length) {
+            html += `<div class="section-sub-header">👤 Жители (${data.npcs.length})</div>`;
+            data.npcs.forEach(n => {
+                html += `<div class="npc-card" data-search="${esc((n.name + ' ' + n.role + ' ' + n.bio).toLowerCase())}">
+                    <strong>${esc(n.name)}</strong>${n.role ? ' — ' + esc(n.role) : ''}
+                    ${n.bio ? `<div style="margin-top:3px; opacity:.85;">${esc(n.bio)}</div>` : ''}
+                </div>`;
+            });
+        }
+        if (data.locations.length) {
+            html += `<div class="section-sub-header">🗺️ Подземелья и точки интереса (${data.locations.length})</div>`;
+            data.locations.forEach((l, idx) => {
+                const dyn = (dungeonOverrides[holdName] || {})[l.name] || {};
+                html += `<div class="loc-card" data-search="${esc((l.name + ' ' + l.desc).toLowerCase())}">
+                    <strong>${esc(l.name)}</strong>
+                    ${l.desc ? `<div style="margin-top:3px;">${esc(l.desc)}</div>` : ''}
+                    <div class="loc-meta">
+                        <label style="font-size:11px; opacity:.7; margin-top:4px;">⚔️ Враги (какие и сколько)</label>
+                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="enemies" value="${esc(dyn.enemies || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
+                        <label style="font-size:11px; opacity:.7; margin-top:4px;">💰 Лут</label>
+                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="loot" value="${esc(dyn.loot || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
+                        <label style="font-size:11px; opacity:.7; margin-top:4px;">✨ Особенности (рудная жила, кузня, алхимическая станция, неотмеченная локация рядом...)</label>
+                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="features" value="${esc(dyn.features || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
+                    </div>
+                </div>`;
+            });
+        }
+        return html;
+    }
+
+    function renderAllHolds() {
+        const container = document.getElementById('holds-container');
+        const allHolds = ['Вайтран', 'Винтерхолд', 'Рифт', 'Фолкрит', 'Солитьюд (Хаафингар)',
+            'Хьялмарк (Морфал)', 'Истмарк (Виндхельм)', 'Белый берег (Данстар)', 'Маркарт (Предел)', 'Схолстейм'];
+        container.innerHTML = allHolds.map(name => {
+            const data = (window.holdsData || {})[name];
+            return `<div class="hold-header" onclick="toggleHold('${name}')">
+                <span>${esc(name)}</span><span id="hold-chevron-${name}">▸</span>
+            </div>
+            <div class="hold-body" id="hold-body-${name}">${renderHoldBody(name, data)}</div>`;
+        }).join('');
+    }
+
+    document.getElementById('hold-search').addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        document.querySelectorAll('.npc-card, .loc-card').forEach(card => {
+            const match = !q || (card.dataset.search || '').includes(q);
+            card.style.display = match ? '' : 'none';
+        });
+        // при поиске раскрываем все владения, чтобы результаты были видны
+        if (q) {
+            document.querySelectorAll('.hold-body').forEach(el => el.classList.add('open'));
+        }
+    });
+
+    renderAllHolds();
+</script>
+</body>
+</html>

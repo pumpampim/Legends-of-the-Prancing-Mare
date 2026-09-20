@@ -86,6 +86,8 @@
         // Изменение (skillIdx=14)
         "14-0": () => ({ discountAlter1: true }),
         "14-2": () => ({ discountAlter2: true }),
+        "14-3": (step) => ({ magicArmorMult: [2, 2.5, 3][step - 1] || 1 }),
+        "14-4": (step) => ({ resistMagicPercent: [10, 20, 30][step - 1] || 0 }),
         "14-5": () => ({ discountAlter3: true }),
         "14-7": () => ({ discountAlter4: true }),
 
@@ -202,6 +204,8 @@
             enchantGeneralBonus: 0, enchantSoulEconomy: 0, enchantFireBonus: 0,
             enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,
             restorationManaBonus: 0,
+            resistMagicPercent: 0,
+            magicArmorMult: 1,
             lockpickNoviceUnlocked: false, lockpickApprenticeUnlocked: false, lockpickAdeptUnlocked: false, lockpickExpertUnlocked: false,
             lockpickSilent: false, lockpickWaxKey: false, lockpickGoldBonus: false, lockpickTreasureBonus: false
         };

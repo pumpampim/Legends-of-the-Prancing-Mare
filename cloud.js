@@ -167,7 +167,10 @@
 
         // Списывает урон с конкретного противника в сессии и пишет запись в общий боевой журнал.
         // Возвращает Promise. isPlayerAction=true подписывает запись именем игрока, а не "Мастер".
-        applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText) {
+        // dmgType (необязательно): 'physical'/'fire'/'frost'/'shock'/'poison'/'magic' — если у врага
+        // есть resist[dmgType], урон уменьшается (или увеличивается, если там отрицательное число —
+        // это уязвимость, как у тролля к огню).
+        applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText, dmgType) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             return ref.get().then(doc => {
@@ -176,13 +179,16 @@
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
-                const newHp = Math.max(0, (enemies[idx].curHp || 0) - dmgAmount);
+                const resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
+                const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
+                const newHp = Math.max(0, (enemies[idx].curHp || 0) - finalDmg);
                 enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
                 const update = { enemies: enemies };
-                if (logText) {
-                    update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText });
+                const finalLogText = (logText && resist) ? logText.replace(/урон (\d+)/, `урон ${finalDmg} (резист ${resist}%, было бы $1)`) : logText;
+                if (finalLogText) {
+                    update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: finalLogText });
                 }
-                return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name }));
+                return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name, finalDmg, resist }));
             });
         },
 
@@ -207,6 +213,45 @@
                 if (idx === -1) return;
                 enemies[idx] = Object.assign({}, enemies[idx], { raised: true });
                 return ref.update({ enemies: enemies });
+            });
+        },
+
+        // Отправляет баф/лечение/статус-эффект другому игроку той же сессии (например, союзнику
+        // при касте баф-заклинания). Идёт через ту же очередь pendingStatusEffects, что и
+        // статус-эффекты от НПС-атак мастера — цель подхватывает её сама через уже существующий
+        // листенер сессии (applyIncomingStatusEffects в index.html), без перезагрузки страницы.
+        pushEffectToPlayer: function (targetUid, effectPayload) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const patch = {};
+            patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(effectPayload);
+            return db.collection('sessions').doc(currentSessionCode).update(patch);
+        },
+
+        // Передаёт предмет (itemData: {itemId,name,count,weight,category,effect,...доп.поля}) ИЛИ
+        // золото (goldAmount) от текущего игрока другому игроку в той же сессии.
+        transferItemToPlayer: function (targetUid, itemData) {
+            if (!db) return Promise.reject(new Error('Нет соединения.'));
+            const ref = db.collection('characters').doc(targetUid);
+            return ref.get().then(doc => {
+                const data = doc.exists ? doc.data() : {};
+                const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+                const existing = inv.find(x => x.itemId === itemData.itemId);
+                if (existing) {
+                    existing.count += itemData.count;
+                } else {
+                    inv.push(Object.assign({}, itemData));
+                }
+                return ref.update({ inventory: inv });
+            });
+        },
+
+        transferGoldToPlayer: function (targetUid, amount) {
+            if (!db) return Promise.reject(new Error('Нет соединения.'));
+            const ref = db.collection('characters').doc(targetUid);
+            return ref.get().then(doc => {
+                const data = doc.exists ? doc.data() : {};
+                const newGold = (parseInt(data.gold) || 0) + amount;
+                return ref.update({ gold: newGold });
             });
         }
     };
@@ -295,6 +340,22 @@
         renderLog(data.combatLog || []);
         if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
         if (typeof window.updateWeatherDisplay === 'function') window.updateWeatherDisplay();
+        if (typeof window.renderTradeSelects === 'function') window.renderTradeSelects();
+
+        // Мастер мог наложить статус-эффект (паралич/страх и т.п.) атакой — он приходит через
+        // сессию (у игрока нет живого листенера на свой собственный документ персонажа).
+        // Применяем один раз и сразу же чистим очередь в сессии, чтобы не наложить повторно.
+        if (currentUser && data.participants && data.participants[currentUser.uid]) {
+            const pending = data.participants[currentUser.uid].pendingStatusEffects;
+            if (Array.isArray(pending) && pending.length && typeof window.applyIncomingStatusEffects === 'function') {
+                window.applyIncomingStatusEffects(pending);
+                if (currentSessionCode) {
+                    db.collection('sessions').doc(currentSessionCode).update({
+                        ['participants.' + currentUser.uid + '.pendingStatusEffects']: []
+                    }).catch(e => console.error('Ошибка очистки статус-эффектов:', e));
+                }
+            }
+        }
     }
 
     function enemyAvatarData(enemy) {

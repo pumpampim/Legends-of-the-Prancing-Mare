@@ -885,6 +885,26 @@
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
             </div>
 
+            <!-- ПЕРЕДАЧА ПРЕДМЕТОВ/ДЕНЕГ ДРУГОМУ ИГРОКУ -->
+            <div class="panel">
+                <h2>🤝 Передать союзнику</h2>
+                <p style="font-size:11px; opacity:.75;">Работает только внутри активной сессии мастера (вкладка «Сессия»). Передача уходит напрямую другому игроку.</p>
+                <label>Кому</label>
+                <select id="trade-target-select"></select>
+
+                <label>Золото</label>
+                <input type="number" id="trade-gold-amount" placeholder="0" value="0" min="0">
+                <button class="btn-success" style="width:100%; margin-top:4px;" onclick="tradeGoldToPlayer()">Передать золото</button>
+
+                <label style="margin-top:10px;">Предмет из инвентаря</label>
+                <select id="trade-item-select"></select>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <input type="number" id="trade-item-qty" value="1" min="1" style="flex:1;">
+                    <button class="btn-success" style="flex:2;" onclick="tradeItemToPlayer()">Передать предмет</button>
+                </div>
+                <div id="trade-result" style="margin-top:8px; font-size:12px;"></div>
+            </div>
+
             <!-- Религия, Еда, Рецепты и Заметки -->
             <div class="panel">
                 <h2>Выживание и Пантеон Богов</h2>
@@ -1865,7 +1885,7 @@ window.toggleSkillPanel = function (idx) {
         if (session && session.participants) {
             const myName = document.getElementById('char-name').value;
             Object.entries(session.participants).forEach(([uid, p]) => {
-                if (p.name && p.name !== myName) opts += `<option value="ally:${escHtml(p.name)}">Цель: ${escHtml(p.name)} (союзник)</option>`;
+                if (p.name && p.name !== myName) opts += `<option value="ally:${escHtml(uid)}">Цель: ${escHtml(p.name)} (союзник)</option>`;
             });
         }
         (activeSummons || []).forEach(s => {
@@ -1878,9 +1898,14 @@ window.toggleSkillPanel = function (idx) {
     // обычном касте (тратит ману), и при использовании свитка (бесплатно, isFree=true).
     // Возвращает {message, logText} для показа игроку/записи в журнал.
     function resolveSpellEffect(spellName, desc, school, targetVal, isFree) {
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         let targetLabel = 'на себя';
-        if (targetVal.indexOf('ally:') === 0) targetLabel = 'на ' + targetVal.slice(5) + ' (союзник)';
-        else if (targetVal.indexOf('summon:') === 0) {
+        let allyUid = null, allyName = null;
+        if (targetVal.indexOf('ally:') === 0) {
+            allyUid = targetVal.slice(5);
+            allyName = (session && session.participants && session.participants[allyUid] && session.participants[allyUid].name) || 'союзника';
+            targetLabel = 'на ' + allyName + ' (союзник)';
+        } else if (targetVal.indexOf('summon:') === 0) {
             const s = activeSummons.find(x => x.id === targetVal.slice(7));
             targetLabel = 'на ' + (s ? s.name : 'своё существо') + ' (существо)';
         }
@@ -1891,7 +1916,6 @@ window.toggleSkillPanel = function (idx) {
             // Если в активной сессии мастера есть конкретный поднимаемый труп (например,
             // сгенерированный бандит) — поднимаем именно его, с его настоящими ХП/уроном,
             // а не общий шаблон по рангу заклинания.
-            const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
             const corpse = session && (session.enemies || []).find(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised);
             if (corpse) {
                 const specificTemplate = Object.assign({}, template, {
@@ -1909,24 +1933,43 @@ window.toggleSkillPanel = function (idx) {
                 const res = performSummon(template, false);
                 extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
             }
+        } else if (template && template.category === 'armor') {
+            const res = castFleshSpell(template, false);
+            extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
         } else if (template) {
             const res = performSummon(template, false);
             extraMsg = res.ok ? ` ${res.message}` : ` ⚠ ${res.message}`;
         } else if (targetVal === 'self') {
-            // Обычный баф/лечение на себя — применяем как активный эффект (как у зелий).
-            const duration = parseDurationTurns(desc);
-            const plain = parsePlainEffectBonus(desc);
-            if (plain) {
-                activeTimedEffects.push({
-                    id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
-                    name: spellName, effectName: spellName, description: desc || '',
-                    turnsRemaining: duration,
-                    hp: plain.key === 'hp' ? plain.value : 0,
-                    mp: plain.key === 'mp' ? plain.value : 0,
-                    value: plain.value
-                });
-                renderActiveEffects();
-                extraMsg = ' Эффект применён на себя и тикает по ходам.';
+            // Сначала пробуем разовое лечение ("восстанавливает N здоровья/маны") — применяется
+            // сразу к текущему хп/мп, не как длящийся бафф. Если не подошло — обычный
+            // длящийся баф/усиление (активный эффект, как у зелий) — хп/мп ИЛИ процентный
+            // (сила/стоимость заклинаний, сопротивления, скорость).
+            const heal = parseInstantHealBonus(desc);
+            if (heal) {
+                const fieldId = heal.key === 'hp' ? 'cur-hp' : 'cur-mp';
+                const maxFieldId = heal.key === 'hp' ? 'max-hp' : 'max-mp';
+                const cur = parseInt(document.getElementById(fieldId).value) || 0;
+                const max = parseInt(document.getElementById(maxFieldId).value) || 0;
+                const newVal = Math.min(max, cur + heal.value);
+                document.getElementById(fieldId).value = newVal;
+                extraMsg = ` Восстановлено ${heal.value} ${heal.key === 'hp' ? 'ХП' : 'МП'} (сейчас ${newVal}/${max}).`;
+            } else {
+                const duration = parseDurationTurns(desc);
+                const plain = parsePlainEffectBonus(desc);
+                const percentEffects = parsePercentEffects(desc);
+                if (plain || percentEffects.length) {
+                    activeTimedEffects.push({
+                        id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                        name: spellName, effectName: spellName, description: desc || '',
+                        turnsRemaining: duration,
+                        hp: plain && plain.key === 'hp' ? plain.value : 0,
+                        mp: plain && plain.key === 'mp' ? plain.value : 0,
+                        value: plain ? plain.value : 0,
+                        percentEffects: percentEffects
+                    });
+                    renderActiveEffects();
+                    extraMsg = ' Эффект применён на себя и тикает по ходам.' + (percentEffects.length ? ' (' + percentEffects.map(p => p.type + ' +' + p.value).join(', ') + ')' : '');
+                }
             }
         } else if (targetVal.indexOf('summon:') === 0) {
             // Лечение/бафф собственного существа — если получилось распарсить "+N хп", лечим напрямую.
@@ -1937,9 +1980,40 @@ window.toggleSkillPanel = function (idx) {
                 renderActiveSummonsList();
                 extraMsg = ` «${s.name}» восстановлено ${plain.value} ХП (сейчас ${s.curHp}/${s.maxHp}).`;
             }
+        } else if (allyUid) {
+            // Баф/лечение на ЧУЖОГО игрока — как и статус-эффекты от мастера, идёт через сессию
+            // (у игрока нет живого листенера на чужой документ персонажа, только на сессию;
+            // цель подхватит эффект сама через уже существующий механизм applyIncomingStatusEffects).
+            const heal = parseInstantHealBonus(desc);
+            const duration = parseDurationTurns(desc);
+            const plain = heal ? null : parsePlainEffectBonus(desc);
+            const percentEffects = heal ? [] : parsePercentEffects(desc);
+            if (window.CloudSync && typeof window.CloudSync.pushEffectToPlayer === 'function') {
+                const myName = document.getElementById('char-name').value || 'Союзник';
+                const payload = {
+                    name: myName, effectName: spellName, description: desc || '', turnsRemaining: duration
+                };
+                if (heal) {
+                    payload.instant = true;
+                    payload[heal.key] = heal.value;
+                } else {
+                    if (plain) {
+                        if (plain.key === 'hp') payload.hp = plain.value;
+                        else if (plain.key === 'mp') payload.mp = plain.value;
+                        payload.value = plain.value;
+                    }
+                    if (percentEffects.length) payload.percentEffects = percentEffects;
+                }
+                window.CloudSync.pushEffectToPlayer(allyUid, payload).catch(e => console.error('Ошибка отправки эффекта союзнику:', e));
+                if (heal) {
+                    extraMsg = ` Лечение отправлено «${allyName}» — восстановит ${heal.value} ${heal.key === 'hp' ? 'ХП' : 'МП'} сразу же.`;
+                } else if (plain || percentEffects.length) {
+                    extraMsg = ` Эффект отправлен «${allyName}» и реально применится у него.`;
+                } else {
+                    extraMsg = ' Заклинание отправлено, но точный числовой эффект не распознан по описанию — сообщи союзнику словами, что применить.';
+                }
+            }
         }
-        // targetVal.indexOf('ally:') === 0 — применить эффект на ЧУЖОГО игрока напрямую
-        // сайт пока не умеет, только фиксирует факт каста в общем боевом журнале ниже.
 
         return {
             message: `Заклинание «${spellName}» прочитано ${targetLabel}!${isFree ? ' (бесплатно, со свитка)' : ' Мана успешно списана.'}${extraMsg}`,
@@ -2121,6 +2195,7 @@ window.toggleSkillPanel = function (idx) {
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
         if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
+        if (typeof renderTradeSelects === 'function') renderTradeSelects();
         if (typeof renderTemperSelect === 'function') renderTemperSelect();
         if (typeof renderMagicStaffList === 'function') renderMagicStaffList();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
@@ -2148,6 +2223,7 @@ window.toggleSkillPanel = function (idx) {
         if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
         if (typeof renderSellList === 'function') renderSellList();
         if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
+        if (typeof renderTradeSelects === 'function') renderTradeSelects();
         if (typeof renderTemperSelect === 'function') renderTemperSelect();
         if (typeof renderMagicStaffList === 'function') renderMagicStaffList();
         if (typeof renderPouchPanel === 'function') renderPouchPanel();
@@ -2880,6 +2956,16 @@ window.toggleSkillPanel = function (idx) {
             const dualChk = document.getElementById('chk-dual-wield');
             if (dualChk) dualChk.checked = true;
         } else if (SLOT_FIELD_MAP[slot]) {
+            // Броню и одеяние нельзя носить одновременно — надевая одно, снимаем другое.
+            if (slot === 'chest' && equippedSlots.robe) {
+                document.getElementById('slot-robe-name').value = '';
+                document.getElementById('slot-robe-armor').value = 0;
+                equippedSlots.robe = null;
+            } else if (slot === 'robe' && equippedSlots.chest) {
+                document.getElementById('slot-chest-name').value = '';
+                document.getElementById('slot-chest-armor').value = 0;
+                equippedSlots.chest = null;
+            }
             document.getElementById(SLOT_FIELD_MAP[slot][0]).value = item.name;
             document.getElementById(SLOT_FIELD_MAP[slot][1]).value = item.armorValue || 0;
             equippedSlots[slot] = item.itemId;
@@ -3040,6 +3126,13 @@ window.toggleSkillPanel = function (idx) {
         const infoEl = document.getElementById('summon-template-info');
         if (!t || !infoEl) return;
         let html = '';
+        if (t.category === 'armor') {
+            html += `Броня (НАДБАВКА поверх надетого, не замена): +${t.armorBase}${t.armorEnh && t.armorEnh !== t.armorBase ? ' (усилена: +' + t.armorEnh + ')' : ''}<br>`;
+            html += `Длительность: ${t.durBase} ходов${t.durEnh ? ' (усилен: ' + t.durEnh + ')' : ''}`;
+            html += `<br><span style="opacity:.8;">Перк «Магическая броня» удваивает/утраивает эту надбавку, если кираса пустая (совсем без брони).</span>`;
+            infoEl.innerHTML = html;
+            return;
+        }
         if (t.hpBase) html += `ХП: ${t.hpBase}${t.hpEnh && t.hpEnh !== t.hpBase ? ' (усилен: ' + t.hpEnh + ')' : ''} · `;
         html += `Урон: ${t.dmgBase} (${t.dmgType})${t.dmgEnh ? ', усилен: ' + t.dmgEnh : ''}<br>`;
         if (t.permanent) {
@@ -3061,6 +3154,9 @@ window.toggleSkillPanel = function (idx) {
     // Призванное оружие занимает слот оружия (ближний/дальний в зависимости от типа),
     // призванная/наколдованная "плоть"-броня занимает кирасу — в обоих случаях старое
     // снаряжение запоминается и возвращается при роспуске/истечении времени. Одеяние не трогается.
+    // «Плоть»-заклинания (Дубовая/Каменная/Железная/Эбонитовая) — это НАДБАВКА к броне поверх
+    // того, что уже надето (как в ваниле), а не замена кирасы — реализованы отдельной веткой ниже,
+    // через активные эффекты, а не через performSummon/экипировку.
     function performSummon(t, enhanced) {
         if (t.permanent) {
             if (countInInventory(t.requiresItem) <= 0) return { ok: false, message: `Нужен предмет «${t.requiresItem}» в инвентаре.` };
@@ -3085,18 +3181,38 @@ window.toggleSkillPanel = function (idx) {
             entry.savedWeaponDmg = document.getElementById(prefix + '-dmg').value;
             document.getElementById(prefix + '-name').value = t.name;
             document.getElementById(prefix + '-dmg').value = entry.dmg;
-        } else if (t.category === 'armor') {
-            entry.savedArmorName = document.getElementById('slot-chest-name').value;
-            entry.savedArmorValue = document.getElementById('slot-chest-armor').value;
-            document.getElementById('slot-chest-name').value = t.name;
-            document.getElementById('slot-chest-armor').value = enhanced && t.armorEnh ? t.armorEnh : t.armorBase;
         }
         activeSummons.push(entry);
         renderActiveSummonsList();
         renderInventoryList();
         updateAll();
         saveLocalStorage();
-        return { ok: true, message: `Призвано/наложено: «${t.name}».` };
+        return { ok: true, message: `Призвано: «${t.name}».` };
+    }
+
+    // Заклинания «плоти» — временная НАДБАВКА к броне (складывается с тем, что надето), а не
+    // замена. Перк «Магическая броня» удваивает/утраивает её, если игрок совсем без брони
+    // (кираса пуста — а раз кираса и одеяние теперь взаимоисключающие, это покрывает и одеяние).
+    function castFleshSpell(t, enhanced) {
+        let armorValue = enhanced && t.armorEnh ? t.armorEnh : t.armorBase;
+        const perks = window.perkBonuses || {};
+        const chestArmor = parseInt(document.getElementById('slot-chest-armor').value) || 0;
+        const noArmor = chestArmor <= 0;
+        const mult = perks.magicArmorMult || 1;
+        if (noArmor && mult > 1) {
+            armorValue = Math.round(armorValue * mult);
+        }
+        activeTimedEffects.push({
+            id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+            name: t.name, effectName: t.name,
+            description: `+${armorValue} к броне (надбавка, складывается с надетым)${noArmor && mult > 1 ? ' — усилено «Магической бронёй»' : ''}`,
+            turnsRemaining: enhanced && t.durEnh ? t.durEnh : t.durBase,
+            hp: 0, mp: 0, value: 0, armor: armorValue
+        });
+        renderActiveEffects();
+        updateAll();
+        saveLocalStorage();
+        return { ok: true, message: `Наложено: «${t.name}» (+${armorValue} брони, надбавка).` };
     }
 
     function restoreSummonGear(s) {
@@ -3104,10 +3220,6 @@ window.toggleSkillPanel = function (idx) {
             const prefix = s.equipSlot === 'ranged' ? 'wep-ranged' : 'wep-melee';
             document.getElementById(prefix + '-name').value = s.savedWeaponName || '';
             document.getElementById(prefix + '-dmg').value = s.savedWeaponDmg || 0;
-        }
-        if (s.category === 'armor') {
-            document.getElementById('slot-chest-name').value = s.savedArmorName || '';
-            document.getElementById('slot-chest-armor').value = s.savedArmorValue || 0;
         }
     }
 
@@ -3121,23 +3233,28 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         const enhanced = document.getElementById('summon-enhanced-check') && document.getElementById('summon-enhanced-check').checked;
-        const res = performSummon(t, enhanced);
+        const res = t.category === 'armor' ? castFleshSpell(t, enhanced) : performSummon(t, enhanced);
         resultEl.innerHTML = res.ok ? `<span style="color:#2ecc71;">✅ ${escHtml(res.message)}</span>` : `<span style="color:#e74c3c;">${escHtml(res.message)}</span>`;
     };
 
     function renderActiveSummonsList() {
         const el = document.getElementById('active-summons-list');
-        if (!el) return;
-        if (!activeSummons.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных существ.</p>'; return; }
-        el.innerHTML = activeSummons.map(s => `
-            <div class="party-row">
-                <div class="row-name"><strong>${escHtml(s.name)}</strong><span>${s.permanent ? 'навсегда' : s.turnsRemaining + ' х. осталось'}</span></div>
-                <div style="font-size:12px; margin:2px 0;">
-                    ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:60px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
-                    ${s.dmg !== null ? `Урон: ${s.dmg} (${escHtml(s.dmgType || '')}) · ` : ''}${s.equipSlot ? '⚔️ занимает слот оружия · ' : ''}${s.category === 'armor' ? '🛡️ занимает кирасу · ' : ''}Скорость: ${s.speed} фт.
-                </div>
-                <button style="width:100%; margin-top:2px;" onclick="dismissSummon('${s.id}')">Развеять/Отпустить</button>
-            </div>`).join('');
+        if (el) {
+            if (!activeSummons.length) {
+                el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных существ.</p>';
+            } else {
+                el.innerHTML = activeSummons.map(s => `
+                    <div class="party-row">
+                        <div class="row-name"><strong>${escHtml(s.name)}</strong><span>${s.permanent ? 'навсегда' : s.turnsRemaining + ' х. осталось'}</span></div>
+                        <div style="font-size:12px; margin:2px 0;">
+                            ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:60px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
+                            ${s.dmg !== null ? `Урон: ${s.dmg} (${escHtml(s.dmgType || '')}) · ` : ''}${s.equipSlot ? '⚔️ занимает слот оружия · ' : ''}${s.category === 'armor' ? '🛡️ занимает кирасу · ' : ''}Скорость: ${s.speed} фт.
+                        </div>
+                        <button style="width:100%; margin-top:2px;" onclick="dismissSummon('${s.id}')">Развеять/Отпустить</button>
+                    </div>`).join('');
+            }
+        }
+        if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
     }
 
     window.setSummonHp = function (id, value) {
@@ -3301,10 +3418,44 @@ window.toggleSkillPanel = function (idx) {
             </div>`).join('');
     }
 
+    // Мастер наложил статус-эффект атакой НПС (паралич/страх/замедление и т.п.) — добавляем
+    // в свой собственный список активных эффектов, тикает по тем же ходам, что и баффы.
+    window.applyIncomingStatusEffects = function (effects) {
+        let names = [];
+        effects.forEach(e => {
+            if (e.instant) {
+                // Мгновенное лечение от союзника — сразу правим текущее хп/мп, не кладём как баф.
+                if (e.hp) {
+                    const cur = parseInt(document.getElementById('cur-hp').value) || 0;
+                    const max = parseInt(document.getElementById('max-hp').value) || 0;
+                    document.getElementById('cur-hp').value = Math.min(max, cur + e.hp);
+                }
+                if (e.mp) {
+                    const cur = parseInt(document.getElementById('cur-mp').value) || 0;
+                    const max = parseInt(document.getElementById('max-mp').value) || 0;
+                    document.getElementById('cur-mp').value = Math.min(max, cur + e.mp);
+                }
+                names.push(e.effectName + ' (мгновенно)');
+                return;
+            }
+            activeTimedEffects.push({
+                id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                name: e.name || 'Противник', effectName: e.effectName, description: e.description || '',
+                turnsRemaining: e.turnsRemaining || 1, hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, value: e.value || 0,
+                percentEffects: e.percentEffects || []
+            });
+            names.push(e.effectName);
+        });
+        renderActiveEffects();
+        updateAll();
+        saveLocalStorage();
+        alert(`⚠ На тебя наложено: ${names.join(', ')}!`);
+    };
+
     function getActiveEffectBonuses() {
-        let hp = 0, mp = 0;
-        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; });
-        return { hp, mp };
+        let hp = 0, mp = 0, armor = 0;
+        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; });
+        return { hp, mp, armor };
     }
 
     function tickActiveEffects() {
@@ -3336,26 +3487,85 @@ window.toggleSkillPanel = function (idx) {
 
     const ENCHANT_AUTO_APPLY_ARMOR = {
         'Повышение здоровья': 'hp', 'Повышение магии': 'mp', 'Повышение переносимого веса': 'weight',
-        'Повышение навыка: «Тяжёлая броня»': 'armor', 'Повышение навыка: «Легкая броня»': 'armor'
+        'Повышение навыка: «Тяжёлая броня»': 'armor', 'Повышение навыка: «Легкая броня»': 'armor',
+        'Сопротивление огню': 'resistFire', 'Сопротивление холоду': 'resistFrost', 'Сопротивление электричеству': 'resistShock',
+        'Сопротивление ядам': 'resistPoison', 'Сопротивление болезням': 'resistDisease', 'Сопротивление магии': 'resistMagic',
+        'Сопротивление крикам': 'resistShout'
     };
     const ENCHANT_AUTO_APPLY_WEAPON = { 'Урон огнем': true, 'Урон холодом': true, 'Урон электричеством': true };
 
-    // Разбирает простой текстовый эффект вида "+50 маны" / "+30 хп" / "+20 веса" у обычных
-    // (не зачарованных игроком) уникальных предметов — чтобы такие бонусы тоже применялись.
+    // Разбирает простой текстовый эффект вида "+50 маны" / "+30 хп" / "+20 веса" (уникальные
+    // предметы, зелья) ИЛИ "Запас магии увеличен на 25" / "здоровье повышено на 30" (заклинания
+    // и часть уникальных предметов пишут именно так, без знака "+").
     function parsePlainEffectBonus(text) {
         if (!text) return null;
-        const m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*)/i);
-        if (!m) return null;
-        const value = parseInt(m[1]);
-        const word = m[2].toLowerCase();
-        if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
-        if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
-        if (word.startsWith('вес')) return { key: 'weight', value };
+        let m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*)/i);
+        if (m) {
+            const value = parseInt(m[1]);
+            const word = m[2].toLowerCase();
+            if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
+            if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
+            if (word.startsWith('вес')) return { key: 'weight', value };
+            return null;
+        }
+        m = text.match(/(хп|здоровь\w*|мана\w*|магии|маги\w*|вес\w*)[а-я\s]{0,15}?(?:увеличен\w*|повышен\w*|возраста\w*)\s+на\s+(\d+)/i);
+        if (m) {
+            const value = parseInt(m[2]);
+            const word = m[1].toLowerCase();
+            if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
+            if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
+            if (word.startsWith('вес')) return { key: 'weight', value };
+        }
         return null;
     }
 
+    // Разовое (не длящееся) лечение — "восстанавливает N единиц здоровья/маны" без слова
+    // "увеличен"/"+" рядом означает мгновенный хил, а не постоянный бафф к максимуму.
+    // Именно так написано большинство заклинаний лечения/восстановления маны в базе.
+    function parseInstantHealBonus(text) {
+        if (!text) return null;
+        let m = text.match(/восстанавливает\s+(\d+)\s*(?:ед\.?|единиц\w*)?\s*здоровь\w*/i);
+        if (m) return { key: 'hp', value: parseInt(m[1]) };
+        m = text.match(/восстанавливает\s+(\d+)\s*(?:ед\.?|единиц\w*)?\s*(?:маг\w*|мп)/i);
+        if (m) return { key: 'mp', value: parseInt(m[1]) };
+        return null;
+    }
+
+    // Разбирает процентные/скоростные баффы заклинаний ("Аура" и им подобные): сила заклинаний,
+    // стоимость каста, сопротивления стихиям/ядам-болезням-крикам, скорость. Возвращает МАССИВ
+    // (одно заклинание может нести сразу несколько эффектов, как "Аура - Скорость").
+    function parsePercentEffects(text) {
+        if (!text) return [];
+        const found = [];
+        let m = text.match(/(?:базовую\s+)?сил[ау]\s+заклинани[йя][^.]*?на\s+(\d+)\s*%/i);
+        if (m) found.push({ type: 'spellPower', value: parseInt(m[1]) });
+        m = text.match(/сто[ий]мость\s+заклинани[йя][^.]*?на\s+(\d+)\s*%/i);
+        if (m) found.push({ type: 'spellCostReduction', value: parseInt(m[1]) });
+        m = text.match(/сопротивлени[ея]\s+стихи[ям][^.]*?на\s+(\d+)\s*%/i);
+        if (m) found.push({ type: 'resistElemental', value: parseInt(m[1]) });
+        m = text.match(/сопротивлени[ея]\s+яд[а-я]*[,\s]+болезн[а-я]*[,\s]+крик[а-я]*[^.]*?на\s+(\d+)\s*%/i);
+        if (m) found.push({ type: 'resistPoisonDiseaseShout', value: parseInt(m[1]) });
+        m = text.match(/скорост[ьи][^.]*?на\s+(\d+)\s*фут/i);
+        if (m) found.push({ type: 'speed', value: parseInt(m[1]) });
+        // "Повышает базовый урон оружия на N%" / "Увеличивает физ урон на N%" — раньше нигде не
+        // разбиралось и не применялось.
+        m = text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?урон[а-я]*\s+оружия[^.]*?на\s+(\d+)\s*%/i) ||
+            text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?физ[а-я]*\s+урон[а-я]*[^.]*?на\s+(\d+)\s*%/i);
+        if (m) found.push({ type: 'weaponDamagePercent', value: parseInt(m[1]) });
+        return found;
+    }
+
+    // Суммирует процентные/скоростные бонусы от всех активных эффектов игрока.
+    function getActivePercentBonuses() {
+        const totals = { spellPower: 0, spellCostReduction: 0, resistElemental: 0, resistPoisonDiseaseShout: 0, speed: 0, weaponDamagePercent: 0 };
+        (activeTimedEffects || []).forEach(e => {
+            (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
+        });
+        return totals;
+    }
+
     function getEquipmentEnchantBonuses() {
-        const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0 };
+        const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0, resistFire: 0, resistFrost: 0, resistShock: 0, resistPoison: 0, resistDisease: 0, resistMagic: 0, resistShout: 0 };
         ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
             const itemId = equippedSlots[slotKey];
             if (!itemId) return;
@@ -3373,6 +3583,45 @@ window.toggleSkillPanel = function (idx) {
             if (plain) bonuses[plain.key] += plain.value;
         });
         return bonuses;
+    }
+
+    // Итоговое сопротивление игрока по типам урона (%, из брони + активных зелий/эффектов + перка
+    // «Сопротивление магии»). Используется мастером при разрешении входящей атаки — без этого
+    // резисты были просто текстом в описании, ничего реально не снижали.
+    function computeTotalResistances() {
+        const gear = getEquipmentEnchantBonuses();
+        const perks = window.perkBonuses || {};
+        const percentBonuses = getActivePercentBonuses();
+        const res = {
+            physical: 0,
+            fire: gear.resistFire, frost: gear.resistFrost, shock: gear.resistShock,
+            poison: gear.resistPoison, disease: gear.resistDisease, shout: gear.resistShout,
+            magic: gear.resistMagic + (perks.resistMagicPercent || 0)
+        };
+        // "Аура" и подобные заклинания дают сопротивление стихиям (огонь/холод/электричество)
+        // ИЛИ сразу трём "прочим" типам (яд/болезни/крики) одним числом.
+        res.fire += percentBonuses.resistElemental;
+        res.frost += percentBonuses.resistElemental;
+        res.shock += percentBonuses.resistElemental;
+        res.poison += percentBonuses.resistPoisonDiseaseShout;
+        res.disease += percentBonuses.resistPoisonDiseaseShout;
+        res.shout += percentBonuses.resistPoisonDiseaseShout;
+        (activeTimedEffects || []).forEach(e => {
+            const m = matchResistEffectName(e.effectName);
+            if (m && typeof e.value === 'number') res[m] += e.value;
+        });
+        Object.keys(res).forEach(k => { res[k] = Math.min(85, Math.max(0, res[k])); }); // потолок 85%, как в ваниле
+        return res;
+    }
+
+    function matchResistEffectName(name) {
+        if (!name) return null;
+        const map = {
+            'сопротивление огню': 'fire', 'сопротивление холоду': 'frost', 'сопротивление электричеству': 'shock',
+            'сопротивление ядам': 'poison', 'сопротивление болезням': 'disease', 'сопротивление магии': 'magic',
+            'сопротивление крикам': 'shout'
+        };
+        return map[name.toLowerCase().trim()] || null;
     }
 
     function getActiveWeaponEnchantDmg(isMelee) {
@@ -4150,7 +4399,18 @@ window.toggleSkillPanel = function (idx) {
     // РАЗРЕШИТЬ АТАКУ (игрок атакует цель из активной сессии мастера)
     // ========================================================================
 
-    let pendingPlayerAttack = null; // { targetId, dmg, logText }
+    let pendingPlayerAttack = null; // { targetId, dmg, dmgType, logText }
+
+    // Определяет тип урона по названию заклинания/эффекта — для вычета резиста цели.
+    function detectDmgTypeFromName(name) {
+        const n = (name || '').toLowerCase();
+        if (/огн|пламен/.test(n)) return 'fire';
+        if (/лед|мороз|холод/.test(n)) return 'frost';
+        if (/молни|гроз|электр/.test(n)) return 'shock';
+        if (/яд|отрав/.test(n)) return 'poison';
+        if (/физическ/.test(n)) return 'physical';
+        return 'magic';
+    }
 
     // Достаёт число урона из описания заклинания (в тексте почти всегда явно
     // указано "наносит N урона" — берём первое такое совпадение).
@@ -4161,6 +4421,78 @@ window.toggleSkillPanel = function (idx) {
                   desc.match(/(\d+)\s*(?:ед\.?\s*)?урон/i);
         return m ? parseInt(m[1]) : null;
     }
+
+    // ========================================================================
+    // ПЕРЕДАЧА ПРЕДМЕТОВ/ДЕНЕГ ДРУГОМУ ИГРОКУ
+    // ========================================================================
+
+    function renderTradeSelects() {
+        const targetSelect = document.getElementById('trade-target-select');
+        const itemSelect = document.getElementById('trade-item-select');
+        if (!targetSelect || !itemSelect) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const myName = document.getElementById('char-name').value;
+        const participants = (session && session.participants) || {};
+        const others = Object.entries(participants).filter(([uid, p]) => p.name && p.name !== myName);
+        targetSelect.innerHTML = others.length
+            ? others.map(([uid, p]) => `<option value="${uid}">${escHtml(p.name)}</option>`).join('')
+            : '<option value="">Нет других игроков в сессии</option>';
+
+        itemSelect.innerHTML = playerInventory.length
+            ? playerInventory.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
+            : '<option value="">Инвентарь пуст</option>';
+    }
+    window.renderTradeSelects = renderTradeSelects;
+
+    window.tradeGoldToPlayer = function () {
+        const targetUid = document.getElementById('trade-target-select').value;
+        const amount = parseInt(document.getElementById('trade-gold-amount').value) || 0;
+        const resultEl = document.getElementById('trade-result');
+        if (!targetUid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери, кому передать.</span>'; return; }
+        if (amount <= 0) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи сумму больше нуля.</span>'; return; }
+        const goldInput = document.getElementById('char-gold');
+        const myGold = parseInt(goldInput.value) || 0;
+        if (myGold < amount) { resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
+
+        window.CloudSync.transferGoldToPlayer(targetUid, amount).then(() => {
+            goldInput.value = myGold - amount;
+            const session = window.CloudSync.getSessionData();
+            const pname = (session.participants[targetUid] || {}).name || targetUid;
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано ${amount} золота игроку ${escHtml(pname)}.</span>`;
+            if (window.CloudSync.postCombatLog) {
+                const myName = document.getElementById('char-name').value;
+                window.CloudSync.postCombatLog(`🤝 ${myName} передал(а) ${amount} золота игроку ${pname}.`, myName);
+            }
+            document.getElementById('trade-gold-amount').value = 0;
+            saveLocalStorage();
+        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
+    };
+
+    window.tradeItemToPlayer = function () {
+        const targetUid = document.getElementById('trade-target-select').value;
+        const itemId = document.getElementById('trade-item-select').value;
+        const qty = parseInt(document.getElementById('trade-item-qty').value) || 1;
+        const resultEl = document.getElementById('trade-result');
+        if (!targetUid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери, кому передать.</span>'; return; }
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item) { resultEl.innerHTML = '<span style="color:#e74c3c;">Предмет не найден.</span>'; return; }
+        if (item.count < qty) { resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
+
+        const itemData = Object.assign({}, item, { count: qty });
+        window.CloudSync.transferItemToPlayer(targetUid, itemData).then(() => {
+            removeFromInventoryByName(itemId, qty);
+            const session = window.CloudSync.getSessionData();
+            const pname = (session.participants[targetUid] || {}).name || targetUid;
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано «${escHtml(item.name)}» ×${qty} игроку ${escHtml(pname)}.</span>`;
+            if (window.CloudSync.postCombatLog) {
+                const myName = document.getElementById('char-name').value;
+                window.CloudSync.postCombatLog(`🤝 ${myName} передал(а) «${item.name}» ×${qty} игроку ${pname}.`, myName);
+            }
+            renderInventoryList();
+            renderTradeSelects();
+            saveLocalStorage();
+        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
+    };
 
     window.renderAttackTargetSelect = function () {
         const select = document.getElementById('attack-target-select');
@@ -4192,6 +4524,11 @@ window.toggleSkillPanel = function (idx) {
         el.innerHTML = html;
     };
 
+    // ========================================================================
+    // ПЕРЕДАЧА ЗОЛОТА/ПРЕДМЕТА СОЮЗНИКУ — уже реализовано выше (tradeGoldToPlayer/
+    // tradeItemToPlayer/renderTradeSelects), тут ничего дублировать не нужно.
+    // ========================================================================
+
     function renderAttackActionSelect() {
         const select = document.getElementById('attack-action-select');
         if (!select) return;
@@ -4199,6 +4536,9 @@ window.toggleSkillPanel = function (idx) {
         (customSpells || []).forEach(s => {
             const dmg = parseSpellDamageFromDesc(s.desc);
             if (dmg) opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)} (заклинание, ~${dmg} урона)</option>`;
+        });
+        (activeSummons || []).forEach(s => {
+            if (s.dmg) opts += `<option value="summon:${escHtml(s.id)}">${escHtml(s.name)} (существо, ${s.dmg} урона)</option>`;
         });
         select.innerHTML = opts;
         updateAttackActionInfo();
@@ -4321,17 +4661,12 @@ window.eatAnyFood = function (itemId) {
         return;
     }
 
-    // Если это блюдо с баффом — активируем как обычный таймэффект (по ходам)
-    if (item.alchemyEffects && item.alchemyEffects.length) {
+    // Если у блюда/еды есть эффект — активируем как обычный длящийся активный эффект
+    // (тикает по ходам, как у зелий) через ту же функцию, что уже это умеет правильно —
+    // раньше здесь был свой код, который понимал только "хп" и трактовал его как мгновенный
+    // хил, из-за чего "+N хп на M ходов" терял и M (длительность), и любые мана/другие бонусы.
+    if ((item.alchemyEffects && item.alchemyEffects.length) || item.effect) {
         activateTimedEffectFromItem(item);
-    } else if (item.effect) {
-        // Для простых блюд с текстовым эффектом — попробуем разобрать "+N хп" и т.д.
-        const plain = parsePlainEffectBonus(item.effect);
-        if (plain && plain.key === 'hp') {
-            const cur = parseInt(document.getElementById('cur-hp').value) || 0;
-            const max = parseInt(document.getElementById('max-hp').value) || 0;
-            document.getElementById('cur-hp').value = Math.min(max, cur + plain.value);
-        }
     }
 
     removeFromInventoryByName(itemId, 1);
@@ -4372,7 +4707,7 @@ function updateHungerPenalty() {
         const target = session && (session.enemies || []).find(e => e.id === targetId);
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
 
-        let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null;
+        let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null, dmgType = 'physical';
 
         if (actionVal === 'melee' || actionVal === 'ranged') {
             document.getElementById('active-combat-weapon').value = actionVal;
@@ -4387,14 +4722,24 @@ function updateHungerPenalty() {
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
-            dmg = parseSpellDamageFromDesc(spell.desc) || 0;
+            const baseDmg = parseSpellDamageFromDesc(spell.desc) || 0;
+            const spellPowerPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0;
+            dmg = Math.round(baseDmg * (1 + spellPowerPct / 100));
+            dmgType = detectDmgTypeFromName(spell.name);
             const skillName = SCHOOL_CODE_TO_SKILL[spell.school] || null;
             const statKey = skillName ? SKILL_TO_STAT[skillName] : null;
             const statInput = statKey ? document.getElementById('stat-' + statKey) : null;
             const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
             mod = calcAbilityMod(rawStat);
-            actionLabel = `заклинанием «${spell.name}»`;
+            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}`;
             skillNameForProgress = skillName;
+        } else if (actionVal.indexOf('summon:') === 0) {
+            const summon = activeSummons.find(s => s.id === actionVal.slice(7));
+            if (!summon) { alert('Существо не найдено.'); return; }
+            dmg = summon.dmg || 0;
+            dmgType = detectDmgTypeFromName(summon.dmgType || summon.name);
+            mod = 0; // у существ нет характеристик игрока — бьют "как есть"
+            actionLabel = `существом «${summon.name}»`;
         } else {
             alert('Выбери способ атаки.');
             return;
@@ -4418,7 +4763,7 @@ function updateHungerPenalty() {
         }
 
         pendingPlayerAttack = hit ? {
-            targetId, dmg,
+            targetId, dmg, dmgType,
             logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
         } : null;
 
@@ -4441,9 +4786,9 @@ function updateHungerPenalty() {
     window.applyPlayerAttackDamage = function () {
         if (!pendingPlayerAttack || !window.CloudSync) return;
         const playerName = document.getElementById('char-name') ? document.getElementById('char-name').value : 'Игрок';
-        window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText)
+        window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType)
             .then(res => {
-                alert(`Урон применён! «${res.enemyName}»: осталось ${res.newHp} HP.`);
+                alert(`Урон применён! «${res.enemyName}»: ${res.resist ? `${res.finalDmg} ед. (резист ${res.resist}%)` : res.finalDmg + ' ед.'}, осталось ${res.newHp} HP.`);
                 pendingPlayerAttack = null;
                 document.getElementById('attack-roll-result').style.display = 'none';
                 window.renderAttackTargetSelect();
@@ -4615,6 +4960,7 @@ function updateHungerPenalty() {
                          (parseInt(document.getElementById('armor-buff').value) || 0);
         if (godB.armor) totalArmor += godB.armor;
         totalArmor += equipBonuses.armor;
+        totalArmor += activeEffectBonuses.armor || 0;
         document.getElementById('armor-total').innerText = totalArmor;
 
         // Вес
@@ -4649,6 +4995,7 @@ function updateHungerPenalty() {
             }
             if (isFoodBuffChecked('Похлёбка из оленины')) speed += 5;
             if (godB.speed) speed += godB.speed;
+            speed += (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().speed : 0;
             if (isOverweight) {
                 document.getElementById('overweight-alert').style.display = 'block';
                 speed = 5;
@@ -4698,7 +5045,11 @@ function updateHungerPenalty() {
                 }
             }
 
-            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult);
+            // Активные заклинания-баффы типа «Аура - Лёгкость» снижают стоимость каста напрямую.
+            const percentBonuses = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses() : { spellCostReduction: 0 };
+            const activeBuffCostMult = Math.max(0.1, 1 - (percentBonuses.spellCostReduction || 0) / 100);
+
+            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult);
         });
 
         const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
@@ -4882,6 +5233,11 @@ function updateHungerPenalty() {
     }
 
     hitModifier -= starve * 2;
+
+    // Активные заклинания-баффы типа "Повышает урон оружия на N%" — раньше нигде не применялись.
+    const weaponDmgPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().weaponDamagePercent : 0;
+    if (weaponDmgPct) totalDmg = Math.round(totalDmg * (1 + weaponDmgPct / 100));
+
     let sneakMult = 2;
     if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
     else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
@@ -4900,6 +5256,9 @@ function updateHungerPenalty() {
     const weaponEnchantDesc = getEquippedWeaponEnchantDesc(mode === 'melee');
     if (weaponEnchantDesc) {
         finalHtml += `<div style="font-size:11px; color:#8a8171;">🔮 ${escHtml(weaponEnchantDesc)}</div>`;
+    }
+    if (weaponDmgPct) {
+        finalHtml += `<div style="font-size:11px; color:#8a8171;">✨ Активный бафф урона: +${weaponDmgPct}% (уже учтено выше)</div>`;
     }
     if (document.getElementById('chk-sneak-attack').checked) {
         finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
@@ -5017,7 +5376,8 @@ function updateHungerPenalty() {
             perkPointsAvailable: perkPointsAvailable,
             skillProgress: skillProgress,
             playerQuests: playerQuests,
-            activeSummons: activeSummons
+            activeSummons: activeSummons,
+            resistances: computeTotalResistances()
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -5296,6 +5656,7 @@ function updateHungerPenalty() {
     renderLevelPanel();
     renderAttackActionSelect();
     if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
+    renderTradeSelects();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

@@ -1016,6 +1016,16 @@
 
     // ---------- Мини-расчёт перков для калькуляторов (без полного perks.js — тут нет DOM игрока) ----------
 
+    // Статус-эффекты, которые НПС может наложить на игрока атакой — пишутся прямо в
+    // activeTimedEffects игрока и тикают по тем же ходам, что и его собственные баффы.
+    const GM_STATUS_EFFECTS = {
+        paralyze: { name: 'Паралич', desc: 'Не может действовать в свой ход.', turns: 1 },
+        fear: { name: 'Страх', desc: 'Вынужден отступать/убегать 1 ход.', turns: 1 },
+        frenzy: { name: 'Бешенство', desc: 'Атакует ближайшую цель без разбора 1 ход.', turns: 1 },
+        slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3 },
+        weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2 }
+    };
+
     const RACE_SKILL_BONUSES = {
         nord: { "Двуручное оружие": 10, "Красноречие": 5, "Легкая броня": 5, "Блокирование": 5, "Кузнечное дело": 5, "Одноручное оружие": 5 },
         altmer: { "Иллюзия": 10, "Колдовство": 5, "Разрушение": 5, "Изменение": 5, "Восстановление": 5, "Зачарование": 5 },
@@ -1345,13 +1355,14 @@
         const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
 
-        let dmg = 0, actionLabel = '';
+        let dmg = 0, dmgType = 'physical', actionLabel = '';
         if (actionVal === 'weapon') {
             dmg = enemy.weaponDmg || 0;
             actionLabel = 'оружием';
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             dmg = s ? s.dmg : 0;
+            dmgType = mapEnemyDmgType(s ? s.name : '');
             actionLabel = `заклинанием «${s ? s.name : '?'}»`;
         } else if (actionVal.indexOf('shout:') === 0) {
             const s = enemy.shouts[parseInt(actionVal.slice(6))];
@@ -1359,40 +1370,71 @@
             actionLabel = `криком «${s ? s.name : '?'}» (${s ? s.effect : ''})`;
         }
         const roll = Math.floor(Math.random() * 20) + 1;
+        const statusKey = el('gm-attack-status-select') ? el('gm-attack-status-select').value : '';
 
         pendingGmAttack = {
-            targetUid, dmg,
-            logText: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: к20=${roll}${dmg ? ', урон ' + dmg : ''}.`
+            targetUid, dmg, dmgType, statusKey, enemyName: enemy.name, targetName,
+            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: к20=${roll}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
             `Бросок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${roll}</strong><br>` +
-            (dmg ? `Урон при попадании: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед.` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
+            (dmg ? `Базовый урон: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
         resultBox.style.display = 'block';
     };
 
+    // Заклинания в enemies-data.js не хранят тип урона отдельно — определяем по названию.
+    function mapEnemyDmgType(spellName) {
+        const n = (spellName || '').toLowerCase();
+        if (/огн|пламен/.test(n)) return 'fire';
+        if (/лед|мороз|холод/.test(n)) return 'frost';
+        if (/молни|гроз|электр/.test(n)) return 'shock';
+        if (/яд|отрав/.test(n)) return 'poison';
+        return 'magic';
+    }
+
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
-        const { targetUid, dmg, logText } = pendingGmAttack;
-        if (!dmg) {
-            // Просто логируем эффект без урона (крики и т.п.)
-            gmPostLogEntryText(logText);
+        const { targetUid, dmg, dmgType, statusKey, logTextBase } = pendingGmAttack;
+        if (!dmg && !statusKey) {
+            gmPostLogEntryText(logTextBase + '.');
             pendingGmAttack = null;
             el('gm-attack-roll-result').style.display = 'none';
             return;
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
-            const newHp = Math.max(0, (parseInt(vitals[0]) || 0) - dmg);
-            vitals[0] = newHp;
-            return db.collection('characters').doc(targetUid).update({ vitals }).then(() => newHp);
-        }).then(newHp => {
-            const patch = {};
-            patch['participants.' + targetUid + '.curHp'] = newHp;
-            return db.collection('sessions').doc(currentCode).update(patch);
-        }).then(() => {
-            gmPostLogEntryText(logText);
-            alert('Урон применён игроку.');
+            const resist = (data.resistances && data.resistances[dmgType]) || 0;
+            const finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
+            let logExtra = '', newHp;
+            const chores = [];
+            if (dmg) {
+                const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
+                newHp = Math.max(0, (parseInt(vitals[0]) || 0) - finalDmg);
+                vitals[0] = newHp;
+                chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
+                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}`;
+            }
+            if (statusKey) {
+                // Статус-эффект пишется В СЕССИЮ (не в документ персонажа) — у игрока нет
+                // живого листенера на свой собственный документ, а на сессию есть, так что
+                // так эффект долетит до него сразу, без перезагрузки страницы.
+                const statusDef = GM_STATUS_EFFECTS[statusKey];
+                const patch = {};
+                patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                    name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns
+                });
+                chores.push(db.collection('sessions').doc(currentCode).update(patch));
+                logExtra += `, наложен статус «${statusDef.name}» (${statusDef.turns} х.)`;
+            }
+            return Promise.all(chores).then(() => ({ newHp, logExtra }));
+        }).then(({ newHp, logExtra }) => {
+            const chain = newHp !== undefined
+                ? db.collection('sessions').doc(currentCode).update({ ['participants.' + targetUid + '.curHp']: newHp })
+                : Promise.resolve();
+            return chain.then(() => logExtra);
+        }).then(logExtra => {
+            gmPostLogEntryText(logTextBase + logExtra + '.');
+            alert('Применено.');
             pendingGmAttack = null;
             el('gm-attack-roll-result').style.display = 'none';
         }).catch(e => alert('Ошибка: ' + e.message));
