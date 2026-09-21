@@ -197,15 +197,15 @@
     function renderParty(participants) {
         const target = el('gm-party-list');
         const uids = Object.keys(participants);
-        if (!uids.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Пока никто не присоединился.</p>'; return; }
+        if (!uids.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Пока никто не присоединился.</p>'; return; }
         target.innerHTML = uids.map(uid => {
             const p = participants[uid] || {};
             return '<div class="party-row">' +
                 '<div class="row-name"><span>' + escapeHtml(p.name || '?') + '</span></div>' +
                 '<div class="grid-2" style="gap:6px;">' +
-                '<div><label style="font-size:11px;">HP (' + (p.maxHp || 0) + ' макс.)</label>' +
+                '<div><label style="font-size:12px;">HP (' + (p.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (p.curHp || 0) + '" onchange="setParticipantField(\'' + uid + '\',\'curHp\',this.value)"></div>' +
-                '<div><label style="font-size:11px;">MP (' + (p.maxMp || 0) + ' макс.)</label>' +
+                '<div><label style="font-size:12px;">MP (' + (p.maxMp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (p.curMp || 0) + '" onchange="setParticipantField(\'' + uid + '\',\'curMp\',this.value)"></div>' +
                 '</div></div>';
         }).join('');
@@ -244,37 +244,37 @@
 
     function renderEnemies(enemies) {
         const target = el('gm-enemies-list');
-        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Противников нет.</p>'; return; }
+        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; return; }
         target.innerHTML = enemies.map(e => {
             const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
             const resistLine = resistEntries.length
-                ? '<div style="font-size:11px; opacity:.75;">Резист: ' + resistEntries.map(([k, v]) => escapeHtml(k) + ' ' + v + '%').join(', ') + '</div>' : '';
-            const dmgLine = e.weaponDmg ? '<div style="font-size:11px; opacity:.75;">Урон оружием: ' + e.weaponDmg + (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' : '';
+                ? '<div style="font-size:12px; opacity:.75;">Резист: ' + resistEntries.map(([k, v]) => escapeHtml(k) + ' ' + v + '%').join(', ') + '</div>' : '';
+            const dmgLine = e.weaponDmg ? '<div style="font-size:12px; opacity:.75;">Урон оружием: ' + e.weaponDmg + (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' : '';
             const spellsLine = (e.spells && e.spells.length)
-                ? '<div style="font-size:11px; opacity:.75;">Заклинания: ' + e.spells.map(s => escapeHtml(s.name) + ' (' + s.dmg + ' урона / ' + s.cost + ' МП)').join(', ') + '</div>' : '';
+                ? '<div style="font-size:12px; opacity:.75;">Заклинания: ' + e.spells.map(s => escapeHtml(s.name) + ' (' + s.dmg + ' урона / ' + s.cost + ' МП)').join(', ') + '</div>' : '';
             const shoutsHtml = (e.shouts && e.shouts.length)
                 ? e.shouts.map((s, si) => {
                     const cdKey = 'shoutCd_' + si;
                     const cdLeft = (e[cdKey] || 0);
-                    return '<div style="font-size:11px; margin-top:2px; padding:3px; background:var(--input-bg); border-radius:3px;">' +
+                    return '<div style="font-size:12px; margin-top:2px; padding:3px; background:var(--input-bg); border-radius:3px;">' +
                         '<strong>🗣️ ' + escapeHtml(s.name) + '</strong> (КД ' + s.cooldown + ' х.): ' + escapeHtml(s.effect) +
                         '<div style="display:flex; gap:4px; align-items:center; margin-top:2px;">' +
                         '<span>Осталось КД: ' + cdLeft + '</span>' +
-                        '<button style="width:auto; padding:1px 6px; font-size:10px;" onclick="useShout(\'' + e.id + '\',' + si + ',' + s.cooldown + ')" ' + (cdLeft > 0 ? 'disabled' : '') + '>Крикнуть</button>' +
+                        '<button style="width:auto; padding:1px 6px; font-size:11px;" onclick="useShout(\'' + e.id + '\',' + si + ',' + s.cooldown + ')" ' + (cdLeft > 0 ? 'disabled' : '') + '>Крикнуть</button>' +
                         '</div></div>';
                 }).join('') : '';
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
-                '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:11px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
+                '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
                 dmgLine + resistLine + spellsLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
-                '<div><label style="font-size:11px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
+                '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
-                '<div><label style="font-size:11px;">MP (' + (e.maxMp || 0) + ' макс.)</label>' +
+                '<div><label style="font-size:12px;">MP (' + (e.maxMp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curMp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curMp\',this.value)"></div>' +
                 '</div>' +
                 (e.isRaisable && (e.curHp || 0) <= 0
-                    ? '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:11px;">' +
+                    ? '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:12px;">' +
                       '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
                       (e.corpseLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>' : '<div style="opacity:.6;">Уже обыскан.</div>') +
                       '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' +
@@ -333,6 +333,9 @@
             if (Object.keys(currentEnemyDbPick.resist || {}).length) extra.resist = currentEnemyDbPick.resist;
             if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
             if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
+            // Только гуманоидов можно поднять заклинанием (Воины/Шаманы/Боевые маги — фалмеры
+            // и подобные; звери/монстры/ловушки — нет).
+            if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
         }
         enemies.push(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra));
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
@@ -357,11 +360,11 @@
 
     function renderInitiative(list) {
         const target = el('gm-initiative-list');
-        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Инициатива не задана.</p>'; return; }
+        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Инициатива не задана.</p>'; return; }
         const sorted = list.slice().sort((a, b) => (b.roll || 0) - (a.roll || 0));
         target.innerHTML = sorted.map((item, i) =>
             '<div class="initiative-row"><span>' + (i + 1) + '. ' + escapeHtml(item.name || '?') + ' — ' + (item.roll ?? '') + '</span>' +
-            '<button class="btn-danger" style="width:auto;padding:1px 8px;font-size:11px;" onclick="removeInitiative(\'' + item.id + '\')">×</button></div>'
+            '<button class="btn-danger" style="width:auto;padding:1px 8px;font-size:12px;" onclick="removeInitiative(\'' + item.id + '\')">×</button></div>'
         ).join('');
     }
 
@@ -712,7 +715,7 @@
         } else {
             currentRecipePlayerUid = null;
             currentPlayerKnownRecipes = [];
-            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
         }
     }
 
@@ -722,17 +725,17 @@
         if (!uid) {
             currentRecipePlayerUid = null;
             currentPlayerKnownRecipes = [];
-            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
             return;
         }
         currentRecipePlayerUid = uid;
-        el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:12px;">Загрузка...</p>';
+        el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Загрузка...</p>';
         db.collection('characters').doc(uid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             currentPlayerKnownRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
             renderRecipeChecklist();
         }).catch(e => {
-            el('recipe-checklist').innerHTML = '<p style="color:#e74c3c; font-size:12px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
+            el('recipe-checklist').innerHTML = '<p style="color:#e74c3c; font-size:13px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
         });
     };
 
@@ -742,7 +745,7 @@
         const search = (el('recipe-search').value || '').toLowerCase();
         const all = getAllSmithingRecipeNames().filter(r => r.name.toLowerCase().includes(search));
         if (!all.length) {
-            container.innerHTML = '<p style="opacity:.6; font-size:12px;">Ничего не найдено.</p>';
+            container.innerHTML = '<p style="opacity:.6; font-size:13px;">Ничего не найдено.</p>';
             return;
         }
         container.innerHTML = all.map(r => {
@@ -750,9 +753,9 @@
             const sub = r.hasOwnProperty('damage')
                 ? `${r.category || ''} · ${r.subcat || ''}`
                 : (r.slot === 'jewelry' ? 'Ювелирное' : `${r.armorType || ''} · ${r.slot || ''}`);
-            return `<label style="display:flex; align-items:center; gap:8px; padding:4px 2px; border-bottom:1px solid var(--border-color); font-size:13px;">
+            return `<label style="display:flex; align-items:center; gap:8px; padding:4px 2px; border-bottom:1px solid var(--border-color); font-size:14px;">
                 <input type="checkbox" ${checked} onchange="toggleRecipeKnown('${escapeHtml(r.name)}', this.checked)">
-                <span style="flex:1;">${escapeHtml(r.name)} <span style="opacity:.6; font-size:11px;">(${escapeHtml(sub)})</span></span>
+                <span style="flex:1;">${escapeHtml(r.name)} <span style="opacity:.6; font-size:12px;">(${escapeHtml(sub)})</span></span>
             </label>`;
         }).join('');
     };
@@ -789,7 +792,7 @@
         } else {
             currentInvPlayerUid = null;
             el('inv-gold-block').style.display = 'none';
-            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
         }
     }
 
@@ -799,11 +802,11 @@
             currentInvPlayerUid = null;
             el('inv-gold-block').style.display = 'none';
             el('inv-level-block').style.display = 'none';
-            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>';
+            el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
             return;
         }
         currentInvPlayerUid = uid;
-        el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:12px;">Загрузка...</p>';
+        el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Загрузка...</p>';
         db.collection('characters').doc(uid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             currentPlayerInvData = {
@@ -822,7 +825,7 @@
             el('inv-level-progress').textContent = `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков`;
             renderGmPlayerInventory();
         }).catch(e => {
-            el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:12px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
+            el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:13px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
         });
     };
 
@@ -906,16 +909,16 @@
         const target = el('inv-items-list');
         const items = currentPlayerInvData.inventory;
         if (!items.length) {
-            target.innerHTML = '<p style="opacity:.6; font-size:12px;">Инвентарь пуст.</p>';
+            target.innerHTML = '<p style="opacity:.6; font-size:13px;">Инвентарь пуст.</p>';
             return;
         }
         target.innerHTML = items.map(item => `
             <div class="party-row">
                 <div class="row-name">
-                    <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:11px;">(вес ${item.weight})</span>` : ''}</span>
-                    <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:11px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
+                    <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:12px;">(вес ${item.weight})</span>` : ''}</span>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
                 </div>
-                ${item.effect ? `<div style="font-size:11px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
+                ${item.effect ? `<div style="font-size:12px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
             </div>
         `).join('');
     }
@@ -1378,7 +1381,7 @@
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
             `Бросок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${roll}</strong><br>` +
-            (dmg ? `Базовый урон: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
+            (dmg ? `Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
         resultBox.style.display = 'block';
     };
 
@@ -1660,9 +1663,11 @@
         const b = lastGeneratedBandit;
         const enemies = (lastData.enemies || []).slice();
         const maxMp = b.isMage ? 50 + b.level * 5 : 0;
+        // Физический резист от брони: 10 очков брони = 1% (та же формула, что у игроков).
+        const physResist = Math.min(85, Math.round((b.armor || 0) / 10));
         enemies.push({
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp, curMp: maxMp,
-            weaponDmg: b.isMage ? 0 : b.weaponDmg, weaponNote: b.weaponNote, resist: {}, spells: b.spells || [],
+            weaponDmg: b.isMage ? 0 : b.weaponDmg, weaponNote: b.weaponNote, resist: { physical: physResist }, spells: b.spells || [],
             isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {

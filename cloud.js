@@ -206,6 +206,24 @@
             }).catch(e => console.error('Ошибка счётчика ходов сессии:', e));
         },
 
+        // Обыскивает труп самим игроком (раньше это умел делать только мастер) — забирает
+        // добычу себе и помечает труп обысканным в сессии, чтобы никто не забрал её дважды.
+        lootCorpseForSelf: function (enemyId) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) throw new Error('Противник не найден.');
+                const corpseLoot = enemies[idx].corpseLoot;
+                if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
+                enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
+                return ref.update({ enemies: enemies }).then(() => corpseLoot);
+            });
+        },
+
         // Пишет произвольную запись в общий боевой журнал сессии от имени игрока.
         postCombatLog: function (text, authorName) {
             if (!currentSessionCode || !db || !text) return Promise.resolve();
@@ -409,7 +427,7 @@
     function renderParty(participants) {
         const target = el('party-list');
         const uids = Object.keys(participants);
-        if (uids.length === 0) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Пока никого нет.</p>'; return; }
+        if (uids.length === 0) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Пока никого нет.</p>'; return; }
         target.innerHTML = uids.map(uid => {
             const p = participants[uid] || {};
             return barRow(p.name || '?', p.curHp || 0, p.maxHp || 0, p.curMp || 0, p.maxMp || 0);
@@ -418,13 +436,21 @@
 
     function renderEnemies(enemies) {
         const target = el('enemies-list');
-        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Противников нет.</p>'; return; }
-        target.innerHTML = enemies.map(e => barRow(e.name || '?', e.curHp || 0, e.maxHp || 0, e.curMp || 0, e.maxMp || 0, enemyAvatarData(e))).join('');
+        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; return; }
+        target.innerHTML = enemies.map(e => {
+            let extra = '';
+            if (e.isRaisable && (e.curHp || 0) <= 0) {
+                extra = e.corpseLoot
+                    ? '<button style="width:100%; margin-top:2px; font-size:12px;" onclick="window.playerLootCorpse(\'' + e.id + '\')">💰 Обыскать труп</button>'
+                    : '<div style="font-size:12px; opacity:.6; margin-top:2px;">Труп уже обыскан.</div>';
+            }
+            return barRow(e.name || '?', e.curHp || 0, e.maxHp || 0, e.curMp || 0, e.maxMp || 0, enemyAvatarData(e)) + extra;
+        }).join('');
     }
 
     function renderInitiative(list) {
         const target = el('initiative-list');
-        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:13px;">Инициатива не задана.</p>'; return; }
+        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Инициатива не задана.</p>'; return; }
         const sorted = list.slice().sort((a, b) => (b.roll || 0) - (a.roll || 0));
         target.innerHTML = sorted.map((item, i) =>
             '<div class="initiative-row"><span>' + (i + 1) + '. ' + escapeHtml(item.name || '?') + '</span><span>' + (item.roll ?? '') + '</span></div>'

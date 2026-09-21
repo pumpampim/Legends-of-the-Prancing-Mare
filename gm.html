@@ -16,7 +16,7 @@
 <div id="auth-overlay" class="auth-overlay">
     <div class="auth-box">
         <h2 style="margin-top:0;">Вход мастера</h2>
-        <p style="font-size:13px; opacity:.85;">Экран мастера требует аккаунт — с него создаются сессии и ведётся бой.</p>
+        <p style="font-size:15px; opacity:.85;">Экран мастера требует аккаунт — с него создаются сессии и ведётся бой.</p>
         <label>Email</label>
         <input type="email" id="auth-email" placeholder="you@example.com">
         <label>Пароль</label>
@@ -26,7 +26,7 @@
             <button class="btn-success" onclick="cloudLogin()">Войти</button>
             <button onclick="cloudRegister()">Зарегистрироваться</button>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; margin:12px 0; opacity:.6; font-size:12px;">
+        <div style="display:flex; align-items:center; gap:8px; margin:12px 0; opacity:.6; font-size:14px;">
             <div style="flex:1; height:1px; background:var(--border-color);"></div>или<div style="flex:1; height:1px; background:var(--border-color);"></div>
         </div>
         <button style="width:100%;" onclick="cloudLoginGoogle()">🔵 Войти через Google</button>
@@ -40,11 +40,11 @@
     </div>
 
     <h1><span class="skyrim-icon icon-dice" aria-hidden="true"></span> ЭКРАН МАСТЕРА — «СКУРИМ»</h1>
-    <p style="margin-top:-8px;"><a href="holds.html" target="_blank" style="color:var(--accent-color); font-size:14px;">🏰 Открыть справочник Владений (города, жители, подземелья)</a></p>
+    <p style="margin-top:-8px;"><a href="holds.html" target="_blank" style="color:var(--accent-color); font-size:16px;">🏰 Открыть справочник Владений (города, жители, подземелья)</a></p>
 
     <div id="no-session-block" class="panel" style="display:none;">
         <h2>Начать сессию</h2>
-        <p style="font-size:13px; opacity:.85;">Создай сессию и передай код игрокам.</p>
+        <p style="font-size:15px; opacity:.85;">Создай сессию и передай код игрокам.</p>
         <button class="btn-success" onclick="createSession()">Создать новую сессию</button>
     </div>
 
@@ -70,7 +70,7 @@
                     <select id="enemy-db-select" onchange="onEnemyDbPicked()">
                         <option value="">— выбрать готового противника —</option>
                     </select>
-                    <div id="enemy-db-info" style="font-size:11px; opacity:.75; margin:4px 0;"></div>
+                    <div id="enemy-db-info" style="font-size:13px; opacity:.75; margin:4px 0;"></div>
 
                     <label>Имя противника</label>
                     <input type="text" id="enemy-name-input" placeholder="Например: Волк">
@@ -85,7 +85,7 @@
 
         <div class="panel">
             <h2><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку (НПС → игрок)</h2>
-            <p style="font-size:11px; opacity:.75;">Выбери, кто из текущих противников атакует и кого из игроков — сайт бросит кубы и посчитает урон (оружие или заклинание/крик противника). Применение — отдельная кнопка.</p>
+            <p style="font-size:13px; opacity:.75;">Выбери, кто из текущих противников атакует и кого из игроков — сайт бросит кубы и посчитает урон (оружие или заклинание/крик противника). Применение — отдельная кнопка.</p>
             <label>Атакующий (противник)</label>
             <select id="gm-attack-attacker-select" onchange="onGmAttackAttackerPicked()"></select>
             <label>Цель (игрок)</label>
@@ -102,7 +102,7 @@
                 <option value="weakened">Ослабление (2 хода)</option>
             </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
-            <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
+            <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
                 <div id="gm-attack-roll-text"></div>
                 <button class="btn-success" style="width:100%; margin-top:8px;" onclick="applyGmAttackDamage()">✅ Применить к игроку</button>
             </div>
@@ -132,7 +132,7 @@
 
             <div class="panel">
                 <h2>🌤️ Время суток и погода</h2>
-                <p style="font-size:11px; opacity:.75;">Задаёт мастер — видят все игроки в сессии. Погода подбирается случайно из пула, подходящего региону.</p>
+                <p style="font-size:13px; opacity:.75;">Задаёт мастер — видят все игроки в сессии. Погода подбирается случайно из пула, подходящего региону.</p>
                 <label>Время суток</label>
                 <select id="weather-time-select">
                     <option value="Утро">Утро</option>
@@ -167,7 +167,7 @@
                     <button class="btn-success" style="flex:1;" onclick="rollWeatherForRegion()">🎲 Погода по региону</button>
                     <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
                 </div>
-                <div id="weather-gm-result" style="margin-top:6px; font-size:12px;"></div>
+                <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
         </div>
 
@@ -184,7 +184,7 @@
     </div>
     <!-- таблица -->
     <div style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px;">
-        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
             <thead style="position:sticky; top:0; background:var(--panel-bg);">
                 <tr>
                     <th>Название</th>
@@ -197,7 +197,7 @@
             <tbody id="gm-items-table-body"></tbody>
         </table>
     </div>
-    <div style="font-size:11px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
+    <div style="font-size:13px; color:#666; margin-top:4px;">Всего: <span id="gm-items-count">0</span></div>
 </div>
 
         <!-- ===== СОЗДАНИЕ СВОЕГО ПРЕДМЕТА ===== -->
@@ -275,16 +275,16 @@
             </div>
 
             <button class="btn-success" style="width:100%; margin-top:10px;" onclick="createCustomItem()">Создать и сохранить в базу</button>
-            <div id="ci-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="ci-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== ПРОВЕРКА АЛХИМИИ ===== -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Проверить зелье/яд</h2>
-            <p style="font-size:11px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам — как на 2, так и на 3 ингредиента, как у игроков. Снаряжение (гир-бонус) не учитывается.</p>
+            <p style="font-size:13px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам — как на 2, так и на 3 ингредиента, как у игроков. Снаряжение (гир-бонус) не учитывается.</p>
             <label>Игрок (для навыка/перков)</label>
             <select id="calc-alch-player"></select>
-            <div id="calc-alch-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+            <div id="calc-alch-skill-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
 
             <label>Ингредиент 1</label>
             <select id="calc-alch-ing1"></select>
@@ -293,16 +293,16 @@
             <label>Ингредиент 3 (необязательно)</label>
             <select id="calc-alch-ing3"></select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="calcAlchemyCheck()">Посчитать</button>
-            <div id="calc-alch-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="calc-alch-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== ПРОВЕРКА ЗАЧАРОВАНИЯ ===== -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-gem" aria-hidden="true"></span> Проверить зачарование</h2>
-            <p style="font-size:11px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам.</p>
+            <p style="font-size:13px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам.</p>
             <label>Игрок (для навыка/перков)</label>
             <select id="calc-ench-player"></select>
-            <div id="calc-ench-skill-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+            <div id="calc-ench-skill-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
 
             <label>Тип</label>
             <select id="calc-ench-type" onchange="renderCalcEnchEffects()">
@@ -320,26 +320,26 @@
                 <option value="Великий">Великий (150%)</option>
             </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="calcEnchantCheck()">Посчитать</button>
-            <div id="calc-ench-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="calc-ench-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== ОТКРЫТИЕ РЕЦЕПТОВ КУЗНИЦЫ ===== -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Открыть рецепты кузницы игроку</h2>
-            <p style="font-size:12px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит».</p>
+            <p style="font-size:14px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит».</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
                 <select id="recipe-player-select" style="flex:1; min-width:150px;" onchange="loadPlayerKnownRecipes()"></select>
                 <input type="text" id="recipe-search" placeholder="Поиск рецепта..." style="flex:1; min-width:150px;" oninput="renderRecipeChecklist()">
             </div>
             <div id="recipe-checklist" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; padding:6px;">
-                <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
+                <p style="opacity:.6; font-size:14px;">Выбери игрока выше.</p>
             </div>
         </div>
 
         <!-- ===== ИНВЕНТАРЬ И ДЕНЬГИ ИГРОКОВ ===== -->
         <div class="panel">
             <h2>🎒 Инвентарь и деньги игрока</h2>
-            <p style="font-size:12px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить или списать.</p>
+            <p style="font-size:14px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить или списать.</p>
             <select id="inv-player-select" style="width:100%; margin-bottom:10px;" onchange="loadPlayerInventoryForGm()"></select>
 
             <div id="inv-gold-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
@@ -353,8 +353,8 @@
 
             <div id="inv-level-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
                 <div>🎓 Уровень: <strong id="inv-level-current">1</strong> · Очков перка: <strong id="inv-perkpoints-current">0</strong></div>
-                <div id="inv-level-progress" style="font-size:12px; opacity:.8; margin:4px 0;"></div>
-                <label style="font-size:12px;">Характеристика для +1 при начислении уровня</label>
+                <div id="inv-level-progress" style="font-size:14px; opacity:.8; margin:4px 0;"></div>
+                <label style="font-size:14px;">Характеристика для +1 при начислении уровня</label>
                 <select id="inv-level-stat-choice">
                     <option value="str">Сила</option>
                     <option value="dex">Ловкость</option>
@@ -367,7 +367,7 @@
                 <button style="width:100%; margin-top:4px;" onclick="grantPerkPointOnly()">Начислить только 1 очко перка</button>
                 <button class="btn-danger" style="width:100%; margin-top:4px;" onclick="revokeLevelUp()">Понизить уровень (−1, без отмены уже взятых перков/характеристик)</button>
 
-                <label style="font-size:12px; margin-top:8px;">Понизить конкретный навык</label>
+                <label style="font-size:14px; margin-top:8px;">Понизить конкретный навык</label>
                 <select id="inv-skill-decrease-select"></select>
                 <div style="display:flex; gap:6px; margin-top:4px;">
                     <input type="number" id="inv-skill-decrease-amount" value="1" min="1" style="flex:1;">
@@ -376,7 +376,7 @@
             </div>
 
             <div id="inv-items-list" style="max-height:400px; overflow-y:auto;">
-                <p style="opacity:.6; font-size:12px;">Выбери игрока выше.</p>
+                <p style="opacity:.6; font-size:14px;">Выбери игрока выше.</p>
             </div>
         </div>
 
@@ -396,13 +396,13 @@
             <label>Награда</label>
             <input type="text" id="quest-reward-input" placeholder="Например: 200 септимов и зелье здоровья">
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantQuest()">Выдать квест</button>
-            <div id="quest-grant-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="quest-grant-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== НАГРАДА НА ВСЮ ГРУППУ ===== -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-chest" aria-hidden="true"></span> Награда на всю группу</h2>
-            <p style="font-size:11px; opacity:.75;">Выдаёт золото и/или один предмет сразу всем участникам сессии — без выбора по одному.</p>
+            <p style="font-size:13px; opacity:.75;">Выдаёт золото и/или один предмет сразу всем участникам сессии — без выбора по одному.</p>
             <label>Золото каждому</label>
             <input type="number" id="party-reward-gold" placeholder="0" value="0">
             <label>Предмет (необязательно, ищи по названию)</label>
@@ -413,7 +413,7 @@
             <label>Количество предмета каждому</label>
             <input type="number" id="party-reward-item-qty" value="1" min="1">
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantPartyReward()">Выдать всей группе</button>
-            <div id="party-reward-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="party-reward-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
@@ -427,7 +427,7 @@
                 <option value="legendary">Легендарный (ур. 13+)</option>
             </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="generateChestLoot()">🎲 Сгенерировать</button>
-            <div id="loot-gen-result" style="margin-top:8px; font-size:12px;"></div>
+            <div id="loot-gen-result" style="margin-top:8px; font-size:14px;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
                 <select id="loot-gen-target-player" style="flex:1;"></select>
                 <button style="width:auto;" onclick="grantGeneratedLoot()">Выдать</button>
@@ -437,11 +437,11 @@
         <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
         <div class="panel">
             <h2>🗡️ Генератор бандита</h2>
-            <p style="font-size:11px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь, иногда лук со стрелами или заклинания вместо оружия). ХП/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает, часть могла быть повреждена в бою.</p>
+            <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь, иногда лук со стрелами или заклинания вместо оружия). ХП/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает, часть могла быть повреждена в бою.</p>
             <label>Средний уровень группы</label>
             <input type="number" id="bandit-avg-level" value="5" min="1" max="50">
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
-            <div id="bandit-gen-result" style="margin-top:8px; font-size:12px; line-height:1.5;"></div>
+            <div id="bandit-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
         </div>
     </div>

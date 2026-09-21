@@ -401,7 +401,7 @@
 <div id="auth-overlay" class="auth-overlay">
     <div class="auth-box">
         <h2 style="margin-top:0;">«Скурим» — вход в аккаунт</h2>
-        <p style="font-size:13px; opacity:.85;">Аккаунт нужен, чтобы твой персонаж сохранялся в облаке и синхронизировался с сессией мастера. Можно и без него — но тогда только локальное сохранение в этом браузере.</p>
+        <p style="font-size:15px; opacity:.85;">Аккаунт нужен, чтобы твой персонаж сохранялся в облаке и синхронизировался с сессией мастера. Можно и без него — но тогда только локальное сохранение в этом браузере.</p>
 
         <label>Email</label>
         <input type="email" id="auth-email" placeholder="you@example.com">
@@ -415,7 +415,7 @@
             <button onclick="cloudRegister()">Зарегистрироваться</button>
         </div>
 
-        <div style="display:flex; align-items:center; gap:8px; margin:12px 0; opacity:.6; font-size:12px;">
+        <div style="display:flex; align-items:center; gap:8px; margin:12px 0; opacity:.6; font-size:14px;">
             <div style="flex:1; height:1px; background:var(--border-color);"></div>или<div style="flex:1; height:1px; background:var(--border-color);"></div>
         </div>
         <button style="width:100%;" onclick="cloudLoginGoogle()">🔵 Войти через Google</button>
@@ -516,11 +516,11 @@
                 <div class="vital-bar" style="border-color: #a02e23;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
-                        <div style="font-size:10px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
+                        <div style="font-size:12px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
                     </div>
                     <div class="vital-inputs">
                         <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
-                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <span style="font-size:22px;color:#aaa;">/</span>
                         <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
                     </div>
                 </div>
@@ -528,11 +528,11 @@
                 <div class="vital-bar" style="border-color: #3498db;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <label style="color:#3498db; margin:0;">МАНА (MP)</label>
-                        <div style="font-size:10px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
+                        <div style="font-size:12px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
                     </div>
                     <div class="vital-inputs">
                         <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
-                        <span style="font-size:20px;color:#aaa;">/</span>
+                        <span style="font-size:22px;color:#aaa;">/</span>
                         <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
                     </div>
                 </div>
@@ -540,18 +540,18 @@
                 <div class="vital-bar" style="border-color: #f1c40f;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
-                        <div style="font-size:10px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
+                        <div style="font-size:12px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
                     </div>
-                    <div style="font-size:11px; margin-top:2px; line-height:1.4;">
-                        Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
-                        Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:45px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
+                    <div style="font-size:13px; margin-top:2px; line-height:1.4;">
+                        Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
+                        Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:54px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
                         <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
                     </div>
                 </div>
             </div>
             
-            <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:12px;">
-                <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:45px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
+            <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:14px;">
+                <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
                 <div>Затраты Мудрости на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span> ед.</div>
             </div>
            <div class="day-controls">
@@ -618,7 +618,7 @@
                 <div class="slot-row">
                     <input type="text" id="ammo-name" value="Железная стрела" placeholder="Название стрел" onchange="saveLocalStorage()">
                     <input type="number" id="ammo-dmg" value="8" placeholder="Урон стрелы" onchange="updateAll(); saveLocalStorage();">
-                    <span style="width:33%; text-align:center; font-size:11px; color:#aaa;">Снаряды</span>
+                    <span style="width:33%; text-align:center; font-size:13px; color:#aaa;">Снаряды</span>
                 </div>
 
                 <label>Используемое в бою оружие (Выбор активного)</label>
@@ -652,7 +652,7 @@
 
                 <div style="background:#090907; padding:10px; border-radius:4px; margin-top:10px; border:1px solid var(--border-color);">
                     <h3 style="margin-top:0;">Расчет текущей боевой готовности</h3>
-                    <div id="combat-results" style="font-size:12px; line-height:1.4; color:var(--text-color);"></div>
+                    <div id="combat-results" style="font-size:14px; line-height:1.4; color:var(--text-color);"></div>
                 </div>
             </div>
 
@@ -693,8 +693,8 @@
                 <h2>🎒 Подсумок и ⏱️ активные эффекты</h2>
 
                 <div id="pouch-block">
-                    <p style="font-size:11px; opacity:.75;">Подсумок надевается в разделе слотов экипировки выше. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
-                    <div id="pouch-capacity-info" style="font-size:12px; margin-bottom:4px;"></div>
+                    <p style="font-size:13px; opacity:.75;">Подсумок надевается в разделе слотов экипировки выше. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
+                    <div id="pouch-capacity-info" style="font-size:14px; margin-bottom:4px;"></div>
                     <div style="display:flex; gap:6px;">
                         <select id="pouch-load-select" style="flex:1;"></select>
                         <button style="width:auto;" onclick="loadPouch()">Загрузить</button>
@@ -703,18 +703,18 @@
                 </div>
 
                 <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
-                    <div id="turn-round-display" style="font-size:14px; font-weight:bold; color:var(--accent-color); margin-bottom:6px;">Ход: 0 | Круг: 0</div>
+                    <div id="turn-round-display" style="font-size:16px; font-weight:bold; color:var(--accent-color); margin-bottom:6px;">Ход: 0 | Круг: 0</div>
                     <div style="display:flex; gap:6px;">
                         <button class="btn-success" style="flex:1;" onclick="nextTurn()">➡️ Следующий ход</button>
                         <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
                     </div>
-                    <p style="font-size:10px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
+                    <p style="font-size:12px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
                     <div id="active-timed-effects-list" style="margin-top:8px;"></div>
                 </div>
 
                 <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
-                    <div id="weather-display" style="font-size:13px; margin-bottom:6px;">🕐 День · Погоду и регион задаёт мастер</div>
-                    <p style="font-size:10px; opacity:.6;">Бонусы/штрафы от погоды — справочные, применяются вручную при бросках (мастер или ты сам решаете, когда они действуют).</p>
+                    <div id="weather-display" style="font-size:15px; margin-bottom:6px;">🕐 День · Погоду и регион задаёт мастер</div>
+                    <p style="font-size:12px; opacity:.6;">Бонусы/штрафы от погоды — справочные, применяются вручную при бросках (мастер или ты сам решаете, когда они действуют).</p>
                 </div>
             </div>
         </div>
@@ -724,7 +724,7 @@
     <div id="tab4" class="tab-content">
         <div class="panel">
             <h2>Интерактивная Книга Заклинаний и Свитки</h2>
-            <p style="font-size:11px; color:#aaa; margin-top:-8px; text-align:center;">
+            <p style="font-size:13px; color:#aaa; margin-top:-8px; text-align:center;">
                 Записывайте любые заклинания, выученные в Коллегии. Вы можете вручную изменять как базовую, так и текущую стоимость каста заклинания!
             </p>
 
@@ -734,7 +734,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-destr">
                     <div id="spells-destr-list"></div>
-                    <button class="btn" style="background:#94291f; color:white; font-size:11px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
+                    <button class="btn" style="background:#94291f; color:white; font-size:13px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','restor')">
@@ -742,7 +742,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-restor">
                     <div id="spells-restor-list"></div>
-                    <button class="btn" style="background:#1e8449; color:white; font-size:11px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
+                    <button class="btn" style="background:#1e8449; color:white; font-size:13px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','alter')">
@@ -750,7 +750,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-alter">
                     <div id="spells-alter-list"></div>
-                    <button class="btn" style="background:#f39c12; color:white; font-size:11px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
+                    <button class="btn" style="background:#f39c12; color:white; font-size:13px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','illus')">
@@ -758,7 +758,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-illus">
                     <div id="spells-illus-list"></div>
-                    <button class="btn" style="background:#8e44ad; color:white; font-size:11px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
+                    <button class="btn" style="background:#8e44ad; color:white; font-size:13px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','conj')">
@@ -766,29 +766,29 @@
                 </div>
                 <div class="profession-body" id="magic-body-conj">
                     <div id="spells-conj-list"></div>
-                    <button class="btn" style="background:#34495e; color:white; font-size:11px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
+                    <button class="btn" style="background:#34495e; color:white; font-size:13px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','summons')">
                     <span>🐺 Призванные существа</span><span id="magic-chevron-summons">▸</span>
                 </div>
                 <div class="profession-body" id="magic-body-summons">
-                    <p style="font-size:11px; opacity:.75;">Существа-оружие/зомби/питомец/атронахи держатся по ходам, как обычные баффы — тикают на «Следующий ход»/«Следующий круг» на вкладке «Проверка». Скелет-компаньон — исключение: призывается навсегда за «Кучку костей» и не истекает по времени.</p>
+                    <p style="font-size:13px; opacity:.75;">Существа-оружие/зомби/питомец/атронахи держатся по ходам, как обычные баффы — тикают на «Следующий ход»/«Следующий круг» на вкладке «Проверка». Скелет-компаньон — исключение: призывается навсегда за «Кучку костей» и не истекает по времени.</p>
                     <label>Кого призвать</label>
                     <select id="summon-template-select" onchange="updateSummonTemplateInfo()"></select>
-                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:4px;">
                         <input type="checkbox" id="summon-enhanced-check" onchange="updateSummonTemplateInfo()">
                         Усиленный вариант (если доступен для этого заклинания)
                     </label>
-                    <div id="summon-template-info" style="font-size:11px; opacity:.8; margin:4px 0 8px;"></div>
+                    <div id="summon-template-info" style="font-size:13px; opacity:.8; margin:4px 0 8px;"></div>
                     <button class="btn-success" style="width:100%;" onclick="summonCreature()">Призвать</button>
-                    <div id="summon-create-result" style="margin-top:6px; font-size:12px;"></div>
+                    <div id="summon-create-result" style="margin-top:6px; font-size:14px;"></div>
 
                     <label style="margin-top:10px;">Какой труп поднять (для «Оживление зомби»/«Оживление трупа»/«Призрак»/«Ужасный зомби»)</label>
                     <select id="corpse-raise-target-select">
                         <option value="">— автоматически (первый доступный) —</option>
                     </select>
-                    <p style="font-size:10px; opacity:.6;">Список — трупы гуманоидов (бандитов), сгенерированных мастером, убитые за последние 5 ходов и ещё не поднятые/не обысканные. Действует для каста через кнопку «Каст» на карточке заклинания в книге заклинаний.</p>
+                    <p style="font-size:12px; opacity:.6;">Список — трупы гуманоидов (бандитов), сгенерированных мастером, убитые за последние 5 ходов и ещё не поднятые/не обысканные. Действует для каста через кнопку «Каст» на карточке заклинания в книге заклинаний.</p>
 
                     <h3 style="margin-top:14px;">Активные существа</h3>
                     <div id="active-summons-list"></div>
@@ -799,12 +799,12 @@
                 <!-- Лаборатория писца -->
                 <div class="panel" style="background:#111; border-color:var(--accent-color);">
                     <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
-                    <p style="font-size:11px; color:#aaa; margin-top:-2px;">
+                    <p style="font-size:13px; color:#aaa; margin-top:-2px;">
                         Свиток можно сделать только из заклинания, которое ты знаешь (выучено на вкладках выше), и только если оно не тратит ману «за ход» (такие эффекты нельзя записать в свиток одноразово).
                     </p>
                     <label>Заклинание для свитка</label>
                     <select id="scroll-spell-select" onchange="updateScrollInfo()"></select>
-                    <div id="scroll-spell-info" style="font-size:12px; opacity:.9; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+                    <div id="scroll-spell-info" style="font-size:14px; opacity:.9; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
                     <button class="btn" onclick="craftScrollInSheet()">Начертить свиток во время отдыха</button>
                 </div>
             </div>
@@ -817,44 +817,44 @@
             <!-- Вес и ресурсы инвентаря -->
             <div class="panel">
                 <h2>🎒 Инвентарь предметов</h2>
-                <p style="font-size:11px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
+                <p style="font-size:13px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
 
                 <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
-                    <label style="font-size:12px;">👕 Надеть/взять в руки предмет из инвентаря</label>
+                    <label style="font-size:14px;">👕 Надеть/взять в руки предмет из инвентаря</label>
                     <select id="equip-item-select"></select>
                     <button class="btn-success" style="width:100%; margin-top:4px;" onclick="equipSelectedItem()">Экипировать</button>
-                    <div id="equipped-enchants-summary" style="margin-top:8px; font-size:12px;"></div>
+                    <div id="equipped-enchants-summary" style="margin-top:8px; font-size:14px;"></div>
                 </div>
 
-                <div id="price-multiplier-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                <div id="price-multiplier-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
                 <div id="player-inventory-list" style="max-height:280px; overflow-y:auto;"></div>
 
-                <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px; border:1px solid var(--border-color); font-size:13px;">
+                <div style="background:#111; padding:10px; border-radius:6px; margin-top:15px; border:1px solid var(--border-color); font-size:15px;">
                     <div class="weight-row">
                         <span>Текущая Грузоподъемность: <span id="weight-current" style="font-weight:bold; color:var(--accent-color);">0</span> / </span>
                         <span><span id="weight-max-display" style="font-weight:bold;">50</span> фунтов</span>
                     </div>
                     <div class="weight-row" style="margin-top:4px;">
-                        <label style="display:inline; font-weight:normal; font-size:12px;">
+                        <label style="display:inline; font-weight:normal; font-size:14px;">
                             <input type="checkbox" id="manual-weight-lock" onchange="updateAll(); saveLocalStorage();"> Ручная грузоподъемность (макс.)
                         </label>
-                        <input type="number" id="max-weight-input" value="50" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                        <input type="number" id="max-weight-input" value="50" style="width:75px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
                     </div>
                     <div class="weight-row" style="margin-top:4px;">
-                        <label for="extra-weight" style="display:inline; font-weight:normal; font-size:12px;">➕ Дополнительный вес (снаряжение, оружие, броня):</label>
-                        <input type="number" id="extra-weight" value="0" min="0" style="width:70px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
+                        <label for="extra-weight" style="display:inline; font-weight:normal; font-size:14px;">➕ Дополнительный вес (снаряжение, оружие, броня):</label>
+                        <input type="number" id="extra-weight" value="0" min="0" style="width:75px; padding:3px;" onchange="updateAll(); saveLocalStorage();">
                     </div>
                     <div class="alert-box" id="overweight-alert">ВНИМАНИЕ: ПЕРЕГРУЗ! Помеха на скорость (падает до 5 фт).</div>
                 </div>
 
-                <label style="margin-top:10px; font-size:13px;"><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Золотые септимы</label>
+                <label style="margin-top:10px; font-size:15px;"><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Золотые септимы</label>
                 <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
             </div>
 
             <!-- ПРОДАЖА ПРЕДМЕТОВ -->
             <div class="panel">
                 <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
-                <p style="font-size:11px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле.</p>
+                <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Накопленный объём продаж тоже прокачивает Красноречие (раз в «уровень × навык» септимов — успех) — считается автоматически, отдельно ничего нажимать не надо.</p>
 
                 <label>Кому продаём</label>
                 <select id="sell-merchant-type" onchange="renderSellList()">
@@ -865,11 +865,11 @@
                     <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
                 </select>
 
-                <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:8px;">
                     <input type="checkbox" id="sell-charm-active" onchange="renderSellList()">
                     Использовать «Очарование» (торгую с противоположным полом, +10%)
                 </label>
-                <div id="sell-charm-locked" style="font-size:11px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
+                <div id="sell-charm-locked" style="font-size:13px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
 
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
             </div>
@@ -877,14 +877,14 @@
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
             <div class="panel">
                 <h2>🤝 Передать союзнику</h2>
-                <p style="font-size:11px; opacity:.75;">Работает только внутри активной сессии мастера. Выбери, кому передавать, — этот же выбор используется и для кнопки «→» у предметов в инвентаре ниже.</p>
+                <p style="font-size:13px; opacity:.75;">Работает только внутри активной сессии мастера. Выбери, кому передавать, — этот же выбор используется и для кнопки «→» у предметов в инвентаре ниже.</p>
                 <label>Кому</label>
                 <select id="trade-target-select" onchange="renderInventoryList()"></select>
 
                 <label>Золото</label>
                 <input type="number" id="trade-gold-amount" placeholder="0" value="0" min="0">
                 <button class="btn-success" style="width:100%; margin-top:4px;" onclick="tradeGoldToPlayer()">Передать золото</button>
-                <div id="trade-result" style="margin-top:8px; font-size:12px;"></div>
+                <div id="trade-result" style="margin-top:8px; font-size:14px;"></div>
             </div>
 
             <!-- Религия, Еда, Рецепты и Заметки -->
@@ -962,7 +962,7 @@
         <!-- КВЕСТЫ -->
         <div class="panel">
             <h2>📜 Активные квесты</h2>
-            <p style="font-size:11px; opacity:.75;">Квесты выдаёт мастер. Отмечай выполненные — мастер увидит статус и сможет выдать награду.</p>
+            <p style="font-size:13px; opacity:.75;">Квесты выдаёт мастер. Отмечай выполненные — мастер увидит статус и сможет выдать награду.</p>
             <div id="quest-list"></div>
         </div>
     </div>
@@ -973,11 +973,11 @@
             <h2><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Сессия</h2>
 
             <div id="session-join-block">
-                <p style="font-size:13px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
+                <p style="font-size:15px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
                 <label>Код сессии</label>
                 <input type="text" id="session-code-input" placeholder="Например: A1B2C3" maxlength="8" style="text-transform:uppercase;">
                 <button class="btn-success" style="margin-top:8px;" onclick="joinSession()">Присоединиться</button>
-                <p style="font-size:12px; opacity:.75; margin-top:12px;">Ты мастер? Открой <a href="gm.html" target="_blank" style="color:var(--accent-color);">gm.html</a> — там создаётся сессия и код для игроков.</p>
+                <p style="font-size:14px; opacity:.75; margin-top:12px;">Ты мастер? Открой <a href="gm.html" target="_blank" style="color:var(--accent-color);">gm.html</a> — там создаётся сессия и код для игроков.</p>
                 <div id="session-join-error" class="auth-error" style="display:none;"></div>
             </div>
 
@@ -995,14 +995,14 @@
 
                 <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
                     <h4 style="margin:0 0 6px;"><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку</h4>
-                    <p style="font-size:11px; opacity:.75;">Атакуй противника напрямую: сайт бросит кубы, посчитает урон (оружие/заклинание/существо) и покажет результат. Применение урона — отдельная кнопка.</p>
+                    <p style="font-size:13px; opacity:.75;">Атакуй противника напрямую: сайт бросит кубы, посчитает урон (оружие/заклинание/существо) и покажет результат. Применение урона — отдельная кнопка.</p>
                     <label>Цель</label>
                     <select id="attack-target-select"></select>
                     <label>Чем атаковать</label>
                     <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
-                    <div id="attack-action-info" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                    <div id="attack-action-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
                     <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
-                    <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px; display:none;">
+                    <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
                         <div id="attack-roll-text"></div>
                         <button class="btn-success" style="width:100%; margin-top:8px;" id="attack-apply-btn" onclick="applyPlayerAttackDamage()">✅ Применить урон к цели</button>
                     </div>
@@ -1029,16 +1029,16 @@
             </div>
             <div class="profession-body" id="prof-body-cooking">
                 <h2><span class="skyrim-icon icon-pot" aria-hidden="true"></span> Кухня</h2>
-                <p style="font-size:12px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
+                <p style="font-size:14px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
                 <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
-                    <p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>
+                    <p style="opacity:.6; font-size:14px;">В инвентаре пока нет продуктов для готовки.</p>
                 </div>
                 <div id="kitchen-alchemy-block" style="display:none; margin-bottom:8px;">
-                    <label style="font-size:12px;"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
+                    <label style="font-size:14px;"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> «Утончённый вкус»: добавить алхимический ингредиент в блюдо (эффект — вручную, берётся первое полезное св-во)</label>
                     <input type="text" id="kitchen-alchemy-note" placeholder="Например: Белянка — уязвимость к холоду">
                 </div>
                 <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
-                <div id="kitchen-result" style="margin-top:10px; font-size:13px; line-height:1.5;"></div>
+                <div id="kitchen-result" style="margin-top:10px; font-size:15px; line-height:1.5;"></div>
             </div>
 
             <div class="profession-header" onclick="toggleProfession('smithing')">
@@ -1046,15 +1046,15 @@
             </div>
             <div class="profession-body" id="prof-body-smithing">
                 <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
-                <p style="font-size:12px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+                <p style="font-size:14px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
                 <div id="smithing-list"></div>
 
                 <h3 style="margin-top:16px;">🔧 Заточка / Улучшение</h3>
-                <p style="font-size:12px; opacity:.8;">Выбери оружие или броню из инвентаря — система сама определит нужный материал по рецепту, из которого сделан предмет, и спишет 1 шт. Улучшение зависит от навыка Кузнечного дела и профильного перка материала.</p>
+                <p style="font-size:14px; opacity:.8;">Выбери оружие или броню из инвентаря — система сама определит нужный материал по рецепту, из которого сделан предмет, и спишет 1 шт. Улучшение зависит от навыка Кузнечного дела и профильного перка материала.</p>
                 <select id="temper-item-select" onchange="updateTemperInfo()"></select>
-                <div id="temper-info" style="font-size:12px; margin:6px 0; padding:6px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+                <div id="temper-info" style="font-size:14px; margin:6px 0; padding:6px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
                 <button class="btn-success" style="width:100%;" onclick="temperItem()">Заточить/Улучшить</button>
-                <div id="temper-result" style="margin-top:8px; font-size:13px;"></div>
+                <div id="temper-result" style="margin-top:8px; font-size:15px;"></div>
             </div>
 
             <div class="profession-header" onclick="toggleProfession('enchanting')">
@@ -1062,11 +1062,11 @@
             </div>
             <div class="profession-body" id="prof-body-enchanting">
                 <h2><span class="skyrim-icon icon-gem" aria-hidden="true"></span> Зачарование брони и оружия</h2>
-                <p style="font-size:12px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
+                <p style="font-size:14px; opacity:.8;">Калькулятор: (макс. значение эффекта) × (% камня душ) × (навык «Зачарование» / 100). Зачарование брони — навсегда, зачарование оружия держится 5 дней и требует подзарядки (см. блок «Посохи» ниже для того же правила).</p>
 
                 <label>Незачарованный предмет из инвентаря (броня, украшение или оружие)</label>
                 <select id="enchant-item-select" onchange="onEnchantItemPicked()"></select>
-                <div id="enchant-item-info" style="font-size:11px; opacity:.7; margin:4px 0 8px;"></div>
+                <div id="enchant-item-info" style="font-size:13px; opacity:.7; margin:4px 0 8px;"></div>
 
                 <label>Эффект</label>
                 <select id="enchant-effect" onchange="updateEnchantCalc()"></select>
@@ -1083,13 +1083,13 @@
                 <label>Навык «Зачарование» (берётся с вкладки навыков, можно поправить)</label>
                 <input type="number" id="enchant-skill-override" placeholder="Авто с вкладки навыков" onchange="updateEnchantCalc()">
 
-                <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px;"></div>
 
                 <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
-                <div id="enchant-result" style="margin-top:10px; font-size:13px;"></div>
+                <div id="enchant-result" style="margin-top:10px; font-size:15px;"></div>
 
                 <h3 style="margin-top:16px;">🪄 Посохи</h3>
-                <p style="font-size:12px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
+                <p style="font-size:14px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
 
                 <label>Эффект нового посоха</label>
                 <select id="staff-effect" onchange="updateStaffCalc()"></select>
@@ -1103,7 +1103,7 @@
                     <option value="Великий">Великий (150%)</option>
                 </select>
 
-                <div id="staff-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <div id="staff-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px;"></div>
 
                 <button class="btn-success" style="width:100%;" onclick="createStaff()">Создать новый посох</button>
 
@@ -1111,11 +1111,11 @@
                 <div id="staff-list"></div>
 
                 <h3 style="margin-top:16px;">🪄 Магические посохи (посох-заклинатель)</h3>
-                <p style="font-size:12px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
+                <p style="font-size:14px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
                 <label>Заклинание (из выученных)</label>
                 <select id="magic-staff-spell-select"></select>
                 <button class="btn-success" style="width:100%; margin-top:6px;" onclick="createMagicStaff()">Создать посох-заклинатель</button>
-                <div id="magic-staff-create-result" style="margin-top:8px; font-size:12px;"></div>
+                <div id="magic-staff-create-result" style="margin-top:8px; font-size:14px;"></div>
 
                 <h4 style="margin-top:14px;">Твои посохи-заклинатели</h4>
                 <label>Способ подзарядки</label>
@@ -1127,7 +1127,7 @@
                 <div id="magic-staff-list" style="margin-top:6px;"></div>
 
                 <h3 style="margin-top:16px;">⚡ Зарядить зачарованное оружие</h3>
-                <p style="font-size:12px; opacity:.8;">Заряд оружия истощается со временем. Дни заряда зависят от размера камня душ: Крохотный — 1, Маленький — 3, Обычный — 5, Большой — 7, Великий — 10.</p>
+                <p style="font-size:14px; opacity:.8;">Заряд оружия истощается со временем. Дни заряда зависят от размера камня душ: Крохотный — 1, Маленький — 3, Обычный — 5, Большой — 7, Великий — 10.</p>
                 <label>Зачарованное оружие</label>
                 <select id="weapon-charge-select"></select>
                 <label>Камень душ для подзарядки</label>
@@ -1139,7 +1139,7 @@
                     <option value="Великий">Великий (10 дней)</option>
                 </select>
                 <button class="btn-success" style="width:100%; margin-top:8px;" onclick="chargeWeapon()">Зарядить</button>
-                <div id="weapon-charge-result" style="margin-top:8px; font-size:13px;"></div>
+                <div id="weapon-charge-result" style="margin-top:8px; font-size:15px;"></div>
             </div>
 
             <div class="profession-header" onclick="toggleProfession('alchemy')">
@@ -1147,19 +1147,19 @@
             </div>
             <div class="profession-body" id="prof-body-alchemy">
                 <h2>🌿 Собрать ингредиенты</h2>
-                <p style="font-size:12px; opacity:.8;">Находит 1-3 ингредиента в зависимости от региона, погоды и времени суток, которые задал мастер (вкладка «Сессия»). Некоторые ингредиенты (части монстров, трофеи) при сборе не попадаются — их можно получить только с трупов врагов.</p>
+                <p style="font-size:14px; opacity:.8;">Находит 1-3 ингредиента в зависимости от региона, погоды и времени суток, которые задал мастер (вкладка «Сессия»). Некоторые ингредиенты (части монстров, трофеи) при сборе не попадаются — их можно получить только с трупов врагов.</p>
                 <button class="btn-success" style="width:100%;" onclick="gatherIngredients()">🌿 Собрать</button>
-                <div id="gather-result" style="margin-top:8px; font-size:13px;"></div>
+                <div id="gather-result" style="margin-top:8px; font-size:15px;"></div>
 
                 <h2 style="margin-top:16px;">🍽️ Съесть ингредиент</h2>
-                <p style="font-size:12px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
+                <p style="font-size:14px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
                 <select id="alch-eat-select" style="width:100%;"></select>
-                <div id="alch-eat-info" style="font-size:12px; opacity:.85; margin:6px 0;"></div>
+                <div id="alch-eat-info" style="font-size:14px; opacity:.85; margin:6px 0;"></div>
                 <button class="btn-success" style="width:100%;" onclick="eatIngredient()">Съесть</button>
-                <div id="alch-eat-result" style="margin-top:8px; font-size:13px;"></div>
+                <div id="alch-eat-result" style="margin-top:8px; font-size:15px;"></div>
 
                 <h3 style="margin-top:16px;">⚗️ Варка зелья / яда</h3>
-                <p style="font-size:12px; opacity:.8;">Выбери 2 или 3 ингредиента из инвентаря. Если у них нет общих свойств — варево не получится (ингредиенты всё равно расходуются). Новые совпавшие свойства сразу становятся известны.</p>
+                <p style="font-size:14px; opacity:.8;">Выбери 2 или 3 ингредиента из инвентаря. Если у них нет общих свойств — варево не получится (ингредиенты всё равно расходуются). Новые совпавшие свойства сразу становятся известны.</p>
                 <label>Ингредиент 1</label>
                 <select id="alch-ing-0" onchange="updateBrewPreview()"></select>
                 <label>Ингредиент 2</label>
@@ -1167,11 +1167,11 @@
                 <label>Ингредиент 3 (необязательно)</label>
                 <select id="alch-ing-2" onchange="updateBrewPreview()"></select>
 
-                <div id="alch-gear-info" style="font-size:11px; opacity:.7; margin-top:6px;"></div>
-                <div id="alch-brew-preview" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:13px;"></div>
+                <div id="alch-gear-info" style="font-size:13px; opacity:.7; margin-top:6px;"></div>
+                <div id="alch-brew-preview" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px;"></div>
 
                 <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
-                <div id="alch-brew-result" style="margin-top:10px; font-size:13px;"></div>
+                <div id="alch-brew-result" style="margin-top:10px; font-size:15px;"></div>
 
                 <h3 style="margin-top:16px;"><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Известные свойства ингредиентов</h3>
                 <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
@@ -1184,7 +1184,7 @@
     <div id="tab10" class="tab-content">
         <div class="panel">
             <h2><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросок кубов</h2>
-            <p style="font-size:12px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
+            <p style="font-size:14px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
 
             <label>Навык проверки</label>
             <select id="dice-skill" onchange="onDiceSkillPicked()">
@@ -1201,7 +1201,7 @@
                 <option value="wis">Мудрость</option>
                 <option value="cha">Харизма</option>
             </select>
-            <div id="dice-stat-info" style="font-size:11px; opacity:.7; margin:-4px 0 6px;"></div>
+            <div id="dice-stat-info" style="font-size:13px; opacity:.7; margin:-4px 0 6px;"></div>
 
             <label>Кубик</label>
             <select id="dice-type">
@@ -1217,18 +1217,18 @@
             <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
 
             <div id="dice-result" style="margin-top:14px; padding:12px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
-                <div style="font-size:32px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
-                <div style="font-size:12px; opacity:.75;" id="dice-result-formula"></div>
-                <div style="font-size:14px; font-weight:bold; margin-top:4px;" id="dice-result-verdict"></div>
+                <div style="font-size:34px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
+                <div style="font-size:14px; opacity:.75;" id="dice-result-formula"></div>
+                <div style="font-size:16px; font-weight:bold; margin-top:4px;" id="dice-result-verdict"></div>
             </div>
 
             <h3 style="margin-top:16px;">Журнал бросков</h3>
-            <div id="dice-history" style="max-height:220px; overflow-y:auto; font-size:12px;"></div>
+            <div id="dice-history" style="max-height:220px; overflow-y:auto; font-size:14px;"></div>
         </div>
 
         <div class="panel">
             <h2>🔓 Взлом замка</h2>
-            <p style="font-size:12px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф (−2 до −5 в зависимости от ступени), если не открыт соответствующий перк «Взломщик-...».</p>
+            <p style="font-size:14px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф (−2 до −5 в зависимости от ступени), если не открыт соответствующий перк «Взломщик-...».</p>
 
             <label>Сложность замка</label>
             <select id="lock-tier" onchange="updateLockInfo()">
@@ -1238,21 +1238,21 @@
                 <option value="3">Эксперт (Сложность 17, порог навыка 75)</option>
             </select>
 
-            <div id="lock-info" style="font-size:12px; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+            <div id="lock-info" style="font-size:14px; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
 
             <button class="btn-success" style="width:100%;" onclick="attemptLockpick()">🔓 Взломать</button>
-            <div id="lock-result" style="margin-top:10px; font-size:14px; text-align:center; font-weight:bold;"></div>
+            <div id="lock-result" style="margin-top:10px; font-size:16px; text-align:center; font-weight:bold;"></div>
         </div>
 
         <div class="panel">
             <h2>🎓 Прокачка персонажа</h2>
-            <p style="font-size:11px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап = уровень×2+2.</p>
+            <p style="font-size:13px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап = уровень×2+2.</p>
 
             <div id="level-summary" style="padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
 
             <div id="levelup-ready-block" style="display:none; padding:8px; background:#2ecc7122; border:1px solid #2ecc71; border-radius:4px; margin-bottom:10px;">
                 <div style="font-weight:bold; color:#2ecc71;">🎉 Готов новый уровень!</div>
-                <label style="font-size:12px;">Какую характеристику поднять на 1?</label>
+                <label style="font-size:14px;">Какую характеристику поднять на 1?</label>
                 <select id="levelup-stat-choice">
                     <option value="str">Сила</option>
                     <option value="dex">Ловкость</option>
@@ -1289,6 +1289,7 @@
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
     let activeSummons = []; // [{ id, category, name, curHp, maxHp, dmg, dmgType, speed, turnsRemaining, permanent }]
+    let speechTradeVolume = 0; // накопленная сумма продаж/покупок — раз в "уровень × Красноречие" септимов даёт +1 успех навыка
 
     // Шаблоны призываемых/поднимаемых существ. Урон/хп/длительность оружия и трупов —
     // цифры прямо из описаний заклинаний (магия.xlsx). Атронахи в файлах даны только
@@ -1430,10 +1431,10 @@ let daysWithoutFood = 0;
                 <div class="perk-item">
                     <div class="perk-row">
                         <div class="perk-left">
-                            <span style="color:#cfc5b6; font-size:12px;">${p.name}</span>
+                            <span style="color:#cfc5b6; font-size:14px;">${p.name}</span>
                         </div>
                         <div class="perk-steps">
-                            ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:10px; opacity:0.6;">(1-${p.steps})</span>` : ''}
+                            ${stepsHtml} ${p.steps > 1 ? `<span style="font-size:12px; opacity:0.6;">(1-${p.steps})</span>` : ''}
                         </div>
                     </div>
                     ${p.desc ? `<div class="perk-desc">${p.desc}</div>` : ''}
@@ -1460,7 +1461,7 @@ let daysWithoutFood = 0;
                 </div>
                 <div class="skill-body" id="skill-body-${idx}" style="display:none;">
                     ${hint}
-                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : '<p style="font-size:12px;opacity:.6;">У этого навыка нет ветки перков.</p>'}
+                    ${pList.length > 0 ? `<div class="perks-list"><strong>Ветка талантов:</strong>${perksHtml}</div>` : '<p style="font-size:14px;opacity:.6;">У этого навыка нет ветки перков.</p>'}
                 </div>
             </div>
         `;
@@ -1725,20 +1726,20 @@ window.toggleSkillPanel = function (idx) {
                     <select class="spell-name-select" style="width:55%; font-weight:bold; padding:2px;" onchange="onSpellPicked('${id}', '${school}')">
                         ${buildSpellOptions(school, isCustomName ? null : name)}
                     </select>
-                    <div style="width:40%; text-align:right; font-size:11px;">
-                        База MP: <input type="number" value="${baseCost}" class="spell-base" style="width:40px; padding:1px; display:inline;" min="0" onchange="saveSpellsAndRefresh()">
+                    <div style="width:40%; text-align:right; font-size:13px;">
+                        База MP: <input type="number" value="${baseCost}" class="spell-base" style="width:46px; padding:1px; display:inline;" min="0" onchange="saveSpellsAndRefresh()">
                     </div>
                 </div>
                 <input type="text" value="${escHtml(name)}" class="spell-name-custom" placeholder="Название заклинания..." style="width:100%; font-weight:bold; padding:2px; margin-bottom:4px; display:${isCustomName || !name ? 'block' : 'none'};" onchange="saveSpellsAndRefresh()">
-                <textarea class="spell-desc" rows="2" style="font-size:11px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
-                <select class="spell-target-select" style="width:100%; font-size:11px; margin-bottom:4px; padding:2px;" onfocus="populateSpellTargetSelect(this)">
+                <textarea class="spell-desc" rows="2" style="font-size:13px; margin-bottom:4px; padding:2px;" onchange="saveSpellsAndRefresh()">${desc}</textarea>
+                <select class="spell-target-select" style="width:100%; font-size:13px; margin-bottom:4px; padding:2px;" onfocus="populateSpellTargetSelect(this)">
                     <option value="self">Цель: на себя</option>
                 </select>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
-                    <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:40px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
-                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
-                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:10px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>
-                    <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:10px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
+                    <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:46px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>
+                    <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:12px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
                 </div>
             </div>
         `;
@@ -1941,6 +1942,8 @@ window.toggleSkillPanel = function (idx) {
                         turnsRemaining: duration,
                         hp: plain && plain.key === 'hp' ? plain.value : 0,
                         mp: plain && plain.key === 'mp' ? plain.value : 0,
+                        armor: plain && plain.key === 'armor' ? plain.value : 0,
+                        speed: plain && plain.key === 'speed' ? plain.value : 0,
                         value: plain ? plain.value : 0,
                         percentEffects: percentEffects
                     });
@@ -1977,6 +1980,8 @@ window.toggleSkillPanel = function (idx) {
                     if (plain) {
                         if (plain.key === 'hp') payload.hp = plain.value;
                         else if (plain.key === 'mp') payload.mp = plain.value;
+                        else if (plain.key === 'armor') payload.armor = plain.value;
+                        else if (plain.key === 'speed') payload.speed = plain.value;
                         payload.value = plain.value;
                     }
                     if (percentEffects.length) payload.percentEffects = percentEffects;
@@ -2099,7 +2104,7 @@ window.toggleSkillPanel = function (idx) {
         if (knownTier) {
             html += `<div>Круг: ${tierNames[knownTier]} (Мудрость на свиток: ${knownTier})</div>`;
         } else {
-            html += `<label style="font-size:11px; margin-top:4px;">Своё заклинание — укажи круг вручную</label>
+            html += `<label style="font-size:13px; margin-top:4px;">Своё заклинание — укажи круг вручную</label>
                 <select id="scroll-manual-tier" onchange="updateScrollManualTierLabel()">
                     <option value="1">Новичок (Мудрость: 1)</option>
                     <option value="2">Ученик (Мудрость: 2)</option>
@@ -2304,7 +2309,7 @@ window.toggleSkillPanel = function (idx) {
 
         const sellable = playerInventory.filter(i => i.price);
         if (!sellable.length) {
-            listEl.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет вещей с ценой для продажи.</p>';
+            listEl.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет вещей с ценой для продажи.</p>';
             return;
         }
         listEl.innerHTML = sellable.map(item => {
@@ -2316,17 +2321,31 @@ window.toggleSkillPanel = function (idx) {
             return `
             <div class="party-row">
                 <div class="row-name">
-                    <span>${escHtml(item.name)} <span style="opacity:.6; font-size:11px;">(есть: ${item.count})</span></span>
+                    <span>${escHtml(item.name)} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
                     <span>${unitPrice} септ./шт.${noteHtml}</span>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
-                    <input type="number" id="sell-qty-${escHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:55px;">
+                    <input type="number" id="sell-qty-${escHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:65px;">
                     <button class="btn-success" style="flex:1;" onclick="sellItem('${escHtml(item.itemId)}')">Продать</button>
                 </div>
             </div>`;
         }).join('');
     }
     window.renderSellList = renderSellList;
+
+    // Каждый раз, когда через торговлю (продажа/покупка) проходит достаточно золота —
+    // "уровень персонажа × эффективное Красноречие" септимов — засчитывается 1 успех навыка,
+    // как будто поторговался достаточно, чтобы это ощутимо прокачало болтливость.
+    function trackSpeechTrade(amount) {
+        if (!amount || amount <= 0) return;
+        speechTradeVolume += amount;
+        const speech = getEffectiveSkillValue('Красноречие');
+        const threshold = Math.max(50, characterLevel * speech);
+        while (speechTradeVolume >= threshold) {
+            speechTradeVolume -= threshold;
+            if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Красноречие');
+        }
+    }
 
     window.sellItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
@@ -2344,6 +2363,7 @@ window.toggleSkillPanel = function (idx) {
         removeFromInventoryByName(itemId, qty);
         const goldInput = document.getElementById('char-gold');
         goldInput.value = (parseInt(goldInput.value) || 0) + total;
+        trackSpeechTrade(total);
 
         renderSellList();
         renderInventoryList();
@@ -2392,30 +2412,30 @@ window.toggleSkillPanel = function (idx) {
             infoEl.textContent = `💬 Красноречие ${speech} × (1 + перки ${Math.round(perkBonus*100)}% + раса ${Math.round(raceBonus*100)}%) → цена = база × ${mult.toFixed(2)}`;
         }
         if (!playerInventory.length) {
-            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Инвентарь пуст.</p>';
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">Инвентарь пуст.</p>';
             return;
         }
         const tradeTargetEl = document.getElementById('trade-target-select');
         const hasTradeTarget = tradeTargetEl && tradeTargetEl.value;
         el.innerHTML = playerInventory.map(item => {
             const priceInfo = item.price
-                ? `<span style="color:var(--accent-color); font-size:11px;"> · ${getDisplayPrice(item.price)} септ. <span style="opacity:.5;">(база ${item.price})</span></span>`
+                ? `<span style="color:var(--accent-color); font-size:13px;"> · ${getDisplayPrice(item.price)} септ. <span style="opacity:.5;">(база ${item.price})</span></span>`
                 : '';
             return `
             <div class="stat-block" style="align-items:flex-start;">
                 <span>
                     <strong>${escHtml(item.name)}</strong> × ${item.count}
-                    ${item.weight ? `<span style="opacity:.6; font-size:11px;"> (вес ${item.weight} / шт.)</span>` : ''}
+                    ${item.weight ? `<span style="opacity:.6; font-size:13px;"> (вес ${item.weight} / шт.)</span>` : ''}
                     ${priceInfo}
-                    ${item.effect ? `<br><span style="font-size:11px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
+                    ${item.effect ? `<br><span style="font-size:13px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
                 </span>
                                <span style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
-                    ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
-                    ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
-                    ${item.category === 'Свиток' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:11px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
-                    ${hasTradeTarget ? `<button style="width:auto; padding:2px 8px; font-size:11px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку">→</button>` : ''}
-                    <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
-                    <button style="width:auto; padding:2px 8px; font-size:11px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
+                    ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
+                    ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
+                    ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
+                    ${hasTradeTarget ? `<button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку">→</button>` : ''}
+                    <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
+                    <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
                 </span>
             </div>
         `;
@@ -2427,15 +2447,15 @@ window.toggleSkillPanel = function (idx) {
         if (!el) return;
         const cookable = playerInventory.filter(i => window.cookingIngredients && window.cookingIngredients.hasOwnProperty(i.itemId));
         if (!cookable.length) {
-            el.innerHTML = '<p style="opacity:.6; font-size:12px;">В инвентаре пока нет продуктов для готовки.</p>';
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">В инвентаре пока нет продуктов для готовки.</p>';
             return;
         }
         el.innerHTML = cookable.map(item => {
             const sel = potSelections[item.itemId] || 0;
             return `
             <div class="stat-block">
-                <span>${escHtml(item.name)} <span style="opacity:.6; font-size:11px;">(есть: ${item.count})</span></span>
-                <input type="number" min="0" max="${item.count}" value="${sel}" style="width:55px;"
+                <span>${escHtml(item.name)} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
+                <input type="number" min="0" max="${item.count}" value="${sel}" style="width:65px;"
                     onchange="setPotQty('${escHtml(item.itemId)}', this.value, ${item.count})">
             </div>`;
         }).join('');
@@ -2551,7 +2571,7 @@ window.toggleSkillPanel = function (idx) {
         if (!el) return;
         const known = getAllSmithingRecipes().filter(r => knownSmithingRecipes.includes(r.name));
         if (!known.length) {
-            el.innerHTML = '<p style="opacity:.7; font-size:13px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
+            el.innerHTML = '<p style="opacity:.7; font-size:15px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
             return;
         }
         el.innerHTML = known.map((r, idx) => {
@@ -2570,10 +2590,10 @@ window.toggleSkillPanel = function (idx) {
             } else {
                 statLine = `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`;
             }
-            const perkNote = !hasMatPerk ? `<div style="font-size:11px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : '';
+            const perkNote = !hasMatPerk ? `<div style="font-size:13px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : '';
             return `<div class="party-row">
-                <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:11px; opacity:.7;">${escHtml(statLine)}</span></div>
-                <div style="font-size:12px; margin:4px 0;">${ingList}</div>
+                <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:13px; opacity:.7;">${escHtml(statLine)}</span></div>
+                <div style="font-size:14px; margin:4px 0;">${ingList}</div>
                 ${perkNote}
                 <button class="btn-success" style="width:100%;" ${canMake ? '' : 'disabled'} onclick="craftSmithingItem(${idx})">Сковать</button>
             </div>`;
@@ -2716,15 +2736,15 @@ window.toggleSkillPanel = function (idx) {
         const gemCount = countInInventory(soulGem + ' камень душ');
         const calc = window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses);
 
-        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
+        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:14px;">${escHtml(effect.description)}</div>`;
         if (calc.boolean) {
             html += `<div style="margin-top:6px;">Эффект без числовой величины (вкл/выкл).</div>`;
         } else {
-            html += `<div style="margin-top:6px; font-size:16px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
-            html += `<div style="font-size:11px; opacity:.6;">При навыке ${skill} и камне «${escHtml(soulGem)}» (макс. по таблице: ${effect.maxValue}${effect.unit})</div>`;
+            html += `<div style="margin-top:6px; font-size:18px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
+            html += `<div style="font-size:13px; opacity:.6;">При навыке ${skill} и камне «${escHtml(soulGem)}» (макс. по таблице: ${effect.maxValue}${effect.unit})</div>`;
         }
         if (gemCount === 0) {
-            html += `<div style="color:#e74c3c; margin-top:4px; font-size:12px;">⚠ В инвентаре нет камня душ «${escHtml(soulGem)}» — сначала попроси у мастера.</div>`;
+            html += `<div style="color:#e74c3c; margin-top:4px; font-size:14px;">⚠ В инвентаре нет камня душ «${escHtml(soulGem)}» — сначала попроси у мастера.</div>`;
         }
         resultEl.innerHTML = html;
     }
@@ -2788,11 +2808,11 @@ window.toggleSkillPanel = function (idx) {
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
         const calc = window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks());
-        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:12px;">${escHtml(effect.description)}</div>`;
+        let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:14px;">${escHtml(effect.description)}</div>`;
         html += calc.boolean
             ? `<div style="margin-top:6px;">Эффект без числовой величины.</div>`
-            : `<div style="margin-top:6px; font-size:16px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
-        if (gemCount === 0) html += `<div style="color:#e74c3c; margin-top:4px; font-size:12px;">⚠ Нет камня душ «${escHtml(soulGem)}» в инвентаре.</div>`;
+            : `<div style="margin-top:6px; font-size:18px; font-weight:bold; color:var(--accent-color);">${calc.value}${calc.unit ? ' ' + escHtml(calc.unit) : ''}</div>`;
+        if (gemCount === 0) html += `<div style="color:#e74c3c; margin-top:4px; font-size:14px;">⚠ Нет камня душ «${escHtml(soulGem)}» в инвентаре.</div>`;
         resultEl.innerHTML = html;
     }
     window.updateStaffCalc = updateStaffCalc;
@@ -2825,11 +2845,11 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('staff-list');
         if (!el) return;
         const staves = playerInventory.filter(i => i.isStaff);
-        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Посохов пока нет.</p>'; return; }
+        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:14px;">Посохов пока нет.</p>'; return; }
         el.innerHTML = staves.map(s => `
             <div class="party-row">
-                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:11px;">Заряд: ${s.chargeDaysLeft} дн.</span></div>
-                <div style="font-size:12px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
+                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:13px;">Заряд: ${s.chargeDaysLeft} дн.</span></div>
+                <div style="font-size:14px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
                 <div style="display:flex; gap:6px;">
                     <button style="flex:1;" onclick="advanceStaffDay('${escHtml(s.itemId)}')" ${s.chargeDaysLeft <= 0 ? 'disabled' : ''}>−1 день</button>
                     <button class="btn-success" style="flex:1;" onclick="rechargeStaff('${escHtml(s.itemId)}')">Перезарядить (камень душ)</button>
@@ -3057,7 +3077,7 @@ window.toggleSkillPanel = function (idx) {
                 lines.push(`<div>🔮 <strong>${escHtml(item.name)}</strong>: ${escHtml(desc)}</div>`);
             }
         });
-        el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:12px;">Зачарованных/особых предметов не надето.</p>';
+        el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:14px;">Зачарованных/особых предметов не надето.</p>';
     }
 
     // ========================================================================
@@ -3079,15 +3099,15 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('quest-list');
         if (!el) return;
         if (!playerQuests.length) {
-            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Пока нет активных квестов.</p>';
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">Пока нет активных квестов.</p>';
             return;
         }
         el.innerHTML = playerQuests.map(q => `
             <div class="party-row" style="opacity:${q.status === 'done' ? 0.6 : 1};">
                 <div class="row-name"><strong>${escHtml(q.title)}</strong><span>${q.status === 'done' ? '✅ Выполнен' : '⏳ Активен'}</span></div>
-                <div style="font-size:12px; margin:2px 0;">${escHtml(q.desc || '')}</div>
-                ${q.requirement ? `<div style="font-size:11px; opacity:.8;">🎯 Нужно: ${escHtml(q.requirement)}</div>` : ''}
-                ${q.reward ? `<div style="font-size:11px; opacity:.8;">🎁 Награда: ${escHtml(q.reward)}</div>` : ''}
+                <div style="font-size:14px; margin:2px 0;">${escHtml(q.desc || '')}</div>
+                ${q.requirement ? `<div style="font-size:13px; opacity:.8;">🎯 Нужно: ${escHtml(q.requirement)}</div>` : ''}
+                ${q.reward ? `<div style="font-size:13px; opacity:.8;">🎁 Награда: ${escHtml(q.reward)}</div>` : ''}
                 ${q.status !== 'done' ? `<button style="width:100%; margin-top:4px;" onclick="markQuestDone('${escHtml(q.id)}')">Отметить выполненным</button>` : ''}
             </div>`).join('');
     }
@@ -3243,13 +3263,13 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('active-summons-list');
         if (el) {
             if (!activeSummons.length) {
-                el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных существ.</p>';
+                el.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет активных существ.</p>';
             } else {
                 el.innerHTML = activeSummons.map(s => `
                     <div class="party-row">
                         <div class="row-name"><strong>${escHtml(s.name)}</strong><span>${s.permanent ? 'навсегда' : s.turnsRemaining + ' х. осталось'}</span></div>
-                        <div style="font-size:12px; margin:2px 0;">
-                            ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:60px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
+                        <div style="font-size:14px; margin:2px 0;">
+                            ${s.maxHp ? `ХП: <input type="number" value="${s.curHp}" style="width:65px; display:inline;" onchange="setSummonHp('${s.id}', this.value)"> / ${s.maxHp} · ` : ''}
                             ${s.dmg !== null ? `Урон: ${s.dmg} (${escHtml(s.dmgType || '')}) · ` : ''}${s.equipSlot ? '⚔️ занимает слот оружия · ' : ''}${s.category === 'armor' ? '🛡️ занимает кирасу · ' : ''}Скорость: ${s.speed} фт.
                         </div>
                         <button style="width:100%; margin-top:2px;" onclick="dismissSummon('${s.id}')">Развеять/Отпустить</button>
@@ -3314,13 +3334,13 @@ window.toggleSkillPanel = function (idx) {
             ? pouchContents.map((entry, idx) => `
                 <div class="party-row">
                     <div class="row-name"><span>${escHtml(entry.name)}</span></div>
-                    <div style="font-size:11px; opacity:.8; margin:2px 0;">${escHtml(entry.effect || '')}</div>
+                    <div style="font-size:13px; opacity:.8; margin:2px 0;">${escHtml(entry.effect || '')}</div>
                     <div style="display:flex; gap:6px;">
                         <button class="btn-success" style="flex:1;" onclick="drinkFromPouch(${idx})">Выпить</button>
                         <button style="flex:1;" onclick="returnFromPouch(${idx})">Убрать обратно</button>
                     </div>
                 </div>`).join('')
-            : '<p style="opacity:.6; font-size:12px;">Подсумок пуст.</p>';
+            : '<p style="opacity:.6; font-size:14px;">Подсумок пуст.</p>';
     }
 
     window.loadPouch = function () {
@@ -3415,7 +3435,7 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('active-timed-effects-list');
         if (!el) return;
         if (!activeTimedEffects.length) {
-            el.innerHTML = '<p style="opacity:.6; font-size:12px;">Нет активных эффектов.</p>';
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет активных эффектов.</p>';
             return;
         }
         el.innerHTML = activeTimedEffects.map(e => `
@@ -3447,7 +3467,7 @@ window.toggleSkillPanel = function (idx) {
             activeTimedEffects.push({
                 id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                 name: e.name || 'Противник', effectName: e.effectName, description: e.description || '',
-                turnsRemaining: e.turnsRemaining || 1, hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, value: e.value || 0,
+                turnsRemaining: e.turnsRemaining || 1, hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, speed: e.speed || 0, value: e.value || 0,
                 percentEffects: e.percentEffects || []
             });
             names.push(e.effectName);
@@ -3510,7 +3530,7 @@ window.toggleSkillPanel = function (idx) {
     // и часть уникальных предметов пишут именно так, без знака "+").
     function parsePlainEffectBonus(text) {
         if (!text) return null;
-        let m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*|скорост\w*)/i);
+        let m = text.match(/\+\s*(\d+)\s*(хп|здоровь\w*|мана\w*|маны|магии|маги\w*|вес\w*|скорост\w*|брон\w*|класс\w*\s+брони)/i);
         if (m) {
             const value = parseInt(m[1]);
             const word = m[2].toLowerCase();
@@ -3518,15 +3538,17 @@ window.toggleSkillPanel = function (idx) {
             if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
             if (word.startsWith('вес')) return { key: 'weight', value };
             if (word.startsWith('скорост')) return { key: 'speed', value };
+            if (word.startsWith('брон') || word.startsWith('класс')) return { key: 'armor', value };
             return null;
         }
-        m = text.match(/(хп|здоровь\w*|мана\w*|магии|маги\w*|вес\w*)[а-я\s]{0,15}?(?:увеличен\w*|повышен\w*|возраста\w*)\s+на\s+(\d+)/i);
+        m = text.match(/(хп|здоровь\w*|мана\w*|магии|маги\w*|вес\w*|брон\w*)[а-я\s]{0,15}?(?:увеличен\w*|повышен\w*|возраста\w*)\s+на\s+(\d+)/i);
         if (m) {
             const value = parseInt(m[2]);
             const word = m[1].toLowerCase();
             if (word.startsWith('хп') || word.startsWith('здоровь')) return { key: 'hp', value };
             if (word.startsWith('ман') || word.startsWith('маги')) return { key: 'mp', value };
             if (word.startsWith('вес')) return { key: 'weight', value };
+            if (word.startsWith('брон')) return { key: 'armor', value };
         }
         return null;
     }
@@ -3607,8 +3629,11 @@ window.toggleSkillPanel = function (idx) {
         const gear = getEquipmentEnchantBonuses();
         const perks = window.perkBonuses || {};
         const percentBonuses = getActivePercentBonuses();
+        // Физический резист от брони: каждые 10 очков суммарной брони = 1% (как договорились) —
+        // раньше тут стоял захардкоженный 0, броня вообще не снижала физический урон.
+        const totalArmor = parseInt((document.getElementById('armor-total') || {}).innerText) || 0;
         const res = {
-            physical: 0,
+            physical: Math.round(totalArmor / 10),
             fire: gear.resistFire, frost: gear.resistFrost, shock: gear.resistShock,
             poison: gear.resistPoison, disease: gear.resistDisease, shout: gear.resistShout,
             magic: gear.resistMagic + (perks.resistMagicPercent || 0)
@@ -3909,7 +3934,7 @@ window.toggleSkillPanel = function (idx) {
 
         let html = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: «${escHtml(itemName)}» (${totalPrice} септ.)</div>`;
         html += `<div style="opacity:.85; margin-top:4px;">${escHtml(desc)}</div>`;
-        if (isMixed) html += `<div style="color:#e67e22; margin-top:4px; font-size:12px;">⚠ В варианте есть и положительные, и отрицательные свойства — сам реши, зелье это или яд (оба эффекта сохранятся).</div>`;
+        if (isMixed) html += `<div style="color:#e67e22; margin-top:4px; font-size:14px;">⚠ В варианте есть и положительные, и отрицательные свойства — сам реши, зелье это или яд (оба эффекта сохранятся).</div>`;
         resultEl.innerHTML = html;
 
         renderAlchIngredientSelects();
@@ -3928,7 +3953,7 @@ window.toggleSkillPanel = function (idx) {
                 ? `<span style="color:#2ecc71;">${escHtml(e)}</span>`
                 : `<span style="opacity:.4;">???</span>`
             ).join(', ');
-            return `<div class="party-row"><div class="row-name"><strong>${escHtml(name)}</strong></div><div style="font-size:12px;">${propsHtml}</div></div>`;
+            return `<div class="party-row"><div class="row-name"><strong>${escHtml(name)}</strong></div><div style="font-size:14px;">${propsHtml}</div></div>`;
         }).join('');
     }
     window.renderKnownIngredients = renderKnownIngredients;
@@ -4169,18 +4194,18 @@ window.toggleSkillPanel = function (idx) {
     function renderSkillProgressList() {
         const el = document.getElementById('skill-progress-list');
         if (!el) return;
-        el.innerHTML = skillNames.map((name, idx) => {
+        el.innerHTML = '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px;">' + skillNames.map((name, idx) => {
             // Читаем то же самое отображаемое значение поля навыка (skill-N.value), что видно
             // на вкладке «Ветки перков» — гарантирует, что два места всегда показывают одно число.
             const skillInput = document.getElementById('skill-' + idx);
             const effVal = skillInput ? (parseInt(skillInput.value) || getEffectiveSkillValue(name)) : getEffectiveSkillValue(name);
             const needed = getSuccessesNeededForSkill(effVal);
             const progress = skillProgress[idx] || 0;
-            return `<div class="party-row">
-                <div class="row-name"><span>${escHtml(name)} (${effVal})</span><span>${progress} / ${needed}</span></div>
-                <button style="width:100%; margin-top:2px;" onclick="logSkillSuccess(${idx})">+1 успех</button>
+            return `<div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:4px; padding:4px 6px;">
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
+                <button style="width:auto; flex-shrink:0; padding:2px 8px; margin:0;" onclick="logSkillSuccess(${idx})">+1</button>
             </div>`;
-        }).join('');
+        }).join('') + '</div>';
     }
 
     // Обёртка для автоматической фиксации успеха по имени навыка (крафт/каст) —
@@ -4369,11 +4394,11 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('magic-staff-list');
         if (!el) return;
         const staves = playerInventory.filter(i => i.isMagicStaff);
-        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:12px;">Посохов-заклинателей пока нет.</p>'; return; }
+        if (!staves.length) { el.innerHTML = '<p style="opacity:.6; font-size:14px;">Посохов-заклинателей пока нет.</p>'; return; }
         el.innerHTML = staves.map(s => `
             <div class="party-row">
-                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:11px;">Заряды: ${s.usesLeft} / ${s.maxUses}</span></div>
-                <div style="font-size:12px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
+                <div class="row-name"><strong>${escHtml(s.name)}</strong><span style="font-size:13px;">Заряды: ${s.usesLeft} / ${s.maxUses}</span></div>
+                <div style="font-size:14px; opacity:.85; margin:2px 0;">${escHtml(s.effect || '')}</div>
                 <div style="display:flex; gap:6px;">
                     <button class="btn-success" style="flex:1;" onclick="useMagicStaff('${escHtml(s.itemId)}')" ${s.usesLeft <= 0 ? 'disabled' : ''}>Использовать</button>
                     <button style="flex:1;" onclick="rechargeMagicStaff('${escHtml(s.itemId)}')" ${s.usesLeft >= s.maxUses ? 'disabled' : ''}>Зарядить</button>
@@ -4539,7 +4564,7 @@ window.toggleSkillPanel = function (idx) {
         const weatherKey = session.currentWeather || 'clear';
         const weather = WEATHER_TYPES[weatherKey] || WEATHER_TYPES.clear;
         let html = `🕐 <strong>${escHtml(period)}</strong> · 📍 ${escHtml(session.currentRegion)}${session.currentHold ? ' (' + escHtml(session.currentHold) + ')' : ''} · ${weather.name}`;
-        if (weather.effect) html += `<div style="font-size:11px; opacity:.75; margin-top:2px;">${escHtml(weather.effect)}</div>`;
+        if (weather.effect) html += `<div style="font-size:13px; opacity:.75; margin-top:2px;">${escHtml(weather.effect)}</div>`;
         el.innerHTML = html;
     };
 
@@ -4811,7 +4836,7 @@ function updateHungerPenalty() {
         let html = `<strong>Игрок:</strong> 1d20 (${playerRoll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${playerTotal}</strong><br>` +
             `<strong>Мастер:</strong> 1d20 = <strong style="color:var(--accent-color);">${gmRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>`;
         if (hit) {
-            html += `<strong style="color:#2ecc71;">✅ Попадание!</strong> Урон: <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
+            html += `<strong style="color:#2ecc71;">✅ Попадание!</strong> Урон: <span style="color:#e74c3c; font-size:17px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
         } else {
             html += `<strong style="color:#e74c3c;">❌ Промах.</strong>`;
         }
@@ -4835,6 +4860,30 @@ function updateHungerPenalty() {
                 window.renderAttackTargetSelect();
             })
             .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Обыск трупа самим игроком — раньше это умел делать только мастер, что было неудобно.
+    window.playerLootCorpse = function (enemyId) {
+        if (!window.CloudSync) return;
+        window.CloudSync.lootCorpseForSelf(enemyId).then(corpseLoot => {
+            (corpseLoot.items || []).forEach(it => {
+                addToInventory(it.name, it.name, 1, it.weight || 0, it.category || '', it.effect || '', {
+                    slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price
+                });
+            });
+            if (corpseLoot.gold) {
+                const goldInput = document.getElementById('char-gold');
+                goldInput.value = (parseInt(goldInput.value) || 0) + corpseLoot.gold;
+            }
+            const myName = document.getElementById('char-name').value;
+            if (window.CloudSync.postCombatLog) {
+                window.CloudSync.postCombatLog(`💀 ${myName} обыскал(а) труп и забрал(а) добычу.`, myName);
+            }
+            alert(`Найдено: 💰${corpseLoot.gold || 0} золота` + (corpseLoot.items || []).map(i => ', ' + i.name).join(''));
+            renderInventoryList();
+            updateAll();
+            saveLocalStorage();
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
 
     function restoreAll() {
@@ -5285,21 +5334,21 @@ function updateHungerPenalty() {
 
     let finalHtml = `
         <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
-        <div style="font-size:11px; opacity:.75; margin:2px 0;">Формула: ${formulaParts.join(' + ')} = ${formulaSum}${mode === 'melee' && wepType !== 'unarmed' ? ' (до силовой атаки/бонусов перков)' : ''}</div>
-        <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:15px; font-weight:bold;">${totalDmg}</span> ед.<br>
+        <div style="font-size:13px; opacity:.75; margin:2px 0;">Формула: ${formulaParts.join(' + ')} = ${formulaSum}${mode === 'melee' && wepType !== 'unarmed' ? ' (до силовой атаки/бонусов перков)' : ''}</div>
+        <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:17px; font-weight:bold;">${totalDmg}</span> ед.<br>
     `;
     const weaponEnchantDesc = getEquippedWeaponEnchantDesc(mode === 'melee');
     if (weaponEnchantDesc) {
-        finalHtml += `<div style="font-size:11px; color:#8a8171;">🔮 ${escHtml(weaponEnchantDesc)}</div>`;
+        finalHtml += `<div style="font-size:13px; color:#8a8171;">🔮 ${escHtml(weaponEnchantDesc)}</div>`;
     }
     if (weaponDmgPct) {
-        finalHtml += `<div style="font-size:11px; color:#8a8171;">✨ Активный бафф урона: +${weaponDmgPct}% (уже учтено выше)</div>`;
+        finalHtml += `<div style="font-size:13px; color:#8a8171;">✨ Активный бафф урона: +${weaponDmgPct}% (уже учтено выше)</div>`;
     }
     if (document.getElementById('chk-sneak-attack').checked) {
         finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
     }
     if (infoNotes.length) {
-        finalHtml += `<div style="margin-top:6px; font-size:11px; color:#c9b896; line-height:1.5;">${infoNotes.join('<br>')}</div>`;
+        finalHtml += `<div style="margin-top:6px; font-size:13px; color:#c9b896; line-height:1.5;">${infoNotes.join('<br>')}</div>`;
     }
 
     document.getElementById('combat-results').innerHTML = finalHtml;
@@ -5411,7 +5460,8 @@ function updateHungerPenalty() {
             skillProgress: skillProgress,
             playerQuests: playerQuests,
             activeSummons: activeSummons,
-            resistances: computeTotalResistances()
+            resistances: computeTotalResistances(),
+            speechTradeVolume: speechTradeVolume
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -5537,6 +5587,7 @@ function updateHungerPenalty() {
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
             playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
             activeSummons = Array.isArray(data.activeSummons) ? data.activeSummons : [];
+            speechTradeVolume = parseInt(data.speechTradeVolume) || 0;
             renderActiveSummonsList();
             renderQuestList();
 

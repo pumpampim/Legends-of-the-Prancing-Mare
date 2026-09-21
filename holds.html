@@ -17,7 +17,7 @@
             border-radius: 6px;
             margin-bottom: 8px;
             font-weight: bold;
-            font-size: 17px;
+            font-size: 19px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -31,18 +31,18 @@
             border-radius: 5px;
             padding: 8px 10px;
             margin-bottom: 6px;
-            font-size: 13px;
+            font-size: 15px;
         }
         .npc-card strong, .loc-card strong { color: var(--accent-color); }
-        .loc-meta { font-size: 12px; margin-top: 4px; line-height: 1.5; }
+        .loc-meta { font-size: 14px; margin-top: 4px; line-height: 1.5; }
         .loc-meta .lbl { opacity: .7; }
         .section-sub-header {
-            font-size: 14px;
+            font-size: 16px;
             margin: 14px 0 8px;
             padding-bottom: 4px;
             border-bottom: 1px solid var(--border-color);
         }
-        .empty-hold { opacity: .6; font-size: 13px; padding: 10px; }
+        .empty-hold { opacity: .6; font-size: 15px; padding: 10px; }
     </style>
 </head>
 <body>
@@ -50,9 +50,9 @@
 <div class="container" style="max-width: 900px; margin: 0 auto; padding: 16px;">
     <h1 style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
         <span>🏰 Владения Скайрима — справочник мастера</span>
-        <a href="gm.html" style="font-size:13px; color:var(--accent-color);">← Назад к экрану мастера</a>
+        <a href="gm.html" style="font-size:15px; color:var(--accent-color);">← Назад к экрану мастера</a>
     </h1>
-    <p style="font-size:13px; opacity:.8;">Города, жители (с ролями/профессиями) и подземелья/точки интереса каждого владения. Данные о жителях и названиях мест — из исходной таблицы владений; описания подземелий (враги, награда, особенности вроде рудных жил или кузни внутри) мастер дополняет сам по ходу подготовки — большинство пока пустые, заполняй перед сессией.</p>
+    <p style="font-size:15px; opacity:.8;">Города, жители (с ролями/профессиями) и подземелья/точки интереса каждого владения. Данные о жителях и названиях мест — из исходной таблицы владений; описания подземелий (враги, награда, особенности вроде рудных жил или кузни внутри) мастер дополняет сам по ходу подготовки — большинство пока пустые, заполняй перед сессией.</p>
 
     <input type="text" id="hold-search" placeholder="Поиск по имени NPC или локации во всех владениях..." style="margin-bottom:16px;">
 
@@ -101,11 +101,11 @@
                     <strong>${esc(l.name)}</strong>
                     ${l.desc ? `<div style="margin-top:3px;">${esc(l.desc)}</div>` : ''}
                     <div class="loc-meta">
-                        <label style="font-size:11px; opacity:.7; margin-top:4px;">⚔️ Враги (какие и сколько)</label>
+                        <label style="font-size:13px; opacity:.7; margin-top:4px;">⚔️ Враги (какие и сколько)</label>
                         <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="enemies" value="${esc(dyn.enemies || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
-                        <label style="font-size:11px; opacity:.7; margin-top:4px;">💰 Лут</label>
+                        <label style="font-size:13px; opacity:.7; margin-top:4px;">💰 Лут</label>
                         <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="loot" value="${esc(dyn.loot || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
-                        <label style="font-size:11px; opacity:.7; margin-top:4px;">✨ Особенности (рудная жила, кузня, алхимическая станция, неотмеченная локация рядом...)</label>
+                        <label style="font-size:13px; opacity:.7; margin-top:4px;">✨ Особенности (рудная жила, кузня, алхимическая станция, неотмеченная локация рядом...)</label>
                         <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="features" value="${esc(dyn.features || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
                     </div>
                 </div>`;
