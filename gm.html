@@ -149,6 +149,13 @@
                     <option value="Равнина">Равнина</option>
                     <option value="Подземелье">Подземелье</option>
                 </select>
+                <label>Сезон (Задача H — влияет на то, какая погода чаще выпадает)</label>
+                <select id="weather-season-select">
+                    <option value="Зима">❄️ Зима</option>
+                    <option value="Весна">🌸 Весна</option>
+                    <option value="Лето" selected>☀️ Лето</option>
+                    <option value="Осень">🍂 Осень</option>
+                </select>
                 <label>Владение (для сбора ингредиентов алхимиками — необязательно)</label>
                 <select id="weather-hold-select">
                     <option value="">— не указано —</option>
@@ -168,6 +175,54 @@
                     <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
                 </div>
                 <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
+            </div>
+
+            <!-- ===== ЖИВЫЕ ТОРГОВЦЫ (Задача C) ===== -->
+            <div class="panel">
+                <h2>🏪 Живые торговцы</h2>
+                <p style="font-size:12px; opacity:.75;">Обновляет ассортимент (10-20 товаров) и сбрасывает золото торговца до базового. Жми раз в игровую неделю (или когда посчитаешь нужным) — старый ассортимент вместе с текущим золотом торговца заменяется новым.</p>
+                <label>Тип торговца</label>
+                <select id="merchant-type-select"></select>
+                <label>Владение</label>
+                <select id="merchant-hold-select"></select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="refreshMerchantStock()">🔄 Обновить ассортимент</button>
+                <div id="merchant-gen-result" style="margin-top:8px; font-size:13px;"></div>
+            </div>
+
+            <!-- ===== ПРАЗДНИК ВРУЧНУЮ (Задача F) ===== -->
+            <div class="panel">
+                <h2>🎉 Запустить праздник вручную</h2>
+                <p style="font-size:12px; opacity:.75;">Праздники по дате и так подсвечиваются у игроков автоматически (если календарь совпадает) — это для случая, когда хочешь запустить эффект праздника независимо от текущей даты на листе игрока.</p>
+                <select id="holiday-manual-select"></select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="launchHolidayManually()">🎉 Запустить</button>
+                <button style="width:100%; margin-top:4px;" onclick="clearActiveHoliday()">Остановить активный праздник</button>
+                <div id="holiday-gm-result" style="margin-top:8px; font-size:13px;"></div>
+            </div>
+
+            <!-- ===== ГРУППОВОЙ БРОСОК (Задача I.1) ===== -->
+            <div class="panel">
+                <h2>🎲 Групповой бросок</h2>
+                <p style="font-size:12px; opacity:.75;">Все игроки в сессии получают запрос кинуть указанный навык. Каждый бросает у себя (d20+модификатор+бонусы навыка), результат сразу виден здесь.</p>
+                <label>Навык</label>
+                <select id="group-check-skill-select"></select>
+                <label>Порог сложности (необязательно — просто для твоей подсказки, кто прошёл)</label>
+                <input type="number" id="group-check-dc" placeholder="Например 15">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="requestGroupCheck()">📣 Запросить у всех</button>
+                <div id="group-check-results" style="margin-top:8px; font-size:13px;"></div>
+            </div>
+
+            <!-- ===== КООПЕРАТИВНАЯ АТАКА (Задача I.2) ===== -->
+            <div class="panel">
+                <h2>⚔️ Кооперативная атака</h2>
+                <p style="font-size:12px; opacity:.75;">Двое игроков бьют одну цель одновременно — один общий бросок, урон обоих оружий складывается.</p>
+                <label>Игрок 1</label>
+                <select id="coop-player1-select"></select>
+                <label>Игрок 2</label>
+                <select id="coop-player2-select"></select>
+                <label>Цель</label>
+                <select id="coop-target-select"></select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="rollCoopAttack()">🎲 Бросить кооперативную атаку</button>
+                <div id="coop-attack-result" style="margin-top:8px; font-size:13px;"></div>
             </div>
         </div>
 
@@ -380,6 +435,28 @@
             </div>
         </div>
 
+        <!-- ===== ГИЛЬДИИ (Задача B) ===== -->
+        <div class="panel">
+            <h2>🏛️ Гильдии</h2>
+            <p style="font-size:12px; opacity:.75;">Счётчик выполненных заказов по каждой гильдии — использует того же игрока, что выбран выше в панели инвентаря.</p>
+            <div id="guilds-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
+        </div>
+
+        <!-- ===== СВЕРХЪЕСТЕСТВЕННОЕ (Задача B) ===== -->
+        <div class="panel">
+            <h2>🌙 Сверхъестественное</h2>
+            <p style="font-size:12px; opacity:.75;">Ликантропия/вампиризм того же выбранного игрока.</p>
+            <div id="supernatural-panel-body"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
+        </div>
+
+        <!-- ===== РЕПУТАЦИЯ ПО ВЛАДЕНИЯМ (Задача D, видно только мастеру) ===== -->
+        <div class="panel">
+            <h2>⚖️ Репутация по владениям</h2>
+            <p style="font-size:12px; opacity:.75;">Видно только мастеру — игрок свою репутацию не видит. Может быть отрицательной.</p>
+            <div id="reputation-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="saveReputation()">Сохранить</button>
+        </div>
+
         <!-- ===== ВЫДАЧА КВЕСТОВ ===== -->
         <div class="panel">
             <h2>📜 Выдать квест</h2>
@@ -395,6 +472,17 @@
             <input type="text" id="quest-req-input" placeholder="Например: найти и вернуть амулет">
             <label>Награда</label>
             <input type="text" id="quest-reward-input" placeholder="Например: 200 септимов и зелье здоровья">
+            <label>От гильдии (необязательно — если квест гильдии, выполнение даст +1 к её прогрессу)</label>
+            <select id="quest-guild-select">
+                <option value="">— не привязан к гильдии —</option>
+                <option value="Гильдия воров">Гильдия воров</option>
+                <option value="Соратники">Соратники</option>
+                <option value="Коллегия магов">Коллегия магов</option>
+                <option value="Тёмное братство">Тёмное братство</option>
+                <option value="Стража Рассвета">Стража Рассвета</option>
+                <option value="Бойцовский клуб">Бойцовский клуб</option>
+                <option value="Коллегия бардов">Коллегия бардов</option>
+            </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantQuest()">Выдать квест</button>
             <div id="quest-grant-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
@@ -450,6 +538,7 @@
 <script src="firebase-config.js"></script>
 <script src="items-data.js"></script>
 <script src="smithing-data.js"></script>
+<script src="holidays-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>
 <script src="spell-data.js"></script>

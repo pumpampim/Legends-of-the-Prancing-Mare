@@ -190,6 +190,8 @@
         populateQuestTargetSelect();
         populateGmAttackSelects();
         populateLootTargetSelect();
+        if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
+        if (typeof populateCoopSelects === 'function') populateCoopSelects();
     }
 
     // ---------- Отряд ----------
@@ -796,6 +798,287 @@
         }
     }
 
+    // ---------- Гильдии и Сверхъестественное ----------
+    const GUILD_NAMES = ['Гильдия воров', 'Соратники', 'Коллегия магов', 'Тёмное братство', 'Стража Рассвета', 'Бойцовский клуб', 'Коллегия бардов'];
+    const REPUTATION_HOLDS = ['Вайтран', 'Рифт', 'Хаафингар', 'Хьялмарк', 'Истмарк', 'Фолкрит', 'Предел', 'Белый Берег', 'Винтерхолд'];
+    const HIRCINE_TOTEMS = ['— нет —', 'Тотем Охоты', 'Тотем Братства', 'Тотем Страха'];
+    // Из Фракции.xlsx, лист "Соратники" — настоящие пороги по количеству съеденных сердец,
+    // раньше был примитивный ручной счётчик "ранг" без всякой связи со способностями.
+    const WEREWOLF_BASE_INFO = 'Раз в сутки на 4 часа: +50 хп, +100 переносимого веса, когти 20 урона (+5 каждые 4 ур. персонажа), +20 скорости';
+    const WEREWOLF_ABILITIES = [
+        { name: 'Звериная сила I', threshold: 5, desc: '+25% урона в форме зверя' },
+        { name: 'Звериная сила II', threshold: 7, desc: '+50% урона в форме зверя' },
+        { name: 'Звериная сила III', threshold: 11, desc: '+75% урона в форме зверя' },
+        { name: 'Звериная сила IV', threshold: 21, desc: '+100% урона в форме зверя' },
+        { name: 'Тотем ледяных братьев', threshold: 15, desc: 'Тотем Братства воем созывает снежных волков' },
+        { name: 'Тотем ужаса', threshold: 15, desc: 'Жуткий вой действует даже на существ выше уровнем (до 18 lvl)' },
+        { name: 'Вечный голод', threshold: 15, desc: 'Время превращения увеличено вдвое (8 часов)' },
+        { name: 'Тотем хищника', threshold: 20, desc: 'Тотем Охоты охватывает весь данж/200 футов, показывает состояние врагов' },
+        { name: 'Жадность в еде', threshold: 20, desc: 'Пожирание трупа восстанавливает вдвое больше здоровья' },
+        { name: 'Тотем луны', threshold: 25, desc: 'Тотем Братства воем созывает вервольфов' },
+        { name: 'Животная энергия', threshold: 27, desc: '+100 хп в форме зверя' }
+    ];
+    // Из Фракции.xlsx, лист "Cтража рассвета и Вампиры" — реальный список, раньше был выдуман
+    // мной с нуля. E19 "Обычный вампиризм" — базовые бонусы САМОГО заражения (даются автоматом,
+    // не чекбоксом): +2 харизма, +1 ловкость, +1 сила, бесплатное заклинание высасывания
+    // (5хп/ход) и бесплатное "Подъём сильного трупа" (160хп, 30 урона). Ниже — уже отдельная,
+    // куда более редкая ступень "Вампир-лорд" (F20-F30), которая открывается не всем — только
+    // с помощью Харкона/Караны/Валерики при высоких значениях определённых навыков.
+    const VAMPIRE_BASE_INFO = '+2 харизма, +1 ловкость, +1 сила · бесплатное заклинание высасывания здоровья (5 хп/ход) · бесплатное "Подъём сильного трупа" (160 хп, 30 урона)';
+    const VAMPIRE_ABILITIES = [
+        { name: 'Сила Могилы', desc: '+50 к здоровью и магии в форме вампира-лорда', prereq: null },
+        { name: 'Хватка вампира', desc: 'Магия крови — притянуть и придушить живое существо с < 10% здоровья', prereq: 'Сила Могилы' },
+        { name: 'Вызов гаргульи', desc: 'Магия крови — призвать гаргулью-союзника', prereq: 'Сила Могилы, Хватка вампира' },
+        { name: 'Трупное проклятье', desc: 'Магия крови — парализовать противника на 4 его хода (Сл. спасброска 17+мудрость)', prereq: 'Сила Могилы, Вызов гаргульи' },
+        { name: 'Обнаружение существ', desc: 'Сила ночи — обнаружение всех существ, включая двемерских автоматонов', prereq: 'Сила Могилы' },
+        { name: 'Туманная форма', desc: 'Сила ночи — неуязвимое туманное облако на 3 ваших хода (нельзя наносить/получать урон)', prereq: 'Сила Могилы, Обнаружение существ' },
+        { name: 'Сверхъестественные рефлексы', desc: 'Сила ночи — следующие 4 атаки получают +4 к кубам', prereq: 'Сила Могилы, Туманная форма' },
+        { name: 'Лечение кровью', desc: 'Убийство укусом/силовой атакой восстанавливает 50% ХП', prereq: 'Сила Могилы' },
+        { name: 'Неземные желания', desc: '+4 ячейки заклинаний Сил ночи и Магии крови', prereq: 'Сила Могилы' },
+        { name: 'Ядовитые когти', desc: 'Рукопашные атаки наносят +20 урона ядом', prereq: 'Сила Могилы' },
+        { name: 'Плащ ночи', desc: 'Перманентная стая летучих мышей наносит 10 урона врагам в ход', prereq: 'Сила Могилы, Неземные желания или Ядовитые когти' }
+    ];
+
+    function defaultGuildsData() {
+        const d = {};
+        GUILD_NAMES.forEach(g => { d[g] = 0; });
+        return d;
+    }
+
+    function defaultReputationData() {
+        const d = {};
+        REPUTATION_HOLDS.forEach(h => { d[h] = 0; });
+        return d;
+    }
+
+    let currentReputationData = defaultReputationData();
+
+    function renderReputationPanel() {
+        const listEl = el('reputation-list');
+        if (!listEl) return;
+        if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
+        listEl.innerHTML = REPUTATION_HOLDS.map(h => `
+            <div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                <span>${escapeHtml(h)}</span>
+                <span style="display:flex; align-items:center; gap:4px;">
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${escapeHtml(h)}', -1)">−1</button>
+                    <input type="number" value="${currentReputationData[h] || 0}" style="width:60px; text-align:center;" onchange="setReputation('${escapeHtml(h)}', this.value)">
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${escapeHtml(h)}', 1)">+1</button>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetReputation('${escapeHtml(h)}')">Сброс</button>
+                </span>
+            </div>`).join('');
+    }
+
+    window.adjustReputation = function (holdName, delta) {
+        if (!currentInvPlayerUid) return;
+        currentReputationData[holdName] = (currentReputationData[holdName] || 0) + delta;
+        renderReputationPanel();
+    };
+
+    window.setReputation = function (holdName, val) {
+        if (!currentInvPlayerUid) return;
+        currentReputationData[holdName] = parseInt(val) || 0;
+        renderReputationPanel();
+    };
+
+    window.resetReputation = function (holdName) {
+        if (!currentInvPlayerUid) return;
+        if (!confirm(`Сбросить репутацию в «${holdName}» до 0?`)) return;
+        currentReputationData[holdName] = 0;
+        renderReputationPanel();
+    };
+
+    // Репутация копится локально по всем регионам и пишется в облако одной кнопкой "Сохранить" —
+    // так мастер может выставить сразу несколько значений и сохранить разом, а не дёргать
+    // Firestore при каждом +1/-1 (в отличие от гильдий, где это не так критично по частоте).
+    window.saveReputation = function () {
+        if (!currentInvPlayerUid) { alert('Выбери игрока выше.'); return; }
+        db.collection('characters').doc(currentInvPlayerUid).update({ reputationByRegion: currentReputationData })
+            .then(() => alert('Репутация сохранена.'))
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function defaultSupernaturalState() {
+        return {
+            lycanthropy: false, vampirism: false,
+            werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, isTransformed: false },
+            vampire: { hungerStage: 0, rank: 0, abilities: {} }
+        };
+    }
+
+    let currentGuildsData = defaultGuildsData();
+
+    // ---------- Задача C: живые торговцы ----------
+    // Категории даны как в items-data.js/allItems; кузнец дополнительно берёт из weaponRecipes/
+    // armorRecipes (базовые скованные вещи туда не всегда дублируются в allItems).
+    const LIVING_MERCHANT_TYPES = {
+        innkeeper: { label: 'Трактирщик', gold: 750, categories: ['Готовые продукты', 'Напитки'] },
+        alchemist2: { label: 'Алхимик', gold: 1250, categories: ['Ингредиенты для алхимии'] },
+        grocer: { label: 'Бакалейщик', gold: 1250, categories: ['Сырые продукты', 'Шкуры', 'Бытовые предметы'] },
+        blacksmith2: { label: 'Кузнец', gold: 1500, categories: ['Легкая броня (лут)', 'Тяжелая броня (лут)', 'Одноручное (лут)', 'Двуручное (лут)'] },
+        clothier: { label: 'Торговец одеждой', gold: 1250, categories: ['Магические одеяния'] },
+        fletcher: { label: 'Торговец луками и стрелами', gold: 1500, categories: ['Луки (лут)'] },
+        jeweler: { label: 'Ювелир', gold: 1500, categories: ['Ювелирное изделие (лут)', 'Ювелирные изделия', 'Драгоценные камни'] },
+        foodVendor: { label: 'Торговец едой', gold: 750, categories: ['Сырые продукты'] },
+        courtWizard: { label: 'Придворный колдун', gold: 1500, categories: ['Свитки (прописанные)', 'Посохи'] }
+    };
+    window.LIVING_MERCHANT_TYPES = LIVING_MERCHANT_TYPES;
+
+    function getMerchantItemPool(typeKey) {
+        const def = LIVING_MERCHANT_TYPES[typeKey];
+        if (!def) return [];
+        let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0);
+        if (typeKey === 'blacksmith2') {
+            pool = pool.concat((window.weaponRecipes || []).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat((window.armorRecipes || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: GM_SMITHING_SLOT_MAP[a.slot] || null })));
+        }
+        if (typeKey === 'fletcher') {
+            pool.push({ name: 'Стрела', category: 'Боеприпасы', price: 1, weight: 0.1 });
+        }
+        return pool;
+    }
+
+    // Генерирует новый ассортимент (10-20 предметов) + сбрасывает золото до базового. Ключ —
+    // "тип@владение", т.к. кузнец в Вайтране и кузнец в Маркарте — разные лавки с разным товаром.
+    window.refreshMerchantStock = function () {
+        const typeKey = el('merchant-type-select').value;
+        const hold = el('merchant-hold-select').value;
+        if (!hold) { alert('Выбери владение.'); return; }
+        const def = LIVING_MERCHANT_TYPES[typeKey];
+        const pool = getMerchantItemPool(typeKey);
+        if (!pool.length) { alert('Нет предметов в базе для этого типа торговца.'); return; }
+        const count = Math.min(pool.length, randInt(10, 20));
+        const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+        const items = shuffled.slice(0, count).map(i => ({ name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '' }));
+        const key = typeKey + '@' + hold;
+        const stocks = Object.assign({}, lastData.merchantStocks || {});
+        stocks[key] = { gold: def.gold, items: items, updatedAt: Date.now(), label: def.label, hold: hold };
+        db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${items.length} товаров, золото ${def.gold}.</span>`;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function renderMerchantHoldSelect() {
+        const sel = el('merchant-hold-select');
+        if (!sel || sel.options.length) return; // уже заполнен один раз
+        sel.innerHTML = '<option value="">— выбери владение —</option>' + REPUTATION_HOLDS.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+    }
+
+    function renderMerchantTypeSelect() {
+        const sel = el('merchant-type-select');
+        if (!sel || sel.options.length) return;
+        sel.innerHTML = Object.entries(LIVING_MERCHANT_TYPES).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)} (база ${v.gold} золота)</option>`).join('');
+    }
+
+    let currentSupernaturalState = defaultSupernaturalState();
+
+    function renderGuildsPanel() {
+        const listEl = el('guilds-list');
+        if (!listEl) return;
+        if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
+        listEl.innerHTML = GUILD_NAMES.map(g => `
+            <div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                <span>${escapeHtml(g)}: <strong>${currentGuildsData[g] || 0}</strong> заказ(ов)</span>
+                <span style="display:flex; gap:4px;">
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 1)">+1</button>
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 5)">+5</button>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetGuildOrders('${escapeHtml(g)}')">Сброс</button>
+                </span>
+            </div>`).join('');
+    }
+
+    window.adjustGuildOrders = function (guildName, delta) {
+        if (!currentInvPlayerUid) return;
+        currentGuildsData[guildName] = Math.max(0, (currentGuildsData[guildName] || 0) + delta);
+        db.collection('characters').doc(currentInvPlayerUid).update({ guildsData: currentGuildsData })
+            .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.resetGuildOrders = function (guildName) {
+        if (!currentInvPlayerUid) return;
+        if (!confirm(`Сбросить счётчик заказов «${guildName}» до 0?`)) return;
+        currentGuildsData[guildName] = 0;
+        db.collection('characters').doc(currentInvPlayerUid).update({ guildsData: currentGuildsData })
+            .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function saveSupernaturalState() {
+        if (!currentInvPlayerUid) return Promise.resolve();
+        return db.collection('characters').doc(currentInvPlayerUid).update({ supernaturalState: currentSupernaturalState });
+    }
+
+    function renderSupernaturalPanel() {
+        const wrap = el('supernatural-panel-body');
+        if (!wrap) return;
+        if (!currentInvPlayerUid) { wrap.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
+        const s = currentSupernaturalState;
+        wrap.innerHTML = `
+            <div class="checkbox-group"><input type="checkbox" id="sn-lycan" ${s.lycanthropy ? 'checked' : ''} onchange="toggleSupernaturalFlag('lycanthropy', this.checked)"><label for="sn-lycan">Ликантропия (оборотень)</label></div>
+            <div id="sn-werewolf-block" style="display:${s.lycanthropy ? 'block' : 'none'}; padding:6px 0 6px 12px; border-left:2px solid var(--border-color); margin:4px 0;">
+                <p style="font-size:12px; opacity:.75;">Базовая форма (всегда): ${escapeHtml(WEREWOLF_BASE_INFO)}</p>
+                <label>Съедено сердец: <input type="number" id="sn-hearts" value="${s.werewolf.heartsEaten}" style="width:70px; display:inline;" onchange="setWerewolfHearts(this.value)"></label>
+                <label style="margin-top:6px;">Активный тотем Хирсина</label>
+                <select id="sn-totem" onchange="setWerewolfTotem(this.value)">
+                    ${HIRCINE_TOTEMS.map(t => `<option value="${escapeHtml(t)}" ${s.werewolf.totem === t ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
+                </select>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="triggerTransform()">🐺 Обратить в зверя (лог в журнал)</button>
+                <label style="margin-top:8px;">Способности (открываются автоматически по числу сердец)</label>
+                ${WEREWOLF_ABILITIES.map(a => {
+                    const unlocked = (s.werewolf.heartsEaten || 0) >= a.threshold;
+                    return `<div style="font-size:12px; margin-top:3px; opacity:${unlocked ? 1 : 0.5};">${unlocked ? '🔓' : '🔒'} <strong>${escapeHtml(a.name)}</strong> (${a.threshold} сердец) — ${escapeHtml(a.desc)}</div>`;
+                }).join('')}
+            </div>
+
+            <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp" ${s.vampirism ? 'checked' : ''} onchange="toggleSupernaturalFlag('vampirism', this.checked)"><label for="sn-vamp">Вампиризм</label></div>
+            <div id="sn-vampire-block" style="display:${s.vampirism ? 'block' : 'none'}; padding:6px 0 6px 12px; border-left:2px solid var(--border-color); margin:4px 0;">
+                <p style="font-size:12px; opacity:.75;">Базовое заражение (даётся автоматически): ${escapeHtml(VAMPIRE_BASE_INFO)}</p>
+                <label>Стадия голода (0-3)</label>
+                <select id="sn-hunger" onchange="setVampireHunger(this.value)">
+                    ${[0, 1, 2, 3].map(n => `<option value="${n}" ${s.vampire.hungerStage === n ? 'selected' : ''}>${n}${n === 0 ? ' (сыт)' : ''}${n === 3 ? ' (истощён)' : ''}</option>`).join('')}
+                </select>
+                <button class="btn-success" style="width:100%; margin-top:4px;" onclick="feedVampire()">🩸 Покормить (стадия → 0)</button>
+                <label style="margin-top:6px;">Ранг вампира: <input type="number" id="sn-vamp-rank" value="${s.vampire.rank}" min="0" style="width:70px; display:inline;" onchange="setVampireRank(this.value)"></label>
+                <button style="width:100%; margin-top:4px;" onclick="setVampireRank(${s.vampire.rank + 1})">+1 ранг вампира</button>
+                <label style="margin-top:8px;">Способности вампира-лорда (редкая ступень — не у всех вампиров)</label>
+                ${VAMPIRE_ABILITIES.map(a => `<div class="checkbox-group" style="align-items:flex-start;">
+                    <input type="checkbox" ${s.vampire.abilities[a.name] ? 'checked' : ''} onchange="toggleVampireAbility('${escapeHtml(a.name)}', this.checked)">
+                    <label><strong>${escapeHtml(a.name)}</strong> — ${escapeHtml(a.desc)}${a.prereq ? `<br><span style="opacity:.6; font-size:11px;">Требует: ${escapeHtml(a.prereq)}</span>` : ''}</label>
+                </div>`).join('')}
+            </div>`;
+    }
+
+    window.toggleSupernaturalFlag = function (key, checked) {
+        currentSupernaturalState[key] = checked;
+        saveSupernaturalState().then(renderSupernaturalPanel);
+    };
+    window.setWerewolfHearts = function (val) {
+        currentSupernaturalState.werewolf.heartsEaten = Math.max(0, parseInt(val) || 0);
+        saveSupernaturalState();
+    };
+    window.setWerewolfTotem = function (val) {
+        currentSupernaturalState.werewolf.totem = val;
+        saveSupernaturalState();
+    };
+    window.triggerTransform = function () {
+        gmPostLogEntryText(`🐺 ${(lastData.participants[currentInvPlayerUid] || {}).name || 'Игрок'} обращается в зверя!`);
+    };
+    window.setVampireHunger = function (val) {
+        currentSupernaturalState.vampire.hungerStage = Math.max(0, Math.min(3, parseInt(val) || 0));
+        saveSupernaturalState();
+    };
+    window.feedVampire = function () {
+        currentSupernaturalState.vampire.hungerStage = 0;
+        saveSupernaturalState().then(renderSupernaturalPanel);
+    };
+    window.setVampireRank = function (val) {
+        currentSupernaturalState.vampire.rank = Math.max(0, parseInt(val) || 0);
+        saveSupernaturalState().then(renderSupernaturalPanel);
+    };
+    window.toggleVampireAbility = function (name, checked) {
+        currentSupernaturalState.vampire.abilities[name] = checked;
+        saveSupernaturalState();
+    };
+
     window.loadPlayerInventoryForGm = function () {
         const uid = el('inv-player-select').value;
         if (!uid) {
@@ -803,6 +1086,12 @@
             el('inv-gold-block').style.display = 'none';
             el('inv-level-block').style.display = 'none';
             el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
+            currentGuildsData = defaultGuildsData();
+            currentSupernaturalState = defaultSupernaturalState();
+            currentReputationData = defaultReputationData();
+            renderGuildsPanel();
+            renderSupernaturalPanel();
+            renderReputationPanel();
             return;
         }
         currentInvPlayerUid = uid;
@@ -824,6 +1113,20 @@
             const needed = currentPlayerInvData.characterLevel * 2 + 2;
             el('inv-level-progress').textContent = `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков`;
             renderGmPlayerInventory();
+
+            // Гильдии/Сверхъестественное — читаем из того же снапшота, без лишнего запроса.
+            currentGuildsData = Object.assign(defaultGuildsData(), data.guildsData || {});
+            const defaultSn = defaultSupernaturalState();
+            currentSupernaturalState = data.supernaturalState ? {
+                lycanthropy: !!data.supernaturalState.lycanthropy,
+                vampirism: !!data.supernaturalState.vampirism,
+                werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
+                vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { abilities: (data.supernaturalState.vampire || {}).abilities || {} })
+            } : defaultSn;
+            currentReputationData = Object.assign(defaultReputationData(), data.reputationByRegion || {});
+            renderGuildsPanel();
+            renderSupernaturalPanel();
+            renderReputationPanel();
         }).catch(e => {
             el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:13px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
         });
@@ -1179,6 +1482,10 @@
 
     if (typeof renderCalcAlchIngredients === 'function') renderCalcAlchIngredients();
     if (typeof populateSkillDecreaseSelect === 'function') populateSkillDecreaseSelect();
+    if (typeof renderMerchantHoldSelect === 'function') renderMerchantHoldSelect();
+    if (typeof renderMerchantTypeSelect === 'function') renderMerchantTypeSelect();
+    if (typeof renderHolidaySelect === 'function') renderHolidaySelect();
+    if (typeof renderGroupCheckSkillSelect === 'function') renderGroupCheckSkillSelect();
     if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();
     if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
 
@@ -1214,6 +1521,7 @@
             desc: el('quest-desc-input').value.trim(),
             requirement: el('quest-req-input').value.trim(),
             reward: el('quest-reward-input').value.trim(),
+            guild: el('quest-guild-select').value || null,
             status: 'active'
         };
         const target = el('quest-target-player').value;
@@ -1407,7 +1715,14 @@
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const resist = (data.resistances && data.resistances[dmgType]) || 0;
-            const finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
+            let finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
+            // Задача L: вампир получает удвоенный урон, если сейчас "День" в сессии — раньше
+            // это было только текстовым предупреждением в интерфейсе, урон не менялся.
+            let sunNote = '';
+            if (finalDmg && data.supernaturalState && data.supernaturalState.vampirism && lastData.timePeriod === 'День') {
+                finalDmg *= 2;
+                sunNote = ' (☀️ уязвимость вампира к солнцу — урон ×2)';
+            }
             let logExtra = '', newHp;
             const chores = [];
             if (dmg) {
@@ -1415,7 +1730,7 @@
                 newHp = Math.max(0, (parseInt(vitals[0]) || 0) - finalDmg);
                 vitals[0] = newHp;
                 chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
-                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}`;
+                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}`;
             }
             if (statusKey) {
                 // Статус-эффект пишется В СЕССИЮ (не в документ персонажа) — у игрока нет
@@ -1724,15 +2039,30 @@
 
     let pendingWeatherKey = null;
 
+    // Задача H: сезон смещает пул погоды региона — зимой чаще снег/метель, весной чаще дождь,
+    // летом чаще ясно, осенью чаще туман (там, где эта погода вообще возможна в регионе).
+    const SEASON_WEATHER_BIAS = {
+        'Зима': ['snow', 'blizzard'],
+        'Весна': ['rain', 'storm'],
+        'Лето': ['clear', 'cloudy'],
+        'Осень': ['fog', 'cloudy']
+    };
+
     window.rollWeatherForRegion = function () {
         const region = el('weather-region-select').value;
-        const pool = REGION_WEATHER_POOL[region] || ['clear'];
+        const season = el('weather-season-select').value;
+        const basePool = REGION_WEATHER_POOL[region] || ['clear'];
+        const biasTypes = (SEASON_WEATHER_BIAS[season] || []).filter(w => basePool.includes(w));
+        // Сезонно уместная погода весит втрое больше, но пул региона остаётся границей
+        // возможного — в лесу зимой не будет "clear-only подземелья", а метели не будет в лесу.
+        const pool = basePool.concat(biasTypes, biasTypes);
         pendingWeatherKey = pool[Math.floor(Math.random() * pool.length)];
         el('weather-gm-result').innerHTML = `Выпало: <strong>${WEATHER_LABELS[pendingWeatherKey]}</strong> — жми «Применить», чтобы сообщить игрокам.`;
     };
 
     window.setSessionTimeWeather = function () {
         const region = el('weather-region-select').value;
+        const season = el('weather-season-select').value;
         const hold = el('weather-hold-select').value;
         const period = el('weather-time-select').value;
         const weatherKey = pendingWeatherKey || 'clear';
@@ -1742,6 +2072,131 @@
             el('weather-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Применено: ${period}, ${region}${hold ? ' (' + hold + ')' : ''}, ${WEATHER_LABELS[weatherKey]}.</span>`;
             gmPostLogEntryText(`🌤️ ${period}, ${region}${hold ? ' (' + hold + ')' : ''}: ${WEATHER_LABELS[weatherKey]}.`);
             pendingWeatherKey = null;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Задача F: праздник вручную ----------
+    function renderHolidaySelect() {
+        const sel = el('holiday-manual-select');
+        if (!sel || sel.options.length || !window.holidaysData) return;
+        sel.innerHTML = window.holidaysData.map((h, i) => `<option value="${i}">${escapeHtml(h.title)}${h.discount ? ' (скидка до ' + h.discount + '%)' : ''}</option>`).join('');
+    }
+
+    window.launchHolidayManually = function () {
+        const idx = parseInt(el('holiday-manual-select').value);
+        const h = window.holidaysData[idx];
+        if (!h) return;
+        db.collection('sessions').doc(currentCode).update({ activeHoliday: { title: h.title, discount: h.discount || null } }).then(() => {
+            el('holiday-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Запущено: «${escapeHtml(h.title)}»${h.discount ? ' (скидка до ' + h.discount + '%)' : ''}.</span>`;
+            gmPostLogEntryText(`🎉 Мастер запускает праздник: «${h.title}»!`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.clearActiveHoliday = function () {
+        db.collection('sessions').doc(currentCode).update({ activeHoliday: null }).then(() => {
+            el('holiday-gm-result').innerHTML = 'Праздник остановлен.';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Задача I: групповые проверки ----------
+
+    function renderGroupCheckSkillSelect() {
+        const sel = el('group-check-skill-select');
+        if (!sel || sel.options.length) return;
+        sel.innerHTML = SKILL_NAMES_BY_IDX.map((name, i) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+    }
+
+    window.requestGroupCheck = function () {
+        const skill = el('group-check-skill-select').value;
+        const dc = parseInt(el('group-check-dc').value) || null;
+        db.collection('sessions').doc(currentCode).update({
+            groupCheck: { skill, dc, requestedAt: Date.now(), results: {} }
+        }).then(() => {
+            gmPostLogEntryText(`📣 Мастер просит групповой бросок: «${skill}»${dc ? ' (порог ' + dc + ')' : ''}!`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function renderGroupCheckResults() {
+        const el2 = el('group-check-results');
+        if (!el2) return;
+        const gc = lastData.groupCheck;
+        if (!gc) { el2.innerHTML = '<p style="opacity:.6; font-size:13px;">Запросов не было.</p>'; return; }
+        const results = gc.results || {};
+        const uids = Object.keys(lastData.participants || {});
+        el2.innerHTML = `<strong>«${escapeHtml(gc.skill)}»${gc.dc ? ' (порог ' + gc.dc + ')' : ''}:</strong><br>` +
+            uids.map(uid => {
+                const pname = (lastData.participants[uid] || {}).name || uid;
+                const r = results[uid];
+                if (!r) return `<div>⏳ ${escapeHtml(pname)}: ждём бросок...</div>`;
+                const passed = gc.dc ? (r.total >= gc.dc ? '✅' : '❌') : '🎲';
+                return `<div>${passed} ${escapeHtml(pname)}: ${r.total} (к20 ${r.roll}${r.mod >= 0 ? '+' : ''}${r.mod})</div>`;
+            }).join('');
+    }
+
+    // ---------- Задача I.2: кооперативная атака ----------
+
+    function populateCoopSelects() {
+        const uids = Object.keys(lastData.participants || {});
+        ['coop-player1-select', 'coop-player2-select'].forEach(id => {
+            const sel = el(id);
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = '<option value="">— выбери —</option>' + uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
+            if (uids.includes(prev)) sel.value = prev;
+        });
+        const targetSel = el('coop-target-select');
+        if (targetSel) {
+            const alive = (lastData.enemies || []).filter(e => (e.curHp || 0) > 0);
+            const prev = targetSel.value;
+            targetSel.innerHTML = alive.length
+                ? alive.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (HP ${e.curHp}/${e.maxHp})</option>`).join('')
+                : '<option value="">Нет живых целей</option>';
+            if (alive.some(e => e.id === prev)) targetSel.value = prev;
+        }
+    }
+
+    window.rollCoopAttack = function () {
+        const p1 = el('coop-player1-select').value;
+        const p2 = el('coop-player2-select').value;
+        const targetId = el('coop-target-select').value;
+        const resultEl = el('coop-attack-result');
+        if (!p1 || !p2 || p1 === p2) { alert('Выбери двух РАЗНЫХ игроков.'); return; }
+        if (!targetId) { alert('Выбери цель.'); return; }
+        Promise.all([
+            db.collection('characters').doc(p1).get(),
+            db.collection('characters').doc(p2).get()
+        ]).then(([d1, d2]) => {
+            const data1 = d1.exists ? d1.data() : {};
+            const data2 = d2.exists ? d2.data() : {};
+            const dmg1 = parseInt(data1.wepMDmg) || 0;
+            const dmg2 = parseInt(data2.wepMDmg) || 0;
+            const totalDmg = dmg1 + dmg2;
+            const roll = Math.floor(Math.random() * 20) + 1;
+            const name1 = (lastData.participants[p1] || {}).name || p1;
+            const name2 = (lastData.participants[p2] || {}).name || p2;
+            const target = (lastData.enemies || []).find(e => e.id === targetId);
+            pendingCoopAttack = { targetId, dmg: totalDmg, name1, name2, targetName: target ? target.name : '?' };
+            resultEl.innerHTML = `<strong>${escapeHtml(name1)} + ${escapeHtml(name2)}</strong> атакуют «${escapeHtml(target ? target.name : '?')}» одновременно.<br>` +
+                `Бросок: 1d20 = <strong>${roll}</strong><br>Суммарный урон при попадании: <span style="color:#e74c3c; font-weight:bold;">${totalDmg}</span> (${dmg1}+${dmg2})<br>` +
+                `<button class="btn-success" style="width:100%; margin-top:6px;" onclick="applyCoopAttackDamage()">✅ Применить урон</button>`;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    let pendingCoopAttack = null;
+
+    window.applyCoopAttackDamage = function () {
+        if (!pendingCoopAttack) return;
+        const { targetId, dmg, name1, name2, targetName } = pendingCoopAttack;
+        window.CloudSync ? null : null; // (мастер сам пишет в сессию напрямую, отдельного CloudSync-моста тут не нужно)
+        const enemies = (lastData.enemies || []).slice();
+        const idx = enemies.findIndex(e => e.id === targetId);
+        if (idx === -1) { alert('Цель уже не найдена.'); return; }
+        const newHp = Math.max(0, (enemies[idx].curHp || 0) - dmg);
+        enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
+        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+            gmPostLogEntryText(`⚔️ ${name1} + ${name2} совместно бьют «${targetName}»: −${dmg} урона.`);
+            el('coop-attack-result').innerHTML = '';
+            pendingCoopAttack = null;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 

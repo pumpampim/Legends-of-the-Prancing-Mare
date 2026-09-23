@@ -224,6 +224,83 @@
             });
         },
 
+        // Задача K: +1 к прогрессу гильдии на СВОЁМ ЖЕ документе персонажа при выполнении квеста
+        // этой гильдии. Атомарный инкремент (не read-then-write) — на своём документе игрок
+        // может писать и без сессии.
+        // Задача C: покупка у живого торговца — убирает купленный товар из ассортимента (он
+        // штучный, не бесконечный) и добавляет цену к золоту торговца в сессии.
+        buyFromMerchantStock: function (key, itemIdx, price) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const stocks = Object.assign({}, data.merchantStocks || {});
+                const stock = stocks[key];
+                if (!stock || !stock.items[itemIdx]) throw new Error('Товар уже не в наличии.');
+                const items = stock.items.slice();
+                items.splice(itemIdx, 1);
+                stocks[key] = Object.assign({}, stock, { items: items, gold: (stock.gold || 0) + (price || 0) });
+                return ref.update({ merchantStocks: stocks });
+            });
+        },
+
+        // Задача I.1: игрок пишет свой результат группового броска — прямо в сессию, чтобы
+        // мастер видел в реальном времени. Атомарный set через dot-notation поля.
+        // Задача I: текущий uid игрока — нужен, чтобы понять "это мой результат/бафф" в
+        // групповых проверках и помощи союзнику.
+        getCurrentUid: function () {
+            return currentUser ? currentUser.uid : null;
+        },
+
+        submitGroupCheckResult: function (uid, roll, mod, total) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const patch = {};
+            patch['groupCheck.results.' + uid] = { roll, mod, total };
+            return db.collection('sessions').doc(currentSessionCode).update(patch);
+        },
+
+        // Задача I.3: "Помочь союзнику" — пишет +1 бафф на следующий бросок цели в общий пул
+        // sessions/{code}.buffs. Цель сама снимает и обнуляет бафф при следующем своём броске.
+        helpAlly: function (targetUid, fromName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const patch = {};
+            patch['buffs.' + targetUid] = { value: 1, fromName: fromName, grantedAt: Date.now() };
+            return db.collection('sessions').doc(currentSessionCode).update(patch);
+        },
+
+        // Снимает (обнуляет) бафф помощи после того, как игрок его использовал в своём броске.
+        clearHelpBuff: function (uid) {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            const patch = {};
+            patch['buffs.' + uid] = firebase.firestore.FieldValue.delete();
+            return db.collection('sessions').doc(currentSessionCode).update(patch).catch(() => {});
+        },
+
+        incrementGuildProgress: function (guildName) {
+            if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            const patch = {};
+            patch['guildsData.' + guildName] = firebase.firestore.FieldValue.increment(1);
+            return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
+        },
+
+        // Задача K: читает одно поле СВОЕГО ЖЕ документа персонажа (например guildsData) —
+        // нужно игроку, чтобы видеть свой прогресс гильдий, который правит мастер.
+        getOwnCharacterField: function (fieldName) {
+            if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            return db.collection('characters').doc(currentUser.uid).get().then(doc => {
+                const data = doc.exists ? doc.data() : {};
+                return data[fieldName];
+            });
+        },
+
+        // Задача L: игрок сам пишет своё же supernaturalState (превращение, подкормка,
+        // дневной тик) — тот же документ, что правит и мастер, merge не затирает остальное.
+        saveOwnSupernaturalState: function (state) {
+            if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            return db.collection('characters').doc(currentUser.uid).set({ supernaturalState: state }, { merge: true });
+        },
+
         // Пишет произвольную запись в общий боевой журнал сессии от имени игрока.
         postCombatLog: function (text, authorName) {
             if (!currentSessionCode || !db || !text) return Promise.resolve();
@@ -373,6 +450,9 @@
         if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
         if (typeof window.updateWeatherDisplay === 'function') window.updateWeatherDisplay();
         if (typeof window.renderCorpseRaiseSelect === 'function') window.renderCorpseRaiseSelect();
+        if (typeof window.renderBuyList === 'function') window.renderBuyList();
+        if (typeof window.renderGroupCheckPlayerPanel === 'function') window.renderGroupCheckPlayerPanel();
+        if (typeof window.renderHelpAllySelect === 'function') window.renderHelpAllySelect();
         if (typeof window.renderTradeSelects === 'function') window.renderTradeSelects();
 
         // Мастер мог наложить статус-эффект (паралич/страх и т.п.) атакой — он приходит через

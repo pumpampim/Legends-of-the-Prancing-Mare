@@ -394,6 +394,7 @@
     <script src="enchant-data.js"></script>
     <script src="spell-data.js"></script>
     <script src="alchemy-data.js"></script>
+    <script src="holidays-data.js"></script>
 </head>
 <body>
 
@@ -441,6 +442,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
         <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
+        <button class="tab-link" onclick="openTab(event, 'tab11')">📅 Календарь</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -559,6 +561,7 @@
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
             </div>
             <div id="hunger-status" class="hunger-warning" style="display:none;"></div>
+            <div id="today-holiday-widget" style="font-size:13px; margin-top:4px;"></div>
 
             <div class="rest-btn" style="margin-top:8px;">
                 <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
@@ -854,7 +857,8 @@
             <!-- ПРОДАЖА ПРЕДМЕТОВ -->
             <div class="panel">
                 <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
-                <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Накопленный объём продаж тоже прокачивает Красноречие (раз в «уровень × навык» септимов — успех) — считается автоматически, отдельно ничего нажимать не надо.</p>
+                <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка от 30 септимов также даёт успехи Красноречия — считается автоматически.</p>
+                <div id="speech-trade-progress" style="font-size:13px; margin-bottom:8px; color:var(--accent-color);"></div>
 
                 <label>Кому продаём</label>
                 <select id="sell-merchant-type" onchange="renderSellList()">
@@ -872,6 +876,16 @@
                 <div id="sell-charm-locked" style="font-size:13px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
 
                 <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
+            </div>
+
+            <!-- ПОКУПКА У ЖИВЫХ ТОРГОВЦЕВ (Задача C) -->
+            <div class="panel">
+                <h2>🏪 Купить у торговца</h2>
+                <p style="font-size:13px; opacity:.75;">Ассортимент и золото торговца задаёт мастер (обновляется примерно раз в неделю). Если товара нет — мастер ещё не завозил ассортимент в это владение для этого типа торговца.</p>
+                <label>Тип торговца</label>
+                <select id="buy-merchant-type" onchange="renderBuyList()"></select>
+                <div id="buy-merchant-info" style="font-size:13px; opacity:.8; margin:4px 0;"></div>
+                <div id="buy-items-list" style="max-height:320px; overflow-y:auto; margin-top:6px;"></div>
             </div>
 
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
@@ -965,6 +979,20 @@
             <p style="font-size:13px; opacity:.75;">Квесты выдаёт мастер. Отмечай выполненные — мастер увидит статус и сможет выдать награду.</p>
             <div id="quest-list"></div>
         </div>
+
+        <!-- ГИЛЬДИИ (Задача K) -->
+        <div class="panel">
+            <h2>🏛️ Гильдии</h2>
+            <p style="font-size:13px; opacity:.75;">Прогресс ведёт мастер (сколько заказов ты выполнил) — здесь только просмотр. Ниже справочник: кто выдаёт задания в каждой гильдии, примерная плата и условия.</p>
+            <div id="guild-panel-player"></div>
+        </div>
+
+        <!-- СВЕРХЪЕСТЕСТВЕННОЕ (Задача L) -->
+        <div class="panel">
+            <h2>🌙 Сверхъестественное состояние</h2>
+            <p style="font-size:13px; opacity:.75;">Ликантропия/вампиризм включает мастер. Превращение и подкормка — твои кнопки, остальное (сердца/ранг/голод) правит мастер.</p>
+            <div id="supernatural-status-player"></div>
+        </div>
     </div>
 
     <!-- ТАБ 6: СЕССИЯ (синхронизация с мастером через Firebase) -->
@@ -1010,6 +1038,19 @@
 
                 <h3><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Инициатива</h3>
                 <div id="initiative-list"></div>
+
+                <div id="group-check-player-panel" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color); display:none;">
+                    <h4 style="margin:0 0 6px;">🎲 Мастер просит бросок</h4>
+                    <div id="group-check-player-info" style="font-size:13px; margin-bottom:6px;"></div>
+                    <button class="btn-success" style="width:100%;" id="group-check-roll-btn" onclick="rollGroupCheckResponse()">Бросить</button>
+                </div>
+
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <h4 style="margin:0 0 6px;">🤝 Помочь союзнику</h4>
+                    <p style="font-size:11px; opacity:.7;">Даёт +1 к следующему броску выбранного союзника (до его следующего хода) — используй, если персонаж рядом (~5 фт.) и логично помогает.</p>
+                    <select id="help-ally-select"></select>
+                    <button style="width:100%; margin-top:4px;" onclick="helpAlly()">Помочь (+1)</button>
+                </div>
 
                 <h3><span class="skyrim-icon icon-book" aria-hidden="true"></span> Боевой журнал</h3>
                 <div id="combat-log" class="combat-log"></div>
@@ -1269,6 +1310,15 @@
         </div>
     </div>
 
+    <div id="tab11" class="tab-content">
+        <div class="panel">
+            <h2>📅 Календарь Тамриэля</h2>
+            <p style="font-size:13px; opacity:.75;">Текущая дата подсвечена. Праздник может дать скидку у торговцев, если это явно указано в его описании (применяет мастер кнопкой «Запустить праздник вручную» на своём экране).</p>
+            <div id="calendar-today-widget" style="padding:8px; background:var(--input-bg); border:1px solid var(--accent-color); border-radius:4px; margin-bottom:10px;"></div>
+            <div id="calendar-list"></div>
+        </div>
+    </div>
+
 <script>
     // Массив всех 19 навыков игровой системы Скурим
     const skillNames = [
@@ -1289,7 +1339,6 @@
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
     let activeSummons = []; // [{ id, category, name, curHp, maxHp, dmg, dmgType, speed, turnsRemaining, permanent }]
-    let speechTradeVolume = 0; // накопленная сумма продаж/покупок — раз в "уровень × Красноречие" септимов даёт +1 успех навыка
 
     // Шаблоны призываемых/поднимаемых существ. Урон/хп/длительность оружия и трупов —
     // цифры прямо из описаний заклинаний (магия.xlsx). Атронахи в файлах даны только
@@ -1369,19 +1418,28 @@
                        'Серебристый окунь', 'Бойцовая рыбка', 'Жемчужина', 'Маленькая жемчужина'],
         'Равнина': ['Пшеница', 'Соль', 'Куриное яйцо', 'Вересковое сердце']
     };
-    // Доп. вес по конкретному владению (поверх регионального) — свои "фирменные" ингредиенты
-    // для каждой локации, по общему лору Skyrim (детальных данных по флоре в файлах нет).
+    // Доп. вес по конкретному владению (поверх регионального) — реальные данные с вики
+    // (распределение ингредиентов у алхимиков по владениям в ванильном Skyrim: взяты только
+    // ингредиенты уровня "Guaranteed"/"Common" для каждого конкретного владения — раньше список
+    // был выдуман на глаз, часть названий даже не совпадала с реальными именами в базе).
     const INGREDIENT_HOLD_TAGS = {
-        'Вайтран': ['Пшеница', 'Куриное яйцо', 'Соль'],
-        'Винтерхолд': ['Морозная мириам', 'Морозная соль', 'Снежные ягоды', 'Соль пустоты'],
-        'Рифт': ['Ягоды можжевельника', 'Медовые соты', 'Пчелиное гнездо', 'Бледная плеть'],
-        'Фолкрит': ['Гниль Намиры', 'Паслен', 'Бородатый мох'],
-        'Солитьюд (Хаафингар)': ['Морской желудь', 'Хисткарп', 'Жемчужина'],
-        'Хьялмарк (Морфал)': ['Болотный стручок', 'Бесовский гриб', 'Ползучая лоза', 'Мора тапинелла'],
-        'Истмарк (Виндхельм)': ['Морозная соль', 'Снежные ягоды'],
-        'Белый берег (Данстар)': ['Серебристый окунь', 'Абесинский окунь', 'Соль пустоты'],
-        'Маркарт (Предел)': ['Огненная соль', 'Голубой горноцвет', 'Красный горноцвет'],
-        'Схолстейм': ['Пепельная слизь гриба', 'Раздутая шляпка', 'Огненная соль']
+        'Вайтран': ['Большие рога', 'Маленькие рога', 'Лаванда', 'Голубой горноцвет', 'Лиловый горноцвет',
+                     'Пушица', 'Торакс светлячка', 'Крыло синей бабочки', 'Крыло монарха', 'Пшеница'],
+        'Винтерхолд': ['Снежные ягоды', 'Травяной стручок'],
+        'Белый берег (Данстар)': ['Травяной стручок', 'Снежные ягоды'],
+        'Рифт': ['Пчелиное гнездо', 'Медовые соты', 'Яйцо соснового дрозда', 'Собачий корень', 'Пчела',
+                  'Хисткарп', 'Сиродильский лопатохвост', 'Серебристый окунь', 'Абесинский окунь', 'Бойцовая рыбка',
+                  'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет', 'Чешуйчатка', 'Пшеница'],
+        'Фолкрит': ['Яйцо соснового дрозда', 'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет',
+                     'Паслен', 'Ветка чертополоха', 'Торакс светлячка', 'Крыло синей бабочки'],
+        'Истмарк (Виндхельм)': ['Виноград джазби', 'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет',
+                                  'Снежные ягоды', 'Ветка чертополоха', 'Пшеница'],
+        'Солитьюд (Хаафингар)': ['Клюв ястреба', 'Перья ястреба', 'Собачий корень', 'Ядовитый колокольчик',
+                                   'Лаванда', 'Травяной стручок', 'Ветка чертополоха', 'Пшеница'],
+        'Хьялмарк (Морфал)': ['Собачий корень', 'Ядовитый колокольчик', 'Оранжевая стрекоза', 'Синяя стрекоза',
+                                'Гигантский лишайник', 'Лаванда', 'Крыло синей бабочки', 'Торакс светлячка', 'Травяной стручок'],
+        'Маркарт (Предел)': ['Бородатый мох', 'Ягоды можжевельника', 'Лаванда', 'Двемерское масло'],
+        'Схолстейм': ['Древесина горелого сприггана']
     };
     // Собираются только ночью.
     const NIGHT_ONLY_INGREDIENTS = new Set([
@@ -1401,6 +1459,26 @@ let gameYear = 201;
 let gameMonth = 6;      // 0-based; 6 = Высокое солнце
 let gameDayNum = 10;    // 10-е число
 let daysWithoutFood = 0;
+
+    // Задача H: сезоны — месяцы 0-2 (Утренняя звезда/Восход солнца/Первое зерно) зима,
+    // 3-5 весна, 6-8 лето, 9-11 осень (та же нумерация, что MONTH_NAMES/gameMonth).
+    const SEASONS = [
+        { name: 'Зима', icon: '❄️', months: [0, 1, 2] },
+        { name: 'Весна', icon: '🌸', months: [3, 4, 5] },
+        { name: 'Лето', icon: '☀️', months: [6, 7, 8] },
+        { name: 'Осень', icon: '🍂', months: [9, 10, 11] }
+    ];
+    function getCurrentSeason() {
+        return SEASONS.find(s => s.months.includes(gameMonth)) || SEASONS[0];
+    }
+    // Ингредиенты недоступны для сбора зимой (травы вымерзли) — часть того, что раньше
+    // считалось доступным круглый год.
+    const WINTER_UNAVAILABLE_INGREDIENTS = new Set([
+        'Голубой горноцвет', 'Красный горноцвет', 'Лиловый горноцвет', 'Ягоды можжевельника',
+        'Лаванда', 'Пчела', 'Медовые соты', 'Пчелиное гнездо', 'Крыло синей бабочки',
+        'Крыло монарха', 'Оранжевая стрекоза', 'Синяя стрекоза', 'Виноград джазби',
+        'Ветка чертополоха', 'Паслен', 'Ядовитый колокольчик'
+    ]);
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
    function initSkills() {
@@ -1566,6 +1644,7 @@ window.toggleSkillPanel = function (idx) {
         let typedValue = parseInt(input.value) || 10;
         let raw = typedValue - bonus;
         if (raw < 10) raw = 10;
+        if (raw > 100) raw = 100; // лимит навыка — 100 (Задача A)
         input.setAttribute('data-raw-val', raw);
         updateAll();
         saveLocalStorage();
@@ -2287,12 +2366,125 @@ window.toggleSkillPanel = function (idx) {
             if (cat !== merchantType) mult *= 0.8; // не его профиль — минус 20%
         }
         if (charmActive) mult *= 1.1; // перк «Очарование»
+        // Задача C: репутация в текущем владении сессии ±5% (тут привязки к конкретному
+        // экземпляру торговца нет, в отличие от покупки у живых торговцев — берём владение,
+        // которое сейчас задано в сессии мастером).
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        mult *= getReputationPriceMult((session && session.currentHold) || null);
         return Math.max(0, Math.round(base * mult));
     }
+
+    // ---------- Задача C: покупка у живых торговцев ----------
+
+    // Репутация в данном владении влияет на цену ±5% (плюс = скидка, минус = наценка) — само
+    // число НИГДЕ не показывается игроку (Задача D), только тихо участвует в формуле цены.
+    function getReputationPriceMult(hold) {
+        if (!hold || !playerReputationByRegion) return 1;
+        const rep = playerReputationByRegion[hold] || 0;
+        if (rep > 0) return 0.95;
+        if (rep < 0) return 1.05;
+        return 1;
+    }
+
+    function renderBuyMerchantTypeSelect() {
+        const sel = document.getElementById('buy-merchant-type');
+        if (!sel) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const stocks = (session && session.merchantStocks) || {};
+        const keys = Object.keys(stocks);
+        const prev = sel.value;
+        sel.innerHTML = keys.length
+            ? keys.map(k => `<option value="${escHtml(k)}">${escHtml(stocks[k].label)} — ${escHtml(stocks[k].hold)}</option>`).join('')
+            : '<option value="">— мастер ещё не завёз ассортимент —</option>';
+        if (keys.includes(prev)) sel.value = prev;
+    }
+
+    function renderBuyList() {
+        renderBuyMerchantTypeSelect();
+        const listEl = document.getElementById('buy-items-list');
+        const infoEl = document.getElementById('buy-merchant-info');
+        if (!listEl || !infoEl) return;
+        const key = document.getElementById('buy-merchant-type').value;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const stock = key && session && session.merchantStocks ? session.merchantStocks[key] : null;
+        if (!stock) { listEl.innerHTML = ''; infoEl.innerHTML = ''; return; }
+        const repMult = getReputationPriceMult(stock.hold);
+        const holidayDiscount = getActiveHolidayDiscount();
+        infoEl.innerHTML = `💰 У торговца: <strong>${stock.gold}</strong> золота · товаров: ${stock.items.length}` +
+            (holidayDiscount ? `<br><span style="color:var(--accent-color);">🎉 Скидка праздника: −${holidayDiscount}% (уже учтена в ценах ниже)</span>` : '');
+        listEl.innerHTML = stock.items.length ? stock.items.map((it, idx) => {
+            const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
+            const canAfford = price <= stock.gold && price <= (parseInt(document.getElementById('char-gold').value) || 0);
+            return `<div class="stat-block" style="align-items:flex-start;">
+                <span><strong>${escHtml(it.name)}</strong>${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
+                <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                    <span style="color:var(--accent-color);">${price} септ.</span>
+                    <button class="btn-success" style="width:auto; padding:2px 8px;" ${canAfford ? '' : 'disabled'} onclick="buyFromMerchant('${escHtml(key)}', ${idx})">Купить</button>
+                </span>
+            </div>`;
+        }).join('') : '<p style="opacity:.6; font-size:13px;">Пусто — весь товар распродан.</p>';
+    }
+    window.renderBuyList = renderBuyList;
+
+    // Задача F: скидка праздника — либо по текущей дате на листе (естественно совпал день),
+    // либо запущена мастером вручную (sessions/{code}.activeHoliday), независимо от даты.
+    // Берём МАКСИМАЛЬНУЮ из двух, если вдруг совпали оба источника.
+    function getActiveHolidayDiscount() {
+        let discount = 0;
+        const todayHolidays = (typeof findTodayHolidays === 'function') ? findTodayHolidays() : [];
+        todayHolidays.forEach(h => { if (h.discount && h.discount > discount) discount = h.discount; });
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        if (session && session.activeHoliday && session.activeHoliday.discount && session.activeHoliday.discount > discount) {
+            discount = session.activeHoliday.discount;
+        }
+        return discount;
+    }
+
+    // Цена покупки: та же формула перка/Красноречия, что уже используется в системе (через
+    // computeSellPrice не подходит — там модификатор для ПРОДАЖИ игроком; тут отдельно, покупка
+    // обычно дороже базовой цены).
+    function computeBuyPrice(basePrice, category) {
+        let price = basePrice * 1.15; // торговец накидывает свою наценку сверху
+        // Задача H: еда зимой дороже (меньше свежих продуктов, больше расходов на хранение).
+        const foodCats = ['Готовые продукты', 'Сырые продукты', 'Напитки'];
+        if (category && foodCats.includes(category) && getCurrentSeason().name === 'Зима') price *= 1.2;
+        const holidayDiscount = getActiveHolidayDiscount();
+        if (holidayDiscount) price *= (1 - holidayDiscount / 100);
+        return Math.round(price);
+    }
+
+    window.buyFromMerchant = function (key, idx) {
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const stock = session && session.merchantStocks ? session.merchantStocks[key] : null;
+        if (!stock || !stock.items[idx]) { alert('Товар уже не в наличии — обнови список.'); return; }
+        const it = stock.items[idx];
+        const repMult = getReputationPriceMult(stock.hold);
+        const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
+        const goldInput = document.getElementById('char-gold');
+        const myGold = parseInt(goldInput.value) || 0;
+        if (price > myGold) { alert('Не хватает золота.'); return; }
+        if (price > stock.gold) { alert('У торговца не хватает золота выкупить это у тебя обратно — купить всё равно можно, но продать потом ему будет некому.'); }
+        if (!window.CloudSync || typeof window.CloudSync.buyFromMerchantStock !== 'function') { alert('Нет соединения с сессией.'); return; }
+        window.CloudSync.buyFromMerchantStock(key, idx, price).then(() => {
+            goldInput.value = myGold - price;
+            addToInventory(it.name, it.name, 1, it.weight || 0, it.category || '', it.effect || '', { slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price });
+            const speechSuccesses = trackSpeechTrade(price, true, false);
+            renderInventoryList();
+            updateAll();
+            saveLocalStorage();
+            alert(`Куплено: ${it.name} за ${price} септимов.${speechSuccesses ? ' (+' + speechSuccesses + ' усп. Красноречия)' : ''}`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
 
     function renderSellList() {
         const listEl = document.getElementById('sell-items-list');
         if (!listEl) return;
+        const progressEl = document.getElementById('speech-trade-progress');
+        if (progressEl) {
+            const speechVal = getEffectiveSkillValue('Красноречие');
+            const speechIdx = skillNames.indexOf('Красноречие');
+            progressEl.textContent = `🗣 Красноречие: ${speechVal} · Прогресс: ${skillProgress[speechIdx] || 0}/${getSuccessesNeededForSkill(speechVal)}`;
+        }
         const merchantType = document.getElementById('sell-merchant-type').value;
         const perks = window.perkBonuses || {};
         const charmCheckbox = document.getElementById('sell-charm-active');
@@ -2333,18 +2525,26 @@ window.toggleSkillPanel = function (idx) {
     }
     window.renderSellList = renderSellList;
 
-    // Каждый раз, когда через торговлю (продажа/покупка) проходит достаточно золота —
-    // "уровень персонажа × эффективное Красноречие" септимов — засчитывается 1 успех навыка,
-    // как будто поторговался достаточно, чтобы это ощутимо прокачало болтливость.
-    function trackSpeechTrade(amount) {
-        if (!amount || amount <= 0) return;
-        speechTradeVolume += amount;
-        const speech = getEffectiveSkillValue('Красноречие');
-        const threshold = Math.max(50, characterLevel * speech);
-        while (speechTradeVolume >= threshold) {
-            speechTradeVolume -= threshold;
+    // Задача A: успехи Красноречия начисляются за КАЖДУЮ сделку отдельно (не накопительно).
+    // База = целая часть от (сумма / 150), но сумма 30-149 даёт ровно 1 успех, макс. 5 за сделку.
+    // Покупка — успехи ×0.5 (округление вниз). Непрофильный торговец — тоже ×0.5. Складываются
+    // (покупка непрофильного = ×0.25). Сумма < 30 — успехов нет вообще.
+    function calcSpeechSuccesses(amount, isPurchase, isOffProfile) {
+        if (!amount || amount < 30) return 0;
+        let base = amount < 150 ? 1 : Math.floor(amount / 150);
+        base = Math.min(5, base);
+        let mult = 1;
+        if (isPurchase) mult *= 0.5;
+        if (isOffProfile) mult *= 0.5;
+        return Math.floor(base * mult);
+    }
+
+    function trackSpeechTrade(amount, isPurchase, isOffProfile) {
+        const successes = calcSpeechSuccesses(amount, !!isPurchase, !!isOffProfile);
+        for (let i = 0; i < successes; i++) {
             if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Красноречие');
         }
+        return successes;
     }
 
     window.sellItem = function (itemId) {
@@ -2359,16 +2559,17 @@ window.toggleSkillPanel = function (idx) {
         const charmActive = document.getElementById('sell-charm-active').checked && !!(window.perkBonuses || {}).hasCharmPerk;
         const unitPrice = computeSellPrice(item, merchantType, charmActive);
         const total = unitPrice * qty;
+        const isOffProfile = merchantType !== 'pawnbroker' && classifyItemForMerchant(item) !== merchantType;
 
         removeFromInventoryByName(itemId, qty);
         const goldInput = document.getElementById('char-gold');
         goldInput.value = (parseInt(goldInput.value) || 0) + total;
-        trackSpeechTrade(total);
+        const speechSuccesses = trackSpeechTrade(total, false, isOffProfile);
 
         renderSellList();
         renderInventoryList();
         saveLocalStorage();
-        alert(`Продано: ${item.name} ×${qty} → ${MERCHANT_LABELS[merchantType]} заплатил ${total} септимов.`);
+        alert(`Продано: ${item.name} ×${qty} → ${MERCHANT_LABELS[merchantType]} заплатил ${total} септимов.${speechSuccesses ? ' (+' + speechSuccesses + ' усп. Красноречия)' : ''}`);
     };
 
     function isFoodItem(item) {
@@ -3095,6 +3296,114 @@ window.toggleSkillPanel = function (idx) {
     // КВЕСТЫ (выдаются мастером, отмечаются игроком)
     // ========================================================================
 
+    // Задача K: квестодатели по каждой гильдии — из Фракции.xlsx (кто выдаёт задания, за сколько,
+    // какие условия). Оплата не всегда фиксированный "за квест" септим — где в источнике так
+    // написано (напр. Тёмное братство/Стража Рассвета), так и указано.
+    const GUILD_QUEST_GIVERS = {
+        'Гильдия воров': [
+            { giver: 'Делвин Меллори / Векс', reward: '—', note: 'Обычные заказы; за каждые 5 заказов — особое задание (500 септимов + бонусы гильдии). После 40 заказов — путь Соловья.' }
+        ],
+        'Соратники': [
+            { giver: 'Эйла Охотница', reward: '—', note: 'Квесты на Тотемы Хирсина + обычные поручения (вредители, сопровождение).' },
+            { giver: 'Вилкас / Скьор', reward: '—', note: 'Поручения: фамильные ценности, беглый преступник и т.п. После 15 поручений — небесное зачарованное оружие (вид/эффект на выбор).' }
+        ],
+        'Коллегия магов': [
+            { giver: 'Толфдир', reward: '—', note: 'Найти перегонный куб в Зале поддержки.' },
+            { giver: 'Древис Нелорен', reward: '3-5 обычных камней душ', note: 'Квест «Балансировка» — очистить фокусные точки магической энергии.' },
+            { giver: 'Сергий Турриан', reward: '12/30/60/120/240 септимов', note: 'Платит за пустые камни душ (по размеру камня).' },
+            { giver: 'Энтир', reward: '150 септимов', note: 'Забрать посох в таверне Винтерхолда.' },
+            { giver: 'Ураг гро-Шуб', reward: '100 септимов за книгу', note: 'Принести определённую книгу из случайного подземелья.' }
+        ],
+        'Тёмное братство': [
+            { giver: 'Астрид / Назир', reward: '250 септимов за контракт', note: 'Обычные заказы-контракты; после 5 удачных — бонус от Братства.' }
+        ],
+        'Стража Рассвета': [
+            { giver: 'Гунмар', reward: '200-500 септимов', note: 'Охота на вампиров и их логова (несколько разных заданий).' }
+        ],
+        'Бойцовский клуб': [
+            { giver: 'Феридар (судья/комментатор)', reward: 'Золото, самоцветы, ювелирка, зачар. оружие/броня', note: 'Запись на турнир (группы по уровню: Новички 1-5 лвл и выше). Медаль подтверждать каждый турнир.' }
+        ],
+        'Коллегия бардов': [
+            { giver: 'Музей коллегии', reward: '800 септимов за легендарную песню', note: 'Сдать историческое/мифическое оружие или броню; 4 легендарные песни → "Бардовская баллада".' }
+        ]
+    };
+
+    let playerGuildsData = null;
+    let playerReputationByRegion = null;
+    let playerSupernaturalState = null;
+
+    // Задача L: показывает активное сверхъестественное состояние на листе игрока, с кнопками
+    // "Превратиться"/"Покормиться" — те же данные, что мастер видит и правит у себя.
+    function renderSupernaturalStatusPlayer() {
+        const el = document.getElementById('supernatural-status-player');
+        if (!el) return;
+        const s = playerSupernaturalState;
+        if (!s || (!s.lycanthropy && !s.vampirism)) {
+            el.innerHTML = '<p style="opacity:.6; font-size:13px;">Нет сверхъестественного состояния.</p>';
+            return;
+        }
+        let html = '';
+        if (s.lycanthropy) {
+            const w = s.werewolf;
+            html += `<div class="party-row">
+                <div class="row-name"><strong>🐺 Ликантропия</strong><span>${w.heartsEaten || 0} сердец</span></div>
+                <div style="font-size:12px; opacity:.85;">Тотем: ${escHtml(w.totem || '— нет —')} · ${w.isTransformed ? 'Сейчас в форме зверя' : (w.hasTransformedToday ? 'Уже превращался(лась) сегодня' : 'Превращение доступно')}</div>
+                ${!w.isTransformed && !w.hasTransformedToday ? `<button class="btn-success" style="width:100%; margin-top:4px;" onclick="playerTransformWerewolf()">Превратиться в зверя</button>` : ''}
+                ${w.isTransformed ? `<button class="btn-danger" style="width:100%; margin-top:4px;" onclick="playerRevertWerewolf()">Вернуть человеческий облик</button>` : ''}
+            </div>`;
+        }
+        if (s.vampirism) {
+            const v = s.vampire;
+            const period = (window.CloudSync && window.CloudSync.getSessionData() && window.CloudSync.getSessionData().timePeriod) || null;
+            const sunWarning = period === 'День' ? '<br><span style="color:#e74c3c;">☀️ Сейчас день — уязвимость к солнцу: входящий урон ×2!</span>' : '';
+            html += `<div class="party-row">
+                <div class="row-name"><strong>🧛 Вампиризм</strong><span>Голод: ${v.hungerStage || 0}/3</span></div>
+                <div style="font-size:12px; opacity:.85;">Ранг: ${v.rank || 0}${sunWarning}</div>
+            </div>`;
+        }
+        el.innerHTML = html;
+    }
+
+    window.playerTransformWerewolf = function () {
+        if (!playerSupernaturalState) return;
+        playerSupernaturalState.werewolf.isTransformed = true;
+        playerSupernaturalState.werewolf.hasTransformedToday = true;
+        saveSupernaturalStatePlayer();
+        renderSupernaturalStatusPlayer();
+        updateAll();
+        if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
+        if (window.CloudSync && window.CloudSync.postCombatLog) {
+            const myName = document.getElementById('char-name').value;
+            window.CloudSync.postCombatLog(`🐺 ${myName} обращается в зверя!`, myName);
+        }
+    };
+
+    window.playerRevertWerewolf = function () {
+        if (!playerSupernaturalState) return;
+        playerSupernaturalState.werewolf.isTransformed = false;
+        saveSupernaturalStatePlayer();
+        renderSupernaturalStatusPlayer();
+        updateAll();
+        if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
+    };
+
+    function saveSupernaturalStatePlayer() {
+        if (!window.CloudSync || !playerSupernaturalState || typeof window.CloudSync.saveOwnSupernaturalState !== 'function') return;
+        window.CloudSync.saveOwnSupernaturalState(playerSupernaturalState).catch(e => console.error('Ошибка сохранения сверхъестественного состояния:', e));
+    }
+
+
+    function renderGuildPanelPlayer() {
+        const el = document.getElementById('guild-panel-player');
+        if (!el) return;
+        const data = playerGuildsData || {};
+        el.innerHTML = Object.keys(GUILD_QUEST_GIVERS).map(g => `
+            <div class="party-row">
+                <div class="row-name"><strong>${escHtml(g)}</strong><span>Заказов: ${data[g] || 0}</span></div>
+                ${GUILD_QUEST_GIVERS[g].map(qg => `<div style="font-size:12px; margin-top:3px; opacity:.85;">👤 <strong>${escHtml(qg.giver)}</strong>${qg.reward !== '—' ? ' · 💰 ' + escHtml(qg.reward) : ''}<br><span style="opacity:.75;">${escHtml(qg.note)}</span></div>`).join('')}
+            </div>`).join('');
+    }
+
     function renderQuestList() {
         const el = document.getElementById('quest-list');
         if (!el) return;
@@ -3108,6 +3417,7 @@ window.toggleSkillPanel = function (idx) {
                 <div style="font-size:14px; margin:2px 0;">${escHtml(q.desc || '')}</div>
                 ${q.requirement ? `<div style="font-size:13px; opacity:.8;">🎯 Нужно: ${escHtml(q.requirement)}</div>` : ''}
                 ${q.reward ? `<div style="font-size:13px; opacity:.8;">🎁 Награда: ${escHtml(q.reward)}</div>` : ''}
+                ${q.guild ? `<div style="font-size:13px; opacity:.8;">🏛️ Гильдия: ${escHtml(q.guild)}</div>` : ''}
                 ${q.status !== 'done' ? `<button style="width:100%; margin-top:4px;" onclick="markQuestDone('${escHtml(q.id)}')">Отметить выполненным</button>` : ''}
             </div>`).join('');
     }
@@ -3118,6 +3428,12 @@ window.toggleSkillPanel = function (idx) {
         q.status = 'done';
         renderQuestList();
         saveLocalStorage();
+        // Задача K: выполнение квеста гильдии автоматически даёт +1 к её прогрессу.
+        if (q.guild && window.CloudSync && typeof window.CloudSync.incrementGuildProgress === 'function') {
+            window.CloudSync.incrementGuildProgress(q.guild).then(() => {
+                if (typeof renderGuildPanelPlayer === 'function') renderGuildPanelPlayer();
+            }).catch(e => console.error('Ошибка прогресса гильдии:', e));
+        }
     };
 
     // ========================================================================
@@ -3755,9 +4071,11 @@ window.toggleSkillPanel = function (idx) {
         const holdTags = hold ? (INGREDIENT_HOLD_TAGS[hold] || []) : [];
 
         const allNames = Object.keys(window.alchemyIngredients || {}).filter(n => !INGREDIENT_CORPSE_ONLY.has(n));
+        const isWinter = getCurrentSeason().name === 'Зима';
         const weighted = [];
         allNames.forEach(n => {
             if (NIGHT_ONLY_INGREDIENTS.has(n) && period !== 'Ночь') return; // ночные не попадаются днём
+            if (isWinter && WINTER_UNAVAILABLE_INGREDIENTS.has(n)) return; // Задача H: трава вымерзла
             // Вес от региона и владения складывается — "фирменный" ингредиент своего владения
             // в подходящем регионе попадается ещё чаще.
             let weight = 1;
@@ -4029,6 +4347,18 @@ window.toggleSkillPanel = function (idx) {
             statLabel = STAT_LABELS[statKey];
         }
 
+        // Задача I.3: неиспользованная помощь союзника учитывается в ЛЮБОЙ следующий бросок
+        // (не только в ответ на групповую проверку) и снимается сразу после использования.
+        let helpNote = '';
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const myUid = window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null;
+        const helpBuff = myUid && session && session.buffs ? session.buffs[myUid] : null;
+        if (helpBuff && helpBuff.value) {
+            statMod += helpBuff.value;
+            helpNote = ` (+${helpBuff.value} помощь от ${helpBuff.fromName || 'союзника'})`;
+            window.CloudSync.clearHelpBuff(myUid);
+        }
+
         const isCombatSkill = skillLabel && COMBAT_SKILLS_TIE_REROLL.includes(skillLabel);
         const hasDc = dc !== null && !isNaN(dc);
 
@@ -4045,7 +4375,7 @@ window.toggleSkillPanel = function (idx) {
         // Значение самого навыка в бросок НЕ идёт — только кубик + модификатор характеристики.
         let formulaParts = [`к${dieSize}: ${roll}`];
         if (statKey) formulaParts.push(`${statLabel} ${statMod >= 0 ? '+' : ''}${statMod}`);
-        let formulaText = (skillLabel ? skillLabel + ' — ' : '') + formulaParts.join(' + ');
+        let formulaText = (skillLabel ? skillLabel + ' — ' : '') + formulaParts.join(' + ') + helpNote;
         if (rerolls > 0) formulaText += ` (перекинуто из-за ничьей: ${rerolls} раз)`;
 
         document.getElementById('dice-result-total').textContent = total;
@@ -4227,10 +4557,12 @@ window.toggleSkillPanel = function (idx) {
         if (skillProgress[skillIdx] >= needed) {
             skillProgress[skillIdx] = 0;
             let raw = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
-            raw += 1;
-            skillInput.setAttribute('data-raw-val', raw);
-            levelUpProgress += 1;
-            alert(`Навык «${skillName}» вырос до ${getEffectiveSkillValue(skillName)}!`);
+            if (raw < 100) { // лимит навыка — 100, дальше успехи не растрачиваются впустую
+                raw = Math.min(100, raw + 1);
+                skillInput.setAttribute('data-raw-val', raw);
+                levelUpProgress += 1;
+                alert(`Навык «${skillName}» вырос до ${getEffectiveSkillValue(skillName)}!`);
+            }
         }
 
         // Проверяем, не готов ли левел-ап
@@ -4585,15 +4917,106 @@ window.toggleSkillPanel = function (idx) {
         if (eligible.some(e => e.id === prev)) select.value = prev;
     };
 
+    // ---------- Задача I: групповые проверки, кооперативная атака, помощь союзнику ----------
+
+    window.renderGroupCheckPlayerPanel = function () {
+        const panel = document.getElementById('group-check-player-panel');
+        const infoEl = document.getElementById('group-check-player-info');
+        const btn = document.getElementById('group-check-roll-btn');
+        if (!panel || !infoEl || !btn) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const gc = session && session.groupCheck;
+        if (!gc) { panel.style.display = 'none'; return; }
+        panel.style.display = 'block';
+        const myUid = window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null;
+        const myResult = myUid && gc.results ? gc.results[myUid] : null;
+        if (myResult) {
+            infoEl.textContent = `«${gc.skill}»${gc.dc ? ' (порог ' + gc.dc + ')' : ''} — твой бросок: ${myResult.total} (уже отправлен).`;
+            btn.disabled = true;
+            btn.textContent = 'Уже брошено';
+        } else {
+            infoEl.textContent = `Мастер просит бросок: «${gc.skill}»${gc.dc ? ' (порог ' + gc.dc + ')' : ''}.`;
+            btn.disabled = false;
+            btn.textContent = 'Бросить';
+        }
+    };
+
+    window.rollGroupCheckResponse = function () {
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const gc = session && session.groupCheck;
+        if (!gc) return;
+        const skillIdx = skillNames.indexOf(gc.skill);
+        const statKey = skillIdx !== -1 ? SKILL_TO_STAT[gc.skill] : null;
+        let mod = 0;
+        if (statKey) {
+            const statInput = document.getElementById('stat-' + statKey);
+            const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
+            mod = calcAbilityMod(rawStat);
+        }
+        // Задача I.3: если есть неиспользованная помощь союзника — прибавляем и снимаем её.
+        const myUid = window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null;
+        const helpBuff = myUid && session.buffs ? session.buffs[myUid] : null;
+        if (helpBuff && helpBuff.value) { mod += helpBuff.value; window.CloudSync.clearHelpBuff(myUid); }
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const total = roll + mod;
+        if (!myUid || !window.CloudSync || typeof window.CloudSync.submitGroupCheckResult !== 'function') { alert('Нет соединения с сессией.'); return; }
+        window.CloudSync.submitGroupCheckResult(myUid, roll, mod, total).then(() => {
+            const myName = document.getElementById('char-name').value;
+            if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`🎲 ${myName} бросает «${gc.skill}»: ${total} (к20 ${roll}${mod >= 0 ? '+' : ''}${mod}${helpBuff ? ', учтена помощь союзника' : ''}).`, myName);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.renderHelpAllySelect = function () {
+        const sel = document.getElementById('help-ally-select');
+        if (!sel) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const myUid = window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null;
+        const participants = (session && session.participants) || {};
+        const others = Object.entries(participants).filter(([uid]) => uid !== myUid);
+        const prev = sel.value;
+        sel.innerHTML = others.length
+            ? others.map(([uid, p]) => `<option value="${uid}">${escHtml(p.name || uid)}</option>`).join('')
+            : '<option value="">Нет других игроков в сессии</option>';
+        if (others.some(([uid]) => uid === prev)) sel.value = prev;
+    };
+
+    window.helpAlly = function () {
+        const targetUid = document.getElementById('help-ally-select').value;
+        if (!targetUid) { alert('Выбери союзника.'); return; }
+        if (!window.CloudSync || typeof window.CloudSync.helpAlly !== 'function') { alert('Нет соединения с сессией.'); return; }
+        const myName = document.getElementById('char-name').value;
+        window.CloudSync.helpAlly(targetUid, myName).then(() => {
+            if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`🤝 ${myName} помогает союзнику (+1 к следующему броску).`, myName);
+            alert('Помощь отправлена — союзник получит +1 к следующему броску.');
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     // ========================================================================
     // ПЕРЕДАЧА ЗОЛОТА/ПРЕДМЕТА СОЮЗНИКУ — уже реализовано выше (tradeGoldToPlayer/
     // tradeItemToPlayer/renderTradeSelects), тут ничего дублировать не нужно.
     // ========================================================================
 
+    // Задача L: урон когтей в форме зверя — база 20 (+5 каждые 4 уровня персонажа), умножается
+    // рангом "Звериная сила" по числу съеденных сердец (25/50/75/100%).
+    function getWerewolfClawDamage() {
+        const level = parseInt(document.getElementById('char-level').value) || 1;
+        let dmg = 20 + 5 * Math.floor((level - 1) / 4);
+        const hearts = (playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.heartsEaten) || 0;
+        let mult = 1;
+        if (hearts >= 21) mult = 2;
+        else if (hearts >= 11) mult = 1.75;
+        else if (hearts >= 7) mult = 1.5;
+        else if (hearts >= 5) mult = 1.25;
+        return Math.round(dmg * mult);
+    }
+
     function renderAttackActionSelect() {
         const select = document.getElementById('attack-action-select');
         if (!select) return;
         let opts = '<option value="melee">Оружие ближнего боя</option><option value="ranged">Оружие дальнего боя</option>';
+        if (playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed) {
+            opts += `<option value="claw">🐺 Когти зверя (${getWerewolfClawDamage()} урона)</option>`;
+        }
         (customSpells || []).forEach(s => {
             // Заклинания призыва/подъёма (плоть, оружие, зомби, атронахи) НЕ прямые атаки — их числа
             // в описании описывают призываемое существо/предмет, а не урон по цели. Кастуются через
@@ -4660,11 +5083,58 @@ window.toggleSectionById = function (panelId) {
     body.style.display = isOpen ? 'none' : 'block';
     if (chev) chev.textContent = isOpen ? '▸' : '▾';
 };
+// Задача F: календарь праздников — ищет праздник(и) на сегодняшнюю дату (gameMonth/gameDayNum
+// уже 0-11, тот же индекс что в holidaysData).
+function findTodayHolidays() {
+    if (!window.holidaysData) return [];
+    return window.holidaysData.filter(h => h.month === gameMonth && h.day === gameDayNum);
+}
+
+function renderTodayHolidayWidget() {
+    const el = document.getElementById('today-holiday-widget');
+    if (!el) return;
+    const today = findTodayHolidays();
+    if (!today.length) { el.innerHTML = ''; return; }
+    el.innerHTML = today.map(h => `<div style="color:var(--accent-color);">🎉 Сегодня: <strong>${escHtml(h.title)}</strong> (${escHtml(h.group)})${h.discount ? ` — скидка у торговцев до ${h.discount}%!` : ''}</div>`).join('');
+}
+
+function renderCalendarTab() {
+    const el = document.getElementById('calendar-list');
+    const widgetEl = document.getElementById('calendar-today-widget');
+    if (!el || !window.holidaysData) return;
+    const today = findTodayHolidays();
+    widgetEl.innerHTML = today.length
+        ? `🎉 Сегодня (${gameDayNum} ${MONTH_NAMES[gameMonth]}): ${today.map(h => `<strong>${escHtml(h.title)}</strong>`).join(', ')}`
+        : `Сегодня (${gameDayNum} ${MONTH_NAMES[gameMonth]}) праздников нет.`;
+
+    // Группируем по "part" (6 частей календаря), сохраняя исходный порядок.
+    const parts = [];
+    const byPart = {};
+    window.holidaysData.forEach(h => {
+        if (!byPart[h.part]) { byPart[h.part] = []; parts.push(h.part); }
+        byPart[h.part].push(h);
+    });
+    el.innerHTML = parts.map(partTitle => `
+        <h3 style="margin-top:14px;">${escHtml(partTitle)}</h3>
+        ${byPart[partTitle].map(h => {
+            const isToday = h.month === gameMonth && h.day === gameDayNum;
+            return `<div class="party-row" style="${isToday ? 'border-color:var(--accent-color); box-shadow:0 0 6px var(--accent-color);' : ''}">
+                <div class="row-name"><strong>${isToday ? '🎉 ' : ''}${escHtml(h.title)}</strong><span>${h.day} ${escHtml(MONTH_NAMES[h.month])}</span></div>
+                <div style="font-size:12px; opacity:.75;">${escHtml(h.group)}${h.discount ? ` · скидка до ${h.discount}%` : ''}</div>
+                <div style="font-size:13px; margin-top:2px;">${escHtml(h.desc)}</div>
+            </div>`;
+        }).join('')}
+    `).join('');
+}
+
 function updateDateDisplay() {
     const el = document.getElementById('date-display');
     if (el) {
-        el.textContent = `📅 ${gameDayNum} ${MONTH_NAMES[gameMonth]}, 4Э ${gameYear}`;
+        const season = getCurrentSeason();
+        el.textContent = `📅 ${gameDayNum} ${MONTH_NAMES[gameMonth]}, 4Э ${gameYear} · ${season.icon} ${season.name}`;
     }
+    renderTodayHolidayWidget();
+    if (typeof renderCalendarTab === 'function') renderCalendarTab();
     const hungerEl = document.getElementById('hunger-status');
     if (hungerEl) {
         if (daysWithoutFood === 0) {
@@ -4696,6 +5166,24 @@ window.nextDay = function () {
 
     // Тик длительности по ходам НЕ происходит — ходы и дни раздельны.
     // Но если хочешь, чтобы «раз в день» способности обнулялись, здесь это место.
+
+    // Задача L: дневной тик сверхъестественного — вампиру растёт голод, оборотню
+    // возвращается возможность превратиться.
+    if (playerSupernaturalState) {
+        let changed = false;
+        if (playerSupernaturalState.vampirism) {
+            playerSupernaturalState.vampire.hungerStage = Math.min(3, (playerSupernaturalState.vampire.hungerStage || 0) + 1);
+            changed = true;
+        }
+        if (playerSupernaturalState.lycanthropy) {
+            playerSupernaturalState.werewolf.hasTransformedToday = false;
+            changed = true;
+        }
+        if (changed) {
+            saveSupernaturalStatePlayer();
+            renderSupernaturalStatusPlayer();
+        }
+    }
 
     // Голод: если сегодня не ели — счётчик растёт
     daysWithoutFood += 1;
@@ -4785,6 +5273,13 @@ function updateHungerPenalty() {
             skillNameForProgress = actionVal === 'melee'
                 ? (calc.wepType === 'twohand_sword' || calc.wepType === 'twohand_axe' || calc.wepType === 'twohand_hammer' ? 'Двуручное оружие' : 'Одноручное оружие')
                 : 'Стрельба';
+        } else if (actionVal === 'claw') {
+            dmg = getWerewolfClawDamage();
+            const strInput = document.getElementById('stat-str');
+            const rawStr = strInput ? (parseInt(strInput.getAttribute('data-raw-stat')) || 10) : 10;
+            mod = calcAbilityMod(rawStr);
+            dmgType = 'physical';
+            actionLabel = 'когтями зверя';
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
@@ -4996,6 +5491,11 @@ function updateHungerPenalty() {
             if (godB.hp) baseHp += godB.hp;
             baseHp += equipBonuses.hp;
             baseHp += activeEffectBonuses.hp;
+            // Задача L: форма зверя даёт +50 хп (+100, если открыта "Животная энергия" — 27 сердец).
+            if (playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed) {
+                const hearts = playerSupernaturalState.werewolf.heartsEaten || 0;
+                baseHp += hearts >= 27 ? 100 : 50;
+            }
             document.getElementById('max-hp').value = baseHp;
         }
 
@@ -5460,8 +5960,7 @@ function updateHungerPenalty() {
             skillProgress: skillProgress,
             playerQuests: playerQuests,
             activeSummons: activeSummons,
-            resistances: computeTotalResistances(),
-            speechTradeVolume: speechTradeVolume
+            resistances: computeTotalResistances()
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
@@ -5470,6 +5969,21 @@ function updateHungerPenalty() {
     // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
     function applyCharacterData(data) {
         if (!data) return;
+        // Задача K: прогресс гильдий приходит вместе со всем остальным документом —
+        // отдельный запрос (getOwnCharacterField) не нужен, экономим чтение Firestore.
+        playerGuildsData = data.guildsData || {};
+        // Задача C: репутация нужна для расчёта цены у торговцев (±5%), но НЕ отображается
+        // игроку нигде — только используется молча в формуле цены (Задача D: "игрок не видит").
+        playerReputationByRegion = data.reputationByRegion || {};
+        if (typeof renderGuildPanelPlayer === 'function') renderGuildPanelPlayer();
+        // Задача L: то же самое для сверхъестественного состояния — читаем сразу из документа.
+        playerSupernaturalState = data.supernaturalState ? {
+            lycanthropy: !!data.supernaturalState.lycanthropy,
+            vampirism: !!data.supernaturalState.vampirism,
+            werewolf: Object.assign({ heartsEaten: 0, totem: '— нет —', hasTransformedToday: false, isTransformed: false }, data.supernaturalState.werewolf || {}),
+            vampire: Object.assign({ hungerStage: 0, rank: 0, abilities: {} }, data.supernaturalState.vampire || {})
+        } : null;
+        if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
         try {
             document.getElementById('char-name').value = data.name || '';
             document.getElementById('char-race').value = data.race || 'nord';
@@ -5520,11 +6034,15 @@ function updateHungerPenalty() {
             // Миграция старого инвентаря ресурсов (фиксированные счётчики) в новый общий
             // инвентарь выполняется ниже, после восстановления playerInventory из data.inventory.
             window._legacyInvToMigrate = data.inv || null;
-            let sInputs = document.querySelectorAll('[id^="skill-"]');
-            if (data.skills && sInputs.length === data.skills.length) {
-                sInputs.forEach((input, i) => {
-                    let val = data.skills[i] || 10;
-                    input.setAttribute('data-raw-val', val);
+            // Раньше здесь был querySelectorAll('[id^="skill-"]') — он случайно захватывал ещё
+            // #skill-progress-list (панель на вкладке «Проверка», тоже начинается с "skill-"),
+            // из-за чего sInputs.length (20) никогда не совпадал с data.skills.length (19) и
+            // проверка ниже всегда проваливалась — навыки молча не восстанавливались при загрузке.
+            // Теперь берём ровно по индексу, как и при сохранении (skill-0 .. skill-N).
+            if (Array.isArray(data.skills)) {
+                data.skills.forEach((val, i) => {
+                    const input = document.getElementById('skill-' + i);
+                    if (input) input.setAttribute('data-raw-val', val || 10);
                 });
             }
             if (data.perkStates) {
@@ -5587,7 +6105,6 @@ function updateHungerPenalty() {
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
             playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
             activeSummons = Array.isArray(data.activeSummons) ? data.activeSummons : [];
-            speechTradeVolume = parseInt(data.speechTradeVolume) || 0;
             renderActiveSummonsList();
             renderQuestList();
 
@@ -5733,6 +6250,9 @@ function updateHungerPenalty() {
     renderAttackActionSelect();
     if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
     renderTradeSelects();
+    renderBuyList();
+    if (typeof renderGroupCheckPlayerPanel === 'function') renderGroupCheckPlayerPanel();
+    if (typeof renderHelpAllySelect === 'function') renderHelpAllySelect();
 </script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

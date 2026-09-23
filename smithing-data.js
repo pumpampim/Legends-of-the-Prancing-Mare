@@ -1205,6 +1205,70 @@ const weaponRecipes = [
         damage: 18, weight: 6.0, price: 1800, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 3 }]
+    },
+    // Кастеты — из исходника "Броня,одеяния,оружие" (колонка F, до этого не были перенесены
+    // в систему вообще). В системе не куются (в исходнике поле "Рецепт" пустое у всех) —
+    // только лут/покупка/квест, ingredients: [] намеренно. Урон снижен на 2 от значений
+    // исходника по прямой просьбе (было: 9/10/13/14/15/14/16/13/18/19/17/20).
+    {
+        name: "Меховые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 7, weight: 3.0, price: 5, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: null, ingredients: []
+    },
+    {
+        name: "Сыромятные боевые наручи", category: "Кастеты", subcat: "Кастеты",
+        damage: 8, weight: 3.0, price: 10, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: null, ingredients: []
+    },
+    {
+        name: "Железные боевые наручи", category: "Кастеты", subcat: "Кастеты",
+        damage: 11, weight: 4.0, price: 25, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: null, ingredients: []
+    },
+    {
+        name: "Стальные боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 12, weight: 4.0, price: 65, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Стальные доспехи", ingredients: []
+    },
+    {
+        name: "Ламеллярные боевые наручи", category: "Кастеты", subcat: "Кастеты",
+        damage: 12, weight: 4.0, price: 75, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: null, ingredients: []
+    },
+    {
+        name: "Пластинчатые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 13, weight: 4.0, price: 150, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: null, ingredients: []
+    },
+    {
+        name: "Эльфийские боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 11, weight: 3.0, price: 50, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Эльфийские доспехи", ingredients: []
+    },
+    {
+        name: "Двемерские боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 14, weight: 5.0, price: 95, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Двемерские доспехи", ingredients: []
+    },
+    {
+        name: "Орочьи боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 16, weight: 4.0, price: 204, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Орочьи доспехи", ingredients: []
+    },
+    {
+        name: "Стеклянные боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 15, weight: 4.0, price: 212, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Стеклянные доспехи", ingredients: []
+    },
+    {
+        name: "Нордские боевые рукавицы", category: "Кастеты", subcat: "Кастеты",
+        damage: 17, weight: 4.0, price: 245, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Стальные доспехи", ingredients: []
+    },
+    {
+        name: "Эбонитовые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
+        damage: 18, weight: 4.0, price: 308, slot: 'melee', isAmmo: false,
+        yieldCount: 1, perkHint: "Эбонитовые доспехи", ingredients: []
     }
 ];
 window.weaponRecipes = weaponRecipes;
