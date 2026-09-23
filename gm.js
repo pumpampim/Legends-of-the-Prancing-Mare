@@ -8,7 +8,7 @@
     let currentUser = null;
     let currentCode = null;
     let unsubSession = null;
-    let lastData = { participants: {}, enemies: [], initiative: [], combatLog: [] };
+    let lastData = { participants: {}, enemies: [], turnOrder: [], combatLog: [] };
     let gmAllItems = [];
     let gmFilteredItems = [];
     let currentRecipePlayerUid = null;
@@ -182,7 +182,8 @@
     function renderAll() {
         renderParty(lastData.participants || {});
         renderEnemies(lastData.enemies || []);
-        renderInitiative(lastData.initiative || []);
+        renderTurnOrder(lastData.turnOrder || []);
+        renderTurnOrderPickSelect();
         renderLog(lastData.combatLog || []);
         populateRecipePlayerSelect();
         populateInvPlayerSelect();
@@ -192,6 +193,7 @@
         populateLootTargetSelect();
         if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
+        if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
     }
 
     // ---------- Отряд ----------
@@ -360,35 +362,75 @@
 
     // ---------- Инициатива ----------
 
-    function renderInitiative(list) {
-        const target = el('gm-initiative-list');
-        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Инициатива не задана.</p>'; return; }
-        const sorted = list.slice().sort((a, b) => (b.roll || 0) - (a.roll || 0));
-        target.innerHTML = sorted.map((item, i) =>
-            '<div class="initiative-row"><span>' + (i + 1) + '. ' + escapeHtml(item.name || '?') + ' — ' + (item.roll ?? '') + '</span>' +
-            '<button class="btn-danger" style="width:auto;padding:1px 8px;font-size:12px;" onclick="removeInitiative(\'' + item.id + '\')">×</button></div>'
-        ).join('');
+    // ---------- Порядок ходов (заменяет инициативу — своя система, без броска) ----------
+
+    function renderTurnOrder(list) {
+        const target = el('turn-order-list');
+        if (!target) return;
+        if (!list.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Порядок ходов не задан.</p>'; return; }
+        target.innerHTML = list.map((item, i) => `
+            <div class="initiative-row">
+                <span>${i + 1}. ${escapeHtml(item.name || '?')}</span>
+                <span style="display:flex; gap:4px;">
+                    <button style="width:auto;padding:1px 8px;font-size:12px;" ${i === 0 ? 'disabled' : ''} onclick="moveTurnOrder('${item.id}', -1)">▲</button>
+                    <button style="width:auto;padding:1px 8px;font-size:12px;" ${i === list.length - 1 ? 'disabled' : ''} onclick="moveTurnOrder('${item.id}', 1)">▼</button>
+                    <button class="btn-danger" style="width:auto;padding:1px 8px;font-size:12px;" onclick="removeTurnOrder('${item.id}')">×</button>
+                </span>
+            </div>`).join('');
     }
 
-    window.addInitiative = function () {
-        const name = el('init-name-input').value.trim();
+    // Собирает список для выпадашки: игроки сессии, их призванные/поднятые существа
+    // (лёгкий список имён, синхронизированный из characters/{uid}.activeSummons), и живые враги.
+    function renderTurnOrderPickSelect() {
+        const sel = el('turn-order-pick-select');
+        if (!sel) return;
+        const opts = [];
+        Object.entries(lastData.participants || {}).forEach(([uid, p]) => {
+            opts.push(`<option value="${escapeHtml(p.name || uid)}">🧑 ${escapeHtml(p.name || uid)}</option>`);
+            (p.summonNames || []).forEach(sn => opts.push(`<option value="${escapeHtml(sn)}">👻 ${escapeHtml(sn)} (существо ${escapeHtml(p.name || uid)})</option>`));
+        });
+        (lastData.enemies || []).filter(e => (e.curHp || 0) > 0).forEach(e => {
+            opts.push(`<option value="${escapeHtml(e.name)}">💀 ${escapeHtml(e.name)}</option>`);
+        });
+        sel.innerHTML = opts.length ? opts.join('') : '<option value="">— никого нет —</option>';
+    }
+
+    window.addTurnOrderFromPick = function () {
+        const name = el('turn-order-pick-select').value;
         if (!name) return;
-        const roll = Number(el('init-roll-input').value) || 0;
-        const initiative = (lastData.initiative || []).slice();
-        initiative.push({ id: genId('i'), name, roll });
-        db.collection('sessions').doc(currentCode).update({ initiative }).then(() => {
-            el('init-name-input').value = '';
-            el('init-roll-input').value = '';
-        }).catch(e => console.error(e));
+        addTurnOrderEntry(name);
     };
 
-    window.removeInitiative = function (id) {
-        const initiative = (lastData.initiative || []).filter(i => i.id !== id);
-        db.collection('sessions').doc(currentCode).update({ initiative }).catch(e => console.error(e));
+    window.addTurnOrderCustom = function () {
+        const input = el('turn-order-name-input');
+        const name = input.value.trim();
+        if (!name) return;
+        addTurnOrderEntry(name);
+        input.value = '';
     };
 
-    window.clearInitiative = function () {
-        db.collection('sessions').doc(currentCode).update({ initiative: [] }).catch(e => console.error(e));
+    function addTurnOrderEntry(name) {
+        const list = (lastData.turnOrder || []).slice();
+        list.push({ id: genId('t'), name });
+        db.collection('sessions').doc(currentCode).update({ turnOrder: list }).catch(e => console.error(e));
+    }
+
+    window.moveTurnOrder = function (id, dir) {
+        const list = (lastData.turnOrder || []).slice();
+        const idx = list.findIndex(i => i.id === id);
+        const swapIdx = idx + dir;
+        if (idx === -1 || swapIdx < 0 || swapIdx >= list.length) return;
+        [list[idx], list[swapIdx]] = [list[swapIdx], list[idx]];
+        db.collection('sessions').doc(currentCode).update({ turnOrder: list }).catch(e => console.error(e));
+    };
+
+    window.removeTurnOrder = function (id) {
+        const list = (lastData.turnOrder || []).filter(i => i.id !== id);
+        db.collection('sessions').doc(currentCode).update({ turnOrder: list }).catch(e => console.error(e));
+    };
+
+    window.clearTurnOrder = function () {
+        db.collection('sessions').doc(currentCode).update({ turnOrder: [] }).catch(e => console.error(e));
     };
 
     // ---------- Боевой журнал ----------
@@ -619,6 +661,8 @@
         if (count === null) return;
         const numCount = parseInt(count) || 1;
         if (numCount < 1) return;
+        // Задача C: краденое можно продать только скупщику Гильдии воров.
+        const isStolen = confirm('Это краденый предмет? (ОК — да, краденое; Отмена — обычный предмет)');
 
         // Переносим слот/броню/урон/цену, чтобы игрок мог сразу надеть/взять в руки предмет
         // и видеть его цену.
@@ -629,6 +673,7 @@
         if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
         if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
+        if (isStolen) extra.stolen = true;
 
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.data();
@@ -856,8 +901,9 @@
     function renderReputationPanel() {
         const listEl = el('reputation-list');
         if (!listEl) return;
-        if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
-        listEl.innerHTML = REPUTATION_HOLDS.map(h => `
+        if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Игрок не выбран — выбери его в панели «Инвентарь и деньги» выше, этот же выбор используется здесь.</p>'; return; }
+        const pname = (lastData.participants && lastData.participants[currentInvPlayerUid] && lastData.participants[currentInvPlayerUid].name) || currentInvPlayerUid;
+        listEl.innerHTML = `<p style="font-size:13px; opacity:.8; margin-bottom:6px;">Игрок: <strong>${escapeHtml(pname)}</strong></p>` + REPUTATION_HOLDS.map(h => `
             <div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
                 <span>${escapeHtml(h)}</span>
                 <span style="display:flex; align-items:center; gap:4px;">
@@ -924,10 +970,23 @@
     };
     window.LIVING_MERCHANT_TYPES = LIVING_MERCHANT_TYPES;
 
+    // Предметы, которые торговец не продаёт, даже если формально попадают в его категорию
+    // (например, человечье мясо — никто не торгует им легально).
+    // Предметы, которые НЕ должны попадать в ассортимент живых торговцев, хотя формально имеют
+    // цену и подходящую категорию: человечье мясо (неаппетитно для витрины алхимика), одеяния
+    // Коллегии магов (выдаются только за полное изучение школы, не продаются торговцами), одежда
+    // повара (рабочая форма, не то, что носят обычные покупатели).
+    const MERCHANT_EXCLUDED_ITEMS = new Set([
+        'Человечье мясо',
+        'Перчатки магистра (школы)', 'Роба разрушения', 'Великий созидатель', 'Создатель обмана',
+        'Мастер даэдра', 'Великий свет', 'Выпускник Коллегии Магов Винтерхолда',
+        'Одение повара', 'Колпак повара'
+    ]);
+
     function getMerchantItemPool(typeKey) {
         const def = LIVING_MERCHANT_TYPES[typeKey];
         if (!def) return [];
-        let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0);
+        let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0 && !MERCHANT_EXCLUDED_ITEMS.has(i.name));
         if (typeKey === 'blacksmith2') {
             pool = pool.concat((window.weaponRecipes || []).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorRecipes || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: GM_SMITHING_SLOT_MAP[a.slot] || null })));
@@ -940,23 +999,85 @@
 
     // Генерирует новый ассортимент (10-20 предметов) + сбрасывает золото до базового. Ключ —
     // "тип@владение", т.к. кузнец в Вайтране и кузнец в Маркарте — разные лавки с разным товаром.
+    // Привязка "что добывают в этом краю" к владению — используется у кузнеца, чтобы его
+    // витрина отражала местные месторождения/традиции, а не была одинаковой по всему Скайриму.
+    // Не эксклюзивно (не единственный материал), просто выпадает заметно чаще.
+    const HOLD_MATERIAL_AFFINITY = {
+        'Вайтран': /^(Железн|Стальн)/i,
+        'Рифт': /^(Стальн|Орочь)/i,
+        'Хаафингар': /^(Стальн|Эльфийск)/i,
+        'Хьялмарк': /^(Железн|Стальн)/i,
+        'Истмарк': /^(Стальн|Нордск)/i,
+        'Фолкрит': /^(Железн|Стальн)/i,
+        'Предел': /^(Двемерск|Эльфийск)/i,
+        'Белый Берег': /^(Железн|Стальн)/i,
+        'Винтерхолд': /^(Стальн|Стеклянн)/i
+    };
+
     window.refreshMerchantStock = function () {
         const typeKey = el('merchant-type-select').value;
         const hold = el('merchant-hold-select').value;
         if (!hold) { alert('Выбери владение.'); return; }
         const def = LIVING_MERCHANT_TYPES[typeKey];
-        const pool = getMerchantItemPool(typeKey);
+        let pool = getMerchantItemPool(typeKey);
         if (!pool.length) { alert('Нет предметов в базе для этого типа торговца.'); return; }
-        const count = Math.min(pool.length, randInt(10, 20));
-        const shuffled = pool.slice().sort(() => Math.random() - 0.5);
-        const items = shuffled.slice(0, count).map(i => ({ name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '' }));
+
+        // У кузнеца — вес местного материала (по владению) в 3 раза выше, остальное не пропадает,
+        // просто попадается реже. Строим "взвешенный" пул простым дублированием записей.
+        let weightedPool = pool;
+        if (typeKey === 'blacksmith2' && HOLD_MATERIAL_AFFINITY[hold]) {
+            const affinity = HOLD_MATERIAL_AFFINITY[hold];
+            weightedPool = [];
+            pool.forEach(i => {
+                const weight = affinity.test(i.name) ? 3 : 1;
+                for (let w = 0; w < weight; w++) weightedPool.push(i);
+            });
+        }
+
+        const count = Math.min(pool.length, randInt(15, 26)); // было 10-20, теперь +5-6 позиций
+        const shuffled = weightedPool.slice().sort(() => Math.random() - 0.5);
+        const items = [];
+        const usedNames = new Set();
+        for (const i of shuffled) {
+            if (items.length >= count) break;
+            if (usedNames.has(i.name)) continue; // без повторов позиций — количество штук решается ниже
+            usedNames.add(i.name);
+            items.push(i);
+        }
+        // Задача: у торговца несколько штук одной вещи (3 пшеницы, 5 соли и т.п.) — расходники
+        // (еда/ингредиенты/боеприпасы/самоцветы) получают случайное количество 2-6, штучные вещи
+        // (оружие/броня/книги/украшения) остаются по 1.
+        const STACKABLE_CATEGORIES = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
+        const finalItems = items.map(i => {
+            const qty = STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1;
+            return { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '', qty };
+        });
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
-        stocks[key] = { gold: def.gold, items: items, updatedAt: Date.now(), label: def.label, hold: hold };
+        stocks[key] = { gold: def.gold, items: finalItems, updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold };
         db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
-            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${items.length} товаров, золото ${def.gold}.</span>`;
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${def.gold}.</span>`;
+            renderMerchantStaleness();
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // Задача C: "раз в неделю" не бывает автоматически без общего счётчика игровых дней (у
+    // календаря на листе игрока нет привязки к сессии) — вместо тихого автосброса посреди игры
+    // мастер явно видит, у кого ассортимент устарел (7+ игровых дней), и жмёт обновить сам.
+    function renderMerchantStaleness() {
+        const box = el('merchant-staleness-list');
+        if (!box) return;
+        const stocks = lastData.merchantStocks || {};
+        const keys = Object.keys(stocks);
+        const currentDay = lastData.gameDayCounter || 0;
+        if (!keys.length) { box.innerHTML = '<p style="opacity:.6; font-size:13px;">Торговцев ещё нет.</p>'; return; }
+        box.innerHTML = keys.map(k => {
+            const s = stocks[k];
+            const daysAgo = currentDay - (s.generatedOnDay || 0);
+            const stale = daysAgo >= 7;
+            return `<div style="font-size:13px; ${stale ? 'color:#e67e22;' : ''}">${stale ? '⚠️ ' : ''}${escapeHtml(s.label)} — ${escapeHtml(s.hold)}: ${daysAgo} игр. дн. назад${stale ? ' (пора обновить)' : ''}</div>`;
+        }).join('');
+    }
 
     function renderMerchantHoldSelect() {
         const sel = el('merchant-hold-select');
@@ -1083,6 +1204,7 @@
         const uid = el('inv-player-select').value;
         if (!uid) {
             currentInvPlayerUid = null;
+            window.CloudSync.unwatchCharacter();
             el('inv-gold-block').style.display = 'none';
             el('inv-level-block').style.display = 'none';
             el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
@@ -1096,8 +1218,10 @@
         }
         currentInvPlayerUid = uid;
         el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Загрузка...</p>';
-        db.collection('characters').doc(uid).get().then(doc => {
-            const data = doc.exists ? doc.data() : {};
+        let firstSnapshot = true;
+        // Живой листенер вместо одноразового .get() — если игрок сам меняет инвентарь/экипировку
+        // на своём листе, мастер видит это СРАЗУ, без повторного выбора из списка.
+        window.CloudSync.watchCharacter(uid, (data) => {
             currentPlayerInvData = {
                 inventory: Array.isArray(data.inventory) ? data.inventory : [],
                 gold: parseInt(data.gold) || 0,
@@ -1114,7 +1238,7 @@
             el('inv-level-progress').textContent = `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков`;
             renderGmPlayerInventory();
 
-            // Гильдии/Сверхъестественное — читаем из того же снапшота, без лишнего запроса.
+            // Гильдии/Сверхъестественное пишутся сразу по клику — безопасно обновлять на лету.
             currentGuildsData = Object.assign(defaultGuildsData(), data.guildsData || {});
             const defaultSn = defaultSupernaturalState();
             currentSupernaturalState = data.supernaturalState ? {
@@ -1123,12 +1247,16 @@
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
                 vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { abilities: (data.supernaturalState.vampire || {}).abilities || {} })
             } : defaultSn;
-            currentReputationData = Object.assign(defaultReputationData(), data.reputationByRegion || {});
             renderGuildsPanel();
             renderSupernaturalPanel();
-            renderReputationPanel();
-        }).catch(e => {
-            el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:13px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</p>';
+            // Репутация копится ЛОКАЛЬНО до явного "Сохранить" (см. панель Задачи D) — если
+            // перезатирать её на каждом чужом снапшоте, можно потерять несохранённые правки
+            // мастера. Подтягиваем из облака только при первом выборе этого игрока.
+            if (firstSnapshot) {
+                currentReputationData = Object.assign(defaultReputationData(), data.reputationByRegion || {});
+                renderReputationPanel();
+                firstSnapshot = false;
+            }
         });
     };
 
@@ -1864,41 +1992,60 @@
         { name: 'Сангвин', blessing: 'Почти не пьянеет; после выпивки +10% физ.урона на 20 ходов' },
         { name: '— без веры —', blessing: '' }
     ];
-    const BANDIT_WEAPON_MATERIAL = /^(Железн|Кожан|Стальн)/i;
     const BANDIT_ARMOR_SLOT_MAP = { 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' };
-    // В базе кузни нет железных/кожаных/стальных луков вообще (самый дешёвый — орочий) —
-    // используем его как "простой" лук бандита, раз других низкоуровневых нет.
-    const BANDIT_BOW_NAME = 'Орочий лук';
-    const BANDIT_SPELLS = [
-        { name: 'Искры', dmg: 15, cost: 17 },
-        { name: 'Обморожение', dmg: 15, cost: 15 },
-        { name: 'Ледяной шип', dmg: 22, cost: 22 }
+
+    // Прогрессия снаряжения по уровню — низкоуровневые бандиты в тряпье/железе, кап (50) — стекло/
+    // эбонит ("полуэбонитовый сет" по просьбе, т.е. до эбонита включительно, не выше). Каждый порог
+    // даёт доступ к материалам ЭТОГО и предыдущих порогов (не заменяет, а расширяет пул) — так
+    // высокоуровневый бандит может выпасть в чём угодно от железа до своего максимума, а не
+    // гарантированно в топе.
+    const BANDIT_TIER_THRESHOLDS = [
+        { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Меховые|Сыромятные|Железн)/i, bow: 'Охотничий лук' },
+        { minLevel: 8, weaponMat: /^Стальн/i, armorMat: /^Стальн/i, bow: 'Имперский лук' },
+        { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Двемерск)/i, bow: 'Орочий лук' },
+        { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bow: 'Эльфийский лук' },
+        { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bow: 'Стеклянный лук' },
+        { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bow: 'Эбонитовый лук' }
     ];
 
-    function getBanditGearPool() {
-        const weapons = (window.weaponRecipes || []).filter(w => BANDIT_WEAPON_MATERIAL.test(w.name) && !/лук/i.test(w.name));
-        const armors = (window.armorRecipes || []).filter(a => BANDIT_WEAPON_MATERIAL.test(a.name));
-        const bow = (window.weaponRecipes || []).find(w => w.name === BANDIT_BOW_NAME);
-        return { weapons, armors, bow };
+    function getBanditTierRegexes(level) {
+        const unlocked = BANDIT_TIER_THRESHOLDS.filter(t => t.minLevel <= level);
+        return {
+            weaponMats: unlocked.map(t => t.weaponMat),
+            armorMats: unlocked.map(t => t.armorMat),
+            bows: unlocked.map(t => t.bow)
+        };
+    }
+
+    function getBanditGearPool(level) {
+        const tiers = getBanditTierRegexes(level);
+        const weapons = (window.weaponRecipes || []).filter(w =>
+            !/лук/i.test(w.name) && tiers.weaponMats.some(re => re.test(w.name)));
+        const armors = (window.armorRecipes || []).filter(a =>
+            tiers.armorMats.some(re => re.test(a.name)));
+        const bowNames = tiers.bows;
+        const bows = (window.weaponRecipes || []).filter(w => bowNames.includes(w.name));
+        return { weapons, armors, bows };
     }
 
     let lastGeneratedBandit = null;
 
     window.generateBandit = function () {
         const resultEl = el('bandit-gen-result');
-        const pool = getBanditGearPool();
-        if (!pool.weapons.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных об оружии — проверь, что smithing-data.js подключён.</span>'; return; }
 
         // Уровень бандита: средний уровень группы (задаётся вручную) ± разброс от -1 до +2, максимум 50.
         const avgLevel = parseInt(el('bandit-avg-level').value) || 5;
         const level = Math.max(1, Math.min(50, avgLevel + (Math.floor(Math.random() * 4) - 1)));
 
+        const pool = getBanditGearPool(level);
+        if (!pool.weapons.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных об оружии — проверь, что smithing-data.js подключён.</span>'; return; }
+
         const race = BANDIT_RACES[Math.floor(Math.random() * BANDIT_RACES.length)];
         const sign = BANDIT_SIGNS[Math.floor(Math.random() * BANDIT_SIGNS.length)];
         const god = BANDIT_GODS[Math.floor(Math.random() * BANDIT_GODS.length)];
 
-        const isRanged = Math.random() < 0.25 && pool.bow;
-        const isMage = !isRanged && Math.random() < 0.2;
+        const isRanged = Math.random() < 0.25 && pool.bows.length;
+        const bow = isRanged ? pool.bows[Math.floor(Math.random() * pool.bows.length)] : null;
         const weapon = pool.weapons[Math.floor(Math.random() * pool.weapons.length)];
 
         const slots = { helmet: null, chest: null, gloves: null, boots: null, shield: null };
@@ -1910,7 +2057,7 @@
         });
         let totalArmor = 0;
         Object.keys(slots).forEach(key => {
-            if (key === 'shield' && (isRanged || isMage || Math.random() > 0.3)) return; // лучники/маги без щита
+            if (key === 'shield' && (isRanged || Math.random() > 0.3)) return; // лучники без щита
             if (key !== 'shield' && Math.random() > 0.7) return;
             const options = bySlot[key];
             if (options && options.length) {
@@ -1923,19 +2070,10 @@
         // Урон и ХП растут с уровнем (грубая, но предсказуемая шкала).
         const levelDmgMult = 1 + (level - 1) * 0.06;
         const levelHpMult = 1 + (level - 1) * 0.08;
-        const weaponDmg = isRanged ? Math.round((pool.bow.damage || 10) * levelDmgMult) : Math.round(weapon.damage * levelDmgMult);
+        const weaponDmg = isRanged ? Math.round(bow.damage * levelDmgMult) : Math.round(weapon.damage * levelDmgMult);
         const hp = Math.round(randInt(40, 90) * levelHpMult);
-
-        const spells = [];
-        if (isMage) {
-            const count = 1 + (Math.random() < 0.4 ? 1 : 0);
-            const pickedSpells = [];
-            while (pickedSpells.length < count && pickedSpells.length < BANDIT_SPELLS.length) {
-                const s = BANDIT_SPELLS[Math.floor(Math.random() * BANDIT_SPELLS.length)];
-                if (!pickedSpells.includes(s)) pickedSpells.push(s);
-            }
-            pickedSpells.forEach(s => spells.push({ name: s.name, dmg: Math.round(s.dmg * levelDmgMult), cost: s.cost }));
-        }
+        // Мана — теперь у ЛЮБОГО бандита (не только мага), для зелий/свитков за столом мастера.
+        const mp = Math.round(randInt(20, 40) * (1 + (level - 1) * 0.05));
 
         const gold = Math.round(randInt(5, 80) * (1 + (level - 1) * 0.1));
         const hasTrinket = Math.random() < 0.3;
@@ -1949,8 +2087,8 @@
         // (включая оружие) свой отдельный шанс попасть в добычу, не 100%.
         const lootItems = [];
         if (Math.random() < 0.8) {
-            if (isRanged) lootItems.push({ name: pool.bow.name, price: pool.bow.price || 0, weight: pool.bow.weight, dmg: weaponDmg, slot: 'ranged', category: 'Оружие (с трупа)' });
-            else if (!isMage) lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weaponDmg, slot: weapon.slot, category: 'Оружие (с трупа)' });
+            if (isRanged) lootItems.push({ name: bow.name, price: bow.price || 0, weight: bow.weight, dmg: weaponDmg, slot: 'ranged', category: 'Оружие (с трупа)' });
+            else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weaponDmg, slot: weapon.slot, category: 'Оружие (с трупа)' });
         }
         if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
         Object.values(slots).forEach(a => {
@@ -1961,14 +2099,96 @@
         if (hasLockpick) lootItems.push({ name: 'Отмычка', price: 5, weight: 0.1, category: 'Инструменты' });
 
         lastGeneratedBandit = {
-            name: 'Бандит', race, sign, god: god.name, level, hp,
-            weaponDmg, weaponNote: isRanged ? pool.bow.name : weapon.name, isRanged, isMage, spells,
+            name: 'Бандит', race, sign, god: god.name, level, hp, mp,
+            weaponDmg, weaponNote: isRanged ? bow.name : weapon.name, isRanged, isMage: false, spells: [],
             armor: totalArmor, gold, lootItems, isRaisable: true
         };
 
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
-        html += `ХП: ${hp} · ${isRanged ? 'Лук' : (isMage ? 'Заклинания' : 'Оружие')}: ${isRanged ? pool.bow.name + ' (' + weaponDmg + ' урона)' : (isMage ? spells.map(s => `${s.name} (${s.dmg}/${s.cost})`).join(', ') : weapon.name + ' (' + weaponDmg + ' урона)')} · Броня: ${totalArmor}<br>`;
+        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' урона)' : weapon.name + ' (' + weaponDmg + ' урона)'} · Броня: ${totalArmor}<br>`;
+        html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
+        resultEl.innerHTML = html;
+    };
+
+    // ---------- Отдельный генератор магов-бандитов (кап уровня 60, одеяния + заклинания) ----------
+
+    // Заклинания магов-бандитов — по рангу заклинания (базовый уровень требуемого умения),
+    // не жёстко привязаны к конкретному уровню бандита: чем выше уровень мага, тем ВЫШЕ ранг
+    // заклинаний ему доступен (использует реальные заклинания из spell-data.js, не выдуманные).
+    function getBanditMageSpellPool(level) {
+        if (!window.spellsData) return [];
+        const maxRank = level >= 45 ? 4 : level >= 25 ? 3 : level >= 10 ? 2 : 1;
+        const schools = ['destr', 'restor', 'conjur']; // разрушение/восстановление/колдовство — боевые школы
+        const pool = [];
+        schools.forEach(school => {
+            for (let r = 1; r <= maxRank; r++) {
+                (window.spellsData[school] && window.spellsData[school][r] || []).forEach(s => pool.push(Object.assign({ school }, s)));
+            }
+        });
+        return pool;
+    }
+
+    // Одеяния для магов-бандитов — по цене (грубая привязка к уровню: чем выше уровень, тем
+    // дороже/лучше одеяние доступно), из реального items-data.js (категория "Магические одеяния").
+    function getBanditMageRobePool(level) {
+        const maxPrice = 50 + level * 15; // кап 60 lvl ≈ 950 септимов потолок цены одеяния
+        return (gmAllItems || []).filter(i => i.category === 'Магические одеяния' && typeof i.price === 'number' && i.price <= maxPrice);
+    }
+
+    let lastGeneratedMageBandit = null;
+
+    window.generateMageBandit = function () {
+        const resultEl = el('bandit-mage-gen-result');
+        const avgLevel = parseInt(el('bandit-mage-avg-level').value) || 10;
+        const level = Math.max(1, Math.min(60, avgLevel + (Math.floor(Math.random() * 4) - 1)));
+
+        const spellPool = getBanditMageSpellPool(level);
+        if (!spellPool.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных о заклинаниях — проверь, что spell-data.js подключён.</span>'; return; }
+
+        const race = BANDIT_RACES[Math.floor(Math.random() * BANDIT_RACES.length)];
+        const sign = BANDIT_SIGNS[Math.floor(Math.random() * BANDIT_SIGNS.length)];
+        const god = BANDIT_GODS[Math.floor(Math.random() * BANDIT_GODS.length)];
+
+        // 2-4 заклинания, желательно из разных школ для разнообразия.
+        const spellCount = Math.min(spellPool.length, 2 + Math.floor(Math.random() * 3));
+        const pickedSpells = [];
+        const shuffled = spellPool.slice().sort(() => Math.random() - 0.5);
+        for (const s of shuffled) {
+            if (pickedSpells.length >= spellCount) break;
+            if (!pickedSpells.find(p => p.name === s.name)) pickedSpells.push(s);
+        }
+        const levelDmgMult = 1 + (level - 1) * 0.05;
+        const spells = pickedSpells.map(s => {
+            const dmg = (typeof parseSpellDamageFromDesc === 'function') ? parseSpellDamageFromDesc(s.desc) : null;
+            return { name: s.name, dmg: dmg ? Math.round(dmg * levelDmgMult) : 0, cost: s.cost || 20, school: s.school };
+        });
+
+        const robePool = getBanditMageRobePool(level);
+        const robe = robePool.length ? robePool[Math.floor(Math.random() * robePool.length)] : null;
+
+        const hp = Math.round(randInt(35, 70) * (1 + (level - 1) * 0.06));
+        const mp = Math.round(randInt(80, 140) * (1 + (level - 1) * 0.08)); // маги — мана в разы больше воинов
+        const gold = Math.round(randInt(15, 100) * (1 + (level - 1) * 0.1));
+
+        const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' && typeof i.price === 'number');
+        const trinket = Math.random() < 0.4 && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
+
+        const lootItems = [];
+        if (robe && Math.random() < 0.7) lootItems.push({ name: robe.name, price: robe.price || 0, weight: robe.weight || 2, slot: 'body', category: 'Магическое одеяние (с трупа)', effect: robe.effect || '' });
+        if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
+        if (Math.random() < 0.5) lootItems.push({ name: 'Отмычка', price: 5, weight: 0.1, category: 'Инструменты' });
+
+        lastGeneratedMageBandit = {
+            name: 'Бандит-маг', race, sign, god: god.name, level, hp, mp,
+            weaponDmg: 0, weaponNote: robe ? robe.name : 'Без одеяния', isRanged: false, isMage: true, spells,
+            armor: 0, gold, lootItems, isRaisable: true
+        };
+
+        let html = `<strong>Маг ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
+        if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
+        html += `ХП: ${hp} · МП: ${mp} · Одеяние: ${robe ? robe.name : '—'}<br>`;
+        html += `Заклинания: ${spells.map(s => `${s.name} (${s.dmg || '—'} урона/${s.cost} маны)`).join(', ')}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
@@ -1977,17 +2197,31 @@
         if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
         const b = lastGeneratedBandit;
         const enemies = (lastData.enemies || []).slice();
-        const maxMp = b.isMage ? 50 + b.level * 5 : 0;
         // Физический резист от брони: 10 очков брони = 1% (та же формула, что у игроков).
         const physResist = Math.min(85, Math.round((b.armor || 0) / 10));
         enemies.push({
-            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp, curMp: maxMp,
-            weaponDmg: b.isMage ? 0 : b.weaponDmg, weaponNote: b.weaponNote, resist: { physical: physResist }, spells: b.spells || [],
+            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
+            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, resist: { physical: physResist }, spells: b.spells || [],
             isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             lastGeneratedBandit = null;
             el('bandit-gen-result').innerHTML = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.addGeneratedMageBanditToCombat = function () {
+        if (!lastGeneratedMageBandit) { alert('Сначала сгенерируй мага-бандита.'); return; }
+        const b = lastGeneratedMageBandit;
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push({
+            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
+            weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
+            isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+        });
+        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+            lastGeneratedMageBandit = null;
+            el('bandit-mage-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -2199,5 +2433,49 @@
             pendingCoopAttack = null;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // ---------- Шторки для всех панелей мастера (gm.html стал очень длинным) ----------
+    // Тот же механизм, что и у игрока (initSectionAccordions в index.html), но без привязки к
+    // вкладкам — тут одна длинная страница, просто берём все .panel целиком.
+    function initGmSectionAccordions() {
+        let counter = 0;
+        document.querySelectorAll('.panel').forEach(panel => {
+            if (panel.dataset.secId) return; // уже обработана — не оборачиваем повторно
+            const h2 = panel.querySelector(':scope > h2');
+            if (!h2) return;
+            const panelId = 'gm-sec-' + (counter++);
+            panel.dataset.secId = panelId;
+
+            const body = document.createElement('div');
+            body.className = 'section-body';
+            body.id = panelId + '-body';
+
+            const kids = Array.from(panel.children);
+            let afterH2 = false;
+            kids.forEach(ch => {
+                if (ch === h2) { afterH2 = true; return; }
+                if (afterH2) body.appendChild(ch);
+            });
+            panel.appendChild(body);
+
+            h2.classList.add('section-header');
+            h2.innerHTML = `<span class="section-title">${h2.innerHTML}</span><span class="section-chevron">▾</span>`;
+            h2.addEventListener('click', () => toggleGmSectionById(panelId));
+        });
+    }
+
+    window.toggleGmSectionById = function (panelId) {
+        const panel = document.querySelector(`[data-sec-id="${panelId}"]`);
+        if (!panel) return;
+        const body = document.getElementById(panelId + '-body');
+        const chev = panel.querySelector('.section-chevron');
+        if (!body) return;
+        const isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        if (chev) chev.textContent = isOpen ? '▸' : '▾';
+    };
+
+    document.addEventListener('DOMContentLoaded', initGmSectionAccordions);
+    if (document.readyState !== 'loading') initGmSectionAccordions();
 
 })();

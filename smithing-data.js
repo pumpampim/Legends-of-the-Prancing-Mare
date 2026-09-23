@@ -1165,6 +1165,18 @@ const weaponRecipes = [
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
     {
+        name: "Охотничий лук", category: "Луки", subcat: "Луки (обычные)",
+        damage: 8, weight: 4.0, price: 50, slot: 'ranged', isAmmo: false,
+        yieldCount: 1, perkHint: null,
+        ingredients: [{ name: "Полоски кожи", qty: 3 }]
+    },
+    {
+        name: "Имперский лук", category: "Луки", subcat: "Луки (обычные)",
+        damage: 10, weight: 4.0, price: 90, slot: 'ranged', isAmmo: false,
+        yieldCount: 1, perkHint: "Стальные доспехи",
+        ingredients: [{ name: "Стальной слиток", qty: 2 }]
+    },
+    {
         name: "Орочий лук", category: "Луки", subcat: "Луки (обычные)",
         damage: 11, weight: 4.0, price: 150, slot: 'ranged', isAmmo: false,
         yieldCount: 1, perkHint: "Орочьи доспехи",

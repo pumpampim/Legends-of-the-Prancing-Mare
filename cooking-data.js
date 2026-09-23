@@ -87,7 +87,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Соль", qty: 2 }, { name: "Картофель", qty: 3 }, { name: "Лук-порей", qty: 2 }, { name: "Капуста", qty: 2 }],
-        effect: "+20 хп на 45 ходов"
+        effect: "+20 хп на 75 ходов"
     },
     {
         name: "Томатный суп",
@@ -95,7 +95,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Соль", qty: 2 }, { name: "Помидор", qty: 3 }, { name: "Чеснок", qty: 1 }, { name: "Лук-порей", qty: 2 }],
-        effect: "+10 урона заклинаний заклинания на 45 ходов"
+        effect: "+10 урона заклинаний заклинания на 75 ходов"
     },
     {
         name: "Похлёбка из капусты и яблок",
@@ -103,7 +103,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Соль", qty: 1 }, { name: "Красное яблоко", qty: 3 }, { name: "Капуста", qty: 2 }],
-        effect: "+10 урона для атак ближнего боя на 45 ходов"
+        effect: "+10 урона для атак ближнего боя на 75 ходов"
     },
     {
         name: "Говяжья похлёбка",
@@ -111,7 +111,7 @@ const recipes = [
         price: 28,
         needsWater: true,
         ingredients: [{ name: "Соль", qty: 2 }, { name: "Сырая говядина", qty: 1 }, { name: "Морковь", qty: 2 }, { name: "Чеснок", qty: 1 }],
-        effect: "+20 хп на 45 ходов"
+        effect: "+20 хп на 75 ходов"
     },
     {
         name: "Овощной суп",
@@ -119,7 +119,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Капуста", qty: 2 }, { name: "Картофель", qty: 3 }, { name: "Лук-порей", qty: 2 }, { name: "Помидор", qty: 2 }],
-        effect: "+10% к сопротивлению ядам на 45 ходов"
+        effect: "+10% к сопротивлению ядам на 75 ходов"
     },
     {
         name: "Похлёбка из оленины",
@@ -127,7 +127,7 @@ const recipes = [
         price: 28,
         needsWater: true,
         ingredients: [{ name: "Соль", qty: 2 }, { name: "Оленина", qty: 1 }, { name: "Картофель", qty: 3 }, { name: "Лук-порей", qty: 2 }],
-        effect: "+5 к скорости на 45 ходов"
+        effect: "+5 к скорости на 75 ходов"
     },
     {
         name: "Похлёбка из хоркера",
@@ -135,7 +135,7 @@ const recipes = [
         price: 28,
         needsWater: true,
         ingredients: [{ name: "Лаванда", qty: 1 }, { name: "Помидор", qty: 3 }, { name: "Чеснок", qty: 1 }, { name: "Мясо хоркера", qty: 1 }],
-        effect: "+20 к брони на 45 ходов"
+        effect: "+20 к брони на 75 ходов"
     },
     {
         name: "Эльсвейрcкое фондю",
@@ -143,7 +143,7 @@ const recipes = [
         price: 25,
         needsWater: false,
         ingredients: [{ name: "Круг эйдарского сыра", qty: 2 }, { name: "Лунный сахар", qty: 1 }],
-        effect: "Запас магии увеличен на 25 на 45 ходов"
+        effect: "Запас магии увеличен на 25 на 75 ходов"
     },
     {
         name: "Суп из молюсков",
@@ -151,7 +151,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Картофель", qty: 2 }, { name: "Мясо устрицы", qty: 3 }, { name: "Соль", qty: 1 }],
-        effect: "шанс 10 % поглотить заклинания на 45 ходов"
+        effect: "шанс 10 % поглотить заклинания на 75 ходов"
     },
     {
         name: "Чесночный хлеб",
@@ -159,7 +159,7 @@ const recipes = [
         price: 25,
         needsWater: false,
         ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Масло", qty: 1 }],
-        effect: "+25% сопротивления к болезням на 45 ходов"
+        effect: "+25% сопротивления к болезням на 75 ходов"
     },
     {
         name: "Булка плетенка",
@@ -167,7 +167,7 @@ const recipes = [
         price: 25,
         needsWater: true,
         ingredients: [{ name: "Мешок муки", qty: 2 }, { name: "Соль", qty: 1 }],
-        effect: "+20 переносимого веса на 45 ходов"
+        effect: "+20 переносимого веса на 75 ходов"
     },
     {
         name: "Картофельный хлеб",
@@ -175,7 +175,7 @@ const recipes = [
         price: 25,
         needsWater: false,
         ingredients: [{ name: "Хлеб", qty: 1 }, { name: "Картофель", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Соль", qty: 1 }],
-        effect: "+20% сопротивления к ядам на 45 ходов"
+        effect: "+20% сопротивления к ядам на 75 ходов"
     },
     {
         name: "Слойка с яблоками",
@@ -183,7 +183,7 @@ const recipes = [
         price: 35,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Зелёное яблоко", qty: 2 }, { name: "Красное яблоко", qty: 2 }],
-        effect: "+10 к урону через броню на 45 ходов"
+        effect: "+10 к урону через броню на 75 ходов"
     },
     {
         name: "Слойка с ланвандой",
@@ -191,7 +191,7 @@ const recipes = [
         price: 35,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Лунный сахар", qty: 2 }, { name: "Лаванда", qty: 2 }],
-        effect: "+10% сопротивления к магии на 45 ходов"
+        effect: "+10% сопротивления к магии на 75 ходов"
     },
     {
         name: "Слойка с курцей",
@@ -199,7 +199,7 @@ const recipes = [
         price: 35,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Куриная грудка", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Чеснок", qty: 1 }, { name: "Соль", qty: 1 }],
-        effect: "+5% к физическому урону на 45 ходов"
+        effect: "+5% к физическому урону на 75 ходов"
     },
     {
         name: "Пирог с виноградом",
@@ -207,7 +207,7 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Виноград джазби", qty: 5 }],
-        effect: "+10% сопротивления к огню на 45 ходов"
+        effect: "+10% сопротивления к огню на 75 ходов"
     },
     {
         name: "Пирог с снежными ягодами",
@@ -215,7 +215,7 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Снежные ягоды", qty: 5 }],
-        effect: "+10% сопротивления к холоду на 45 ходов"
+        effect: "+10% сопротивления к холоду на 75 ходов"
     },
     {
         name: "Пирог с можевельником",
@@ -223,7 +223,7 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Ягоды можжевельника", qty: 5 }],
-        effect: "+10% сопротивления к электричеству на 45 ходов"
+        effect: "+10% сопротивления к электричеству на 75 ходов"
     },
     {
         name: "Похлёбка из лютого гриба",
@@ -231,7 +231,7 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Лютый гриб", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Кувшин молока", qty: 1 }],
-        effect: "+20 хп на 45 ходов"
+        effect: "+20 хп на 75 ходов"
     },
     {
         name: "Похлёбка из белянки",
@@ -239,7 +239,7 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Белянка", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Кувшин молока", qty: 1 }],
-        effect: "+30 мп на 45 ходов"
+        effect: "+30 мп на 75 ходов"
     },
     {
         name: "Похлёбка из мора тапинеллы",
@@ -247,13 +247,13 @@ const recipes = [
         price: 40,
         needsWater: false,
         ingredients: [{ name: "Мора тапинелла", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Кувшин молока", qty: 1 }],
-        effect: "5 к скорости на 45 ходов"
+        effect: "5 к скорости на 75 ходов"
     }
 ];
 
 // Блюдо, которое получится, если игрок готовит без рецепта / не угадал состав.
 // Источник: свод правил, раздел "Кулинария и еда".
-const failedDish = { name: "Похлёбка", weight: 1, price: 0, effect: "+10 хп на 45 ходов" };
+const failedDish = { name: "Похлёбка", weight: 1, price: 0, effect: "+10 хп на 75 ходов" };
 
 window.cookingIngredients = cookingIngredients;
 window.recipes = recipes;

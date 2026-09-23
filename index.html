@@ -484,8 +484,8 @@
 
                 <div class="grid-2" style="margin-top:10px;">
                     <div>
-                        <label>Текущий Уровень Героя</label>
-                        <input type="number" id="char-level" value="1" min="1" onchange="updateAll(); saveLocalStorage();">
+                        <label>Текущий Уровень Героя (растёт на вкладке «Проверка»)</label>
+                        <input type="number" id="char-level" value="1" min="1" readonly style="background:#080604; color:#c8a566; cursor:not-allowed;">
                     </div>
                     <div>
                         <label>Запас Свободных Жизней</label>
@@ -867,6 +867,7 @@
                     <option value="alchemist"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимик (зелья, яды, ингредиенты)</option>
                     <option value="mage"><span class="skyrim-icon icon-book" aria-hidden="true"></span> Колдун (книги, одеяния, свитки, камни душ)</option>
                     <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
+                    <option value="fence">🗡️ Скупщик Гильдии воров (единственный, кто купит краденое — нужно членство в гильдии)</option>
                 </select>
 
                 <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:8px;">
@@ -1370,6 +1371,21 @@
     }
 
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
+
+    // Стакинг баффов: повторный каст ТОГО ЖЕ заклинания/эффекта (по имени) не добавляет вторую
+    // копию — просто обновляет оставшееся время до нового значения (и остальные числа, на случай
+    // усиленного каста поверх обычного). Разные эффекты — разные записи, как раньше.
+    function pushOrRefreshTimedEffect(entry) {
+        const key = entry.effectName || entry.name;
+        const existing = activeTimedEffects.find(e => (e.effectName || e.name) === key);
+        if (existing) {
+            const keepId = existing.id;
+            Object.assign(existing, entry, { id: keepId });
+            return existing;
+        }
+        activeTimedEffects.push(entry);
+        return entry;
+    }
     let gameTurn = 0, gameRound = 0;
 
     // ==================== ВРЕМЯ СУТОК / ПОГОДА / СБОР ИНГРЕДИЕНТОВ ====================
@@ -1589,7 +1605,14 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function validatePerkCheck(checkbox) {
-        if (!checkbox.checked) { updateAll(); saveLocalStorage(); return; }
+        if (!checkbox.checked) {
+            // Возвращаем очко при снятии перка — respec без штрафа. Не проверяем каскадно,
+            // не сломает ли это перки, которые требовали именно этот (игрок сам разберётся,
+            // если решит откатить несколько ступеней разом).
+            perkPointsAvailable += 1;
+            renderLevelPanel();
+            updateAll(); saveLocalStorage(); return;
+        }
 
         const skillIdx = parseInt(checkbox.dataset.skillidx);
         const perkIdx = parseInt(checkbox.dataset.perkidx);
@@ -1629,6 +1652,16 @@ window.toggleSkillPanel = function (idx) {
                 }
             }
         }
+
+        // Раньше здесь не было проверки на очки перков вообще — можно было взять любое
+        // количество перков независимо от уровня. Каждая ступень стоит 1 очко.
+        if (perkPointsAvailable <= 0) {
+            checkbox.checked = false;
+            alert('Нет свободных очков перков. Получи уровень (вкладка «Проверка»), чтобы открыть ещё одно.');
+            return;
+        }
+        perkPointsAvailable -= 1;
+        renderLevelPanel();
         updateAll();
         saveLocalStorage();
     }
@@ -2014,8 +2047,9 @@ window.toggleSkillPanel = function (idx) {
                 const duration = parseDurationTurns(desc);
                 const plain = parsePlainEffectBonus(desc);
                 const percentEffects = parsePercentEffects(desc);
-                if (plain || percentEffects.length) {
-                    activeTimedEffects.push({
+                const manaPerTurn = parseManaPerTurn(desc);
+                if (plain || percentEffects.length || manaPerTurn) {
+                    pushOrRefreshTimedEffect({
                         id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                         name: spellName, effectName: spellName, description: desc || '',
                         turnsRemaining: duration,
@@ -2024,10 +2058,11 @@ window.toggleSkillPanel = function (idx) {
                         armor: plain && plain.key === 'armor' ? plain.value : 0,
                         speed: plain && plain.key === 'speed' ? plain.value : 0,
                         value: plain ? plain.value : 0,
-                        percentEffects: percentEffects
+                        percentEffects: percentEffects,
+                        manaPerTurn: manaPerTurn
                     });
                     renderActiveEffects();
-                    extraMsg = ' Эффект применён на себя и тикает по ходам.' + (percentEffects.length ? ' (' + percentEffects.map(p => p.type + ' +' + p.value).join(', ') + ')' : '');
+                    extraMsg = ' Эффект применён на себя и тикает по ходам.' + (percentEffects.length ? ' (' + percentEffects.map(p => p.type + ' +' + p.value).join(', ') + ')' : '') + (manaPerTurn ? ` ⚠️ Поддержание: ${manaPerTurn} маны/ход, пока не снимешь сам или не кончится мана.` : '');
                 }
             }
         } else if (targetVal.indexOf('summon:') === 0) {
@@ -2328,7 +2363,7 @@ window.toggleSkillPanel = function (idx) {
 
     const MERCHANT_LABELS = {
         food: 'Продавец еды', blacksmith: 'Кузнец', alchemist: 'Алхимик',
-        mage: 'Колдун', pawnbroker: 'Барахольщик'
+        mage: 'Колдун', pawnbroker: 'Барахольщик', fence: 'Скупщик (Гильдия воров)'
     };
 
     // Определяет, к какому "профилю" торговца относится предмет.
@@ -2361,6 +2396,8 @@ window.toggleSkillPanel = function (idx) {
         let mult = 1;
         if (merchantType === 'pawnbroker') {
             mult *= 0.9; // барахольщик всегда на 10% дешевле
+        } else if (merchantType === 'fence') {
+            mult *= 0.85; // скупщик рискует, поэтому платит чуть меньше барахольщика
         } else {
             const cat = classifyItemForMerchant(item);
             if (cat !== merchantType) mult *= 0.8; // не его профиль — минус 20%
@@ -2415,8 +2452,9 @@ window.toggleSkillPanel = function (idx) {
         listEl.innerHTML = stock.items.length ? stock.items.map((it, idx) => {
             const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
             const canAfford = price <= stock.gold && price <= (parseInt(document.getElementById('char-gold').value) || 0);
+            const qty = it.qty || 1;
             return `<div class="stat-block" style="align-items:flex-start;">
-                <span><strong>${escHtml(it.name)}</strong>${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
+                <span><strong>${escHtml(it.name)}</strong>${qty > 1 ? ` <span style="opacity:.6; font-size:12px;">(есть: ${qty})</span>` : ''}${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
                 <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                     <span style="color:var(--accent-color);">${price} септ.</span>
                     <button class="btn-success" style="width:auto; padding:2px 8px;" ${canAfford ? '' : 'disabled'} onclick="buyFromMerchant('${escHtml(key)}', ${idx})">Купить</button>
@@ -2475,7 +2513,6 @@ window.toggleSkillPanel = function (idx) {
             alert(`Куплено: ${it.name} за ${price} септимов.${speechSuccesses ? ' (+' + speechSuccesses + ' усп. Красноречия)' : ''}`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
-
     function renderSellList() {
         const listEl = document.getElementById('sell-items-list');
         if (!listEl) return;
@@ -2499,21 +2536,42 @@ window.toggleSkillPanel = function (idx) {
         }
         const charmActive = charmCheckbox.checked && !!perks.hasCharmPerk;
 
+        // Задача C: краденое можно продать только скупщику, и только состоя в Гильдии воров
+        // (хотя бы 1 выполненный заказ — считаем это активным членством).
+        const inThievesGuild = ((playerGuildsData || {})['Гильдия воров'] || 0) > 0;
+        const fenceLocked = merchantType === 'fence' && !inThievesGuild;
+
         const sellable = playerInventory.filter(i => i.price);
         if (!sellable.length) {
             listEl.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет вещей с ценой для продажи.</p>';
             return;
         }
+        if (fenceLocked) {
+            listEl.innerHTML = '<p style="color:#e74c3c; font-size:14px;">Скупщик не станет иметь с тобой дел — ты не состоишь в Гильдии воров (нет выполненных заказов).</p>';
+            return;
+        }
         listEl.innerHTML = sellable.map(item => {
             const cat = classifyItemForMerchant(item);
-            const matches = merchantType === 'pawnbroker' ? true : cat === merchantType;
+            const matches = (merchantType === 'pawnbroker' || merchantType === 'fence') ? true : cat === merchantType;
             const unitPrice = computeSellPrice(item, merchantType, charmActive);
-            const noteHtml = merchantType !== 'pawnbroker' && !matches
+            const noteHtml = (merchantType !== 'pawnbroker' && merchantType !== 'fence' && !matches)
                 ? '<span style="color:#e67e22;"> (не профиль, −20%)</span>' : '';
+            // Краденое нельзя сбыть никому, кроме скупщика.
+            const stolenBlocked = item.stolen && merchantType !== 'fence';
+            const stolenTag = item.stolen ? '<span style="color:#c0392b;"> 🏷️ краденое</span>' : '';
+            if (stolenBlocked) {
+                return `
+            <div class="party-row">
+                <div class="row-name">
+                    <span>${escHtml(item.name)}${stolenTag} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
+                </div>
+                <div style="font-size:12px; color:#e74c3c; margin-top:2px;">Краденое — этот торговец его не купит, нужен скупщик.</div>
+            </div>`;
+            }
             return `
             <div class="party-row">
                 <div class="row-name">
-                    <span>${escHtml(item.name)} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
+                    <span>${escHtml(item.name)}${stolenTag} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
                     <span>${unitPrice} септ./шт.${noteHtml}</span>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
@@ -2556,10 +2614,19 @@ window.toggleSkillPanel = function (idx) {
         if (qty <= 0) return;
 
         const merchantType = document.getElementById('sell-merchant-type').value;
+        // Задача C: краденое — только скупщику, и только состоя в Гильдии воров.
+        if (item.stolen && merchantType !== 'fence') {
+            alert('Это краденое — его купит только скупщик Гильдии воров.');
+            return;
+        }
+        if (merchantType === 'fence' && ((playerGuildsData || {})['Гильдия воров'] || 0) <= 0) {
+            alert('Скупщик не станет иметь с тобой дел — ты не состоишь в Гильдии воров.');
+            return;
+        }
         const charmActive = document.getElementById('sell-charm-active').checked && !!(window.perkBonuses || {}).hasCharmPerk;
         const unitPrice = computeSellPrice(item, merchantType, charmActive);
         const total = unitPrice * qty;
-        const isOffProfile = merchantType !== 'pawnbroker' && classifyItemForMerchant(item) !== merchantType;
+        const isOffProfile = (merchantType !== 'pawnbroker' && merchantType !== 'fence') && classifyItemForMerchant(item) !== merchantType;
 
         removeFromInventoryByName(itemId, qty);
         const goldInput = document.getElementById('char-gold');
@@ -3538,7 +3605,7 @@ window.toggleSkillPanel = function (idx) {
         if (noArmor && mult > 1) {
             armorValue = Math.round(armorValue * mult);
         }
-        activeTimedEffects.push({
+        pushOrRefreshTimedEffect({
             id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
             name: t.name, effectName: t.name,
             description: `+${armorValue} к броне (надбавка, складывается с надетым)${noArmor && mult > 1 ? ' — усилено «Магической бронёй»' : ''}`,
@@ -3697,9 +3764,19 @@ window.toggleSkillPanel = function (idx) {
     // АКТИВНЫЕ ЭФФЕКТЫ ПО ХОДАМ (зелья/еда со сроком действия)
     // ========================================================================
 
+    // Заклинания "на поддержании" (Трансмутация мускулов и т.п.) тратят N маны КАЖДЫЙ ход, пока
+    // либо игрок сам не снимет бафф, либо не кончится мана — у них нет фиксированной длительности
+    // в ходах, поэтому turnsRemaining для них не 75/дефолт, а "бесконечность" (см. ниже).
+    function parseManaPerTurn(text) {
+        const m = (text || '').match(/поддержани[а-я]*\s+(\d+)[\d\/]*\s*маны\s+за\s+ход/i);
+        return m ? parseInt(m[1]) : 0;
+    }
+
     function parseDurationTurns(text) {
+        // Если есть стоимость поддержания в ход — длительность не по ходам, а по мане (см. выше).
+        if (parseManaPerTurn(text)) return Infinity;
         const m = (text || '').match(/(\d+)\s*ход/i);
-        return m ? parseInt(m[1]) : 45; // по умолчанию как у большинства блюд
+        return m ? parseInt(m[1]) : 75; // по умолчанию как у большинства блюд
     }
 
     function activateTimedEffectFromItem(item) {
@@ -3707,7 +3784,7 @@ window.toggleSkillPanel = function (idx) {
             item.alchemyEffects.forEach(e => {
                 const isHp = e.name === 'Восстановление здоровья' || e.name === 'Повышение здоровья';
                 const isMp = e.name === 'Восстановление магии' || e.name === 'Повышение магии';
-                activeTimedEffects.push({
+                pushOrRefreshTimedEffect({
                     id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                     name: item.name, effectName: e.name,
                     description: `${e.name}: ${e.magnitude}${e.unit || ''}${e.duration ? ' (' + e.duration + ' х.)' : ''}`,
@@ -3721,7 +3798,7 @@ window.toggleSkillPanel = function (idx) {
             const duration = parseDurationTurns(item.effect);
             const plain = parsePlainEffectBonus(item.effect);
             const percentEffects = (typeof parsePercentEffects === 'function') ? parsePercentEffects(item.effect) : [];
-            activeTimedEffects.push({
+            pushOrRefreshTimedEffect({
                 id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                 name: item.name, effectName: item.name,
                 description: item.effect || '',
@@ -3757,8 +3834,18 @@ window.toggleSkillPanel = function (idx) {
         el.innerHTML = activeTimedEffects.map(e => `
             <div class="party-row">
                 <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${e.turnsRemaining} х.</span></div>
+                <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px; margin-top:2px;" onclick="removeActiveEffect('${escHtml(e.id)}')">Снять</button>
             </div>`).join('');
     }
+
+    // Игрок сам снимает с себя эффект (бафф или дебафф) — без необходимости ждать, пока
+    // истечёт время, или просить мастера.
+    window.removeActiveEffect = function (id) {
+        activeTimedEffects = activeTimedEffects.filter(e => e.id !== id);
+        renderActiveEffects();
+        updateAll();
+        saveLocalStorage();
+    };
 
     // Мастер наложил статус-эффект атакой НПС (паралич/страх/замедление и т.п.) — добавляем
     // в свой собственный список активных эффектов, тикает по тем же ходам, что и баффы.
@@ -3780,7 +3867,7 @@ window.toggleSkillPanel = function (idx) {
                 names.push(e.effectName + ' (мгновенно)');
                 return;
             }
-            activeTimedEffects.push({
+            pushOrRefreshTimedEffect({
                 id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                 name: e.name || 'Противник', effectName: e.effectName, description: e.description || '',
                 turnsRemaining: e.turnsRemaining || 1, hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, speed: e.speed || 0, value: e.value || 0,
@@ -3801,8 +3888,28 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function tickActiveEffects() {
-        activeTimedEffects.forEach(e => { e.turnsRemaining -= 1; });
-        activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0);
+        // Заклинания "на поддержании" тратят ману каждый ход (не только тикают время) — если маны
+        // не хватает, бафф спадает сам, как и было бы в бою при истощении.
+        const mpEl = document.getElementById('cur-mp');
+        let curMp = mpEl ? (parseInt(mpEl.value) || 0) : 0;
+        let manaRanOut = [];
+        activeTimedEffects.forEach(e => {
+            if (e.manaPerTurn) {
+                if (curMp >= e.manaPerTurn) {
+                    curMp -= e.manaPerTurn;
+                } else {
+                    curMp = 0;
+                    manaRanOut.push(e.name);
+                    e.turnsRemaining = 0; // спадёт ниже вместе с обычным тиканьем
+                }
+            }
+        });
+        const hasMaintained = activeTimedEffects.some(e => e.manaPerTurn);
+        if (mpEl && hasMaintained) mpEl.value = curMp;
+        if (manaRanOut.length) alert(`Мана кончилась — спадает: ${manaRanOut.join(', ')}.`);
+
+        activeTimedEffects.forEach(e => { if (e.turnsRemaining !== Infinity) e.turnsRemaining -= 1; });
+        activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0 || e.turnsRemaining === Infinity);
         renderActiveEffects();
         if (typeof tickActiveSummons === 'function') tickActiveSummons();
         updateAll();
@@ -5157,6 +5264,11 @@ window.nextDay = function () {
         if (gameMonth > 11) { gameMonth = 0; gameYear++; }
     }
 
+    // Задача C: счётчик игровых дней сессии — нужен мастеру для "ассортимент устарел".
+    if (window.CloudSync && typeof window.CloudSync.bumpGameDayCounter === 'function') {
+        window.CloudSync.bumpGameDayCounter();
+    }
+
     // Тик дней заряда оружия и посохов
     playerInventory.forEach(i => {
         if (Object.prototype.hasOwnProperty.call(i, 'chargeDaysLeft') && i.chargeDaysLeft > 0) {
@@ -5404,6 +5516,12 @@ function updateHungerPenalty() {
 
     // ===== ИСПРАВЛЕННАЯ updateAll =====
     function updateAll() {
+        // Единый источник правды для уровня — characterLevel (растёт через «Проверку»).
+        // Раньше поле #char-level на главной было отдельным, свободно редактируемым числом,
+        // никак не связанным с characterLevel — отсюда рассинхрон между вкладками.
+        const levelDisplayEl = document.getElementById('char-level');
+        if (levelDisplayEl && levelDisplayEl.value != characterLevel) levelDisplayEl.value = characterLevel;
+
         const calcMod = (val) => Math.floor((val - 10) / 2);
         
         let strBase = parseInt(document.getElementById('stat-str').getAttribute('data-raw-stat')) || 10;
@@ -5871,7 +5989,7 @@ function updateHungerPenalty() {
             name: document.getElementById('char-name').value,
             race: document.getElementById('char-race').value,
             sign: document.getElementById('char-sign').value,
-            lvl: document.getElementById('char-level').value,
+            lvl: characterLevel, // дублируем в старое поле для обратной совместимости, не читаем при восстановлении
             lives: document.getElementById('char-lives').value,
             gold: document.getElementById('char-gold').value,
             starve: document.getElementById('food-starve').value,
@@ -5966,8 +6084,11 @@ function updateHungerPenalty() {
         if (window.CloudSync) window.CloudSync.saveCharacter(data);
     }
 
-    // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
-    function applyCharacterData(data) {
+    // Поля, которые правит МАСТЕР (гильдии/сверхъестественное/репутация) — вынесены отдельно,
+    // т.к. применяются и при первой загрузке персонажа (через applyCharacterData), и живым
+    // листенером на каждое внешнее изменение (cloud.js), без риска задеть то, что редактирует
+    // сам игрок (хп/инвентарь/статы и т.д. этой функцией не трогаются).
+    function applyGmControlledFields(data) {
         if (!data) return;
         // Задача K: прогресс гильдий приходит вместе со всем остальным документом —
         // отдельный запрос (getOwnCharacterField) не нужен, экономим чтение Firestore.
@@ -5984,11 +6105,51 @@ function updateHungerPenalty() {
             vampire: Object.assign({ hungerStage: 0, rank: 0, abilities: {} }, data.supernaturalState.vampire || {})
         } : null;
         if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
+
+        // Раньше только гильдии/репутация/сверхъестественное обновлялись без перезагрузки — урон
+        // от мастера, выданные предметы, золото, уровень и снижение навыка требовали F5. Теперь
+        // те же самые поля, что реально правит мастер (и только они — не весь документ, чтобы не
+        // затирать то, что игрок мог сам сейчас редактировать в других полях листа).
+        if (Array.isArray(data.vitals) && data.vitals.length === 4) {
+            // Только ТЕКУЩИЕ хп/мп — max-hp/max-mp считаются локально из статов и могут
+            // отличаться от сохранённого снимка, перетирать их живым листенером не стоит.
+            const curHpEl = document.getElementById('cur-hp');
+            const curMpEl = document.getElementById('cur-mp');
+            if (curHpEl && curHpEl.value != data.vitals[0]) curHpEl.value = data.vitals[0];
+            if (curMpEl && curMpEl.value != data.vitals[1]) curMpEl.value = data.vitals[1];
+        }
+        if (typeof data.gold !== 'undefined') {
+            const goldEl = document.getElementById('char-gold');
+            if (goldEl && goldEl.value != data.gold) goldEl.value = data.gold;
+        }
+        if (typeof data.characterLevel !== 'undefined' && data.characterLevel !== characterLevel) {
+            characterLevel = parseInt(data.characterLevel) || 1;
+            if (typeof renderLevelPanel === 'function') renderLevelPanel();
+        }
+        if (typeof data.perkPointsAvailable !== 'undefined') perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
+        if (Array.isArray(data.skills)) {
+            data.skills.forEach((val, i) => {
+                const input = document.getElementById('skill-' + i);
+                if (input && input.getAttribute('data-raw-val') != val) input.setAttribute('data-raw-val', val || 10);
+            });
+        }
+        if (Array.isArray(data.inventory) && JSON.stringify(data.inventory) !== JSON.stringify(playerInventory)) {
+            playerInventory = data.inventory;
+            if (typeof renderInventoryList === 'function') renderInventoryList();
+        }
+        if (typeof updateAll === 'function') updateAll();
+    }
+    window.applyGmControlledFields = applyGmControlledFields;
+
+    // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
+    function applyCharacterData(data) {
+        if (!data) return;
+        applyGmControlledFields(data);
         try {
             document.getElementById('char-name').value = data.name || '';
             document.getElementById('char-race').value = data.race || 'nord';
             document.getElementById('char-sign').value = data.sign || 'none';
-            document.getElementById('char-level').value = data.lvl || 1;
+            // char-level больше не восстанавливается отдельно — его выставит updateAll() из characterLevel
             document.getElementById('char-lives').value = data.lives || 50;
             document.getElementById('char-gold').value = data.gold || 150;
             document.getElementById('food-starve').value = data.starve || 0;

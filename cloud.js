@@ -13,6 +13,7 @@
     let currentUser = null;
     let currentSessionCode = null;
     let unsubSession = null;
+    let unsubWatchedCharacter = null;
     let saveTimer = null;
     let cloudDataReady = false; // true только после того, как персонаж загружен из облака хотя бы раз —
                                  // защищает от перезаписи реальных данных дефолтными при входе с нового устройства.
@@ -118,6 +119,8 @@
         });
     }
 
+    let unsubSelfGmFields = null;
+
     function loadCharacterFromCloud(uid) {
         db.collection('characters').doc(uid).get().then(doc => {
             if (doc.exists && window.applyCharacterData) {
@@ -131,6 +134,17 @@
             // навсегда останется нередактируемым при сбое сети.
             cloudDataReady = true;
         });
+
+        // Живой листенер ТОЛЬКО на поля, которые правит мастер (гильдии/сверхъестественное/
+        // репутация) — не на весь документ, чтобы не перезаписывать активные локальные правки
+        // игрока (хп/инвентарь/статы и т.д.) чужим снапшотом. Игрок должен увидеть, что мастер
+        // включил ему ликантропию или поднял прогресс гильдии, СРАЗУ, без перезагрузки страницы.
+        if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
+        unsubSelfGmFields = db.collection('characters').doc(uid).onSnapshot(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            if (window.applyGmControlledFields) window.applyGmControlledFields(data);
+        }, e => console.error('Ошибка подписки на поля мастера:', e));
     }
 
     // ---------- Сохранение персонажа (вызывается из saveLocalStorage) ----------
@@ -153,6 +167,10 @@
                     patch['participants.' + currentUser.uid + '.curMp'] = Number(vitals[1]) || 0;
                     patch['participants.' + currentUser.uid + '.maxHp'] = Number(vitals[2]) || 0;
                     patch['participants.' + currentUser.uid + '.maxMp'] = Number(vitals[3]) || 0;
+                    // Задача "порядок ходов": лёгкий список имён призванных/поднятых существ игрока,
+                    // чтобы мастер видел их и мог включить в порядок ходов, не зная деталей.
+                    patch['participants.' + currentUser.uid + '.summonNames'] = Array.isArray(data.activeSummons)
+                        ? data.activeSummons.map(s => s.name).filter(Boolean) : [];
                     db.collection('sessions').doc(currentSessionCode).update(patch)
                         .catch(e => console.error('Ошибка синхронизации с сессией:', e));
                 }
@@ -206,6 +224,16 @@
             }).catch(e => console.error('Ошибка счётчика ходов сессии:', e));
         },
 
+        // Задача C: игровой день, синхронизированный в сессию (календарь живёт только у игрока,
+        // но мастеру нужно знать, сколько игровых дней прошло с последнего обновления
+        // ассортимента торговца — "раз в неделю" не бывает без общего счётчика дней).
+        bumpGameDayCounter: function () {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                gameDayCounter: firebase.firestore.FieldValue.increment(1)
+            }).catch(e => console.error('Ошибка счётчика игровых дней:', e));
+        },
+
         // Обыскивает труп самим игроком (раньше это умел делать только мастер) — забирает
         // добычу себе и помечает труп обысканным в сессии, чтобы никто не забрал её дважды.
         lootCorpseForSelf: function (enemyId) {
@@ -251,6 +279,24 @@
         // групповых проверках и помощи союзнику.
         getCurrentUid: function () {
             return currentUser ? currentUser.uid : null;
+        },
+
+        // Живой листенер на документ персонажа — используется мастером в панелях "Инвентарь",
+        // "Гильдии", "Сверхъестественное" и т.п., чтобы изменения игрока (свои же правки на его
+        // листе) отражались у мастера СРАЗУ, без повторного выбора игрока из списка или
+        // перезагрузки страницы мастера. Раньше эти панели читали документ один раз через .get().
+        // Подписка всего одна одновременно — переключение на другого игрока автоматически снимает
+        // предыдущую подписку.
+        watchCharacter: function (uid, callback) {
+            if (unsubWatchedCharacter) { unsubWatchedCharacter(); unsubWatchedCharacter = null; }
+            if (!uid || !db) return;
+            unsubWatchedCharacter = db.collection('characters').doc(uid).onSnapshot(doc => {
+                callback(doc.exists ? doc.data() : {});
+            }, e => console.error('Ошибка подписки на персонажа:', e));
+        },
+
+        unwatchCharacter: function () {
+            if (unsubWatchedCharacter) { unsubWatchedCharacter(); unsubWatchedCharacter = null; }
         },
 
         submitGroupCheckResult: function (uid, roll, mod, total) {

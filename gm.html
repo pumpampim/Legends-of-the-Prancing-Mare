@@ -110,14 +110,18 @@
 
         <div class="grid-2">
             <div class="panel">
-                <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Инициатива</h2>
-                <div id="gm-initiative-list"></div>
+                <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Порядок ходов</h2>
+                <p style="font-size:12px; opacity:.75;">Своя система, без броска инициативы — расставляешь порядок сам, из игроков/врагов/существ (призванных и поднятых игроками) или вручную по имени.</p>
+                <div id="turn-order-list"></div>
                 <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px; display:flex; gap:6px;">
-                    <input type="text" id="init-name-input" placeholder="Имя" style="flex:1;">
-                    <input type="number" id="init-roll-input" placeholder="Бросок" style="width:80px;">
-                    <button onclick="addInitiative()">+</button>
+                    <select id="turn-order-pick-select" style="flex:1;"></select>
+                    <button onclick="addTurnOrderFromPick()">+</button>
                 </div>
-                <button style="margin-top:6px; width:100%;" onclick="clearInitiative()">Очистить инициативу</button>
+                <div style="margin-top:6px; display:flex; gap:6px;">
+                    <input type="text" id="turn-order-name-input" placeholder="Или своё имя" style="flex:1;">
+                    <button onclick="addTurnOrderCustom()">+</button>
+                </div>
+                <button style="margin-top:6px; width:100%;" onclick="clearTurnOrder()">Очистить порядок ходов</button>
             </div>
 
             <div class="panel">
@@ -180,13 +184,14 @@
             <!-- ===== ЖИВЫЕ ТОРГОВЦЫ (Задача C) ===== -->
             <div class="panel">
                 <h2>🏪 Живые торговцы</h2>
-                <p style="font-size:12px; opacity:.75;">Обновляет ассортимент (10-20 товаров) и сбрасывает золото торговца до базового. Жми раз в игровую неделю (или когда посчитаешь нужным) — старый ассортимент вместе с текущим золотом торговца заменяется новым.</p>
+                <p style="font-size:12px; opacity:.75;">Обновляет ассортимент (10-20 товаров) и сбрасывает золото торговца до базового. Ниже видно, у кого ассортимент устарел (7+ игровых дней с момента последнего обновления, считается по общему счётчику дней сессии) — авто-сброса нет специально, чтобы не менять товар посреди игры без твоего ведома.</p>
                 <label>Тип торговца</label>
                 <select id="merchant-type-select"></select>
                 <label>Владение</label>
                 <select id="merchant-hold-select"></select>
                 <button class="btn-success" style="width:100%; margin-top:6px;" onclick="refreshMerchantStock()">🔄 Обновить ассортимент</button>
                 <div id="merchant-gen-result" style="margin-top:8px; font-size:13px;"></div>
+                <div id="merchant-staleness-list" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border-color);"></div>
             </div>
 
             <!-- ===== ПРАЗДНИК ВРУЧНУЮ (Задача F) ===== -->
@@ -525,12 +530,23 @@
         <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
         <div class="panel">
             <h2>🗡️ Генератор бандита</h2>
-            <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера (для колорита и озвучки за столом) + случайное снаряжение (железо/кожа/сталь, иногда лук со стрелами или заклинания вместо оружия). ХП/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает, часть могла быть повреждена в бою.</p>
+            <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера + снаряжение, подобранное по уровню (чем выше уровень — тем лучше материал, до стекла/эбонита на 50-м, кап уровня). Есть шанс лука (охотничий/имперский/орочий/эльфийский/стеклянный/эбонитовый — тоже по уровню). ХП/мана/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает.</p>
             <label>Средний уровень группы</label>
             <input type="number" id="bandit-avg-level" value="5" min="1" max="50">
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
             <div id="bandit-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
+        </div>
+
+        <!-- ===== ГЕНЕРАТОР МАГОВ-БАНДИТОВ ===== -->
+        <div class="panel">
+            <h2>🔮 Генератор мага-бандита</h2>
+            <p style="font-size:13px; opacity:.75;">Отдельный генератор — только заклинания (2-4 шт, реальные из книги заклинаний, ранг растёт с уровнем) и магическое одеяние вместо брони/оружия. Кап уровня — 60 (выше базовых бандитов). Мана в разы больше, чем у обычных бандитов.</p>
+            <label>Средний уровень группы</label>
+            <input type="number" id="bandit-mage-avg-level" value="10" min="1" max="60">
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateMageBandit()">🎲 Сгенерировать мага-бандита</button>
+            <div id="bandit-mage-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+            <button style="width:100%; margin-top:6px;" onclick="addGeneratedMageBanditToCombat()">Добавить в бой</button>
         </div>
     </div>
 </div>
