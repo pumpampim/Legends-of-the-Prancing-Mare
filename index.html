@@ -443,6 +443,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
         <button class="tab-link" onclick="openTab(event, 'tab11')">📅 Календарь</button>
+        <button class="tab-link" onclick="openTab(event, 'tab12')">🏪 Торговля</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -548,6 +549,7 @@
                         Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
                         Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:54px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
                         <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
+                        <div id="resistances-display" style="font-size:12px; margin-top:3px; opacity:.85;"></div>
                     </div>
                 </div>
             </div>
@@ -560,8 +562,14 @@
                 <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
             </div>
+            <div class="day-controls" style="margin-top:6px;">
+                <span id="turn-round-display-main" style="font-size:15px; font-weight:bold; color:var(--accent-color);">Ход: 0 | Круг: 0</span>
+                <button class="btn-success" style="width:auto; margin:0; padding:4px 10px;" onclick="nextTurn()">➡️ Следующий ход</button>
+                <button class="btn-success" style="width:auto; margin:0; padding:4px 10px;" onclick="nextRound()">🔄 Следующий круг</button>
+            </div>
             <div id="hunger-status" class="hunger-warning" style="display:none;"></div>
             <div id="today-holiday-widget" style="font-size:13px; margin-top:4px;"></div>
+            <div id="crime-status-widget" style="font-size:13px; margin-top:4px;"></div>
 
             <div class="rest-btn" style="margin-top:8px;">
                 <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
@@ -854,41 +862,6 @@
                 <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
             </div>
 
-            <!-- ПРОДАЖА ПРЕДМЕТОВ -->
-            <div class="panel">
-                <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
-                <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка от 30 септимов также даёт успехи Красноречия — считается автоматически.</p>
-                <div id="speech-trade-progress" style="font-size:13px; margin-bottom:8px; color:var(--accent-color);"></div>
-
-                <label>Кому продаём</label>
-                <select id="sell-merchant-type" onchange="renderSellList()">
-                    <option value="food">🍲 Продавец еды (еда, напитки)</option>
-                    <option value="blacksmith"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузнец (броня, оружие, боеприпасы)</option>
-                    <option value="alchemist"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимик (зелья, яды, ингредиенты)</option>
-                    <option value="mage"><span class="skyrim-icon icon-book" aria-hidden="true"></span> Колдун (книги, одеяния, свитки, камни душ)</option>
-                    <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
-                    <option value="fence">🗡️ Скупщик Гильдии воров (единственный, кто купит краденое — нужно членство в гильдии)</option>
-                </select>
-
-                <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:8px;">
-                    <input type="checkbox" id="sell-charm-active" onchange="renderSellList()">
-                    Использовать «Очарование» (торгую с противоположным полом, +10%)
-                </label>
-                <div id="sell-charm-locked" style="font-size:13px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
-
-                <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
-            </div>
-
-            <!-- ПОКУПКА У ЖИВЫХ ТОРГОВЦЕВ (Задача C) -->
-            <div class="panel">
-                <h2>🏪 Купить у торговца</h2>
-                <p style="font-size:13px; opacity:.75;">Ассортимент и золото торговца задаёт мастер (обновляется примерно раз в неделю). Если товара нет — мастер ещё не завозил ассортимент в это владение для этого типа торговца.</p>
-                <label>Тип торговца</label>
-                <select id="buy-merchant-type" onchange="renderBuyList()"></select>
-                <div id="buy-merchant-info" style="font-size:13px; opacity:.8; margin:4px 0;"></div>
-                <div id="buy-items-list" style="max-height:320px; overflow-y:auto; margin-top:6px;"></div>
-            </div>
-
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
             <div class="panel">
                 <h2>🤝 Передать союзнику</h2>
@@ -984,7 +957,7 @@
         <!-- ГИЛЬДИИ (Задача K) -->
         <div class="panel">
             <h2>🏛️ Гильдии</h2>
-            <p style="font-size:13px; opacity:.75;">Прогресс ведёт мастер (сколько заказов ты выполнил) — здесь только просмотр. Ниже справочник: кто выдаёт задания в каждой гильдии, примерная плата и условия.</p>
+            <p style="font-size:13px; opacity:.75;">Показаны только гильдии, в которые тебя принял мастер. Ранг растёт автоматически с числом выполненных заказов. Ниже справочник: кто выдаёт задания, примерная плата и условия.</p>
             <div id="guild-panel-player"></div>
         </div>
 
@@ -1317,6 +1290,43 @@
             <p style="font-size:13px; opacity:.75;">Текущая дата подсвечена. Праздник может дать скидку у торговцев, если это явно указано в его описании (применяет мастер кнопкой «Запустить праздник вручную» на своём экране).</p>
             <div id="calendar-today-widget" style="padding:8px; background:var(--input-bg); border:1px solid var(--accent-color); border-radius:4px; margin-bottom:10px;"></div>
             <div id="calendar-list"></div>
+        </div>
+    </div>
+
+    <div id="tab12" class="tab-content">
+        <!-- ПРОДАЖА ПРЕДМЕТОВ -->
+        <div class="panel">
+            <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
+            <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка от 30 септимов также даёт успехи Красноречия — считается автоматически.</p>
+            <div id="speech-trade-progress" style="font-size:13px; margin-bottom:8px; color:var(--accent-color);"></div>
+
+            <label>Кому продаём</label>
+            <select id="sell-merchant-type" onchange="renderSellList()">
+                <option value="food">🍲 Продавец еды (еда, напитки)</option>
+                <option value="blacksmith"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузнец (броня, оружие, боеприпасы)</option>
+                <option value="alchemist"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимик (зелья, яды, ингредиенты)</option>
+                <option value="mage"><span class="skyrim-icon icon-book" aria-hidden="true"></span> Колдун (книги, одеяния, свитки, камни душ)</option>
+                <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
+                <option value="fence">🗡️ Скупщик Гильдии воров (единственный, кто купит краденое — нужно членство в гильдии)</option>
+            </select>
+
+            <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:8px;">
+                <input type="checkbox" id="sell-charm-active" onchange="renderSellList()">
+                Использовать «Очарование» (торгую с противоположным полом, +10%)
+            </label>
+            <div id="sell-charm-locked" style="font-size:13px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
+
+            <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
+        </div>
+
+        <!-- ПОКУПКА У ЖИВЫХ ТОРГОВЦЕВ (Задача C) -->
+        <div class="panel">
+            <h2>🏪 Купить у торговца</h2>
+            <p style="font-size:13px; opacity:.75;">Ассортимент и золото торговца задаёт мастер (обновляется примерно раз в неделю). Если товара нет — мастер ещё не завозил ассортимент в это владение для этого типа торговца.</p>
+            <label>Тип торговца</label>
+            <select id="buy-merchant-type" onchange="renderBuyList()"></select>
+            <div id="buy-merchant-info" style="font-size:13px; opacity:.8; margin:4px 0;"></div>
+            <div id="buy-items-list" style="max-height:320px; overflow-y:auto; margin-top:6px;"></div>
         </div>
     </div>
 
@@ -2165,6 +2175,13 @@ window.toggleSkillPanel = function (idx) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || item.count <= 0) return;
         const spellName = item.scrollSpellName || item.name.replace(/^Свиток:\s*/, '');
+        // Боевые свитки (наносят урон) нужно использовать через "Разрешить атаку" на вкладке
+        // «Сессия» — там есть выбор цели. Через "Читать" (self-target) они раньше просто ничего
+        // не делали, из-за чего казалось, что свитки в принципе не работают.
+        if (parseSpellDamageFromDesc(item.effect || '')) {
+            alert(`«${item.name}» — боевой свиток. Используй его через «Разрешить атаку» на вкладке «Сессия» (там выбираешь цель), а не через «Читать».`);
+            return;
+        }
         const result = resolveSpellEffect(spellName, item.effect || '', item.scrollSchool || null, 'self', true);
         removeFromInventoryByName(itemId, 1);
         alert(result.message);
@@ -2701,9 +2718,8 @@ window.toggleSkillPanel = function (idx) {
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
-                    ${hasTradeTarget ? `<button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку">→</button>` : ''}
+                    <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
-                    <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', 1)">+</button>
                 </span>
             </div>
         `;
@@ -3398,6 +3414,7 @@ window.toggleSkillPanel = function (idx) {
     let playerGuildsData = null;
     let playerReputationByRegion = null;
     let playerSupernaturalState = null;
+    let playerCrimeState = null;
 
     // Задача L: показывает активное сверхъестественное состояние на листе игрока, с кнопками
     // "Превратиться"/"Покормиться" — те же данные, что мастер видит и правит у себя.
@@ -3460,15 +3477,52 @@ window.toggleSkillPanel = function (idx) {
     }
 
 
+    // То же самое, что и в gm.js (разные файлы, поэтому дублируется) — ранги гильдий.
+    const GUILD_RANK_TIERS = {
+        'Гильдия воров': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Постоянный клиент' }, { at: 15, name: 'Тень' }, { at: 25, name: 'Мастер-вор' }, { at: 40, name: 'Соловей' }],
+        'Соратники': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Щенок' }, { at: 10, name: 'Соратник' }, { at: 15, name: 'Хозяин небесного оружия' }],
+        'Коллегия магов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Студент' }, { at: 15, name: 'Мастер школы' }, { at: 30, name: 'Архимаг' }],
+        'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный убийца' }, { at: 15, name: 'Тёмный брат/сестра' }, { at: 25, name: 'Слышащий' }],
+        'Стража Рассвета': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Страж' }, { at: 15, name: 'Охотник на вампиров' }, { at: 25, name: 'Ветеран Стражи' }],
+        'Бойцовский клуб': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Боец' }, { at: 15, name: 'Чемпион группы' }, { at: 25, name: 'Легенда арены' }],
+        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Бард' }, { at: 15, name: 'Мастер баллад' }, { at: 25, name: 'Хранитель Бардовской баллады' }]
+    };
+    function getGuildRank(guildName, orders) {
+        const tiers = GUILD_RANK_TIERS[guildName] || [{ at: 0, name: 'Новичок' }];
+        let current = tiers[0], next = null;
+        for (let i = 0; i < tiers.length; i++) {
+            if (tiers[i].at <= orders) current = tiers[i];
+            else { next = tiers[i]; break; }
+        }
+        return { rankName: current.name, next };
+    }
+    // Старый формат (голое число) → {member:true, orders:N}, чтобы не потерять прогресс.
+    function normalizePlayerGuildEntry(v) {
+        if (typeof v === 'number') return { member: v > 0, orders: v };
+        if (v && typeof v === 'object') return { member: !!v.member, orders: parseInt(v.orders) || 0 };
+        return { member: false, orders: 0 };
+    }
+
     function renderGuildPanelPlayer() {
         const el = document.getElementById('guild-panel-player');
         if (!el) return;
         const data = playerGuildsData || {};
-        el.innerHTML = Object.keys(GUILD_QUEST_GIVERS).map(g => `
+        // Только гильдии, в которые мастер реально принял игрока — не все 7 сразу.
+        const joined = Object.keys(GUILD_QUEST_GIVERS).filter(g => normalizePlayerGuildEntry(data[g]).member);
+        if (!joined.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:13px;">Ты пока ни в одной гильдии не состоишь — членство назначает мастер.</p>';
+            return;
+        }
+        el.innerHTML = joined.map(g => {
+            const gd = normalizePlayerGuildEntry(data[g]);
+            const rank = getGuildRank(g, gd.orders);
+            return `
             <div class="party-row">
-                <div class="row-name"><strong>${escHtml(g)}</strong><span>Заказов: ${data[g] || 0}</span></div>
+                <div class="row-name"><strong>${escHtml(g)}</strong><span>${escHtml(rank.rankName)}${rank.next ? ` (ещё ${rank.next.at - gd.orders} до «${escHtml(rank.next.name)}»)` : ' (макс. ранг)'}</span></div>
+                <div style="font-size:12px; opacity:.7;">Заказов выполнено: ${gd.orders}</div>
                 ${GUILD_QUEST_GIVERS[g].map(qg => `<div style="font-size:12px; margin-top:3px; opacity:.85;">👤 <strong>${escHtml(qg.giver)}</strong>${qg.reward !== '—' ? ' · 💰 ' + escHtml(qg.reward) : ''}<br><span style="opacity:.75;">${escHtml(qg.note)}</span></div>`).join('')}
-            </div>`).join('');
+            </div>`;
+        }).join('');
     }
 
     function renderQuestList() {
@@ -3921,8 +3975,11 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function updateTurnRoundDisplay() {
+        const text = `Ход: ${gameTurn} | Круг: ${gameRound}`;
         const el = document.getElementById('turn-round-display');
-        if (el) el.textContent = `Ход: ${gameTurn} | Круг: ${gameRound}`;
+        if (el) el.textContent = text;
+        const elMain = document.getElementById('turn-round-display-main');
+        if (elMain) elMain.textContent = text;
     }
 
     window.nextTurn = function () {
@@ -4901,9 +4958,12 @@ window.toggleSkillPanel = function (idx) {
     // указано "наносит N урона" — берём первое такое совпадение).
     function parseSpellDamageFromDesc(desc) {
         if (!desc) return null;
-        const m = desc.match(/наносящ\w*\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
-                  desc.match(/наносит\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
-                  desc.match(/(\d+)\s*(?:ед\.?\s*)?урон/i);
+        // [а-я] вместо \w — \w не матчит кириллицу. "нанос[а-я]*" покрывает наносит/наносящий/
+        // нанося и т.п. одним паттерном. (ед.?|единиц) — раньше "N единиц урона" не понималось,
+        // только сокращённое "ед.". Опциональное слово перед "урон" — "физ/огненн/ледян/..." —
+        // раньше "наносит 40 физ урона" не матчилось, т.к. между числом и "урон" было слово.
+        const m = desc.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
+                  desc.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
         return m ? parseInt(m[1]) : null;
     }
 
@@ -5132,6 +5192,13 @@ window.toggleSkillPanel = function (idx) {
             const dmg = parseSpellDamageFromDesc(s.desc);
             if (dmg) opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)} (заклинание, ~${dmg} урона)</option>`;
         });
+        // Свитки с уроном — раньше их вообще не было в списке, "Читать" всегда бил по себе,
+        // из-за чего боевые свитки на деле ничего не делали.
+        (playerInventory || []).filter(i => (i.category || '').indexOf('Свит') === 0).forEach(i => {
+            if (findSummonTemplateBySpellName(i.scrollSpellName || i.name.replace(/^Свиток:\s*/, ''))) return;
+            const dmg = parseSpellDamageFromDesc(i.effect || '');
+            if (dmg) opts += `<option value="scroll:${escHtml(i.itemId)}">📜 ${escHtml(i.name)} (свиток, ~${dmg} урона, есть: ${i.count})</option>`;
+        });
         (activeSummons || []).forEach(s => {
             if (s.dmg) opts += `<option value="summon:${escHtml(s.id)}">${escHtml(s.name)} (существо, ${s.dmg} урона)</option>`;
         });
@@ -5203,6 +5270,21 @@ function renderTodayHolidayWidget() {
     const today = findTodayHolidays();
     if (!today.length) { el.innerHTML = ''; return; }
     el.innerHTML = today.map(h => `<div style="color:var(--accent-color);">🎉 Сегодня: <strong>${escHtml(h.title)}</strong> (${escHtml(h.group)})${h.discount ? ` — скидка у торговцев до ${h.discount}%!` : ''}</div>`).join('');
+}
+
+// Штрафы/тюрьма — в отличие от репутации, это должно быть видно игроку.
+function renderCrimeStatusPlayer() {
+    const el = document.getElementById('crime-status-widget');
+    if (!el) return;
+    const c = playerCrimeState;
+    if (!c) { el.innerHTML = ''; return; }
+    if (c.inJail) {
+        el.innerHTML = `<div style="color:#e67e22;">🔒 Ты в тюрьме (${escHtml(c.jailHold || '?')}), осталось ${c.jailDaysRemaining || 0} дн.</div>`;
+    } else if (c.fineAmount > 0) {
+        el.innerHTML = `<div style="color:#e74c3c;">⚖️ Штраф: ${c.fineAmount} септимов (${escHtml(c.fineHold || '?')})${c.fineReason ? ' — ' + escHtml(c.fineReason) : ''}</div>`;
+    } else {
+        el.innerHTML = '';
+    }
 }
 
 function renderCalendarTab() {
@@ -5406,6 +5488,17 @@ function updateHungerPenalty() {
             mod = calcAbilityMod(rawStat);
             actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}`;
             skillNameForProgress = skillName;
+        } else if (actionVal.indexOf('scroll:') === 0) {
+            const itemId = actionVal.slice(7);
+            const item = playerInventory.find(i => i.itemId === itemId);
+            if (!item || item.count <= 0) { alert('Свиток не найден.'); return; }
+            dmg = parseSpellDamageFromDesc(item.effect || '') || 0;
+            dmgType = detectDmgTypeFromName(item.scrollSpellName || item.name);
+            mod = 0; // свиток срабатывает одинаково у кого угодно, без бонуса от навыка/статы
+            actionLabel = `свитком «${item.name}»`;
+            removeFromInventoryByName(itemId, 1);
+            renderInventoryList();
+            renderAttackActionSelect();
         } else if (actionVal.indexOf('summon:') === 0) {
             const summon = activeSummons.find(s => s.id === actionVal.slice(7));
             if (!summon) { alert('Существо не найдено.'); return; }
@@ -5664,6 +5757,23 @@ function updateHungerPenalty() {
         totalArmor += equipBonuses.armor;
         totalArmor += activeEffectBonuses.armor || 0;
         document.getElementById('armor-total').innerText = totalArmor;
+
+        // Сопротивления рядом с бронёй — то же самое, что реально вычитается из входящего урона
+        // (computeTotalResistances уже читает armor-total, поэтому вызываем сразу после него).
+        const resEl = document.getElementById('resistances-display');
+        if (resEl && typeof computeTotalResistances === 'function') {
+            const res = computeTotalResistances();
+            const parts = [];
+            if (res.physical) parts.push(`🛡️ Физ. ${res.physical}%`);
+            if (res.fire) parts.push(`🔥 Огонь ${res.fire}%`);
+            if (res.frost) parts.push(`❄️ Холод ${res.frost}%`);
+            if (res.shock) parts.push(`⚡ Электр. ${res.shock}%`);
+            if (res.poison) parts.push(`☠️ Яд ${res.poison}%`);
+            if (res.disease) parts.push(`🤢 Болезни ${res.disease}%`);
+            if (res.shout) parts.push(`📢 Крики ${res.shout}%`);
+            if (res.magic) parts.push(`✨ Магия ${res.magic}%`);
+            resEl.textContent = parts.length ? parts.join(' · ') : 'Сопротивлений нет';
+        }
 
         // Вес
         let weightFromItems = 0;
@@ -6105,6 +6215,10 @@ function updateHungerPenalty() {
             vampire: Object.assign({ hungerStage: 0, rank: 0, abilities: {} }, data.supernaturalState.vampire || {})
         } : null;
         if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
+
+        // Штрафы/тюрьма — игрок ДОЛЖЕН это видеть (в отличие от репутации), это не тайное число.
+        playerCrimeState = data.crimeState || null;
+        if (typeof renderCrimeStatusPlayer === 'function') renderCrimeStatusPlayer();
 
         // Раньше только гильдии/репутация/сверхъестественное обновлялись без перезагрузки — урон
         // от мастера, выданные предметы, золото, уровень и снижение навыка требовали F5. Теперь

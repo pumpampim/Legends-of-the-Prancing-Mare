@@ -326,7 +326,7 @@
         incrementGuildProgress: function (guildName) {
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
             const patch = {};
-            patch['guildsData.' + guildName] = firebase.firestore.FieldValue.increment(1);
+            patch['guildsData.' + guildName + '.orders'] = firebase.firestore.FieldValue.increment(1);
             return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
         },
 

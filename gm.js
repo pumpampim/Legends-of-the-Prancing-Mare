@@ -884,10 +884,49 @@
         { name: 'Плащ ночи', desc: 'Перманентная стая летучих мышей наносит 10 урона врагам в ход', prereq: 'Сила Могилы, Неземные желания или Ядовитые когти' }
     ];
 
+    // Ранги гильдий — своя разработка (детальных порогов по рангам в Фракции.xlsx нет почти
+    // нигде, кроме отдельных упоминаний вроде "40 заказов → Соловей" у воров и "15 поручений →
+    // небесное оружие" у Соратников — они и легли в основу верхних порогов, остальное — разумная
+    // прогрессия по аналогии).
+    const GUILD_RANK_TIERS = {
+        'Гильдия воров': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Постоянный клиент' }, { at: 15, name: 'Тень' }, { at: 25, name: 'Мастер-вор' }, { at: 40, name: 'Соловей' }],
+        'Соратники': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Щенок' }, { at: 10, name: 'Соратник' }, { at: 15, name: 'Хозяин небесного оружия' }],
+        'Коллегия магов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Студент' }, { at: 15, name: 'Мастер школы' }, { at: 30, name: 'Архимаг' }],
+        'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный убийца' }, { at: 15, name: 'Тёмный брат/сестра' }, { at: 25, name: 'Слышащий' }],
+        'Стража Рассвета': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Страж' }, { at: 15, name: 'Охотник на вампиров' }, { at: 25, name: 'Ветеран Стражи' }],
+        'Бойцовский клуб': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Боец' }, { at: 15, name: 'Чемпион группы' }, { at: 25, name: 'Легенда арены' }],
+        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Бард' }, { at: 15, name: 'Мастер баллад' }, { at: 25, name: 'Хранитель Бардовской баллады' }]
+    };
+
+    function getGuildRank(guildName, orders) {
+        const tiers = GUILD_RANK_TIERS[guildName] || [{ at: 0, name: 'Новичок' }];
+        let current = tiers[0], next = null;
+        for (let i = 0; i < tiers.length; i++) {
+            if (tiers[i].at <= orders) current = tiers[i];
+            else { next = tiers[i]; break; }
+        }
+        return { rankName: current.name, next };
+    }
+
     function defaultGuildsData() {
         const d = {};
-        GUILD_NAMES.forEach(g => { d[g] = 0; });
+        // Новая структура: {member, orders} вместо голого числа — раньше игрок видел ВСЕ 7 гильдий
+        // всегда, независимо от того, вступил он в них или нет. Членство теперь назначает мастер.
+        GUILD_NAMES.forEach(g => { d[g] = { member: false, orders: 0 }; });
         return d;
+    }
+
+    // Старые сохранённые данные (голое число вместо {member,orders}) — трактуем как "member: true,
+    // orders: N" (раз счётчик не нулевой, игрок явно уже в гильдии играл), чтобы никто не потерял
+    // накопленный прогресс при переходе на новую структуру.
+    function normalizeGuildsData(raw) {
+        const out = defaultGuildsData();
+        GUILD_NAMES.forEach(g => {
+            const v = raw ? raw[g] : undefined;
+            if (typeof v === 'number') out[g] = { member: v > 0, orders: v };
+            else if (v && typeof v === 'object') out[g] = { member: !!v.member, orders: parseInt(v.orders) || 0 };
+        });
+        return out;
     }
 
     function defaultReputationData() {
@@ -944,6 +983,99 @@
             .catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // ---------- Штрафы и тюрьма ----------
+    // Порог, с которого штраф означает тюрьму, а не просто оплату — как в ванильном Skyrim
+    // (там 1000 золотых). Ниже порога игрок обычно просто платит; отказ платить (любую сумму)
+    // тоже даёт мастеру право посадить.
+    const JAIL_FINE_THRESHOLD = 1000;
+    let currentCrimeState = { fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 };
+
+    function renderCrimePanel() {
+        const box = el('crime-panel-body');
+        if (!box) return;
+        if (!currentInvPlayerUid) { box.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
+        const c = currentCrimeState;
+        let html = '';
+        if (c.inJail) {
+            html += `<p style="color:#e67e22;">🔒 В тюрьме (${escapeHtml(c.jailHold)}), осталось ${c.jailDaysRemaining} дн.</p>
+                <button class="btn-success" style="width:100%;" onclick="releaseFromJail()">Освободить</button>`;
+        } else if (c.fineAmount > 0) {
+            html += `<p>💰 Штраф: <strong>${c.fineAmount}</strong> септимов (${escapeHtml(c.fineHold)}) — ${escapeHtml(c.fineReason || 'без причины')}${c.refused ? '<br><span style="color:#e74c3c;">Игрок отказался платить.</span>' : ''}</p>
+                <button class="btn-danger" style="width:100%;" onclick="clearFine()">Списать штраф (оплачен/прощён)</button>
+                ${!c.refused ? `<button style="width:100%; margin-top:4px;" onclick="markFineRefused()">🙅 Отметить отказ платить</button>` : ''}
+                <label style="margin-top:6px;">Отправить в тюрьму на (дней)</label>
+                <input type="number" id="jail-days-input" value="3" min="1" style="width:70px; display:inline;">
+                <button style="width:100%; margin-top:4px;" onclick="sendToJail()">🔒 Отправить в тюрьму</button>`;
+        } else {
+            html += '<p style="opacity:.6; font-size:13px;">Штрафов нет.</p>';
+        }
+        html += `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
+            <label>Новый штраф</label>
+            <input type="number" id="fine-amount-input" placeholder="Сумма">
+            <select id="fine-hold-select">${REPUTATION_HOLDS.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('')}</select>
+            <input type="text" id="fine-reason-input" placeholder="За что (необязательно)">
+            <button class="btn-success" style="width:100%; margin-top:4px;" onclick="issueFine()">Выписать штраф</button>
+            ${JAIL_FINE_THRESHOLD ? `<p style="font-size:11px; opacity:.6; margin-top:4px;">От ${JAIL_FINE_THRESHOLD} септимов штраф обычно ведёт в тюрьму, если не оплачен сразу.</p>` : ''}
+        </div>`;
+        box.innerHTML = html;
+    }
+
+    function saveCrimeState() {
+        if (!currentInvPlayerUid) return Promise.resolve();
+        return db.collection('characters').doc(currentInvPlayerUid).update({ crimeState: currentCrimeState });
+    }
+
+    window.issueFine = function () {
+        if (!currentInvPlayerUid) return;
+        const amount = parseInt(el('fine-amount-input').value) || 0;
+        if (amount <= 0) { alert('Укажи сумму штрафа.'); return; }
+        currentCrimeState = Object.assign({}, currentCrimeState, {
+            fineAmount: amount, fineHold: el('fine-hold-select').value,
+            fineReason: el('fine-reason-input').value.trim(), refused: false
+        });
+        saveCrimeState().then(() => {
+            renderCrimePanel();
+            gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${currentCrimeState.fineHold})${currentCrimeState.fineReason ? ': ' + currentCrimeState.fineReason : ''}.`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.markFineRefused = function () {
+        if (!currentInvPlayerUid) return;
+        currentCrimeState = Object.assign({}, currentCrimeState, { refused: true });
+        saveCrimeState().then(() => {
+            renderCrimePanel();
+            gmPostLogEntryText('🙅 Игрок отказался платить штраф.');
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.clearFine = function () {
+        if (!currentInvPlayerUid) return;
+        currentCrimeState = Object.assign({}, currentCrimeState, { fineAmount: 0, fineHold: '', fineReason: '', refused: false });
+        saveCrimeState().then(renderCrimePanel).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.sendToJail = function () {
+        if (!currentInvPlayerUid) return;
+        const days = parseInt(el('jail-days-input').value) || 1;
+        currentCrimeState = Object.assign({}, currentCrimeState, {
+            inJail: true, jailHold: currentCrimeState.fineHold, jailDaysRemaining: days,
+            fineAmount: 0, fineReason: '', refused: false // штраф "отработан" сроком
+        });
+        saveCrimeState().then(() => {
+            renderCrimePanel();
+            gmPostLogEntryText(`🔒 Игрок отправлен в тюрьму на ${days} дн. (${currentCrimeState.jailHold}).`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.releaseFromJail = function () {
+        if (!currentInvPlayerUid) return;
+        currentCrimeState = Object.assign({}, currentCrimeState, { inJail: false, jailHold: '', jailDaysRemaining: 0 });
+        saveCrimeState().then(() => {
+            renderCrimePanel();
+            gmPostLogEntryText('🔓 Игрок освобождён из тюрьмы.');
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     function defaultSupernaturalState() {
         return {
             lycanthropy: false, vampirism: false,
@@ -988,11 +1120,17 @@
         if (!def) return [];
         let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0 && !MERCHANT_EXCLUDED_ITEMS.has(i.name));
         if (typeKey === 'blacksmith2') {
-            pool = pool.concat((window.weaponRecipes || []).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat((window.weaponRecipes || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorRecipes || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: GM_SMITHING_SLOT_MAP[a.slot] || null })));
+            pool = pool.concat((window.weaponsNonCraftable || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat((window.armorNonCraftable || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot) })));
         }
         if (typeKey === 'fletcher') {
             pool.push({ name: 'Стрела', category: 'Боеприпасы', price: 1, weight: 0.1 });
+            // "Луки (лут)" в allItems — только зачарованные варианты; базовые луки лежат в
+            // weaponRecipes/weaponsNonCraftable, раньше торговец луками их вообще не продавал.
+            pool = pool.concat((window.weaponRecipes || []).filter(w => /лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat((window.weaponsNonCraftable || []).filter(w => /лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
         }
         return pool;
     }
@@ -1097,20 +1235,43 @@
         const listEl = el('guilds-list');
         if (!listEl) return;
         if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
-        listEl.innerHTML = GUILD_NAMES.map(g => `
-            <div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                <span>${escapeHtml(g)}: <strong>${currentGuildsData[g] || 0}</strong> заказ(ов)</span>
-                <span style="display:flex; gap:4px;">
-                    <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 1)">+1</button>
-                    <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 5)">+5</button>
-                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetGuildOrders('${escapeHtml(g)}')">Сброс</button>
-                </span>
-            </div>`).join('');
+        listEl.innerHTML = GUILD_NAMES.map(g => {
+            const gd = currentGuildsData[g] || { member: false, orders: 0 };
+            const rank = getGuildRank(g, gd.orders);
+            return `
+            <div class="party-row" style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:6px; margin:0;">
+                        <input type="checkbox" ${gd.member ? 'checked' : ''} onchange="toggleGuildMembership('${escapeHtml(g)}', this.checked)">
+                        <strong>${escapeHtml(g)}</strong>
+                    </label>
+                    ${gd.member ? `<span style="font-size:12px; opacity:.8;">${escapeHtml(rank.rankName)}${rank.next ? ' → ещё ' + (rank.next.at - gd.orders) + ' до «' + escapeHtml(rank.next.name) + '»' : ' (максимум)'}</span>` : ''}
+                </div>
+                ${gd.member ? `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                    <span>Заказов: <strong>${gd.orders}</strong></span>
+                    <span style="display:flex; gap:4px;">
+                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 1)">+1</button>
+                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 5)">+5</button>
+                        <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetGuildOrders('${escapeHtml(g)}')">Сброс</button>
+                    </span>
+                </div>` : ''}
+            </div>`;
+        }).join('');
     }
+
+    window.toggleGuildMembership = function (guildName, isMember) {
+        if (!currentInvPlayerUid) return;
+        const gd = currentGuildsData[guildName] || { member: false, orders: 0 };
+        currentGuildsData[guildName] = Object.assign({}, gd, { member: isMember });
+        db.collection('characters').doc(currentInvPlayerUid).update({ guildsData: currentGuildsData })
+            .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
+    };
 
     window.adjustGuildOrders = function (guildName, delta) {
         if (!currentInvPlayerUid) return;
-        currentGuildsData[guildName] = Math.max(0, (currentGuildsData[guildName] || 0) + delta);
+        const gd = currentGuildsData[guildName] || { member: false, orders: 0 };
+        currentGuildsData[guildName] = Object.assign({}, gd, { orders: Math.max(0, gd.orders + delta) });
         db.collection('characters').doc(currentInvPlayerUid).update({ guildsData: currentGuildsData })
             .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -1118,7 +1279,8 @@
     window.resetGuildOrders = function (guildName) {
         if (!currentInvPlayerUid) return;
         if (!confirm(`Сбросить счётчик заказов «${guildName}» до 0?`)) return;
-        currentGuildsData[guildName] = 0;
+        const gd = currentGuildsData[guildName] || { member: false, orders: 0 };
+        currentGuildsData[guildName] = Object.assign({}, gd, { orders: 0 });
         db.collection('characters').doc(currentInvPlayerUid).update({ guildsData: currentGuildsData })
             .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -1239,7 +1401,7 @@
             renderGmPlayerInventory();
 
             // Гильдии/Сверхъестественное пишутся сразу по клику — безопасно обновлять на лету.
-            currentGuildsData = Object.assign(defaultGuildsData(), data.guildsData || {});
+            currentGuildsData = normalizeGuildsData(data.guildsData);
             const defaultSn = defaultSupernaturalState();
             currentSupernaturalState = data.supernaturalState ? {
                 lycanthropy: !!data.supernaturalState.lycanthropy,
@@ -1249,6 +1411,8 @@
             } : defaultSn;
             renderGuildsPanel();
             renderSupernaturalPanel();
+            currentCrimeState = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, data.crimeState || {});
+            renderCrimePanel();
             // Репутация копится ЛОКАЛЬНО до явного "Сохранить" (см. панель Задачи D) — если
             // перезатирать её на каждом чужом снапшоте, можно потерять несохранённые правки
             // мастера. Подтягиваем из облака только при первом выборе этого игрока.
@@ -2000,12 +2164,12 @@
     // высокоуровневый бандит может выпасть в чём угодно от железа до своего максимума, а не
     // гарантированно в топе.
     const BANDIT_TIER_THRESHOLDS = [
-        { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Меховые|Сыромятные|Железн)/i, bow: 'Охотничий лук' },
-        { minLevel: 8, weaponMat: /^Стальн/i, armorMat: /^Стальн/i, bow: 'Имперский лук' },
-        { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Двемерск)/i, bow: 'Орочий лук' },
-        { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bow: 'Эльфийский лук' },
-        { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bow: 'Стеклянный лук' },
-        { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bow: 'Эбонитовый лук' }
+        { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Меховые|Сыромятные|Железн)/i, bows: ['Длинный лук', 'Охотничий лук'] },
+        { minLevel: 8, weaponMat: /^Стальн/i, armorMat: /^Стальн/i, bows: ['Имперский лук', 'Древний нордский лук'] },
+        { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Двемерск)/i, bows: ['Орочий лук', 'Лук Изгоев'] },
+        { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bows: ['Эльфийский лук', 'Фалмерский лук'] },
+        { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bows: ['Стеклянный лук', 'Лук бич магов'] },
+        { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bows: ['Эбонитовый лук', 'Фалмерский гибкий лук'] }
     ];
 
     function getBanditTierRegexes(level) {
@@ -2013,18 +2177,27 @@
         return {
             weaponMats: unlocked.map(t => t.weaponMat),
             armorMats: unlocked.map(t => t.armorMat),
-            bows: unlocked.map(t => t.bow)
+            bows: unlocked.reduce((acc, t) => acc.concat(t.bows), [])
         };
+    }
+
+    // Английские ключи слота (armorNonCraftable) и русские подписи (armorRecipes, через
+    // BANDIT_ARMOR_SLOT_MAP) — приводим обе базы к одному набору ключей: helmet/chest/gloves/
+    // boots/shield.
+    const ARMOR_SLOT_KEYS = new Set(['helmet', 'chest', 'gloves', 'boots', 'shield']);
+    function normalizeArmorSlot(rawSlot) {
+        if (ARMOR_SLOT_KEYS.has(rawSlot)) return rawSlot;
+        return BANDIT_ARMOR_SLOT_MAP[rawSlot] || null;
     }
 
     function getBanditGearPool(level) {
         const tiers = getBanditTierRegexes(level);
-        const weapons = (window.weaponRecipes || []).filter(w =>
+        const weapons = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).filter(w =>
             !/лук/i.test(w.name) && tiers.weaponMats.some(re => re.test(w.name)));
-        const armors = (window.armorRecipes || []).filter(a =>
+        const armors = (window.armorRecipes || []).concat(window.armorNonCraftable || []).filter(a =>
             tiers.armorMats.some(re => re.test(a.name)));
         const bowNames = tiers.bows;
-        const bows = (window.weaponRecipes || []).filter(w => bowNames.includes(w.name));
+        const bows = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).filter(w => bowNames.includes(w.name));
         return { weapons, armors, bows };
     }
 
@@ -2051,7 +2224,7 @@
         const slots = { helmet: null, chest: null, gloves: null, boots: null, shield: null };
         const bySlot = {};
         pool.armors.forEach(a => {
-            const key = BANDIT_ARMOR_SLOT_MAP[a.slot];
+            const key = normalizeArmorSlot(a.slot);
             if (!key) return;
             (bySlot[key] = bySlot[key] || []).push(a);
         });
@@ -2092,7 +2265,7 @@
         }
         if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
         Object.values(slots).forEach(a => {
-            if (a && Math.random() < 0.6) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: BANDIT_ARMOR_SLOT_MAP[a.slot], category: 'Броня (с трупа)' });
+            if (a && Math.random() < 0.6) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot), category: 'Броня (с трупа)' });
         });
         if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
         if (foodItem && Math.random() < 0.5) lootItems.push({ name: foodItem.name, price: foodItem.price || 0, weight: foodItem.weight || 0.5, category: foodItem.category, effect: foodItem.effect || '' });
