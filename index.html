@@ -395,6 +395,7 @@
     <script src="spell-data.js"></script>
     <script src="alchemy-data.js"></script>
     <script src="holidays-data.js"></script>
+    <script src="skill-books-data.js"></script>
 </head>
 <body>
 
@@ -438,7 +439,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
-        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь, Еда и Боги</button>
+        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь и квесты</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
         <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
@@ -561,6 +562,7 @@
            <div class="day-controls">
                 <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
+                <button class="btn btn-danger" style="width:auto; margin:0; padding:6px 14px;" onclick="resetData()">🗑️ Сброс персонажа</button>
             </div>
             <div class="day-controls" style="margin-top:6px;">
                 <span id="turn-round-display-main" style="font-size:15px; font-weight:bold; color:var(--accent-color);">Ход: 0 | Круг: 0</span>
@@ -573,8 +575,71 @@
 
             <div class="rest-btn" style="margin-top:8px;">
                 <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
-                <button class="btn btn-danger" onclick="resetData()">🗑️ Сброс персонажа</button>
             </div>
+        </div>
+
+        <!-- Выживание: голод, регион, вера -->
+        <div class="panel">
+            <h2>Выживание и Пантеон Богов</h2>
+
+            <label>Голодание (Пропущено дней без еды)</label>
+            <label>Голод (дней без еды)</label>
+<input type="number" id="food-starve" value="0" min="0" readonly
+       style="background:#080604; color:#c8a566; cursor:not-allowed;"
+       title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
+
+            <div class="checkbox-group" style="margin-top:10px;">
+                <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
+                <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
+            </div>
+
+            <h3 style="margin-top:15px;">Религия и Благословения</h3>
+            <label>Священный покровитель (Аэдра или Принц Даэдра)</label>
+            <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
+                <option value="none">Без веры / Атеист</option>
+                <optgroup label="9 Божеств Аэдра">
+                    <option value="zenithar">Зенитар (Труд, Бонус к HP, силовому урону)</option>
+                    <option value="stendarr">Стендарр (Защита и чистый урон по даэдра/нежити)</option>
+                    <option value="julianos">Джулианос (+Манапул, скидка на касты)</option>
+                    <option value="mara">Мара (Резист ядам/болезням, сила хила)</option>
+                    <option value="dibella">Дибелла (Бонус к броне плоти и красноречию)</option>
+                    <option value="kynareth">Кинарет (Иммунитет к падению, пробитие брони)</option>
+                    <option value="arkay">Аркей (+Защита, резист к холоду)</option>
+                    <option value="talos">Талос (+Урон топорами/секирами, резист к крикам)</option>
+                    <option value="akatosh">Акатош (+Броня, урон зачарования, резист огню)</option>
+                </optgroup>
+                <optgroup label="Принцы Даэдра">
+                    <option value="boethiah">Боэтия (Скрытность, скорость, урон из тени)</option>
+                    <option value="mephala">Мефала (Яды, вампиризм при атаках)</option>
+                    <option value="peryite">Периайт (Болезни превращаются в мощные баффы)</option>
+                    <option value="hermaeus">Хермеус Мора (+Мана, вампиризм заклинаниями)</option>
+                    <option value="nocturnal">Ноктюрнал (Скорость, множитель скрытности)</option>
+                    <option value="malacath">Малакат (+HP, огромный урон силовых атак)</option>
+                    <option value="azura">Азура (Зачарование, резист стихиям)</option>
+                    <option value="meridia">Меридия (Скидки восстановления, урон по нежити)</option>
+                    <option value="mehrunes">Мерунес Дагон (+Мана, урон огнем, 1% шанс ваншота)</option>
+                    <option value="sanguine">Сангвин (Бафф физ. урона от алкоголя, вампиризм)</option>
+                    <option value="namira">Намира (Усиление зелий, бафф за поедание тел)</option>
+                    <option value="vaermina">Вермина (Бесшумные иллюзии, шанс обратить в страх)</option>
+                    <option value="sheogorath">Шеогорат (Рандом урона/защиты каждый ход!)</option>
+                    <option value="clavicus">Клавикус Вайл (+HP, красноречие, пробитие брони)</option>
+                    <option value="molag">Молаг Бал (+HP/MP, резист физ. урону, вампиризм оружия)</option>
+                    <option value="hircine">Хирсин (+Броня, скорость, урон оборотня)</option>
+                </optgroup>
+            </select>
+
+            <label>Стадия Благословения (Ранг преданности)</label>
+            <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
+                <option value="1">1 Ранг (Последователь)</option>
+                <option value="2">2 Ранг (Ревнитель веры)</option>
+                <option value="3">3 Ранг (Избранник божества)</option>
+            </select>
+            <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none;">
+                ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
+            </div>
+
+            <label style="margin-top:10px;">Текущий дар и догматы божества (Заметки веры)</label>
+            <textarea id="faith-notes" rows="2" placeholder="Запишите сюда точный бонус выбранного ранга вашего бога (например: Талос 1 р. — +5% урона топорами)..." onchange="saveLocalStorage()"></textarea>
         </div>
     </div>
 
@@ -875,72 +940,11 @@
                 <div id="trade-result" style="margin-top:8px; font-size:14px;"></div>
             </div>
 
-            <!-- Религия, Еда, Рецепты и Заметки -->
+            <!-- Заметки и рецепты -->
             <div class="panel">
-                <h2>Выживание и Пантеон Богов</h2>
-                
-                <label>Голодание (Пропущено дней без еды)</label>
-                <label>Голод (дней без еды)</label>
-<input type="number" id="food-starve" value="0" min="0" readonly
-       style="background:#080604; color:#c8a566; cursor:not-allowed;"
-       title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
-
-                <div class="checkbox-group" style="margin-top:10px;">
-                    <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
-                    <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
-                </div>
-
-                <h3 style="margin-top:15px;">Религия и Благословения</h3>
-                <label>Священный покровитель (Аэдра или Принц Даэдра)</label>
-                <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
-                    <option value="none">Без веры / Атеист</option>
-                    <optgroup label="9 Божеств Аэдра">
-                        <option value="zenithar">Зенитар (Труд, Бонус к HP, силовому урону)</option>
-                        <option value="stendarr">Стендарр (Защита и чистый урон по даэдра/нежити)</option>
-                        <option value="julianos">Джулианос (+Манапул, скидка на касты)</option>
-                        <option value="mara">Мара (Резист ядам/болезням, сила хила)</option>
-                        <option value="dibella">Дибелла (Бонус к броне плоти и красноречию)</option>
-                        <option value="kynareth">Кинарет (Иммунитет к падению, пробитие брони)</option>
-                        <option value="arkay">Аркей (+Защита, резист к холоду)</option>
-                        <option value="talos">Талос (+Урон топорами/секирами, резист к крикам)</option>
-                        <option value="akatosh">Акатош (+Броня, урон зачарования, резист огню)</option>
-                    </optgroup>
-                    <optgroup label="Принцы Даэдра">
-                        <option value="boethiah">Боэтия (Скрытность, скорость, урон из тени)</option>
-                        <option value="mephala">Мефала (Яды, вампиризм при атаках)</option>
-                        <option value="peryite">Периайт (Болезни превращаются в мощные баффы)</option>
-                        <option value="hermaeus">Хермеус Мора (+Мана, вампиризм заклинаниями)</option>
-                        <option value="nocturnal">Ноктюрнал (Скорость, множитель скрытности)</option>
-                        <option value="malacath">Малакат (+HP, огромный урон силовых атак)</option>
-                        <option value="azura">Азура (Зачарование, резист стихиям)</option>
-                        <option value="meridia">Меридия (Скидки восстановления, урон по нежити)</option>
-                        <option value="mehrunes">Мерунес Дагон (+Мана, урон огнем, 1% шанс ваншота)</option>
-                        <option value="sanguine">Сангвин (Бафф физ. урона от алкоголя, вампиризм)</option>
-                        <option value="namira">Намира (Усиление зелий, бафф за поедание тел)</option>
-                        <option value="vaermina">Вермина (Бесшумные иллюзии, шанс обратить в страх)</option>
-                        <option value="sheogorath">Шеогорат (Рандом урона/защиты каждый ход!)</option>
-                        <option value="clavicus">Клавикус Вайл (+HP, красноречие, пробитие брони)</option>
-                        <option value="molag">Молаг Бал (+HP/MP, резист физ. урону, вампиризм оружия)</option>
-                        <option value="hircine">Хирсин (+Броня, скорость, урон оборотня)</option>
-                    </optgroup>
-                </select>
-
-                <label>Стадия Благословения (Ранг преданности)</label>
-                <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
-                    <option value="1">1 Ранг (Последователь)</option>
-                    <option value="2">2 Ранг (Ревнитель веры)</option>
-                    <option value="3">3 Ранг (Избранник божества)</option>
-                </select>
-                <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none;">
-                    ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
-                </div>
-
-                <!-- Текстовое окно для записи точных эффектов бога -->
-                <label style="margin-top:10px;">Текущий дар и догматы божества (Заметки веры)</label>
-                <textarea id="faith-notes" rows="2" placeholder="Запишите сюда точный бонус выбранного ранга вашего бога (например: Талос 1 р. — +5% урона топорами)..." onchange="saveLocalStorage()"></textarea>
-
+                <h2>Заметки</h2>
                 <!-- Походный блокнот для рецептов алхимии и кузнечки -->
-                <div style="margin-top:12px; background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
+                <div style="background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
                     <label>📜 Походный блокнот (Рецепты алхимии, кузнечного дела и заметки квестов)</label>
                     <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
                 </div>
@@ -957,7 +961,7 @@
         <!-- ГИЛЬДИИ (Задача K) -->
         <div class="panel">
             <h2>🏛️ Гильдии</h2>
-            <p style="font-size:13px; opacity:.75;">Показаны только гильдии, в которые тебя принял мастер. Ранг растёт автоматически с числом выполненных заказов. Ниже справочник: кто выдаёт задания, примерная плата и условия.</p>
+            <p style="font-size:13px; opacity:.75;">Показаны только гильдии, в которые тебя принял мастер. Ранг растёт автоматически с числом выполненных заказов (мастер отмечает выполнение квеста).</p>
             <div id="guild-panel-player"></div>
         </div>
 
@@ -2171,6 +2175,27 @@ window.toggleSkillPanel = function (idx) {
     }
 
     // Свиток — одноразовое бесплатное чтение заклинания (не тратит ману, тратит сам свиток).
+    // Книги умений — как в ваниле: чтение даёт +1 к базовому значению навыка, расходует
+    // предмет. Систему "уже читал именно эту книгу раньше" не отслеживаем (мастер сам решает,
+    // выдавать ли вторую копию той же книги) — упрощение, чтобы не городить отдельный трекер.
+    window.readSkillBook = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.count <= 0 || !item.skill) return;
+        const skillIdx = skillNames.indexOf(item.skill);
+        if (skillIdx === -1) { alert('Не нашёл навык «' + item.skill + '» в списке.'); return; }
+        const input = document.getElementById('skill-' + skillIdx);
+        if (!input) return;
+        let raw = parseInt(input.getAttribute('data-raw-val')) || 10;
+        if (raw >= 100) { alert(`«${item.skill}» уже на максимуме (100) — книга не поможет, но её всё равно можно оставить или продать.`); return; }
+        raw = Math.min(100, raw + 1);
+        input.setAttribute('data-raw-val', raw);
+        removeFromInventoryByName(itemId, 1);
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+        alert(`Прочитано: «${item.name}». Навык «${item.skill}» вырос на 1 (теперь ${raw}).`);
+    };
+
     window.useScrollItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || item.count <= 0) return;
@@ -2440,6 +2465,17 @@ window.toggleSkillPanel = function (idx) {
         return 1;
     }
 
+    // Ранг Гильдии воров механически даёт скидку у торговцев — с капюшоном соответствующего
+    // ранга (Новичок 10% / Умелый вор 15% / Мастер вора 20%, из реальных данных Фракции.xlsx).
+    // Первый пример "ранг влияет механически", остальные гильдии — по мере проработки.
+    function getGuildDiscountMult() {
+        const gd = normalizePlayerGuildEntry((playerGuildsData || {})['Гильдия воров']);
+        if (!gd.member) return 1;
+        if (gd.orders >= 10) return 0.80;
+        if (gd.orders >= 5) return 0.85;
+        return 0.90;
+    }
+
     function renderBuyMerchantTypeSelect() {
         const sel = document.getElementById('buy-merchant-type');
         if (!sel) return;
@@ -2505,6 +2541,7 @@ window.toggleSkillPanel = function (idx) {
         if (category && foodCats.includes(category) && getCurrentSeason().name === 'Зима') price *= 1.2;
         const holidayDiscount = getActiveHolidayDiscount();
         if (holidayDiscount) price *= (1 - holidayDiscount / 100);
+        price *= getGuildDiscountMult();
         return Math.round(price);
     }
 
@@ -2718,6 +2755,7 @@ window.toggleSkillPanel = function (idx) {
                     ${['Зелье', 'Яд', 'Блюдо', 'Провал готовки'].includes(item.category) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useInventoryItem('${escHtml(item.itemId)}')">Исп.</button>` : ''}
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
+                    ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${escHtml(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -3382,34 +3420,7 @@ window.toggleSkillPanel = function (idx) {
     // Задача K: квестодатели по каждой гильдии — из Фракции.xlsx (кто выдаёт задания, за сколько,
     // какие условия). Оплата не всегда фиксированный "за квест" септим — где в источнике так
     // написано (напр. Тёмное братство/Стража Рассвета), так и указано.
-    const GUILD_QUEST_GIVERS = {
-        'Гильдия воров': [
-            { giver: 'Делвин Меллори / Векс', reward: '—', note: 'Обычные заказы; за каждые 5 заказов — особое задание (500 септимов + бонусы гильдии). После 40 заказов — путь Соловья.' }
-        ],
-        'Соратники': [
-            { giver: 'Эйла Охотница', reward: '—', note: 'Квесты на Тотемы Хирсина + обычные поручения (вредители, сопровождение).' },
-            { giver: 'Вилкас / Скьор', reward: '—', note: 'Поручения: фамильные ценности, беглый преступник и т.п. После 15 поручений — небесное зачарованное оружие (вид/эффект на выбор).' }
-        ],
-        'Коллегия магов': [
-            { giver: 'Толфдир', reward: '—', note: 'Найти перегонный куб в Зале поддержки.' },
-            { giver: 'Древис Нелорен', reward: '3-5 обычных камней душ', note: 'Квест «Балансировка» — очистить фокусные точки магической энергии.' },
-            { giver: 'Сергий Турриан', reward: '12/30/60/120/240 септимов', note: 'Платит за пустые камни душ (по размеру камня).' },
-            { giver: 'Энтир', reward: '150 септимов', note: 'Забрать посох в таверне Винтерхолда.' },
-            { giver: 'Ураг гро-Шуб', reward: '100 септимов за книгу', note: 'Принести определённую книгу из случайного подземелья.' }
-        ],
-        'Тёмное братство': [
-            { giver: 'Астрид / Назир', reward: '250 септимов за контракт', note: 'Обычные заказы-контракты; после 5 удачных — бонус от Братства.' }
-        ],
-        'Стража Рассвета': [
-            { giver: 'Гунмар', reward: '200-500 септимов', note: 'Охота на вампиров и их логова (несколько разных заданий).' }
-        ],
-        'Бойцовский клуб': [
-            { giver: 'Феридар (судья/комментатор)', reward: 'Золото, самоцветы, ювелирка, зачар. оружие/броня', note: 'Запись на турнир (группы по уровню: Новички 1-5 лвл и выше). Медаль подтверждать каждый турнир.' }
-        ],
-        'Коллегия бардов': [
-            { giver: 'Музей коллегии', reward: '800 септимов за легендарную песню', note: 'Сдать историческое/мифическое оружие или броню; 4 легендарные песни → "Бардовская баллада".' }
-        ]
-    };
+    const GUILD_NAMES = ['Гильдия воров', 'Соратники', 'Коллегия магов', 'Тёмное братство', 'Стража Рассвета', 'Бойцовский клуб', 'Коллегия бардов'];
 
     let playerGuildsData = null;
     let playerReputationByRegion = null;
@@ -3479,10 +3490,10 @@ window.toggleSkillPanel = function (idx) {
 
     // То же самое, что и в gm.js (разные файлы, поэтому дублируется) — ранги гильдий.
     const GUILD_RANK_TIERS = {
-        'Гильдия воров': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Постоянный клиент' }, { at: 15, name: 'Тень' }, { at: 25, name: 'Мастер-вор' }, { at: 40, name: 'Соловей' }],
+        'Гильдия воров': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Умелый вор' }, { at: 10, name: 'Мастер вора' }, { at: 40, name: 'Соловей' }],
         'Соратники': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Щенок' }, { at: 10, name: 'Соратник' }, { at: 15, name: 'Хозяин небесного оружия' }],
         'Коллегия магов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Студент' }, { at: 15, name: 'Мастер школы' }, { at: 30, name: 'Архимаг' }],
-        'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный убийца' }, { at: 15, name: 'Тёмный брат/сестра' }, { at: 25, name: 'Слышащий' }],
+        'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный член' }, { at: 25, name: 'Тёмный брат/сестра' }],
         'Стража Рассвета': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Страж' }, { at: 15, name: 'Охотник на вампиров' }, { at: 25, name: 'Ветеран Стражи' }],
         'Бойцовский клуб': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Боец' }, { at: 15, name: 'Чемпион группы' }, { at: 25, name: 'Легенда арены' }],
         'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Бард' }, { at: 15, name: 'Мастер баллад' }, { at: 25, name: 'Хранитель Бардовской баллады' }]
@@ -3508,7 +3519,7 @@ window.toggleSkillPanel = function (idx) {
         if (!el) return;
         const data = playerGuildsData || {};
         // Только гильдии, в которые мастер реально принял игрока — не все 7 сразу.
-        const joined = Object.keys(GUILD_QUEST_GIVERS).filter(g => normalizePlayerGuildEntry(data[g]).member);
+        const joined = GUILD_NAMES.filter(g => normalizePlayerGuildEntry(data[g]).member);
         if (!joined.length) {
             el.innerHTML = '<p style="opacity:.6; font-size:13px;">Ты пока ни в одной гильдии не состоишь — членство назначает мастер.</p>';
             return;
@@ -3520,7 +3531,6 @@ window.toggleSkillPanel = function (idx) {
             <div class="party-row">
                 <div class="row-name"><strong>${escHtml(g)}</strong><span>${escHtml(rank.rankName)}${rank.next ? ` (ещё ${rank.next.at - gd.orders} до «${escHtml(rank.next.name)}»)` : ' (макс. ранг)'}</span></div>
                 <div style="font-size:12px; opacity:.7;">Заказов выполнено: ${gd.orders}</div>
-                ${GUILD_QUEST_GIVERS[g].map(qg => `<div style="font-size:12px; margin-top:3px; opacity:.85;">👤 <strong>${escHtml(qg.giver)}</strong>${qg.reward !== '—' ? ' · 💰 ' + escHtml(qg.reward) : ''}<br><span style="opacity:.75;">${escHtml(qg.note)}</span></div>`).join('')}
             </div>`;
         }).join('');
     }
@@ -3543,6 +3553,22 @@ window.toggleSkillPanel = function (idx) {
             </div>`).join('');
     }
 
+    // Задача "гильдии подробнее": пороги наград бронёй — только там, где в исходнике чётко
+    // прописано "после N заказов" (Воры, Тёмное братство). У остальных гильдий награды либо не
+    // по числу заказов (сердца оборотня/легендарные песни/турниры), либо не бронёй — для них
+    // авто-выдачи пока нет, справочник по ним смотри у мастера.
+    const GUILD_ARMOR_REWARDS = {
+        'Гильдия воров': [
+            { at: 5, items: ['Капюшон Умелого вора', 'Броня Умелого вора', 'Перчатки Умелого вора', 'Сапоги Умелого вора'] },
+            { at: 10, items: ['Капюшон мастера вора', 'Броня мастера вора', 'перчатки мастера вора', 'Сапоги мастера вора'] },
+            { at: 40, items: ['Капюшон соловья', 'Броня соловья', 'Перчатки соловья', 'Сапоги соловьи', 'Соловьиный клинок', 'Соловьиный лук'] }
+        ],
+        'Тёмное братство': [
+            { at: 5, items: ['Древняя броня теней', 'Древние сапоги теней', 'Древние перчатки теней', 'Древний капюшон теней с маской'] },
+            { at: 25, items: ['Кожа Ситиса', 'Когти Ситиса', 'Хвост Ситиса', 'Лицо Ситиса'] }
+        ]
+    };
+
     window.markQuestDone = function (id) {
         const q = playerQuests.find(x => x.id === id);
         if (!q) return;
@@ -3551,8 +3577,18 @@ window.toggleSkillPanel = function (idx) {
         saveLocalStorage();
         // Задача K: выполнение квеста гильдии автоматически даёт +1 к её прогрессу.
         if (q.guild && window.CloudSync && typeof window.CloudSync.incrementGuildProgress === 'function') {
+            const before = normalizePlayerGuildEntry((playerGuildsData || {})[q.guild]).orders;
+            const after = before + 1;
             window.CloudSync.incrementGuildProgress(q.guild).then(() => {
                 if (typeof renderGuildPanelPlayer === 'function') renderGuildPanelPlayer();
+                // Авто-выдача брони, если этот заказ как раз довёл счётчик до порога награды.
+                const reward = (GUILD_ARMOR_REWARDS[q.guild] || []).find(r => r.at === after);
+                if (reward) {
+                    reward.items.forEach(name => addToInventory(name, name, 1, 1, 'Броня (награда гильдии)', ''));
+                    renderInventoryList();
+                    saveLocalStorage();
+                    alert(`🏅 Гильдия «${q.guild}» выдаёт награду за ${after} заказ(ов): ${reward.items.join(', ')}!`);
+                }
             }).catch(e => console.error('Ошибка прогресса гильдии:', e));
         }
     };

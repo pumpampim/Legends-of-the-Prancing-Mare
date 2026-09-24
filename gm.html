@@ -447,6 +447,14 @@
             <div id="guilds-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
         </div>
 
+        <!-- ===== СПРАВОЧНИК ПО ГИЛЬДИИ (только мастер, одна гильдия за раз) ===== -->
+        <div class="panel">
+            <h2>📖 Справочник гильдии</h2>
+            <p style="font-size:12px; opacity:.75;">Квестодатели, плюшки гильдии и пороги наград бронёй — из Фракции.xlsx. Игрок этого не видит.</p>
+            <select id="guild-info-select" onchange="renderGuildInfoPanel()"></select>
+            <div id="guild-info-body" style="margin-top:8px;"></div>
+        </div>
+
         <!-- ===== СВЕРХЪЕСТЕСТВЕННОЕ (Задача B) ===== -->
         <div class="panel">
             <h2>🌙 Сверхъестественное</h2>
@@ -562,6 +570,7 @@
 <script src="items-data.js"></script>
 <script src="smithing-data.js"></script>
 <script src="holidays-data.js"></script>
+<script src="skill-books-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>
 <script src="spell-data.js"></script>
