@@ -1587,3 +1587,7 @@ input[type="number"] {
     border-radius: 4px;
     margin-top: 8px;
 }
+.skill-panel .skill-header {
+    padding-left: 26px;
+    padding-right: 26px;
+}
