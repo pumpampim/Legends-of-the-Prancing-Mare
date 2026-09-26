@@ -188,7 +188,7 @@
         // dmgType (необязательно): 'physical'/'fire'/'frost'/'shock'/'poison'/'magic' — если у врага
         // есть resist[dmgType], урон уменьшается (или увеличивается, если там отрицательное число —
         // это уязвимость, как у тролля к огню).
-        applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText, dmgType) {
+        applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText, dmgType, penetrationPct) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             return ref.get().then(doc => {
@@ -198,7 +198,10 @@
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 const wasAlive = (enemies[idx].curHp || 0) > 0;
-                const resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
+                let resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
+                // Пробитие брони/магической защиты (Боевые искусства/богиня Малакат/Азура) —
+                // снижает эффективный резист цели именно для этого удара, не трогает сам объект врага.
+                if (penetrationPct) resist = Math.max(0, resist - penetrationPct);
                 const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
                 const newHp = Math.max(0, (enemies[idx].curHp || 0) - finalDmg);
                 const patch = { curHp: newHp };
@@ -292,7 +295,10 @@
             if (!uid || !db) return;
             unsubWatchedCharacter = db.collection('characters').doc(uid).onSnapshot(doc => {
                 callback(doc.exists ? doc.data() : {});
-            }, e => console.error('Ошибка подписки на персонажа:', e));
+            }, e => {
+                console.error('Ошибка подписки на персонажа:', e);
+                callback(null); // сигнал колбэку показать ошибку на экране, а не молчать
+            });
         },
 
         unwatchCharacter: function () {

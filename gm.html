@@ -181,6 +181,13 @@
                 <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
 
+            <!-- ===== СПРАВОЧНИК ПО ВСЕЙ ПОГОДЕ (только мастер) ===== -->
+            <div class="panel">
+                <h2>📋 Все погодные явления</h2>
+                <p style="font-size:12px; opacity:.75;">Игрок видит только ТЕКУЩУЮ погоду и её эффект (в виджете на своём листе) — полный список всех вариантов только здесь.</p>
+                <div id="all-weather-body"></div>
+            </div>
+
             <!-- ===== ЖИВЫЕ ТОРГОВЦЫ (Задача C) ===== -->
             <div class="panel">
                 <h2>🏪 Живые торговцы</h2>
@@ -455,6 +462,13 @@
             <div id="guild-info-body" style="margin-top:8px;"></div>
         </div>
 
+        <!-- ===== СПРАВОЧНИК ЗАЧАРОВАНИЙ (только мастер, полный список) ===== -->
+        <div class="panel">
+            <h2>🔮 Справочник зачарований</h2>
+            <p style="font-size:12px; opacity:.75;">Все эффекты зачарования оружия/брони — игрок видит в своём инструменте зачарования только УЗНАННЫЕ (разрушив подходящую вещь), это полный список для справки/создания предметов.</p>
+            <div id="all-enchants-body" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
+
         <!-- ===== СВЕРХЪЕСТЕСТВЕННОЕ (Задача B) ===== -->
         <div class="panel">
             <h2>🌙 Сверхъестественное</h2>
@@ -569,6 +583,7 @@
 <script src="firebase-config.js"></script>
 <script src="items-data.js"></script>
 <script src="smithing-data.js"></script>
+<script src="enchant-data.js"></script>
 <script src="holidays-data.js"></script>
 <script src="skill-books-data.js"></script>
 <script src="cooking-data.js"></script>

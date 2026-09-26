@@ -379,8 +379,99 @@
                 3: { hp: 50, armor: 120, speed: 10, powerAttackDmg: 15, weaponDmg: 10 }
             }
         };
+
+        // Читаемые подписи для всех ключей godBonuses — сами цифры уже были в системе (см. выше),
+        // просто нигде не показывались игроку текстом. auto:true — уже реально применяется в
+        // расчёте (updateAll), остальное — информационно, применять вручную/через мастера.
+        const GOD_BONUS_LABELS = {
+            hp: { label: 'Здоровье', suffix: '', auto: true },
+            mp: { label: 'Мана', suffix: '', auto: true },
+            armor: { label: 'Броня', suffix: '', auto: true },
+            speed: { label: 'Скорость', suffix: ' фт.', auto: true },
+            powerAttackDmg: { label: 'Урон силовых атак', suffix: '%', auto: true },
+            smithing: { label: 'Кузнечное дело (эффективность)', suffix: '%' },
+            prices: { label: 'Цены у торговцев выгоднее', suffix: '%', auto: true },
+            armorSpell: { label: 'Заклинания «плоти»', suffix: '%' },
+            arrowResist: { label: 'Резист стрелам', suffix: '%', auto: true },
+            alterationCost: { label: 'Стоимость каста: Изменение', suffix: '% дешевле', auto: true },
+            spellAbsorb: { label: 'Поглощение маны при попадании по врагу заклинанием', suffix: '%' },
+            poisonDiseaseResist: { label: 'Резист яду/болезням', suffix: '%', auto: true },
+            armorPenetration: { label: 'Пробитие брони', suffix: '%', auto: true },
+            spellPower: { label: 'Сила заклинаний', suffix: '%', auto: true },
+            restorationLivingDmg: { label: 'Заклинания Восстановления по живым целям', suffix: '%', auto: true },
+            daedraUndeadResist: { label: 'Резист урону от даэдра/нежити', suffix: '%' },
+            daedraUndeadDmg: { label: 'Урон по даэдра/нежити', suffix: '%' },
+            meleeDmg: { label: 'Урон ближним оружием', suffix: '%', auto: true },
+            magicResist: { label: 'Сопротивление магии', suffix: '%', auto: true },
+            spellCost: { label: 'Стоимость каста заклинаний', suffix: '% дешевле', auto: true },
+            spellHitBonus: { label: 'Бонус к попаданию заклинанием', suffix: ' к броску', auto: true },
+            fallImmunity: { label: 'Иммунитет к урону от падения', suffix: '', bool: true },
+            weaponDmg: { label: 'Урон оружием', suffix: '%', auto: true },
+            coldResist: { label: 'Резист холоду', suffix: '%', auto: true },
+            restorationCost: { label: 'Стоимость каста: Восстановление', suffix: '% дешевле', auto: true },
+            axeDmg: { label: 'Урон топорами/секирами', suffix: '%', auto: true },
+            shoutResist: { label: 'Резист крикам', suffix: '%', auto: true },
+            shockResist: { label: 'Резист электричеству', suffix: '%', auto: true },
+            enchantDmg: { label: 'Урон от зачарованного оружия', suffix: '%', auto: true },
+            fireResist: { label: 'Резист огню', suffix: '%', auto: true },
+            elementalExtraDmg: { label: 'Доп. урон стихийным заклинанием', suffix: '', auto: true },
+            rangedDmg: { label: 'Урон дальним оружием', suffix: '%', auto: true },
+            poisonDmg: { label: 'Урон ядом', suffix: '%', auto: true },
+            poisonLifeSteal: { label: 'Похищение здоровья через яд', suffix: '%', auto: true },
+            poisonVulnerability: { label: 'Уязвимость к яду (у тебя самого)', suffix: '%' },
+            diseaseBuff: { label: 'Сила баффа от болезни (Периайт превращает болезнь в мощь)', suffix: '%' },
+            spellVampire: { label: 'Похищение здоровья заклинаниями', suffix: '%', auto: true },
+            allSchoolsBonus: { label: 'Сила заклинаний всех школ', suffix: '%', auto: true },
+            sneakSpeed: { label: 'Скорость в скрытности', suffix: '%' },
+            sneakMult: { label: 'Множитель урона из скрытности', suffix: 'х доп.' },
+            harderToDetect: { label: 'Труднее обнаружить в скрытности', suffix: '', bool: true },
+            powerAttackHeal: { label: 'Лечение при силовой атаке', suffix: '%', auto: true },
+            enchantingPower: { label: 'Сила зачарования', suffix: '%', auto: true },
+            elementalResist: { label: 'Резист стихиям (огонь/холод/электро)', suffix: '%', auto: true },
+            elementalWeaponDmg: { label: 'Урон стихийным оружием', suffix: '%' },
+            ignoreMagicDmg: { label: 'Игнорирование магической защиты цели', suffix: '%', auto: true },
+            undeadDmg: { label: 'Урон по нежити', suffix: '%' },
+            undeadAuraBonus: { label: 'Аура урона по нежити рядом', suffix: '' },
+            destructionSkill: { label: 'Навык Разрушение (эффективность)', suffix: '%', auto: true },
+            fireWeaponDmg: { label: 'Урон огненным оружием/заклинанием', suffix: '%', auto: true },
+            instantKillChance: { label: 'Шанс мгновенного убийства силовой атакой', suffix: '%', auto: true },
+            drunkBuff: { label: 'Бафф от алкоголя сильнее', suffix: '%' },
+            physMagicVamp: { label: 'Похищение здоровья физ./магической атакой', suffix: '%', auto: true },
+            potionPower: { label: 'Сила зелий', suffix: '%', auto: true },
+            pureDmg: { label: 'Чистый (нестихийный) урон', suffix: '%' },
+            cannibalBuff: { label: 'Бафф от поедания тел', suffix: '%' },
+            silentIllusion: { label: 'Заклинания Иллюзии бесшумны', suffix: '', bool: true },
+            illusionCost: { label: 'Стоимость каста: Иллюзия', suffix: '% дешевле', auto: true },
+            fearChance: { label: 'Доп. шанс обратить врага в бегство страхом', suffix: '%', auto: true },
+            randomDmg: { label: 'Случайный множитель урона каждый ход', suffix: '', bool: true },
+            randomDefense: { label: 'Случайный множитель защиты каждый ход', suffix: '', bool: true },
+            randomBuff: { label: 'Случайный бафф каждый ход', suffix: '', bool: true },
+            speech: { label: 'Красноречие', suffix: '%', auto: true },
+            physResist: { label: 'Резист физическому урону', suffix: '%', auto: true },
+            weaponVamp: { label: 'Похищение здоровья оружием', suffix: '%', auto: true }
+        };
+
+        function describeGodBonuses(god, rank) {
+            if (!god || god === 'none' || !godBonuses[god] || !godBonuses[god][rank]) return [];
+            const b = godBonuses[god][rank];
+            return Object.keys(b).map(k => {
+                const info = GOD_BONUS_LABELS[k] || { label: k, suffix: '' };
+                const val = b[k];
+                const text = info.bool ? info.label : `${info.label}: +${val}${info.suffix}`;
+                return { text, auto: !!info.auto };
+            });
+        }
+
+        // Короткий геттер бонуса текущего бога по ключу — используется по всему боевому/магическому
+        // движку вместо повторного godBonuses[god][rank][key] || 0 везде.
+        function gb(key) {
+            return (window.activeGodBonuses && window.activeGodBonuses[key]) || 0;
+        }
+        function gbBool(key) {
+            return !!(window.activeGodBonuses && window.activeGodBonuses[key]);
+        }
     </script>
-    
+
     <link rel="stylesheet" href="style.css?v=2">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
@@ -513,53 +604,114 @@
             </div>
         </div>
 
-        <!-- Трекеры состояния -->
+        <!-- Трекеры состояния + Выживание + Боги — всё в одной компактной панели -->
         <div class="panel">
             <h2>Панель состояния, Брони и Урона</h2>
-            <div class="grid-3">
-                <div class="vital-bar" style="border-color: #a02e23;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
-                        <div style="font-size:12px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
+            <div class="grid-2">
+                <div>
+                    <div class="vital-bar" style="border-color: #a02e23;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
+                            <div style="font-size:12px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
+                        </div>
+                        <div class="vital-inputs">
+                            <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
+                            <span style="font-size:22px;color:#aaa;">/</span>
+                            <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
+                        </div>
                     </div>
-                    <div class="vital-inputs">
-                        <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
-                        <span style="font-size:22px;color:#aaa;">/</span>
-                        <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
+
+                    <div class="vital-bar" style="border-color: #3498db; margin-top:6px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="color:#3498db; margin:0;">МАНА (MP)</label>
+                            <div style="font-size:12px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
+                        </div>
+                        <div class="vital-inputs">
+                            <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
+                            <span style="font-size:22px;color:#aaa;">/</span>
+                            <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
+                        </div>
                     </div>
-                </div>
-                
-                <div class="vital-bar" style="border-color: #3498db;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="color:#3498db; margin:0;">МАНА (MP)</label>
-                        <div style="font-size:12px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
+
+                    <div class="vital-bar" style="border-color: #f1c40f; margin-top:6px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
+                            <div style="font-size:12px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
+                        </div>
+                        <div style="font-size:13px; margin-top:2px; line-height:1.4;">
+                            Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
+                            Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:54px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
+                            <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
+                            <div id="resistances-display" style="font-size:12px; margin-top:3px; opacity:.85;"></div>
+                        </div>
                     </div>
-                    <div class="vital-inputs">
-                        <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
-                        <span style="font-size:22px;color:#aaa;">/</span>
-                        <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
+
+                    <div class="grid-2" style="margin-top:6px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:13px;">
+                        <div>Скорость: <input type="number" id="val-speed" value="35" style="width:48px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной)</div>
+                        <div>Мудрость на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span></div>
                     </div>
                 </div>
 
-                <div class="vital-bar" style="border-color: #f1c40f;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
-                        <div style="font-size:12px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
+                <div>
+                    <label>Голод (дней без еды)</label>
+                    <input type="number" id="food-starve" value="0" min="0" readonly
+                           style="background:#080604; color:#c8a566; cursor:not-allowed;"
+                           title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
+
+                    <div class="checkbox-group" style="margin-top:6px;">
+                        <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
+                        <label for="chk-frost-region" style="font-size:13px;"><strong>Морозный регион</strong></label>
                     </div>
-                    <div style="font-size:13px; margin-top:2px; line-height:1.4;">
-                        Итоговый урон оружия: <input type="number" id="main-panel-dmg" value="2" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"><br>
-                        Временная Броня (Магия): <input type="number" id="armor-buff" value="0" style="width:54px;display:inline;padding:1px;" onchange="updateAll(); saveLocalStorage();"><br>
-                        <strong>Суммарный класс Брони: <span id="armor-total" style="color:var(--success-color);font-weight:bold;">0</span></strong>
-                        <div id="resistances-display" style="font-size:12px; margin-top:3px; opacity:.85;"></div>
+
+                    <label style="margin-top:8px;">Священный покровитель</label>
+                    <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
+                        <option value="none">Без веры / Атеист</option>
+                        <optgroup label="9 Божеств Аэдра">
+                            <option value="zenithar">Зенитар</option>
+                            <option value="stendarr">Стендарр</option>
+                            <option value="julianos">Джулианос</option>
+                            <option value="mara">Мара</option>
+                            <option value="dibella">Дибелла</option>
+                            <option value="kynareth">Кинарет</option>
+                            <option value="arkay">Аркей</option>
+                            <option value="talos">Талос</option>
+                            <option value="akatosh">Акатош</option>
+                        </optgroup>
+                        <optgroup label="Принцы Даэдра">
+                            <option value="boethiah">Боэтия</option>
+                            <option value="mephala">Мефала</option>
+                            <option value="peryite">Периайт</option>
+                            <option value="hermaeus">Хермеус Мора</option>
+                            <option value="nocturnal">Ноктюрнал</option>
+                            <option value="malacath">Малакат</option>
+                            <option value="azura">Азура</option>
+                            <option value="meridia">Меридия</option>
+                            <option value="mehrunes">Мерунес Дагон</option>
+                            <option value="sanguine">Сангвин</option>
+                            <option value="namira">Намира</option>
+                            <option value="vaermina">Вермина</option>
+                            <option value="sheogorath">Шеогорат</option>
+                            <option value="clavicus">Клавикус Вайл</option>
+                            <option value="molag">Молаг Бал</option>
+                            <option value="hircine">Хирсин</option>
+                        </optgroup>
+                    </select>
+
+                    <label>Стадия Благословения</label>
+                    <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
+                        <option value="1">1 Ранг (Последователь)</option>
+                        <option value="2">2 Ранг (Ревнитель веры)</option>
+                        <option value="3">3 Ранг (Избранник божества)</option>
+                    </select>
+                    <div id="god-bonus-description" style="font-size:12px; margin-top:6px; line-height:1.5;"></div>
+                    <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none; margin-top:6px;">
+                        ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
                     </div>
+                    <textarea id="faith-notes" rows="2" placeholder="Доп. заметки по вере (необязательно)..." style="margin-top:6px; font-size:12px;" onchange="saveLocalStorage()"></textarea>
                 </div>
             </div>
-            
-            <div class="grid-2" style="margin-top:10px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:14px;">
-                <div>Текущая тактическая скорость: <input type="number" id="val-speed" value="35" style="width:54px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной ввод)</div>
-                <div>Затраты Мудрости на свитки: <span id="val-scrolls" style="font-weight:bold;color:var(--accent-color);">10</span> / <span id="val-scrolls-max">10</span> ед.</div>
-            </div>
-           <div class="day-controls">
+
+           <div class="day-controls" style="margin-top:10px;">
                 <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
                 <button class="btn btn-danger" style="width:auto; margin:0; padding:6px 14px;" onclick="resetData()">🗑️ Сброс персонажа</button>
@@ -576,70 +728,6 @@
             <div class="rest-btn" style="margin-top:8px;">
                 <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
             </div>
-        </div>
-
-        <!-- Выживание: голод, регион, вера -->
-        <div class="panel">
-            <h2>Выживание и Пантеон Богов</h2>
-
-            <label>Голодание (Пропущено дней без еды)</label>
-            <label>Голод (дней без еды)</label>
-<input type="number" id="food-starve" value="0" min="0" readonly
-       style="background:#080604; color:#c8a566; cursor:not-allowed;"
-       title="Изменяется автоматически кнопкой «Следующий день» и сбрасывается при еде">
-
-            <div class="checkbox-group" style="margin-top:10px;">
-                <input type="checkbox" id="chk-frost-region" onchange="updateAll(); saveLocalStorage();">
-                <label for="chk-frost-region"><strong>Персонаж идет по морозному региону</strong></label>
-            </div>
-
-            <h3 style="margin-top:15px;">Религия и Благословения</h3>
-            <label>Священный покровитель (Аэдра или Принц Даэдра)</label>
-            <select id="faith-god" onchange="updateAll(); saveLocalStorage();">
-                <option value="none">Без веры / Атеист</option>
-                <optgroup label="9 Божеств Аэдра">
-                    <option value="zenithar">Зенитар (Труд, Бонус к HP, силовому урону)</option>
-                    <option value="stendarr">Стендарр (Защита и чистый урон по даэдра/нежити)</option>
-                    <option value="julianos">Джулианос (+Манапул, скидка на касты)</option>
-                    <option value="mara">Мара (Резист ядам/болезням, сила хила)</option>
-                    <option value="dibella">Дибелла (Бонус к броне плоти и красноречию)</option>
-                    <option value="kynareth">Кинарет (Иммунитет к падению, пробитие брони)</option>
-                    <option value="arkay">Аркей (+Защита, резист к холоду)</option>
-                    <option value="talos">Талос (+Урон топорами/секирами, резист к крикам)</option>
-                    <option value="akatosh">Акатош (+Броня, урон зачарования, резист огню)</option>
-                </optgroup>
-                <optgroup label="Принцы Даэдра">
-                    <option value="boethiah">Боэтия (Скрытность, скорость, урон из тени)</option>
-                    <option value="mephala">Мефала (Яды, вампиризм при атаках)</option>
-                    <option value="peryite">Периайт (Болезни превращаются в мощные баффы)</option>
-                    <option value="hermaeus">Хермеус Мора (+Мана, вампиризм заклинаниями)</option>
-                    <option value="nocturnal">Ноктюрнал (Скорость, множитель скрытности)</option>
-                    <option value="malacath">Малакат (+HP, огромный урон силовых атак)</option>
-                    <option value="azura">Азура (Зачарование, резист стихиям)</option>
-                    <option value="meridia">Меридия (Скидки восстановления, урон по нежити)</option>
-                    <option value="mehrunes">Мерунес Дагон (+Мана, урон огнем, 1% шанс ваншота)</option>
-                    <option value="sanguine">Сангвин (Бафф физ. урона от алкоголя, вампиризм)</option>
-                    <option value="namira">Намира (Усиление зелий, бафф за поедание тел)</option>
-                    <option value="vaermina">Вермина (Бесшумные иллюзии, шанс обратить в страх)</option>
-                    <option value="sheogorath">Шеогорат (Рандом урона/защиты каждый ход!)</option>
-                    <option value="clavicus">Клавикус Вайл (+HP, красноречие, пробитие брони)</option>
-                    <option value="molag">Молаг Бал (+HP/MP, резист физ. урону, вампиризм оружия)</option>
-                    <option value="hircine">Хирсин (+Броня, скорость, урон оборотня)</option>
-                </optgroup>
-            </select>
-
-            <label>Стадия Благословения (Ранг преданности)</label>
-            <select id="faith-rank" onchange="updateAll(); saveLocalStorage();">
-                <option value="1">1 Ранг (Последователь)</option>
-                <option value="2">2 Ранг (Ревнитель веры)</option>
-                <option value="3">3 Ранг (Избранник божества)</option>
-            </select>
-            <div class="alert-box" id="daedra-alert" style="background:#d35400; display:none;">
-                ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
-            </div>
-
-            <label style="margin-top:10px;">Текущий дар и догматы божества (Заметки веры)</label>
-            <textarea id="faith-notes" rows="2" placeholder="Запишите сюда точный бонус выбранного ранга вашего бога (например: Талос 1 р. — +5% урона топорами)..." onchange="saveLocalStorage()"></textarea>
         </div>
     </div>
 
@@ -680,8 +768,8 @@
 
                 <label>Оружие дальнего боя (Лук или Арбалет)</label>
                 <div class="slot-row">
-                    <input type="text" id="wep-ranged-name" value="Длинный лук" placeholder="Название лука" onchange="saveLocalStorage()">
-                    <input type="number" id="wep-ranged-dmg" value="10" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
+                    <input type="text" id="wep-ranged-name" placeholder="Название лука (пусто, если не надет)" onchange="saveLocalStorage()">
+                    <input type="number" id="wep-ranged-dmg" value="0" placeholder="Баз. урон" onchange="updateAll(); saveLocalStorage();">
                     <select id="wep-ranged-type" onchange="updateAll(); saveLocalStorage();">
                         <option value="bow">Лук (Обычный)</option>
                         <option value="crossbow">Арбалет (1 ход на КД)</option>
@@ -955,14 +1043,14 @@
         <div class="panel">
             <h2>📜 Активные квесты</h2>
             <p style="font-size:13px; opacity:.75;">Квесты выдаёт мастер. Отмечай выполненные — мастер увидит статус и сможет выдать награду.</p>
-            <div id="quest-list"></div>
+            <div id="quest-list" style="max-height:320px; overflow-y:auto;"></div>
         </div>
 
         <!-- ГИЛЬДИИ (Задача K) -->
         <div class="panel">
             <h2>🏛️ Гильдии</h2>
             <p style="font-size:13px; opacity:.75;">Показаны только гильдии, в которые тебя принял мастер. Ранг растёт автоматически с числом выполненных заказов (мастер отмечает выполнение квеста).</p>
-            <div id="guild-panel-player"></div>
+            <div id="guild-panel-player" style="max-height:320px; overflow-y:auto;"></div>
         </div>
 
         <!-- СВЕРХЪЕСТЕСТВЕННОЕ (Задача L) -->
@@ -1284,7 +1372,7 @@
             </div>
 
             <h3 style="margin-top:10px;">Прогресс по навыкам</h3>
-            <div id="skill-progress-list"></div>
+            <div id="skill-progress-list" style="max-height:400px; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -1293,7 +1381,7 @@
             <h2>📅 Календарь Тамриэля</h2>
             <p style="font-size:13px; opacity:.75;">Текущая дата подсвечена. Праздник может дать скидку у торговцев, если это явно указано в его описании (применяет мастер кнопкой «Запустить праздник вручную» на своём экране).</p>
             <div id="calendar-today-widget" style="padding:8px; background:var(--input-bg); border:1px solid var(--accent-color); border-radius:4px; margin-bottom:10px;"></div>
-            <div id="calendar-list"></div>
+            <div id="calendar-list" style="max-height:500px; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -1320,6 +1408,19 @@
             </label>
             <div id="sell-charm-locked" style="font-size:13px; color:#e67e22; display:none;">У тебя ещё нет перка «Очарование».</div>
 
+            <label style="margin-top:8px;">Показать категорию</label>
+            <select id="sell-category-filter" onchange="renderSellList()">
+                <option value="all">Всё</option>
+                <option value="weapon">Оружие</option>
+                <option value="armor">Броня/одежда</option>
+                <option value="potion">Зелья и яды</option>
+                <option value="ingredient">Ингредиенты (алхимия/кухня)</option>
+                <option value="food">Еда и напитки</option>
+                <option value="magic">Свитки/книги/посохи/камни душ</option>
+                <option value="jewelry">Ювелирные изделия</option>
+                <option value="other">Прочее</option>
+            </select>
+
             <div id="sell-items-list" style="max-height:320px; overflow-y:auto; margin-top:10px;"></div>
         </div>
 
@@ -1329,6 +1430,18 @@
             <p style="font-size:13px; opacity:.75;">Ассортимент и золото торговца задаёт мастер (обновляется примерно раз в неделю). Если товара нет — мастер ещё не завозил ассортимент в это владение для этого типа торговца.</p>
             <label>Тип торговца</label>
             <select id="buy-merchant-type" onchange="renderBuyList()"></select>
+            <label style="margin-top:6px;">Показать категорию</label>
+            <select id="buy-category-filter" onchange="renderBuyList()">
+                <option value="all">Всё</option>
+                <option value="weapon">Оружие</option>
+                <option value="armor">Броня/одежда</option>
+                <option value="potion">Зелья и яды</option>
+                <option value="ingredient">Ингредиенты (алхимия/кухня)</option>
+                <option value="food">Еда и напитки</option>
+                <option value="magic">Свитки/книги/посохи/камни душ</option>
+                <option value="jewelry">Ювелирные изделия</option>
+                <option value="other">Прочее</option>
+            </select>
             <div id="buy-merchant-info" style="font-size:13px; opacity:.8; margin:4px 0;"></div>
             <div id="buy-items-list" style="max-height:320px; overflow-y:auto; margin-top:6px;"></div>
         </div>
@@ -1351,6 +1464,7 @@
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
     let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
+    let knownEnchantments = []; // ["Урон огнем", ...] — узнаётся разрушением зачарованного предмета
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
     let activeSummons = []; // [{ id, category, name, curHp, maxHp, dmg, dmgType, speed, turnsRemaining, permanent }]
@@ -2390,7 +2504,7 @@ window.toggleSkillPanel = function (idx) {
 
     function getSpeechPriceMultiplier() {
         const perks = window.perkBonuses || {};
-        const speech = getSkillRawValue('Красноречие');
+        const speech = getSkillRawValue('Красноречие') + gb('speech');
         return (speech * 0.01) * (1 + (perks.merchantPriceBonus || 0) + getRacialPriceBonus());
     }
 
@@ -2409,11 +2523,36 @@ window.toggleSkillPanel = function (idx) {
     };
 
     // Определяет, к какому "профилю" торговца относится предмет.
+    // Широкая категория для фильтра "Показать категорию" в купле-продаже (оружие/броня/зелья/
+    // ингредиенты/еда/магия/украшения/прочее) — селекты sell-category-filter/buy-category-filter
+    // уже стояли в HTML, но нигде не читались, фильтрация не работала вообще.
+    function classifyItemBroad(item) {
+        const cat = (item.category || '').toLowerCase();
+        if (['ring', 'amulet', 'circlet'].includes(item.slot) || cat.includes('ювелир')) return 'jewelry';
+        if (cat.includes('зелье') || cat.includes('яд')) return 'potion';
+        if (cat.includes('ингредиент')) return 'ingredient';
+        if (cat.includes('блюдо') || cat.includes('провал готовки') || cat.includes('продукт') || cat.includes('напит') || cat.includes('еда')) return 'food';
+        if (cat.includes('посох') || cat.startsWith('свит') || cat.includes('камни душ') || cat.includes('камень душ') || cat.includes('книг')) return 'magic';
+        if (cat.includes('броня') || cat.includes('доспех') || cat.includes('щит') || cat.includes('одеян') ||
+            ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield'].includes(item.slot)) return 'armor';
+        if (cat.includes('оружие') || cat.includes('лук') || cat.includes('стрел') || cat.includes('боеприпас') ||
+            ['melee', 'ranged'].includes(item.slot)) return 'weapon';
+        return 'other';
+    }
+
     function classifyItemForMerchant(item) {
         const cat = (item.category || '').toLowerCase();
         const type = (item.type || '').toLowerCase();
 
-        if (item.isStaff || type === 'staff' || cat.includes('посох') || cat.includes('свиток') ||
+        // Зачарованные вещи (любой слот) — профиль мага, независимо от того, что это в
+        // остальном оружие/броня. Раньше не проверялось вообще, падало в кузнеца по категории.
+        if (item.enchantment || (item.effect && ['melee', 'ranged', 'helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'amulet', 'circlet'].includes(item.slot))) {
+            return 'mage';
+        }
+        // "свиток" (ед.ч.) не матчит "свитки" (мн.ч., как хранятся выданные мастером и
+        // прописанные свитки) — та же кириллическая ловушка подстрок, что чинил для кнопки
+        // "Читать" раньше, только здесь отдельное место.
+        if (item.isStaff || type === 'staff' || cat.includes('посох') || cat.startsWith('свит') ||
             cat.includes('камни душ') || cat.includes('камень душ') || cat.includes('одеян') || cat.includes('книг')) {
             return 'mage';
         }
@@ -2426,6 +2565,7 @@ window.toggleSkillPanel = function (idx) {
         }
         if (cat.includes('броня') || cat.includes('оружие') || cat.includes('доспех') || cat.includes('кузнеч') ||
             cat.includes('шкур') || cat.includes('щит') || cat.includes('боеприпас') || cat.includes('двемерск') ||
+            cat.includes('стрел') || cat.includes('лук') ||
             ['helmet', 'chest', 'gloves', 'boots', 'shield', 'melee', 'ranged'].includes(item.slot)) {
             return 'blacksmith';
         }
@@ -2502,7 +2642,11 @@ window.toggleSkillPanel = function (idx) {
         const holidayDiscount = getActiveHolidayDiscount();
         infoEl.innerHTML = `💰 У торговца: <strong>${stock.gold}</strong> золота · товаров: ${stock.items.length}` +
             (holidayDiscount ? `<br><span style="color:var(--accent-color);">🎉 Скидка праздника: −${holidayDiscount}% (уже учтена в ценах ниже)</span>` : '');
-        listEl.innerHTML = stock.items.length ? stock.items.map((it, idx) => {
+        const catFilterEl = document.getElementById('buy-category-filter');
+        const catFilter = catFilterEl ? catFilterEl.value : 'all';
+        const withIdx = stock.items.map((it, idx) => ({ it, idx }));
+        const filtered = catFilter === 'all' ? withIdx : withIdx.filter(({ it }) => classifyItemBroad(it) === catFilter);
+        listEl.innerHTML = filtered.length ? filtered.map(({ it, idx }) => {
             const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
             const canAfford = price <= stock.gold && price <= (parseInt(document.getElementById('char-gold').value) || 0);
             const qty = it.qty || 1;
@@ -2513,7 +2657,7 @@ window.toggleSkillPanel = function (idx) {
                     <button class="btn-success" style="width:auto; padding:2px 8px;" ${canAfford ? '' : 'disabled'} onclick="buyFromMerchant('${escHtml(key)}', ${idx})">Купить</button>
                 </span>
             </div>`;
-        }).join('') : '<p style="opacity:.6; font-size:13px;">Пусто — весь товар распродан.</p>';
+        }).join('') : (stock.items.length ? '<p style="opacity:.6; font-size:13px;">В этой категории у торговца пусто.</p>' : '<p style="opacity:.6; font-size:13px;">Пусто — весь товар распродан.</p>');
     }
     window.renderBuyList = renderBuyList;
 
@@ -2542,6 +2686,7 @@ window.toggleSkillPanel = function (idx) {
         const holidayDiscount = getActiveHolidayDiscount();
         if (holidayDiscount) price *= (1 - holidayDiscount / 100);
         price *= getGuildDiscountMult();
+        if (gb('prices')) price *= (1 - gb('prices') / 100);
         return Math.round(price);
     }
 
@@ -2559,7 +2704,7 @@ window.toggleSkillPanel = function (idx) {
         if (!window.CloudSync || typeof window.CloudSync.buyFromMerchantStock !== 'function') { alert('Нет соединения с сессией.'); return; }
         window.CloudSync.buyFromMerchantStock(key, idx, price).then(() => {
             goldInput.value = myGold - price;
-            addToInventory(it.name, it.name, 1, it.weight || 0, it.category || '', it.effect || '', { slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price });
+            addToInventory(it.name, it.name, 1, it.weight || 0, it.category || '', it.effect || '', { slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price, capacity: it.capacity });
             const speechSuccesses = trackSpeechTrade(price, true, false);
             renderInventoryList();
             updateAll();
@@ -2596,6 +2741,9 @@ window.toggleSkillPanel = function (idx) {
         const fenceLocked = merchantType === 'fence' && !inThievesGuild;
 
         const sellable = playerInventory.filter(i => i.price);
+        const catFilterEl = document.getElementById('sell-category-filter');
+        const catFilter = catFilterEl ? catFilterEl.value : 'all';
+        const filtered = catFilter === 'all' ? sellable : sellable.filter(i => classifyItemBroad(i) === catFilter);
         if (!sellable.length) {
             listEl.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет вещей с ценой для продажи.</p>';
             return;
@@ -2604,7 +2752,11 @@ window.toggleSkillPanel = function (idx) {
             listEl.innerHTML = '<p style="color:#e74c3c; font-size:14px;">Скупщик не станет иметь с тобой дел — ты не состоишь в Гильдии воров (нет выполненных заказов).</p>';
             return;
         }
-        listEl.innerHTML = sellable.map(item => {
+        if (!filtered.length) {
+            listEl.innerHTML = '<p style="opacity:.6; font-size:14px;">В этой категории продавать нечего.</p>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(item => {
             const cat = classifyItemForMerchant(item);
             const matches = (merchantType === 'pawnbroker' || merchantType === 'fence') ? true : cat === merchantType;
             const unitPrice = computeSellPrice(item, merchantType, charmActive);
@@ -2756,6 +2908,7 @@ window.toggleSkillPanel = function (idx) {
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
                     ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${escHtml(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
+                    ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -3012,6 +3165,21 @@ window.toggleSkillPanel = function (idx) {
         onEnchantItemPicked();
     }
 
+    // Разрушение зачарованного предмета — как в ваниле: вещь пропадает, а зачарование
+    // становится узнанным навсегда (можно применять самому при зачаровании других вещей).
+    window.disenchantItem = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.enchantment) return;
+        const name = item.enchantment.name;
+        if (!confirm(`Разрушить «${item.name}»? Вещь пропадёт навсегда, но зачарование «${name}» станет известно.`)) return;
+        if (!knownEnchantments.includes(name)) knownEnchantments.push(name);
+        removeFromInventoryByName(itemId, 1);
+        renderInventoryList();
+        if (typeof onEnchantItemPicked === 'function') onEnchantItemPicked();
+        saveLocalStorage();
+        alert(`Зачарование «${name}» узнано.`);
+    };
+
     window.onEnchantItemPicked = function () {
         const itemId = document.getElementById('enchant-item-select').value;
         const item = playerInventory.find(i => i.itemId === itemId);
@@ -3033,7 +3201,12 @@ window.toggleSkillPanel = function (idx) {
             const eSlot = equipSlotToEnchantSlot(item.slot);
             effects = (window.enchantArmorEffects || []).filter(e => e.slots.includes(eSlot));
         }
-        effectSelect.innerHTML = effects.map((e, i) => `<option value="${i}">${escHtml(e.name)}</option>`).join('');
+        // Как в ваниле — применить можно только УЖЕ УЗНАННОЕ зачарование (разрушив вещь с этим
+        // эффектом). Раньше тут был весь список без разбора, знал игрок эффект или нет.
+        const known = effects.filter(e => knownEnchantments.includes(e.name));
+        effectSelect.innerHTML = known.length
+            ? known.map((e) => `<option value="${effects.indexOf(e)}">${escHtml(e.name)}</option>`).join('')
+            : '<option value="">Нет узнанных зачарований для этого слота — разрушь подходящий зачарованный предмет</option>';
         updateEnchantCalc();
     };
 
@@ -3048,6 +3221,15 @@ window.toggleSkillPanel = function (idx) {
         return { item, effect: effects[idx] };
     }
 
+    // Азура: сила зачарования +N% — применяется после расчёта calcEnchantPower, единообразно
+    // и для обычных вещей, и для посохов.
+    function applyGodEnchantBonus(calc, effect) {
+        if (!calc.boolean && gb('enchantingPower')) {
+            calc.value = Math.min(effect.maxValue, Math.round(calc.value * (1 + gb('enchantingPower') / 100) * 100) / 100);
+        }
+        return calc;
+    }
+
     function updateEnchantCalc() {
         const resultEl = document.getElementById('enchant-calc-result');
         if (!resultEl) return;
@@ -3056,7 +3238,7 @@ window.toggleSkillPanel = function (idx) {
         const soulGem = document.getElementById('enchant-soulgem').value;
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
-        const calc = window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses);
+        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect);
 
         let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:14px;">${escHtml(effect.description)}</div>`;
         if (calc.boolean) {
@@ -3083,7 +3265,7 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         const skill = getEnchantSkill();
-        const calc = window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses);
+        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect);
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
 
         removeFromInventoryByName(gemKey, 1);
@@ -3129,7 +3311,7 @@ window.toggleSkillPanel = function (idx) {
         const soulGem = document.getElementById('staff-soulgem').value;
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
-        const calc = window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks());
+        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks()), effect);
         let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:14px;">${escHtml(effect.description)}</div>`;
         html += calc.boolean
             ? `<div style="margin-top:6px;">Эффект без числовой величины.</div>`
@@ -3150,7 +3332,7 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         const skill = getEnchantSkill();
-        const calc = window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks());
+        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks()), effect);
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
         removeFromInventoryByName(gemKey, 1);
         const name = `Посох: ${effect.name}`;
@@ -4166,6 +4348,18 @@ window.toggleSkillPanel = function (idx) {
             const m = matchResistEffectName(e.effectName);
             if (m && typeof e.value === 'number') res[m] += e.value;
         });
+        // Резисты от бога — раньше эти ~10 ключей были в данных, но нигде не прибавлялись.
+        // arrowResist/physResist (нет отдельного "резист стрелам" — считаем как физический,
+        // стрелы физический урон); daedraUndeadResist пропущен — нет данных о типе противника
+        // в бою, применять условно вручную по описанию (см. панель бога).
+        res.physical += gb('arrowResist') + gb('physResist');
+        res.fire += gb('fireResist') + gb('elementalResist');
+        res.frost += gb('coldResist') + gb('elementalResist');
+        res.shock += gb('shockResist') + gb('elementalResist');
+        res.poison += gb('poisonDiseaseResist');
+        res.disease += gb('poisonDiseaseResist');
+        res.shout += gb('shoutResist');
+        res.magic += gb('magicResist');
         Object.keys(res).forEach(k => { res[k] = Math.min(85, Math.max(0, res[k])); }); // потолок 85%, как в ваниле
         return res;
     }
@@ -4373,13 +4567,20 @@ window.toggleSkillPanel = function (idx) {
         const name1 = document.getElementById('alch-ing-0').value;
         const name2 = document.getElementById('alch-ing-1').value;
         const name3 = document.getElementById('alch-ing-2').value;
-        if (!name1 || !name2 || name1 === name2) return { effects: [], name1, name2, name3 };
+        // Раньше проверялось только name1===name2 — повтор в паре (1,3) или (2,3) проходил
+        // молча и getSharedAlchemyEffects сравнивал ингредиент сам с собой (совпадает по
+        // всем 4 свойствам с самим собой) — отсюда "если в 1 и 3 — вылезают все 4 свойства".
+        // Правило: каждый ингредиент в вареве — только один раз, без повторов.
+        const picked = [name1, name2, name3].filter(Boolean);
+        const hasDuplicate = new Set(picked).size !== picked.length;
+        if (!name1 || !name2 || hasDuplicate) return { effects: [], name1, name2, name3 };
         const effects = getSharedAlchemyEffects(name1, name2, name3);
         const perkState = getAlchemyPerkState();
         const skill = getAlchemySkillValue();
         const computed = effects.map(effName => {
             const info = window.alchemyBaseEffects[effName] || { base: 5, hasDuration: true, unit: '', polarity: 'positive', priceBase: 5 };
-            const magnitude = calcAlchemyValue(info.base, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, perkState.gearBonus, info.polarity, effName);
+            let magnitude = calcAlchemyValue(info.base, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, perkState.gearBonus, info.polarity, effName);
+            if (gb('potionPower')) magnitude = Math.round(magnitude * (1 + gb('potionPower') / 100) * 100) / 100;
             const duration = info.hasDuration ? calcAlchemyValue(1, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, perkState.gearBonus, info.polarity, effName) : null;
             const price = calcAlchemyEffectPrice(effName, magnitude, duration);
             return { name: effName, magnitude, duration, unit: info.unit, polarity: info.polarity, price };
@@ -4390,8 +4591,13 @@ window.toggleSkillPanel = function (idx) {
     window.updateBrewPreview = function () {
         renderAlchGearInfo();
         const previewEl = document.getElementById('alch-brew-preview');
-        const { effects, name1, name2 } = computeBrewEffects();
+        const name1 = document.getElementById('alch-ing-0').value;
+        const name2 = document.getElementById('alch-ing-1').value;
+        const name3 = document.getElementById('alch-ing-2').value;
+        const picked = [name1, name2, name3].filter(Boolean);
         if (!name1 || !name2) { previewEl.innerHTML = '<span style="opacity:.7;">Выбери минимум 2 ингредиента.</span>'; return; }
+        if (new Set(picked).size !== picked.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ Один и тот же ингредиент выбран дважды — так нельзя, выбери разные.</span>'; return; }
+        const { effects } = computeBrewEffects();
         if (!effects.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ Нет общих свойств — варево не получится.</span>'; return; }
         previewEl.innerHTML = effects.map(e => {
             const durStr = e.duration ? ` · ${e.duration} ход(ов)` : '';
@@ -4410,6 +4616,8 @@ window.toggleSkillPanel = function (idx) {
         const resultEl = document.getElementById('alch-brew-result');
         const { effects, name1, name2, name3 } = computeBrewEffects();
         if (!name1 || !name2) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери минимум 2 ингредиента.</span>'; return; }
+        const picked = [name1, name2, name3].filter(Boolean);
+        if (new Set(picked).size !== picked.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">Один и тот же ингредиент выбран дважды — выбери разные.</span>'; return; }
         const names = [name1, name2, name3].filter(Boolean);
         if (names.some(n => countInInventory(n) <= 0)) {
             resultEl.innerHTML = '<span style="color:#e74c3c;">Каких-то из выбранных ингредиентов уже не хватает в инвентаре.</span>';
@@ -5492,6 +5700,8 @@ function updateHungerPenalty() {
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
 
         let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null, dmgType = 'physical';
+        let lifestealPct = gb('physMagicVamp'); // Молаг Бал — универсальный вампиризм, добавляется всегда
+        let penetrationPct = 0;
 
         if (actionVal === 'melee' || actionVal === 'ranged') {
             document.getElementById('active-combat-weapon').value = actionVal;
@@ -5499,6 +5709,8 @@ function updateHungerPenalty() {
             const calc = window.lastWeaponCombatCalc || { totalDmg: 0, hitModifier: 0 };
             mod = calc.hitModifier;
             dmg = calc.totalDmg;
+            lifestealPct += gb('weaponVamp');
+            penetrationPct = gb('armorPenetration');
             actionLabel = actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием';
             skillNameForProgress = actionVal === 'melee'
                 ? (calc.wepType === 'twohand_sword' || calc.wepType === 'twohand_axe' || calc.wepType === 'twohand_hammer' ? 'Двуручное оружие' : 'Одноручное оружие')
@@ -5509,6 +5721,8 @@ function updateHungerPenalty() {
             const rawStr = strInput ? (parseInt(strInput.getAttribute('data-raw-stat')) || 10) : 10;
             mod = calcAbilityMod(rawStr);
             dmgType = 'physical';
+            lifestealPct += gb('weaponVamp');
+            penetrationPct = gb('armorPenetration');
             actionLabel = 'когтями зверя';
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
@@ -5521,8 +5735,18 @@ function updateHungerPenalty() {
             const statKey = skillName ? SKILL_TO_STAT[skillName] : null;
             const statInput = statKey ? document.getElementById('stat-' + statKey) : null;
             const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
-            mod = calcAbilityMod(rawStat);
-            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}`;
+            mod = calcAbilityMod(rawStat) + gb('spellHitBonus');
+            // Бонусы бога к силе заклинаний — общие (allSchoolsBonus/spellPower) и по школе.
+            let godSpellPct = gb('allSchoolsBonus') + gb('spellPower');
+            if (skillName === 'Разрушение') godSpellPct += gb('destructionSkill');
+            if (skillName === 'Восстановление') godSpellPct += gb('restorationLivingDmg');
+            if (dmgType === 'fire') godSpellPct += gb('fireWeaponDmg');
+            if (dmgType === 'poison') godSpellPct += gb('poisonDmg');
+            if (godSpellPct) dmg = Math.round(dmg * (1 + godSpellPct / 100));
+            if (gb('elementalExtraDmg') && ['fire', 'frost', 'shock'].includes(dmgType)) dmg += gb('elementalExtraDmg');
+            lifestealPct += gb('spellVampire');
+            penetrationPct = gb('ignoreMagicDmg');
+            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}${godSpellPct ? ` (+${godSpellPct}% от бога)` : ''}`;
             skillNameForProgress = skillName;
         } else if (actionVal.indexOf('scroll:') === 0) {
             const itemId = actionVal.slice(7);
@@ -5546,6 +5770,7 @@ function updateHungerPenalty() {
             alert('Выбери способ атаки.');
             return;
         }
+        if (dmgType === 'poison') lifestealPct += gb('poisonLifeSteal');
 
         // Опозный бросок: игрок 1к20+модификатор против мастера "голым" 1к20 (без модификаторов).
         // Ничья = перекид обеих костей (не провал и не успех — просто бросаем заново),
@@ -5564,8 +5789,12 @@ function updateHungerPenalty() {
             logSkillSuccessByName(skillNameForProgress);
         }
 
+        // Лечение при силовой атаке (Малакат) — плюсуется к обычному вампиризму, применяется
+        // от того же реального (пост-резист) урона при "Применить".
+        const healPct = lifestealPct + ((document.getElementById('chk-power-attack').checked && (actionVal === 'melee' || actionVal === 'ranged')) ? gb('powerAttackHeal') : 0);
+
         pendingPlayerAttack = hit ? {
-            targetId, dmg, dmgType,
+            targetId, dmg, dmgType, healPct, penetrationPct,
             logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
         } : null;
 
@@ -5588,9 +5817,22 @@ function updateHungerPenalty() {
     window.applyPlayerAttackDamage = function () {
         if (!pendingPlayerAttack || !window.CloudSync) return;
         const playerName = document.getElementById('char-name') ? document.getElementById('char-name').value : 'Игрок';
-        window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType)
+        window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType, pendingPlayerAttack.penetrationPct)
             .then(res => {
-                alert(`Урон применён! «${res.enemyName}»: ${res.resist ? `${res.finalDmg} ед. (резист ${res.resist}%)` : res.finalDmg + ' ед.'}, осталось ${res.newHp} HP.`);
+                let healMsg = '';
+                // Вампиризм/лечение силовой атаки — считается от РЕАЛЬНОГО (пост-резист) урона.
+                if (pendingPlayerAttack.healPct && res.finalDmg) {
+                    const healAmt = Math.round(res.finalDmg * pendingPlayerAttack.healPct / 100);
+                    if (healAmt > 0) {
+                        const hpEl = document.getElementById('cur-hp');
+                        const maxHp = parseInt(document.getElementById('max-hp').value) || 999999;
+                        const newHp = Math.min(maxHp, (parseInt(hpEl.value) || 0) + healAmt);
+                        hpEl.value = newHp;
+                        saveLocalStorage();
+                        healMsg = ` Похищено здоровья: +${healAmt} ХП.`;
+                    }
+                }
+                alert(`Урон применён! «${res.enemyName}»: ${res.resist ? `${res.finalDmg} ед. (резист ${res.resist}%)` : res.finalDmg + ' ед.'}, осталось ${res.newHp} HP.${healMsg}`);
                 pendingPlayerAttack = null;
                 document.getElementById('attack-roll-result').style.display = 'none';
                 window.renderAttackTargetSelect();
@@ -5680,6 +5922,15 @@ function updateHungerPenalty() {
         if (sign === 'steed') { con += 2; }
 
         const godB = getGodBonuses(god, rnk);
+        window.activeGodBonuses = godB;
+        const godDescEl = document.getElementById('god-bonus-description');
+        if (godDescEl) {
+            const items = describeGodBonuses(god, rnk);
+            godDescEl.innerHTML = items.length
+                ? items.map(i => `<div>${i.auto ? '✅' : '📝'} ${escHtml(i.text)}</div>`).join('') +
+                  '<div style="opacity:.6; margin-top:4px;">✅ — уже учтено в расчёте автоматически · 📝 — применяй сам/через мастера</div>'
+                : '';
+        }
 
         document.getElementById('stat-str').value = str;
         document.getElementById('stat-dex').value = dex;
@@ -5897,7 +6148,15 @@ function updateHungerPenalty() {
             const percentBonuses = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses() : { spellCostReduction: 0 };
             const activeBuffCostMult = Math.max(0.1, 1 - (percentBonuses.spellCostReduction || 0) / 100);
 
-            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult);
+            // Бонусы бога на стоимость каста — общая скидка (spellCost/Джулианос,Хермеус,Мерунес)
+            // + по конкретной школе (alterationCost/restorationCost/illusionCost).
+            let godCostPct = gb('spellCost');
+            if (school === 'alter') godCostPct += gb('alterationCost');
+            if (school === 'restor') godCostPct += gb('restorationCost');
+            if (school === 'illus') godCostPct += gb('illusionCost');
+            const godCostMult = Math.max(0.1, 1 - godCostPct / 100);
+
+            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult * godCostMult);
         });
 
         const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
@@ -6016,6 +6275,11 @@ function updateHungerPenalty() {
                 totalDmg = Math.round(totalDmg * 2);
                 infoNotes.push('🏃 Рывок-атака: фиксированный х2 урона (дистанция подтверждена мастером)');
             } else {
+                // Раньше при isSprintAttack без перка код молча уходил в обычную силовую атаку
+                // без единого слова об этом — игрок не понимал, почему галочка "ничего не делает".
+                if (isSprintAttack && !sprintPerkUnlocked) {
+                    infoNotes.push('⚠ Галочка «Рывок-атака» стоит, но перк «Рывок»/«Великий рывок» не открыт — считается как обычная силовая атака.');
+                }
                 // Обычная силовая атака: множитель 1.5 + бонусы (Безжалостный удар, Сокрушительный удар)
                 let powerMult = 1.5;
                 if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
@@ -6086,6 +6350,32 @@ function updateHungerPenalty() {
     const weaponDmgPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().weaponDamagePercent : 0;
     if (weaponDmgPct) totalDmg = Math.round(totalDmg * (1 + weaponDmgPct / 100));
 
+    // Бонусы бога к урону оружием — раньше godBonuses существовал в данных, но реально считались
+    // только hp/mp/armor/speed. Подключаем весь боевой блок разом.
+    let godDmgNotes = [];
+    if (gb('weaponDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('weaponDmg') / 100)); godDmgNotes.push(`оружие +${gb('weaponDmg')}%`); }
+    if (mode === 'melee' && gb('meleeDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('meleeDmg') / 100)); godDmgNotes.push(`ближний бой +${gb('meleeDmg')}%`); }
+    if (mode !== 'melee' && gb('rangedDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('rangedDmg') / 100)); godDmgNotes.push(`дальний бой +${gb('rangedDmg')}%`); }
+    if (mode === 'melee' && gb('axeDmg') && (wepType === 'twohand_axe' || document.getElementById('wep-melee-name').value.toLowerCase().match(/топор|секир/))) {
+        totalDmg = Math.round(totalDmg * (1 + gb('axeDmg') / 100)); godDmgNotes.push(`топор/секира (Талос) +${gb('axeDmg')}%`);
+    }
+    if (enchantDmgMain && gb('enchantDmg')) {
+        const bonus = Math.round(enchantDmgMain * gb('enchantDmg') / 100);
+        totalDmg += bonus; godDmgNotes.push(`зачарование (Акатош) +${bonus}`);
+    }
+    if (isPowerAttack && gb('powerAttackDmg') && mode === 'melee') {
+        totalDmg = Math.round(totalDmg * (1 + gb('powerAttackDmg') / 100)); godDmgNotes.push(`силовая атака +${gb('powerAttackDmg')}%`);
+    }
+    if (isPowerAttack && gb('powerAttackHeal') && mode === 'melee') {
+        godDmgNotes.push(`⚕️ силовая атака лечит ${gb('powerAttackHeal')}% от урона (применится автоматически при "Применить" в бою)`);
+    }
+    if (isPowerAttack && gb('instantKillChance') && mode === 'melee') {
+        godDmgNotes.push(`💀 Шанс мгновенного убийства (Мерунес Дагон): ${gb('instantKillChance')}% — решает мастер`);
+    }
+    if (gb('fearChance')) {
+        godDmgNotes.push(`😱 Доп. шанс обратить цель в бегство: +${gb('fearChance')}% — решает мастер`);
+    }
+
     let sneakMult = 2;
     if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
     else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
@@ -6107,6 +6397,9 @@ function updateHungerPenalty() {
     }
     if (weaponDmgPct) {
         finalHtml += `<div style="font-size:13px; color:#8a8171;">✨ Активный бафф урона: +${weaponDmgPct}% (уже учтено выше)</div>`;
+    }
+    if (godDmgNotes.length) {
+        finalHtml += `<div style="font-size:13px; color:#8a8171;">🙏 Бог: ${godDmgNotes.join(', ')} (уже учтено выше)</div>`;
     }
     if (document.getElementById('chk-sneak-attack').checked) {
         finalHtml += `<strong style="color:#e67e22;">Урон из скрытности (х${sneakMult}): ${totalDmg * sneakMult} ед. урона!</strong>`;
@@ -6210,6 +6503,7 @@ function updateHungerPenalty() {
             inventory: playerInventory,
             equippedSlots: equippedSlots,
             knownIngredientProps: knownIngredientProps,
+            knownEnchantments: knownEnchantments,
             pouchContents: pouchContents,
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
@@ -6286,6 +6580,10 @@ function updateHungerPenalty() {
         if (Array.isArray(data.inventory) && JSON.stringify(data.inventory) !== JSON.stringify(playerInventory)) {
             playerInventory = data.inventory;
             if (typeof renderInventoryList === 'function') renderInventoryList();
+            // Раньше не обновлялось здесь — предмет, выданный мастером ПОСЛЕ загрузки страницы,
+            // появлялся в инвентаре, но не появлялся в выборе "что зачаровать" вообще (сам пункт
+            // списка отсутствовал), пока игрок не перезагружал страницу.
+            if (typeof renderEnchantItemSelect === 'function') renderEnchantItemSelect();
         }
         if (typeof updateAll === 'function') updateAll();
     }
@@ -6474,6 +6772,7 @@ function updateHungerPenalty() {
             renderPouchPanel();
 
             knownIngredientProps = (data.knownIngredientProps && typeof data.knownIngredientProps === 'object') ? data.knownIngredientProps : {};
+            knownEnchantments = Array.isArray(data.knownEnchantments) ? data.knownEnchantments : [];
             renderAlchEatSelect();
             renderAlchIngredientSelects();
             renderKnownIngredients();

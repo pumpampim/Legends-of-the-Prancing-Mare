@@ -292,7 +292,8 @@ select {
 
 .vital-inputs {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 6px;
     align-items: center;
     margin-top: 2px;
 }

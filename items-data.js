@@ -26,17 +26,17 @@ const allItems = [
     { name: "Золотой обруч с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 450 },
     { name: "Золотой обруч с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "circlet", weight: 2, price: 500 },
     // Ожерелья
-    { name: "Серебряное ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 60 },
-    { name: "Серебряное ожерелье с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 830 },
-    { name: "Серебряное ожерелье с гранатами", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 380 },
-    { name: "Серебряное ожерелье с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 580 },
-    { name: "Золотое ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 120 },
-    { name: "Золотое ожерелье с бриллиантом", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 1200 },
-    { name: "Золотое ожерелье с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 550 },
-    { name: "Золотое ожерелье с аметистами", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 485 },
-    { name: "Амулет (Аэдра)", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 1, price: 100 },
-    { name: "Кулон Восточной имперской компании", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 0.5, price: 25 },
-    { name: "Амулет скаала", category: "Ювелирные изделия", type: "jewelry", slot: "necklace", weight: 1, price: 1000 },
+    { name: "Серебряное ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 60 },
+    { name: "Серебряное ожерелье с изумрудом", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 830 },
+    { name: "Серебряное ожерелье с гранатами", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 380 },
+    { name: "Серебряное ожерелье с сапфиром", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 580 },
+    { name: "Золотое ожерелье", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 120 },
+    { name: "Золотое ожерелье с бриллиантом", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 1200 },
+    { name: "Золотое ожерелье с рубином", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 550 },
+    { name: "Золотое ожерелье с аметистами", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 485 },
+    { name: "Амулет (Аэдра)", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 1, price: 100 },
+    { name: "Кулон Восточной имперской компании", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 0.5, price: 25 },
+    { name: "Амулет скаала", category: "Ювелирные изделия", type: "jewelry", slot: "amulet", weight: 1, price: 1000 },
 
     // --- 2. Ингредиенты для кузнечного дела ---
     { name: "Кожа", category: "Кузнечные ингредиенты", type: "misc", weight: 2, price: 10 },
@@ -104,10 +104,9 @@ const allItems = [
     { name: "Спальный мешок", category: "Походное снаряжение", type: "misc", weight: 3, price: 75 },
     { name: "Палатка (15x15 футов)", category: "Походное снаряжение", type: "misc", weight: 10, price: 300 },
     { name: "Алхимический куб", category: "Походное снаряжение", type: "misc", weight: 5, price: 450 },
-    { name: "Подсумок на 2 зелья", category: "Походное снаряжение", type: "misc", weight: 2, price: 50 },
-    { name: "Подсумок на 4 зелья", category: "Походное снаряжение", type: "misc", weight: 2, price: 250 },
-    { name: "Подсумок на 6 зелий", category: "Походное снаряжение", type: "misc", weight: 2, price: 400 },
-    { name: "Подсумок на 8 зелий", category: "Походное снаряжение", type: "misc", weight: 2, price: 800 },
+    // Подсумки — см. category:"Подсумки" ниже (с slot/capacity); тут раньше были дубли без
+    // этих полей, которые перекрывали правильные записи в find()-поиске по имени — отсюда
+    // "подсумок надет, но вместимость 0 независимо от того, какой именно".
     { name: "Карта владения", category: "Походное снаряжение", type: "misc", weight: 1, price: 150 },
     { name: "Котелок с столовыми приборами", category: "Походное снаряжение", type: "misc", weight: 10, price: 75 },
     { name: "Набор для костра", category: "Походное снаряжение", type: "misc", weight: 5, price: 25 },

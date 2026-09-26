@@ -676,6 +676,32 @@
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
         if (isStolen) extra.stolen = true;
 
+        // Мастер видит и может применить ЛЮБОЕ зачарование (не только то, что игрок уже узнал
+        // разрушив вещь — у мастера, в отличие от игрока, ограничения "только узнанное" нет).
+        // Только для вещей с экипировочным слотом — обычные расходники зачаровать нельзя.
+        const enchantableSlots = ['melee', 'ranged', 'helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'amulet', 'circlet'];
+        if (sourceItem.slot && enchantableSlots.includes(sourceItem.slot) && !sourceItem.enchantment &&
+            confirm(`Зачаровать «${sourceItem.name}» перед выдачей?`)) {
+            const isWeapon = sourceItem.slot === 'melee' || sourceItem.slot === 'ranged';
+            const armorSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' };
+            const wantedSlot = armorSlotMap[sourceItem.slot] || sourceItem.slot;
+            const pool = isWeapon ? (window.enchantWeaponEffects || []) : (window.enchantArmorEffects || []).filter(e => e.slots.includes(wantedSlot));
+            if (!pool.length) {
+                alert('Нет подходящих эффектов зачарования для этого слота.');
+            } else {
+                const listText = pool.map((e, i) => `${i + 1}: ${e.name} (до ${e.maxValue}${e.unit})`).join('\n');
+                const pick = prompt(`Выбери эффект зачарования:\n${listText}\n\nВведи номер:`);
+                const pickIdx = parseInt(pick) - 1;
+                if (pick !== null && pickIdx >= 0 && pickIdx < pool.length) {
+                    const chosen = pool[pickIdx];
+                    const valStr = prompt(`Величина эффекта (макс. ${chosen.maxValue}${chosen.unit}):`, String(chosen.maxValue));
+                    const val = parseFloat(valStr) || chosen.maxValue;
+                    extra.enchantment = { name: chosen.name, value: val, unit: chosen.unit || '', description: `${chosen.name}: ${val}${chosen.unit || ''}` };
+                    extra.effect = extra.enchantment.description;
+                }
+            }
+        }
+
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.data();
             let inv = data.inventory || [];
@@ -1260,7 +1286,7 @@
         const STACKABLE_CATEGORIES = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
         const finalItems = items.map(i => {
             const qty = STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1;
-            return { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '', qty };
+            return { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '', qty, capacity: i.capacity };
         });
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
@@ -1356,6 +1382,20 @@
         if (info.note) html += `<div style="font-size:11px; opacity:.65; margin-top:8px;">ℹ️ ${escapeHtml(info.note)}</div>`;
         box.innerHTML = html;
     };
+
+    function renderAllEnchantsReference() {
+        const box = el('all-enchants-body');
+        if (!box) return;
+        if (!window.enchantWeaponEffects || !window.enchantArmorEffects) {
+            box.innerHTML = '<p style="opacity:.6; font-size:13px;">enchant-data.js не подключён.</p>';
+            return;
+        }
+        let html = '<h4 style="margin:4px 0 2px;">Оружие (все 6, срок 5 дней без подзарядки)</h4>';
+        html += window.enchantWeaponEffects.map(e => `<div style="font-size:12px; margin-top:2px;">⚔️ <strong>${escapeHtml(e.name)}</strong> — до ${e.maxValue}${escapeHtml(e.unit)}. ${escapeHtml(e.description)}</div>`).join('');
+        html += '<h4 style="margin:10px 0 2px;">Броня/украшения (все 28, постоянно)</h4>';
+        html += window.enchantArmorEffects.map(e => `<div style="font-size:12px; margin-top:2px;">🛡️ <strong>${escapeHtml(e.name)}</strong> — до ${e.maxValue}${escapeHtml(e.unit)} · слоты: ${e.slots.join(', ')}. ${escapeHtml(e.description)}</div>`).join('');
+        box.innerHTML = html;
+    }
 
     window.toggleGuildMembership = function (guildName, isMember) {
         if (!currentInvPlayerUid) return;
@@ -1481,6 +1521,12 @@
         // Живой листенер вместо одноразового .get() — если игрок сам меняет инвентарь/экипировку
         // на своём листе, мастер видит это СРАЗУ, без повторного выбора из списка.
         window.CloudSync.watchCharacter(uid, (data) => {
+            if (data === null) {
+                // Раньше ошибка подписки уходила только в консоль браузера — на экране
+                // "Загрузка..." оставалась НАВСЕГДА, без единого объяснения, что не так.
+                el('inv-items-list').innerHTML = '<p style="color:#e74c3c; font-size:13px;">Не удалось загрузить инвентарь игрока (ошибка подписки — подробности в консоли браузера, F12). Попробуй выбрать игрока заново.</p>';
+                return;
+            }
             currentPlayerInvData = {
                 inventory: Array.isArray(data.inventory) ? data.inventory : [],
                 gold: parseInt(data.gold) || 0,
@@ -1876,6 +1922,8 @@
     if (typeof renderHolidaySelect === 'function') renderHolidaySelect();
     if (typeof renderGroupCheckSkillSelect === 'function') renderGroupCheckSkillSelect();
     if (typeof renderGuildInfoSelect === 'function') { renderGuildInfoSelect(); renderGuildInfoPanel(); }
+    if (typeof renderAllWeatherReference === 'function') renderAllWeatherReference();
+    if (typeof renderAllEnchantsReference === 'function') renderAllEnchantsReference();
     if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();
     if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
 
@@ -2541,6 +2589,26 @@
         clear: '☀️ Ясно', cloudy: '☁️ Облачно', rain: '🌧️ Дождь', storm: '⛈️ Гроза',
         snow: '🌨️ Снегопад', blizzard: '🌬️ Метель', fog: '🌫️ Туман'
     };
+    // Задача "погода — чёткие плюсы/минусы": та же самая формулировка, что видит игрок в
+    // виджете текущей погоды (index.html WEATHER_TYPES) — продублировано тут, т.к. gm.js
+    // отдельный файл без общего доступа к переменным index.html. Полный список (все явления
+    // разом, не только текущее) — только у мастера, справочником ниже.
+    const WEATHER_EFFECTS = {
+        clear: '', cloudy: '',
+        rain: '−2 к дальнему бою (Стрельба), +2 к Скрытности — дождь маскирует шаги',
+        storm: '−4 к дальнему бою, вспышки молний иногда выдают позицию (−2 к Скрытности при ударе)',
+        snow: '−5 фт. скорости, +2 к Скрытности — снег глушит шаги',
+        blizzard: '−10 фт. скорости, −4 к дальнему бою, видимость почти нулевая',
+        fog: '+4 к Скрытности, −4 к дальнему бою — плохая видимость'
+    };
+
+    function renderAllWeatherReference() {
+        const box = el('all-weather-body');
+        if (!box) return;
+        box.innerHTML = Object.keys(WEATHER_LABELS).map(k =>
+            `<div style="font-size:12px; margin-top:3px;"><strong>${WEATHER_LABELS[k]}</strong>${WEATHER_EFFECTS[k] ? ' — ' + escapeHtml(WEATHER_EFFECTS[k]) : ' — без штрафов/бонусов'}</div>`
+        ).join('');
+    }
 
     let pendingWeatherKey = null;
 
