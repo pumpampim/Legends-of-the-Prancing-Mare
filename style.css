@@ -1587,12 +1587,3 @@ input[type="number"] {
     border-radius: 4px;
     margin-top: 8px;
 }
-.skill-panel .skill-header {
-    padding-left: 26px;
-    padding-right: 26px;
-}
-/* Сужаем панели состояния (HP / мана / урон / защита) примерно вдвое */
-.vital-bar {
-    width: 50%;
-    max-width: 50%;
-}

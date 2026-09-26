@@ -177,6 +177,16 @@
             }, 800);
         },
 
+        // "Сброс персонажа" раньше чистил только localStorage — Firebase-авторизация переживает
+        // перезагрузку страницы, и старые данные из облака сразу подтягивались обратно поверх
+        // очищенного localStorage, отсюда "персонажа по сути нельзя удалить". set() БЕЗ merge —
+        // полная перезапись документа, а не долив полей поверх старых.
+        resetCloudCharacter: function () {
+            if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            clearTimeout(saveTimer); // отменяем любое отложенное автосохранение старых данных
+            return db.collection('characters').doc(currentUser.uid).set({ resetAt: Date.now() });
+        },
+
         // Текущие данные активной сессии (враги/группа/инициатива/журнал), как последний раз
         // пришли из Firestore. null, если игрок не в сессии.
         getSessionData: function () {

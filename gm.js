@@ -8,7 +8,29 @@
     let currentUser = null;
     let currentCode = null;
     let unsubSession = null;
+    let unsubGmWatchedCharacter = null; // подписка на инвентарь выбранного игрока (своя, не через
+                                          // cloud.js — gm.html его вообще не подключает)
     let lastData = { participants: {}, enemies: [], turnOrder: [], combatLog: [] };
+
+    // Погода — здесь, В САМОМ НАЧАЛЕ файла, а не рядом с остальной логикой погоды: стартовая
+    // инициализация (внизу файла) вызывает renderAllWeatherReference() сразу при загрузке
+    // страницы, а gm.js выполняется построчно сверху вниз — если бы эти const стояли ниже места
+    // вызова, при загрузке страница ловила бы "Cannot access before initialization" и вся
+    // остальная инициализация после этой строки просто не происходила (инвентарь игрока,
+    // порядок ходов, выбор атакующего — всё, что раньше "тихо не грузилось").
+    const WEATHER_LABELS = {
+        clear: '☀️ Ясно', cloudy: '☁️ Облачно', rain: '🌧️ Дождь', storm: '⛈️ Гроза',
+        snow: '🌨️ Снегопад', blizzard: '🌬️ Метель', fog: '🌫️ Туман'
+    };
+    const WEATHER_EFFECTS = {
+        clear: '', cloudy: '',
+        rain: '−2 к дальнему бою (Стрельба), +2 к Скрытности — дождь маскирует шаги',
+        storm: '−4 к дальнему бою, вспышки молний иногда выдают позицию (−2 к Скрытности при ударе)',
+        snow: '−5 фт. скорости, +2 к Скрытности — снег глушит шаги',
+        blizzard: '−10 фт. скорости, −4 к дальнему бою, видимость почти нулевая',
+        fog: '+4 к Скрытности, −4 к дальнему бою — плохая видимость'
+    };
+
     let gmAllItems = [];
     let gmFilteredItems = [];
     let currentRecipePlayerUid = null;
@@ -253,9 +275,17 @@
             const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
             const resistLine = resistEntries.length
                 ? '<div style="font-size:12px; opacity:.75;">Резист: ' + resistEntries.map(([k, v]) => escapeHtml(k) + ' ' + v + '%').join(', ') + '</div>' : '';
-            const dmgLine = e.weaponDmg ? '<div style="font-size:12px; opacity:.75;">Урон оружием: ' + e.weaponDmg + (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' : '';
-            const spellsLine = (e.spells && e.spells.length)
-                ? '<div style="font-size:12px; opacity:.75;">Заклинания: ' + e.spells.map(s => escapeHtml(s.name) + ' (' + s.dmg + ' урона / ' + s.cost + ' МП)').join(', ') + '</div>' : '';
+            // Урон оружием — теперь редактируемое поле, не просто текст. Раньше поправить урон
+            // можно было только удалив и заново добавив противника с нуля.
+            const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
+                '<input type="number" value="' + (e.weaponDmg || 0) + '" style="width:56px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'weaponDmg\',this.value)">' +
+                (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>';
+            const spellsHtml = (e.spells && e.spells.length)
+                ? e.spells.map((s, si) => '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">' +
+                    escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
+                    '<input type="number" value="' + (s.cost || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'cost\',this.value)"> МП</div>').join('')
+                : '';
+            const lootLine = e.loot ? '<div style="font-size:11px; opacity:.6; margin-top:2px;">🎒 ' + escapeHtml(e.loot) + '</div>' : '';
             const shoutsHtml = (e.shouts && e.shouts.length)
                 ? e.shouts.map((s, si) => {
                     const cdKey = 'shoutCd_' + si;
@@ -270,7 +300,7 @@
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                dmgLine + resistLine + spellsLine + shoutsHtml +
+                dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -317,6 +347,7 @@
         el('enemy-mp-input').value = totalMana;
         let info = '';
         if (e.weaponDmg) info += `Урон: ${e.weaponDmg}${e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : ''}<br>`;
+        if (e.weaponOptions && e.weaponOptions.length > 1) info += `🎲 Варианты оружия (при добавлении выберется случайно): ${e.weaponOptions.map(escapeHtml).join(', ')}<br>`;
         if (Object.keys(e.resist).length) info += `Резист: ${Object.entries(e.resist).map(([k, v]) => k + ' ' + v + '%').join(', ')}<br>`;
         if (e.spells.length) info += `Заклинания: ${e.spells.map(s => s.name + ' (' + s.dmg + '/' + s.cost + ')').join(', ')}<br>`;
         if (e.shouts.length) info += `Крики: ${e.shouts.map(s => s.name).join(', ')}<br>`;
@@ -333,10 +364,18 @@
         const extra = {};
         if (currentEnemyDbPick && currentEnemyDbPick.name === name) {
             if (currentEnemyDbPick.weaponDmg) extra.weaponDmg = currentEnemyDbPick.weaponDmg;
-            if (currentEnemyDbPick.weaponNote) extra.weaponNote = currentEnemyDbPick.weaponNote;
+            // Рандомайзер оружия — у драугров/подобных несколько вариантов оружия в источнике
+            // (Враги.xlsx), раньше просто брался статичный weaponNote. Один случайный вариант при
+            // каждом добавлении в бой — правдоподобнее, чем всегда одно и то же оружие у всех.
+            if (currentEnemyDbPick.weaponOptions && currentEnemyDbPick.weaponOptions.length) {
+                extra.weaponNote = currentEnemyDbPick.weaponOptions[Math.floor(Math.random() * currentEnemyDbPick.weaponOptions.length)];
+            } else if (currentEnemyDbPick.weaponNote) {
+                extra.weaponNote = currentEnemyDbPick.weaponNote;
+            }
             if (Object.keys(currentEnemyDbPick.resist || {}).length) extra.resist = currentEnemyDbPick.resist;
             if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
             if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
+            if (currentEnemyDbPick.loot) extra.loot = currentEnemyDbPick.loot;
             // Только гуманоидов можно поднять заклинанием (Воины/Шаманы/Боевые маги — фалмеры
             // и подобные; звери/монстры/ловушки — нет).
             if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
@@ -352,6 +391,18 @@
 
     window.setEnemyField = function (id, field, value) {
         const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: Number(value) || 0 } : e);
+        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+    };
+
+    // Редактирование урона/стоимости конкретного заклинания врага — раньше заклинания были
+    // просто текстом, поправить их можно было только удалив и заново добавив противника.
+    window.setEnemySpellField = function (id, spellIdx, field, value) {
+        const enemies = (lastData.enemies || []).map(e => {
+            if (e.id !== id || !Array.isArray(e.spells)) return e;
+            const spells = e.spells.slice();
+            spells[spellIdx] = Object.assign({}, spells[spellIdx], { [field]: Number(value) || 0 });
+            return { ...e, spells };
+        });
         db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
     };
 
@@ -1501,9 +1552,9 @@
 
     window.loadPlayerInventoryForGm = function () {
         const uid = el('inv-player-select').value;
+        if (unsubGmWatchedCharacter) { unsubGmWatchedCharacter(); unsubGmWatchedCharacter = null; }
         if (!uid) {
             currentInvPlayerUid = null;
-            window.CloudSync.unwatchCharacter();
             el('inv-gold-block').style.display = 'none';
             el('inv-level-block').style.display = 'none';
             el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
@@ -1519,8 +1570,12 @@
         el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Загрузка...</p>';
         let firstSnapshot = true;
         // Живой листенер вместо одноразового .get() — если игрок сам меняет инвентарь/экипировку
-        // на своём листе, мастер видит это СРАЗУ, без повторного выбора из списка.
-        window.CloudSync.watchCharacter(uid, (data) => {
+        // на своём листе, мастер видит это СРАЗУ, без повторного выбора из списка. Раньше здесь
+        // было window.CloudSync.watchCharacter(...) — а gm.html вообще не подключает cloud.js
+        // (тот файл только для index.html), поэтому window.CloudSync был undefined и любой выбор
+        // игрока падал с ошибкой прямо тут, оставляя "Загрузка..." навсегда.
+        unsubGmWatchedCharacter = db.collection('characters').doc(uid).onSnapshot(doc => {
+            const data = doc.exists ? doc.data() : null;
             if (data === null) {
                 // Раньше ошибка подписки уходила только в консоль браузера — на экране
                 // "Загрузка..." оставалась НАВСЕГДА, без единого объяснения, что не так.
@@ -1564,6 +1619,9 @@
                 renderReputationPanel();
                 firstSnapshot = false;
             }
+        }, err => {
+            console.error('Ошибка подписки на инвентарь игрока:', err);
+            el('inv-items-list').innerHTML = `<p style="color:#e74c3c; font-size:13px;">Не удалось загрузить инвентарь игрока: ${escapeHtml(err.message || String(err))}</p>`;
         });
     };
 
@@ -2050,11 +2108,33 @@
 
     function parseSpellDamageForGm(desc) {
         if (!desc) return null;
-        const m = desc.match(/наносящ\w*\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
-                  desc.match(/наносит\s+(\d+)\s*(?:ед\.?\s*)?урон/i) ||
-                  desc.match(/(\d+)\s*(?:ед\.?\s*)?урон/i);
+        // [а-я] вместо \w — та же кириллическая ловушка, что чинил в index.html.
+        const m = desc.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
+                  desc.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
         return m ? parseInt(m[1]) : null;
     }
+
+    // Перенесено выше populateGmAttackSelects — раньше стояло НИЖЕ, но populateGmAttackSelects
+    // (вызывается из renderAll на каждый снапшот сессии, в т.ч. самый первый при загрузке
+    // страницы) звало onGmAttackAttackerPicked() ДО того, как этот window.-присвоение вообще
+    // успевало выполниться построчно сверху вниз — ReferenceError "is not defined", и весь
+    // остаток инициализации после этой строки просто не происходил.
+    window.onGmAttackAttackerPicked = function () {
+        const attackerId = el('gm-attack-attacker-select').value;
+        const actionSelect = el('gm-attack-action-select');
+        if (!actionSelect) return;
+        const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
+        if (!enemy) { actionSelect.innerHTML = '<option value="">—</option>'; return; }
+        let opts = '';
+        if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemy.weaponDmg} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
+        (enemy.spells || []).forEach((s, i) => {
+            opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${s.dmg} урона / ${s.cost} МП)</option>`;
+        });
+        (enemy.shouts || []).forEach((s, i) => {
+            opts += `<option value="shout:${i}">🗣️ ${escapeHtml(s.name)} (эффект, без прямого урона)</option>`;
+        });
+        actionSelect.innerHTML = opts || '<option value="">У этого противника нет известных действий — впиши урон вручную в журнал</option>';
+    };
 
     function populateGmAttackSelects() {
         const attackerSelect = el('gm-attack-attacker-select');
@@ -2076,23 +2156,6 @@
 
         onGmAttackAttackerPicked();
     }
-
-    window.onGmAttackAttackerPicked = function () {
-        const attackerId = el('gm-attack-attacker-select').value;
-        const actionSelect = el('gm-attack-action-select');
-        if (!actionSelect) return;
-        const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
-        if (!enemy) { actionSelect.innerHTML = '<option value="">—</option>'; return; }
-        let opts = '';
-        if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemy.weaponDmg} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
-        (enemy.spells || []).forEach((s, i) => {
-            opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${s.dmg} урона / ${s.cost} МП)</option>`;
-        });
-        (enemy.shouts || []).forEach((s, i) => {
-            opts += `<option value="shout:${i}">🗣️ ${escapeHtml(s.name)} (эффект, без прямого урона)</option>`;
-        });
-        actionSelect.innerHTML = opts || '<option value="">У этого противника нет известных действий — впиши урон вручную в журнал</option>';
-    };
 
     window.rollGmAttack = function () {
         const attackerId = el('gm-attack-attacker-select').value;
@@ -2585,22 +2648,14 @@
         'Равнина': ['clear', 'cloudy', 'rain'],
         'Подземелье': ['clear']
     };
-    const WEATHER_LABELS = {
-        clear: '☀️ Ясно', cloudy: '☁️ Облачно', rain: '🌧️ Дождь', storm: '⛈️ Гроза',
-        snow: '🌨️ Снегопад', blizzard: '🌬️ Метель', fog: '🌫️ Туман'
-    };
     // Задача "погода — чёткие плюсы/минусы": та же самая формулировка, что видит игрок в
     // виджете текущей погоды (index.html WEATHER_TYPES) — продублировано тут, т.к. gm.js
     // отдельный файл без общего доступа к переменным index.html. Полный список (все явления
     // разом, не только текущее) — только у мастера, справочником ниже.
-    const WEATHER_EFFECTS = {
-        clear: '', cloudy: '',
-        rain: '−2 к дальнему бою (Стрельба), +2 к Скрытности — дождь маскирует шаги',
-        storm: '−4 к дальнему бою, вспышки молний иногда выдают позицию (−2 к Скрытности при ударе)',
-        snow: '−5 фт. скорости, +2 к Скрытности — снег глушит шаги',
-        blizzard: '−10 фт. скорости, −4 к дальнему бою, видимость почти нулевая',
-        fog: '+4 к Скрытности, −4 к дальнему бою — плохая видимость'
-    };
+    // (сами WEATHER_LABELS/WEATHER_EFFECTS объявлены в самом начале файла — вызов
+    // renderAllWeatherReference() в стартовой инициализации происходит раньше, чем скрипт успел
+    // бы дойти досюда, и const в temporal dead zone бросал ReferenceError, ломая ВЕСЬ остаток
+    // инициализации гм-панели: инвентарь игрока, атаку, порядок ходов — всё, что шло после)
 
     function renderAllWeatherReference() {
         const box = el('all-weather-body');
@@ -2760,7 +2815,8 @@
     window.applyCoopAttackDamage = function () {
         if (!pendingCoopAttack) return;
         const { targetId, dmg, name1, name2, targetName } = pendingCoopAttack;
-        window.CloudSync ? null : null; // (мастер сам пишет в сессию напрямую, отдельного CloudSync-моста тут не нужно)
+        // Мастер сам пишет в сессию напрямую через свой db — моста к cloud.js не нужно
+        // (gm.html вообще его не подключает).
         const enemies = (lastData.enemies || []).slice();
         const idx = enemies.findIndex(e => e.id === targetId);
         if (idx === -1) { alert('Цель уже не найдена.'); return; }

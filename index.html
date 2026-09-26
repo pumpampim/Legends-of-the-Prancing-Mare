@@ -443,9 +443,9 @@
             silentIllusion: { label: 'Заклинания Иллюзии бесшумны', suffix: '', bool: true },
             illusionCost: { label: 'Стоимость каста: Иллюзия', suffix: '% дешевле', auto: true },
             fearChance: { label: 'Доп. шанс обратить врага в бегство страхом', suffix: '%', auto: true },
-            randomDmg: { label: 'Случайный множитель урона каждый ход', suffix: '', bool: true },
-            randomDefense: { label: 'Случайный множитель защиты каждый ход', suffix: '', bool: true },
-            randomBuff: { label: 'Случайный бафф каждый ход', suffix: '', bool: true },
+            randomDmg: { label: 'Случайный множитель урона каждый ход', suffix: '', bool: true, auto: true },
+            randomDefense: { label: 'Случайный множитель защиты каждый ход', suffix: '', bool: true, auto: true },
+            randomBuff: { label: 'Случайный бафф каждый ход', suffix: '', bool: true, auto: true },
             speech: { label: 'Красноречие', suffix: '%', auto: true },
             physResist: { label: 'Резист физическому урону', suffix: '%', auto: true },
             weaponVamp: { label: 'Похищение здоровья оружием', suffix: '%', auto: true }
@@ -614,10 +614,11 @@
                             <label style="color:#e74c3c; margin:0;">ЗДОРОВЬЕ (HP)</label>
                             <div style="font-size:12px;"><input type="checkbox" id="manual-hp-lock" onchange="updateAll()"> Ручной макс.</div>
                         </div>
+                        <div class="bar-track"><div class="bar-fill-hp" id="hp-bar-fill" style="width:100%;"></div></div>
                         <div class="vital-inputs">
-                            <input type="number" id="cur-hp" value="100" onchange="saveLocalStorage()">
+                            <input type="number" id="cur-hp" value="100" onchange="updateVitalBars(); saveLocalStorage();">
                             <span style="font-size:22px;color:#aaa;">/</span>
-                            <input type="number" id="max-hp" value="100" onchange="saveLocalStorage()">
+                            <input type="number" id="max-hp" value="100" onchange="updateVitalBars(); saveLocalStorage();">
                         </div>
                     </div>
 
@@ -626,10 +627,11 @@
                             <label style="color:#3498db; margin:0;">МАНА (MP)</label>
                             <div style="font-size:12px;"><input type="checkbox" id="manual-mp-lock" onchange="updateAll()"> Ручной макс.</div>
                         </div>
+                        <div class="bar-track"><div class="bar-fill-mp" id="mp-bar-fill" style="width:100%;"></div></div>
                         <div class="vital-inputs">
-                            <input type="number" id="cur-mp" value="100" onchange="saveLocalStorage()">
+                            <input type="number" id="cur-mp" value="100" onchange="updateVitalBars(); saveLocalStorage();">
                             <span style="font-size:22px;color:#aaa;">/</span>
-                            <input type="number" id="max-mp" value="100" onchange="saveLocalStorage()">
+                            <input type="number" id="max-mp" value="100" onchange="updateVitalBars(); saveLocalStorage();">
                         </div>
                     </div>
 
@@ -1922,36 +1924,10 @@ window.toggleSkillPanel = function (idx) {
     }
 
     const SCHOOL_DISCOUNT_PREFIX = { destr: 'Destr', restor: 'Restor', conj: 'Conj', illus: 'Illus', alter: 'Alter' };
-
-    // Перки «Новичок/Ученик/Адепт/Эксперт школы Х» дают -50% к стоимости заклинаний
-    // соответствующего ранга этой школы — применяем автоматически к полю "Каст".
-    function applySpellDiscounts() {
-        const perks = window.perkBonuses || {};
-        const schools = ['destr', 'restor', 'alter', 'illus', 'conj'];
-        schools.forEach(school => {
-            const container = document.getElementById(`spells-${school}-list`);
-            if (!container) return;
-            container.querySelectorAll('.spell-card').forEach(card => {
-                const select = card.querySelector('.spell-name-select');
-                const isCustom = select.value === '__custom__';
-                const name = isCustom ? card.querySelector('.spell-name-custom').value : select.value;
-                const finalCostInput = card.querySelector('.spell-final-cost');
-                const baseInput = card.querySelector('.spell-base');
-                const base = parseInt(baseInput.value) || 0;
-                finalCostInput.setAttribute('data-base', base);
-                const tier = isCustom ? null : getSpellTier(school, name);
-                let mult = 1;
-                let discountApplied = false;
-                if (tier) {
-                    const key = 'discount' + SCHOOL_DISCOUNT_PREFIX[school] + tier;
-                    if (perks[key]) { mult = 0.5; discountApplied = true; }
-                }
-                finalCostInput.value = Math.round(base * mult);
-                finalCostInput.title = discountApplied ? 'Скидка школы применена: -50% (ранг ' + tier + ')' : '';
-            });
-        });
-    }
-    window.applySpellDiscounts = applySpellDiscounts;
+    // Полный расчёт стоимости каста (штраф брони + скидка школы + зачарование/зелья на навык +
+    // активные баффы + бог) живёт в updateAll() — там же теперь строится и разбивка в .title.
+    // Раньше здесь была вторая, неполная версия (applySpellDiscounts, считала только скидку
+    // школы) — мёртвый код, нигде не вызывалась, но могла запутать при будущей правке.
 
     function addCustomSpell(school, loadedData = null) {
         const id = loadedData ? loadedData.id : 'spell-' + Date.now() + Math.floor(Math.random()*1000);
@@ -1962,6 +1938,7 @@ window.toggleSkillPanel = function (idx) {
 
         const html = `
             <div class="spell-card" id="card-${id}">
+                <div style="font-size:11px; opacity:.65; margin-bottom:2px;">Школа: ${escHtml(SCHOOL_CODE_TO_SKILL[school] || school)}</div>
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:4px;">
                     <select class="spell-name-select" style="width:55%; font-weight:bold; padding:2px;" onchange="onSpellPicked('${id}', '${school}')">
                         ${buildSpellOptions(school, isCustomName ? null : name)}
@@ -4200,8 +4177,39 @@ window.toggleSkillPanel = function (idx) {
         if (elMain) elMain.textContent = text;
     }
 
+    // Шеогорат: раз в ход — случайный множитель урона, случайный сдвиг защиты, случайный бафф.
+    // Не активируется сам по себе — только когда Шеогорат выбран покровителем.
+    let sheogorathRoll = { dmgMult: 1, defSwing: 0 };
+    const SHEOGORATH_BUFF_POOL = [
+        { name: 'Хаос: Прилив сил', hp: 15 },
+        { name: 'Хаос: Прилив магии', mp: 15 },
+        { name: 'Хаос: Быстрые ноги', speed: 10 },
+        { name: 'Хаос: Каменная кожа', armor: 15 },
+        { name: 'Хаос: Обжигающий взгляд', percentEffects: [{ type: 'weaponDamagePercent', value: 15 }] },
+        { name: 'Хаос: Ледяное спокойствие', percentEffects: [{ type: 'resistElemental', value: 15 }] }
+    ];
+
+    function rollSheogorathChaos() {
+        const god = document.getElementById('faith-god').value;
+        if (god !== 'sheogorath') { sheogorathRoll = { dmgMult: 1, defSwing: 0 }; return; }
+        const dmgMult = Math.round((0.5 + Math.random() * 1.5) * 10) / 10; // 0.5x .. 2.0x
+        const defSwing = Math.floor(Math.random() * 41) - 20; // -20 .. +20 к физ. резисту на ход
+        const buff = SHEOGORATH_BUFF_POOL[Math.floor(Math.random() * SHEOGORATH_BUFF_POOL.length)];
+        sheogorathRoll = { dmgMult, defSwing };
+        pushOrRefreshTimedEffect({
+            id: 'eff-sheogorath', name: buff.name, effectName: buff.name,
+            description: `${buff.name} (Шеогорат, до конца этого хода)`,
+            turnsRemaining: 1,
+            hp: buff.hp || 0, mp: buff.mp || 0, armor: buff.armor || 0, speed: buff.speed || 0,
+            percentEffects: buff.percentEffects || []
+        });
+        renderActiveEffects();
+        alert(`🎭 Шеогорат бросает кости: урон ×${dmgMult}, защита ${defSwing >= 0 ? '+' : ''}${defSwing}%, бафф «${buff.name}».`);
+    }
+
     window.nextTurn = function () {
         gameTurn++;
+        rollSheogorathChaos();
         tickActiveEffects();
         updateTurnRoundDisplay();
         saveLocalStorage();
@@ -4209,6 +4217,7 @@ window.toggleSkillPanel = function (idx) {
 
     window.nextRound = function () {
         gameRound++;
+        rollSheogorathChaos();
         tickActiveEffects();
         updateTurnRoundDisplay();
         saveLocalStorage();
@@ -4361,6 +4370,13 @@ window.toggleSkillPanel = function (idx) {
         res.shout += gb('shoutResist');
         res.magic += gb('magicResist');
         Object.keys(res).forEach(k => { res[k] = Math.min(85, Math.max(0, res[k])); }); // потолок 85%, как в ваниле
+        // Знак «Ученик» — уязвимость к магии 10% (было только текстом в описании). В отличие от
+        // обычного резиста это НЕ клампится до 0 — именно доп. урон сверху, а не "просто нет резиста".
+        const sign = document.getElementById('char-sign').value;
+        if (sign === 'apprentice') res.magic -= 10;
+        // Шеогорат — качели физ. защиты за ход, тоже без клампа до 0 (может УМЕНЬШИТЬ реальный
+        // резист ниже нуля в "плохой" ход, не просто занулить).
+        if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.defSwing) res.physical += sheogorathRoll.defSwing;
         return res;
     }
 
@@ -5434,7 +5450,10 @@ window.toggleSkillPanel = function (idx) {
             // обычную кнопку "Каст" на карточке заклинания, не через этот инструмент.
             if (findSummonTemplateBySpellName(s.name)) return;
             const dmg = parseSpellDamageFromDesc(s.desc);
-            if (dmg) opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)} (заклинание, ~${dmg} урона)</option>`;
+            if (dmg) {
+                const schoolLabel = SCHOOL_CODE_TO_SKILL[s.school] || '';
+                opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)}${schoolLabel ? ' [' + escHtml(schoolLabel) + ']' : ''} (заклинание, ~${dmg} урона)</option>`;
+            }
         });
         // Свитки с уроном — раньше их вообще не было в списке, "Читать" всегда бил по себе,
         // из-за чего боевые свитки на деле ничего не делали.
@@ -5744,9 +5763,10 @@ function updateHungerPenalty() {
             if (dmgType === 'poison') godSpellPct += gb('poisonDmg');
             if (godSpellPct) dmg = Math.round(dmg * (1 + godSpellPct / 100));
             if (gb('elementalExtraDmg') && ['fire', 'frost', 'shock'].includes(dmgType)) dmg += gb('elementalExtraDmg');
+            if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) dmg = Math.round(dmg * sheogorathRoll.dmgMult);
             lifestealPct += gb('spellVampire');
             penetrationPct = gb('ignoreMagicDmg');
-            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}${godSpellPct ? ` (+${godSpellPct}% от бога)` : ''}`;
+            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}${godSpellPct ? ` (+${godSpellPct}% от бога)` : ''}${(typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) ? ` (Шеогорат ×${sheogorathRoll.dmgMult})` : ''}`;
             skillNameForProgress = skillName;
         } else if (actionVal.indexOf('scroll:') === 0) {
             const itemId = actionVal.slice(7);
@@ -6156,7 +6176,23 @@ function updateHungerPenalty() {
             if (school === 'illus') godCostPct += gb('illusionCost');
             const godCostMult = Math.max(0.1, 1 - godCostPct / 100);
 
-            finalCostInput.value = Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult * godCostMult);
+            // Знак «Маг» — бесплатный каст заклинаний 1 уровня (было только текстом в описании,
+            // нигде не применялось).
+            const signFreeTier1 = (sign === 'mage' && tier === 1);
+
+            finalCostInput.value = signFreeTier1 ? 0 : Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult * godCostMult);
+
+            // Полная разбивка в подсказке — раньше игрок видел только голую итоговую цифру,
+            // без единого объяснения, откуда она взялась (штраф брони/скидка школы/зачарование
+            // и зелья/активные баффы/бог — всё считалось молча).
+            const breakdown = [];
+            if (signFreeTier1) breakdown.push('знак «Маг»: заклинания 1 уровня бесплатны');
+            if (armorMult !== 1) breakdown.push(`броня: ${armorMult > 1 ? '+' : ''}${Math.round((armorMult - 1) * 100)}%`);
+            if (schoolMult !== 1) breakdown.push(`скидка школы (ранг ${tier}): −${Math.round((1 - schoolMult) * 100)}%`);
+            if (skillBoostMult !== 1) breakdown.push(`зачарование/зелья на навык: −${Math.round((1 - skillBoostMult) * 100)}%`);
+            if (activeBuffCostMult !== 1) breakdown.push(`активный бафф: −${Math.round((1 - activeBuffCostMult) * 100)}%`);
+            if (godCostMult !== 1) breakdown.push(`бог: −${Math.round((1 - godCostMult) * 100)}%`);
+            finalCostInput.title = breakdown.length ? `База ${base} → ${breakdown.join(', ')}` : `База ${base}, без модификаторов`;
         });
 
         const daedraList = ['boethiah','mephala','peryite','hermaeus','nocturnal','malacath','azura','meridia','mehrunes','sanguine','namira','vaermina','sheogorath','clavicus','molag','hircine'];
@@ -6168,8 +6204,24 @@ function updateHungerPenalty() {
 
         // === ВЫЗЫВАЕМ БОЕВОЙ КАЛЬКУЛЯТОР (теперь он определён снаружи) ===
         updateCombat(str, dex);
+        updateVitalBars();
         // saveLocalStorage(); // если нужно сохранять, раскомментируй
     } // ← ЭТА СКОБКА ЗАКРЫВАЕТ updateAll()
+
+    // Визуальные полоски ХП/МП — CSS для них (.bar-track/.bar-fill-hp/.bar-fill-mp) существовал
+    // давно, но HTML-элементы, которые их используют, где-то потерялись при одном из редизайнов
+    // панели — оставались только цифровые поля.
+    function updateVitalBars() {
+        const curHp = parseInt(document.getElementById('cur-hp').value) || 0;
+        const maxHp = parseInt(document.getElementById('max-hp').value) || 1;
+        const hpFill = document.getElementById('hp-bar-fill');
+        if (hpFill) hpFill.style.width = Math.max(0, Math.min(100, (curHp / maxHp) * 100)) + '%';
+
+        const curMp = parseInt(document.getElementById('cur-mp').value) || 0;
+        const maxMp = parseInt(document.getElementById('max-mp').value) || 1;
+        const mpFill = document.getElementById('mp-bar-fill');
+        if (mpFill) mpFill.style.width = Math.max(0, Math.min(100, (curMp / maxMp) * 100)) + '%';
+    }
 
     // ===== ОТДЕЛЬНАЯ ФУНКЦИЯ updateCombat (исправленная) =====
   function updateCombat(finalStr, finalDex) {
@@ -6365,6 +6417,11 @@ function updateHungerPenalty() {
     }
     if (isPowerAttack && gb('powerAttackDmg') && mode === 'melee') {
         totalDmg = Math.round(totalDmg * (1 + gb('powerAttackDmg') / 100)); godDmgNotes.push(`силовая атака +${gb('powerAttackDmg')}%`);
+    }
+    // Шеогорат — случайный множитель урона за ход (роль кидается по "Следующий ход/круг").
+    if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) {
+        totalDmg = Math.round(totalDmg * sheogorathRoll.dmgMult);
+        godDmgNotes.push(`Шеогорат: урон ×${sheogorathRoll.dmgMult} на этот ход`);
     }
     if (isPowerAttack && gb('powerAttackHeal') && mode === 'melee') {
         godDmgNotes.push(`⚕️ силовая атака лечит ${gb('powerAttackHeal')}% от урона (применится автоматически при "Применить" в бою)`);
@@ -6821,7 +6878,15 @@ function updateHungerPenalty() {
         if (confirm("Вы уверены, что хотите полностью стереть все сохраненные данные? Это удалит инвентарь, перки, блокнот и кастомные заклинания!")) {
             localStorage.removeItem('skyrim_ttrpg_save_v3_6');
             localStorage.removeItem('skyrim_custom_spells_v3_5');
-            location.reload();
+            // Раньше тут чистился только localStorage — облачный документ оставался цел, и после
+            // reload() Firebase-авторизация (переживает перезагрузку) сразу подтягивала старые
+            // данные обратно поверх пустого localStorage. Теперь чистим и облако тоже (если есть
+            // подключение), ЖДЁМ завершения записи, и только потом перезагружаем страницу.
+            if (window.CloudSync && typeof window.CloudSync.resetCloudCharacter === 'function') {
+                window.CloudSync.resetCloudCharacter().then(() => location.reload()).catch(() => location.reload());
+            } else {
+                location.reload();
+            }
         }
     }
 
