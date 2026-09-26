@@ -1591,3 +1591,8 @@ input[type="number"] {
     padding-left: 26px;
     padding-right: 26px;
 }
+/* Сужаем панели состояния (HP / мана / урон / защита) примерно вдвое */
+.vital-bar {
+    width: 50%;
+    max-width: 50%;
+}
