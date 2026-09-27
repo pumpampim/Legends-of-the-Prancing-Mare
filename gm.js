@@ -85,6 +85,28 @@
         return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     }
 
+    // Та же формула модификатора характеристики, что у игрока (index.html) — gm.js отдельный
+    // файл, общих переменных с ним нет, поэтому копия.
+    function calcAbilityMod(val) {
+        return Math.floor((val - 10) / 2);
+    }
+
+    // Firestore ЦЕЛИКОМ отвергает .set()/.update(), если хоть ОДНО поле где-то внутри (даже
+    // вложенно, в массиве объектов) — undefined. Динамически собранные объекты (лут бандитов,
+    // ассортимент торговцев) легко на это натыкаются — предмет без резиста/урона/слота даёт
+    // undefined в этом поле. Рекурсивно чистит перед записью.
+    function stripUndefinedDeep(value) {
+        if (Array.isArray(value)) return value.map(stripUndefinedDeep);
+        if (value && typeof value === 'object') {
+            const out = {};
+            Object.keys(value).forEach(k => {
+                if (value[k] !== undefined) out[k] = stripUndefinedDeep(value[k]);
+            });
+            return out;
+        }
+        return value;
+    }
+
     // ---------- Авторизация ----------
 
     window.cloudRegister = function () {
@@ -220,20 +242,35 @@
 
     // ---------- Отряд ----------
 
+    // Задача "нет хелбаров, сгруппируй" — раньше каждый игрок занимал целый блок с двумя большими
+    // цифровыми полями. Теперь компактная карточка с настоящими полосками (те же CSS-классы
+    // .bar-track/.bar-fill-hp/.bar-fill-mp, что у игрока на его листе — style.css общий файл).
     function renderParty(participants) {
         const target = el('gm-party-list');
         const uids = Object.keys(participants);
         if (!uids.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Пока никто не присоединился.</p>'; return; }
         target.innerHTML = uids.map(uid => {
             const p = participants[uid] || {};
-            return '<div class="party-row">' +
-                '<div class="row-name"><span>' + escapeHtml(p.name || '?') + '</span></div>' +
-                '<div class="grid-2" style="gap:6px;">' +
-                '<div><label style="font-size:12px;">HP (' + (p.maxHp || 0) + ' макс.)</label>' +
-                '<input type="number" value="' + (p.curHp || 0) + '" onchange="setParticipantField(\'' + uid + '\',\'curHp\',this.value)"></div>' +
-                '<div><label style="font-size:12px;">MP (' + (p.maxMp || 0) + ' макс.)</label>' +
-                '<input type="number" value="' + (p.curMp || 0) + '" onchange="setParticipantField(\'' + uid + '\',\'curMp\',this.value)"></div>' +
-                '</div></div>';
+            const maxHp = p.maxHp || 1, maxMp = p.maxMp || 1;
+            const hpPct = Math.max(0, Math.min(100, (p.curHp || 0) / maxHp * 100));
+            const mpPct = Math.max(0, Math.min(100, (p.curMp || 0) / maxMp * 100));
+            return `<div style="border:1px solid var(--border-color); border-radius:4px; padding:5px 8px; margin-bottom:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:bold;">
+                    <span>${escapeHtml(p.name || '?')}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
+                    <span style="font-size:11px; color:#e74c3c; width:24px;">HP</span>
+                    <div class="bar-track" style="flex:1; margin-bottom:0;"><div class="bar-fill-hp" style="width:${hpPct}%;"></div></div>
+                    <input type="number" value="${p.curHp || 0}" style="width:50px; padding:1px; font-size:12px;" onchange="setParticipantField('${uid}','curHp',this.value)">
+                    <span style="font-size:11px; opacity:.6; width:34px;">/${maxHp}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
+                    <span style="font-size:11px; color:#3498db; width:24px;">MP</span>
+                    <div class="bar-track" style="flex:1; margin-bottom:0;"><div class="bar-fill-mp" style="width:${mpPct}%;"></div></div>
+                    <input type="number" value="${p.curMp || 0}" style="width:50px; padding:1px; font-size:12px;" onchange="setParticipantField('${uid}','curMp',this.value)">
+                    <span style="font-size:11px; opacity:.6; width:34px;">/${maxMp}</span>
+                </div>
+            </div>`;
         }).join('');
     }
 
@@ -241,6 +278,24 @@
         const patch = {};
         patch['participants.' + uid + '.' + field] = Number(value) || 0;
         db.collection('sessions').doc(currentCode).update(patch).catch(e => console.error(e));
+
+        // Раньше правка ХП/МП мастером через панель "Отряд" писала ТОЛЬКО сюда, в сессию — сам
+        // документ персонажа (characters/{uid}.vitals) оставался нетронутым. Из-за этого лист
+        // игрока ничего не знал об изменении, и при следующем же автосохранении (срабатывает
+        // почти на любое его действие) молча перезаписывал сессию обратно СВОИМ старым значением
+        // ХП — правка мастера "слетала" через пару ходов. Теперь пишем и туда: читаем текущий
+        // vitals, меняем нужный индекс, сохраняем массив целиком (Firestore не даёт точечно
+        // менять один элемент массива через dot-notation).
+        if (field === 'curHp' || field === 'curMp') {
+            const vitalsIdx = field === 'curHp' ? 0 : 1;
+            db.collection('characters').doc(uid).get().then(doc => {
+                if (!doc.exists) return;
+                const data = doc.data();
+                const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
+                vitals[vitalsIdx] = Number(value) || 0;
+                return db.collection('characters').doc(uid).update({ vitals });
+            }).catch(e => console.error('Ошибка синхронизации ХП/МП с персонажем:', e));
+        }
     };
 
     function enemyAvatarData(enemy) {
@@ -275,6 +330,11 @@
             const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
             const resistLine = resistEntries.length
                 ? '<div style="font-size:12px; opacity:.75;">Резист: ' + resistEntries.map(([k, v]) => escapeHtml(k) + ' ' + v + '%').join(', ') + '</div>' : '';
+            // Характеристики бандита (Задача "телосложение/сила/ловкость") — только у тех, у кого
+            // есть (сгенерированы генератором бандитов), остальные враги из базы их не имеют.
+            const statsLine = (e.str || e.dex)
+                ? `<div style="font-size:11px; opacity:.65;">СИЛ ${e.str || '—'} · ЛОВ ${e.dex || '—'} · ТЕЛ ${e.con || '—'}</div>`
+                : (e.int || e.wis) ? `<div style="font-size:11px; opacity:.65;">ИНТ ${e.int || '—'} · ДУХ ${e.wis || '—'} · ТЕЛ ${e.con || '—'}</div>` : '';
             // Урон оружием — теперь редактируемое поле, не просто текст. Раньше поправить урон
             // можно было только удалив и заново добавив противника с нуля.
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
@@ -300,7 +360,7 @@
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
+                statsLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -380,7 +440,7 @@
             // и подобные; звери/монстры/ловушки — нет).
             if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
         }
-        enemies.push(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra));
+        enemies.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             el('enemy-name-input').value = '';
             el('enemy-db-select').value = '';
@@ -724,6 +784,7 @@
         if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
         if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
         if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
+        if (typeof sourceItem.maxUses === 'number') { extra.maxUses = sourceItem.maxUses; extra.usesLeft = sourceItem.maxUses; }
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
         if (isStolen) extra.stolen = true;
 
@@ -1337,11 +1398,20 @@
         const STACKABLE_CATEGORIES = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
         const finalItems = items.map(i => {
             const qty = STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1;
-            return { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, dmg: i.dmg, armor: i.armor, slot: i.slot, effect: i.effect || '', qty, capacity: i.capacity };
+            // Firestore ЦЕЛИКОМ отвергает .update(), если хоть ОДНО поле где-то внутри — undefined
+            // (было тут: dmg/armor/slot/capacity у предмета без этих свойств, например у еды) —
+            // отсюда "торговец не появляется" после нажатия "Обновить ассортимент": запись просто
+            // молча проваливалась. Добавляем поле, только если оно реально есть.
+            const out = { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, effect: i.effect || '', qty };
+            if (typeof i.dmg === 'number') out.dmg = i.dmg;
+            if (typeof i.armor === 'number') out.armor = i.armor;
+            if (i.slot) out.slot = i.slot;
+            if (typeof i.capacity === 'number') out.capacity = i.capacity;
+            return out;
         });
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
-        stocks[key] = { gold: def.gold, items: finalItems, updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold };
+        stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold };
         db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
             el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${def.gold}.</span>`;
             renderMerchantStaleness();
@@ -1711,18 +1781,30 @@
         target.innerHTML = items.map(item => `
             <div class="party-row">
                 <div class="row-name">
-                    <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:12px;">(вес ${item.weight})</span>` : ''}</span>
-                    <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
+                    <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:12px;">(вес ${item.weight})</span>` : ''}${typeof item.price === 'number' ? ` <span style="opacity:.6; font-size:12px;">· ${item.price} септ./шт.</span>` : ''}</span>
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <input type="number" id="del-qty-${escapeHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:52px;">
+                        <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
+                    </span>
                 </div>
                 ${item.effect ? `<div style="font-size:12px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
             </div>
         `).join('');
     }
 
+    // Раньше удаляло весь стек разом, даже если у игрока было 10 стрел — теперь удаляет ровно
+    // то количество, что указано в поле рядом с кнопкой (по умолчанию 1).
     window.deletePlayerItem = function (itemId) {
         if (!currentInvPlayerUid) return;
-        if (!confirm('Удалить этот предмет у игрока?')) return;
-        const newInv = currentPlayerInvData.inventory.filter(i => i.itemId !== itemId);
+        const item = currentPlayerInvData.inventory.find(i => i.itemId === itemId);
+        if (!item) return;
+        const qtyInput = el('del-qty-' + itemId);
+        const qty = Math.max(1, Math.min(item.count, parseInt(qtyInput ? qtyInput.value : 1) || 1));
+        if (!confirm(`Удалить ${qty} шт. «${item.name}» у игрока?`)) return;
+        const newCount = item.count - qty;
+        const newInv = newCount > 0
+            ? currentPlayerInvData.inventory.map(i => i.itemId === itemId ? { ...i, count: newCount } : i)
+            : currentPlayerInvData.inventory.filter(i => i.itemId !== itemId);
         db.collection('characters').doc(currentInvPlayerUid).update({ inventory: newInv }).then(() => {
             currentPlayerInvData.inventory = newInv;
             renderGmPlayerInventory();
@@ -1733,10 +1815,11 @@
         if (!currentInvPlayerUid) return;
         const amount = parseInt(el('inv-gold-delta').value) || 0;
         if (amount <= 0) { alert('Укажи положительную сумму.'); return; }
-        const newGold = Math.max(0, currentPlayerInvData.gold + sign * amount);
-        db.collection('characters').doc(currentInvPlayerUid).update({ gold: newGold }).then(() => {
-            currentPlayerInvData.gold = newGold;
-            el('inv-gold-current').textContent = newGold;
+        // Та же гонка, что и в grantPartyReward — currentPlayerInvData.gold мог отстать от
+        // реального значения в Firestore (если игрок только что что-то залутал/продал, а его
+        // автосохранение ещё не долетело). Атомарный increment не читает старое значение вообще.
+        const delta = sign * amount;
+        db.collection('characters').doc(currentInvPlayerUid).update({ gold: firebase.firestore.FieldValue.increment(delta) }).then(() => {
             el('inv-gold-delta').value = '';
             const pname = (lastData.participants[currentInvPlayerUid] || {}).name || currentInvPlayerUid;
             gmPostLogEntryText(`💰 Мастер ${sign > 0 ? 'выдал' : 'списал'} ${amount} золота игроку ${pname}.`);
@@ -2071,27 +2154,36 @@
             if (typeof sourceItem.dmg === 'number') itemExtra.weaponDmg = sourceItem.dmg;
             if (typeof sourceItem.price === 'number') itemExtra.price = sourceItem.price;
             if (typeof sourceItem.capacity === 'number') itemExtra.capacity = sourceItem.capacity;
+            if (typeof sourceItem.maxUses === 'number') { itemExtra.maxUses = sourceItem.maxUses; itemExtra.usesLeft = sourceItem.maxUses; }
         }
 
-        Promise.all(uids.map(uid =>
-            db.collection('characters').doc(uid).get().then(doc => {
+        // Золото — атомарный FieldValue.increment(), а не "прочитать старое значение + прибавить
+        // + записать целиком". Раньше тут читалось doc.data().gold (могло быть УСТАРЕВШИМ, если
+        // игрок только что залутал труп — его автосохранение задерживается на 800мс) и писалось
+        // поверх — если автосохранение игрока срабатывало ПОСЛЕ, оно перезаписывало это своим
+        // локальным (тоже отстающим от выдачи мастера) значением. Инкремент не читает вообще —
+        // Firestore сам прибавляет к тому, что там СЕЙЧАС, никакой гонки для золота больше нет.
+        Promise.all(uids.map(uid => {
+            const update = {};
+            if (gold) update.gold = firebase.firestore.FieldValue.increment(gold);
+            if (!sourceItem) return db.collection('characters').doc(uid).update(update);
+            // Предмет по-прежнему требует прочитать текущий инвентарь (нужно проверить, есть ли
+            // уже такой стек) — тут гонка технически остаётся, но она намного уже без золота
+            // в этой же операции, и out-of-band риск метаться отдельно от inventory игрока.
+            return db.collection('characters').doc(uid).get().then(doc => {
                 const data = doc.exists ? doc.data() : {};
-                const update = {};
-                if (gold) update.gold = (parseInt(data.gold) || 0) + gold;
-                if (sourceItem) {
-                    const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-                    const existing = inv.find(i => i.itemId === itemId);
-                    if (existing) {
-                        existing.count += itemQty;
-                        Object.assign(existing, itemExtra);
-                    } else {
-                        inv.push(Object.assign({ itemId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
-                    }
-                    update.inventory = inv;
+                const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+                const existing = inv.find(i => i.itemId === itemId);
+                if (existing) {
+                    existing.count += itemQty;
+                    Object.assign(existing, itemExtra);
+                } else {
+                    inv.push(Object.assign({ itemId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
                 }
+                update.inventory = inv;
                 return db.collection('characters').doc(uid).update(update);
-            })
-        )).then(() => {
+            });
+        })).then(() => {
             const parts = [];
             if (gold) parts.push(`${gold} золота`);
             if (sourceItem) parts.push(`${itemQty}× «${sourceItem.name}»`);
@@ -2449,11 +2541,23 @@
             }
         });
 
-        // Урон и ХП растут с уровнем (грубая, но предсказуемая шкала).
+        // Настоящие характеристики бандита — раньше их не было вообще, только плоский weaponDmg
+        // и ХП из случайного диапазона 40-90 без всякой связи с телом. Упор на Телосложение
+        // (ХП)/Силу(ближний бой)/Ловкость(дальний бой) — они разбойники-воины, не барды. Растут
+        // с уровнем, у мага-бандита (отдельный генератор ниже) приоритет другой — там Дух/Интеллект.
+        const con = 14 + Math.floor(level * 0.3) + Math.floor(Math.random() * 3); // 14→~30 к 50 ур.
+        const str = 12 + Math.floor(level * 0.24) + Math.floor(Math.random() * 3); // 12→~26
+        const dex = 11 + Math.floor(level * 0.2) + Math.floor(Math.random() * 3); // 11→~21
+        const conMod = calcAbilityMod(con), strMod = calcAbilityMod(str), dexMod = calcAbilityMod(dex);
+
+        // Урон и ХП растут с уровнем (грубая, но предсказуемая шкала) — ТЕПЕРЬ и с модификатором
+        // характеристики сверху, как у игрока (Сила — ближний бой, Ловкость — дальний).
         const levelDmgMult = 1 + (level - 1) * 0.06;
         const levelHpMult = 1 + (level - 1) * 0.08;
-        const weaponDmg = isRanged ? Math.round(bow.damage * levelDmgMult) : Math.round(weapon.damage * levelDmgMult);
-        const hp = Math.round(randInt(40, 90) * levelHpMult);
+        const weaponDmg = isRanged
+            ? Math.round(bow.damage * levelDmgMult) + dexMod
+            : Math.round(weapon.damage * levelDmgMult) + strMod;
+        const hp = con * 10 + Math.round(randInt(0, 20) * levelHpMult);
         // Мана — теперь у ЛЮБОГО бандита (не только мага), для зелий/свитков за столом мастера.
         const mp = Math.round(randInt(20, 40) * (1 + (level - 1) * 0.05));
 
@@ -2482,13 +2586,15 @@
 
         lastGeneratedBandit = {
             name: 'Бандит', race, sign, god: god.name, level, hp, mp,
+            str, dex, con,
             weaponDmg, weaponNote: isRanged ? bow.name : weapon.name, isRanged, isMage: false, spells: [],
             armor: totalArmor, gold, lootItems, isRaisable: true
         };
 
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
-        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' урона)' : weapon.name + ' (' + weaponDmg + ' урона)'} · Броня: ${totalArmor}<br>`;
+        html += `СИЛ ${str}(${strMod >= 0 ? '+' : ''}${strMod}) · ЛОВ ${dex}(${dexMod >= 0 ? '+' : ''}${dexMod}) · ТЕЛ ${con}(${conMod >= 0 ? '+' : ''}${conMod})<br>`;
+        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' урона, вкл. ЛОВ)' : weapon.name + ' (' + weaponDmg + ' урона, вкл. СИЛ)'} · Броня: ${totalArmor}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
@@ -2540,16 +2646,23 @@
             if (pickedSpells.length >= spellCount) break;
             if (!pickedSpells.find(p => p.name === s.name)) pickedSpells.push(s);
         }
+        // Характеристики мага-бандита — приоритет Интеллект(сила заклинаний)/Дух(мана), Телосложение
+        // ниже, чем у воинов-бандитов (маги традиционно более хрупкие).
+        const con = 10 + Math.floor(level * 0.2) + Math.floor(Math.random() * 3);
+        const int_ = 13 + Math.floor(level * 0.26) + Math.floor(Math.random() * 3);
+        const wis = 12 + Math.floor(level * 0.22) + Math.floor(Math.random() * 3);
+        const intMod = calcAbilityMod(int_);
+
         const levelDmgMult = 1 + (level - 1) * 0.05;
         const spells = pickedSpells.map(s => {
             const dmg = (typeof parseSpellDamageFromDesc === 'function') ? parseSpellDamageFromDesc(s.desc) : null;
-            return { name: s.name, dmg: dmg ? Math.round(dmg * levelDmgMult) : 0, cost: s.cost || 20, school: s.school };
+            return { name: s.name, dmg: dmg ? Math.round(dmg * levelDmgMult) + intMod : 0, cost: s.cost || 20, school: s.school };
         });
 
         const robePool = getBanditMageRobePool(level);
         const robe = robePool.length ? robePool[Math.floor(Math.random() * robePool.length)] : null;
 
-        const hp = Math.round(randInt(35, 70) * (1 + (level - 1) * 0.06));
+        const hp = con * 10 + Math.round(randInt(0, 15) * (1 + (level - 1) * 0.06));
         const mp = Math.round(randInt(80, 140) * (1 + (level - 1) * 0.08)); // маги — мана в разы больше воинов
         const gold = Math.round(randInt(15, 100) * (1 + (level - 1) * 0.1));
 
@@ -2563,14 +2676,16 @@
 
         lastGeneratedMageBandit = {
             name: 'Бандит-маг', race, sign, god: god.name, level, hp, mp,
+            con, int: int_, wis,
             weaponDmg: 0, weaponNote: robe ? robe.name : 'Без одеяния', isRanged: false, isMage: true, spells,
             armor: 0, gold, lootItems, isRaisable: true
         };
 
         let html = `<strong>Маг ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
+        html += `ИНТ ${int_}(${intMod >= 0 ? '+' : ''}${intMod}) · ДУХ ${wis} · ТЕЛ ${con}<br>`;
         html += `ХП: ${hp} · МП: ${mp} · Одеяние: ${robe ? robe.name : '—'}<br>`;
-        html += `Заклинания: ${spells.map(s => `${s.name} (${s.dmg || '—'} урона/${s.cost} маны)`).join(', ')}<br>`;
+        html += `Заклинания (вкл. ИНТ): ${spells.map(s => `${s.name} (${s.dmg || '—'} урона/${s.cost} маны)`).join(', ')}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
@@ -2583,8 +2698,9 @@
         const physResist = Math.min(85, Math.round((b.armor || 0) / 10));
         enemies.push({
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
+            str: b.str, dex: b.dex, con: b.con,
             weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, resist: { physical: physResist }, spells: b.spells || [],
-            isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             lastGeneratedBandit = null;
@@ -2598,8 +2714,9 @@
         const enemies = (lastData.enemies || []).slice();
         enemies.push({
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
+            con: b.con, int: b.int, wis: b.wis,
             weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
-            isRaisable: true, corpseLoot: { gold: b.gold, items: b.lootItems }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             lastGeneratedMageBandit = null;
@@ -2656,6 +2773,20 @@
     // renderAllWeatherReference() в стартовой инициализации происходит раньше, чем скрипт успел
     // бы дойти досюда, и const в temporal dead zone бросал ReferenceError, ломая ВЕСЬ остаток
     // инициализации гм-панели: инвентарь игрока, атаку, порядок ходов — всё, что шло после)
+
+    // Задача E: случайные события — раньше у мастера не было даже кнопки.
+    window.rollRandomEvent = function () {
+        const box = el('random-event-result');
+        if (!box || !window.randomEventsData || !window.randomEventsData.length) {
+            if (box) box.innerHTML = '<span style="color:#e74c3c;">База событий не загрузилась.</span>';
+            return;
+        }
+        const e = window.randomEventsData[Math.floor(Math.random() * window.randomEventsData.length)];
+        box.innerHTML = `<div style="font-size:13px;"><strong>🎲 ${e.roll}: ${escapeHtml(e.name)}</strong></div>
+            <div style="margin-top:3px;">${escapeHtml(e.desc)}</div>
+            ${e.req ? `<div style="margin-top:3px; opacity:.7;">⚠️ Условие: ${escapeHtml(e.req)}</div>` : ''}`;
+        gmPostLogEntryText(`🎲 Случайное событие: «${e.name}»`);
+    };
 
     function renderAllWeatherReference() {
         const box = el('all-weather-body');

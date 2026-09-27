@@ -59,7 +59,7 @@
         <div class="grid-2">
             <div class="panel">
                 <h2><span class="skyrim-icon icon-shield" aria-hidden="true"></span> Отряд</h2>
-                <div id="gm-party-list"></div>
+                <div id="gm-party-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px;"></div>
             </div>
 
             <div class="panel">
@@ -179,6 +179,14 @@
                     <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
                 </div>
                 <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
+            </div>
+
+            <!-- ===== СЛУЧАЙНЫЕ СОБЫТИЯ (Задача E) ===== -->
+            <div class="panel">
+                <h2>🎲 Случайное событие в пути</h2>
+                <p style="font-size:12px; opacity:.75;">54 встречи из таблицы (д100, но реально заполнено только до 54). У каждой может быть условие ("только на дорогах" и т.п.) — ты сам решаешь, подходит ли контекст, событие не фильтруется автоматически.</p>
+                <button class="btn-success" style="width:100%;" onclick="rollRandomEvent()">🎲 Бросить случайное событие</button>
+                <div id="random-event-result" style="margin-top:8px; font-size:13px;"></div>
             </div>
 
             <!-- ===== СПРАВОЧНИК ПО ВСЕЙ ПОГОДЕ (только мастер) ===== -->
@@ -585,6 +593,7 @@
 <script src="smithing-data.js"></script>
 <script src="enchant-data.js"></script>
 <script src="holidays-data.js"></script>
+<script src="random-events-data.js"></script>
 <script src="skill-books-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>

@@ -778,6 +778,12 @@
                     </select>
                     <select id="slot-ranged-picker" class="slot-picker" onchange="equipToSlotDirect('ranged', this.value, 'slot-ranged-picker')"></select>
                 </div>
+
+                <label>Заряженные боеприпасы (списываются при выстреле — без них нельзя стрелять)</label>
+                <div class="slot-row">
+                    <select id="ammo-select" onchange="equipAmmo(this.value)"></select>
+                    <span id="ammo-count-display" style="font-size:13px; opacity:.8; white-space:nowrap;">не выбрано</span>
+                </div>
                 <div id="slot-ranged-enchant-info" class="slot-enchant-info"></div>
 
                 <label>Экипированные боеприпасы</label>
@@ -1464,7 +1470,7 @@
     let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
-    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
+    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let knownEnchantments = []; // ["Урон огнем", ...] — узнаётся разрушением зачарованного предмета
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
@@ -1489,6 +1495,21 @@
         { category: 'atronach', name: 'Ледяной атронах', hpBase: 240, dmgBase: 15, dmgType: 'холод', durBase: 16, durEnh: 20, enhCount: 2, estimated: true, note: 'Замедляет цель', spellName: 'Вызов ледяного атронаха' },
         { category: 'atronach', name: 'Грозовой атронах', hpBase: 250, dmgBase: 25, dmgType: 'электричество', durBase: 20, durEnh: 24, enhCount: 2, estimated: true, spellName: 'Вызов грозового атронаха' },
         { category: 'skeleton', name: 'Скелет-компаньон', hpBase: 50, dmgBase: 12, dmgType: 'физический', speed: 30, permanent: true, requiresItem: 'Кучка костей' },
+        // Настоящие 10 вариантов "Вызов скелета" из книги заклинаний (spell-data.js, школа
+        // Колдовство) — раньше НИ ОДИН из них не был в этом списке, только не связанный с ними
+        // "Скелет-компаньон" выше. Из-за этого призыв скелета вообще не распознавался как призыв
+        // и уходил в обычный расчёт урона по описанию — с неправильными числами. permanent:true —
+        // в тексте у всех явно "бессрочно" (держится пока не убьют/не отзовут, не по счётчику ходов).
+        { category: 'skeleton', name: 'Скелет солдата', hpBase: 50, dmgBase: 15, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета солдата' },
+        { category: 'skeleton', name: 'Скелет мага', hpBase: 50, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Вызов Скелета мага', note: 'Атакует обморожением (мана 120)' },
+        { category: 'skeleton', name: 'Скелет лучника', hpBase: 100, dmgBase: 35, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета лучника' },
+        { category: 'skeleton', name: 'Скелет-танк', hpBase: 190, dmgBase: 20, dmgType: 'физический', speed: 35, permanent: true, spellName: 'вызов скелета танка' },
+        { category: 'skeleton', name: 'Сильный скелет воин', hpBase: 130, dmgBase: 30, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв сильного скелета воина' },
+        { category: 'skeleton', name: 'Сильный скелет маг', hpBase: 100, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Призыв сильного скелета мага', note: 'Обморожение(15мп)/Ледяной шип(25мп, 25 урона)/Ледяная буря(70мп, 70 урона)' },
+        { category: 'skeleton', name: 'Сильный скелет лучник', hpBase: 130, dmgBase: 40, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв сильного скелета лучника' },
+        { category: 'skeleton', name: 'Скелет-герой', hpBase: 180, dmgBase: 50, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв Скелета героя' },
+        { category: 'skeleton', name: 'Скелет-эксперт', hpBase: 140, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Призыв Скелета эксперта', note: 'Обморожение(10мп)/Ледяной шип(20мп,25)/Ледяная буря(50мп,70)/Морозная нова(150мп)' },
+        { category: 'skeleton', name: 'Скелет-снайпер', hpBase: 170, dmgBase: 50, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв Скелета снайпера' },
         // «Плоть» — временная броня поверх кирасы (слот «Одеяние» не трогается).
         { category: 'armor', name: 'Дубовая плоть', armorBase: 40, armorEnh: 120, durBase: 9, durEnh: 13, spellName: 'Дубовая плоть' },
         { category: 'armor', name: 'Каменная плоть', armorBase: 60, armorEnh: 180, durBase: 9, durEnh: 12, spellName: 'Каменная плоть' },
@@ -2269,6 +2290,26 @@ window.toggleSkillPanel = function (idx) {
     // Книги умений — как в ваниле: чтение даёт +1 к базовому значению навыка, расходует
     // предмет. Систему "уже читал именно эту книгу раньше" не отслеживаем (мастер сам решает,
     // выдавать ли вторую копию той же книги) — упрощение, чтобы не городить отдельный трекер.
+    // Общая механика "предмет с ограниченным числом применений" (Чернила/мешочек Вазьмицы и
+    // подобное) — раньше такого класса предметов не было вообще, у GM-выданных экземпляров
+    // usesLeft выставляется при выдаче (см. gm.js). Когда заряды кончаются — предмет пропадает.
+    window.useLimitedItem = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.maxUses) return;
+        let usesLeft = typeof item.usesLeft === 'number' ? item.usesLeft : item.maxUses;
+        if (usesLeft <= 0) { alert(`«${item.name}» больше не действует — заряды закончились.`); return; }
+        usesLeft -= 1;
+        if (usesLeft <= 0) {
+            removeFromInventoryByName(itemId, 1);
+            alert(`Использовано: «${item.name}». Заряды закончились, предмет израсходован.\n${item.effect || ''}`);
+        } else {
+            item.usesLeft = usesLeft;
+            alert(`Использовано: «${item.name}». Осталось зарядов: ${usesLeft}/${item.maxUses}.\n${item.effect || ''}`);
+        }
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
     window.readSkillBook = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || item.count <= 0 || !item.skill) return;
@@ -2841,12 +2882,15 @@ window.toggleSkillPanel = function (idx) {
     // 3. Fallback — по названию (на случай если категория/тип потерялись при передаче предмета мастером)
     const nameKeywords = [
         'яблоко', 'хлеб', 'сыр', 'мясо', 'рыба', 'суп', 'похлёбка',
-        'пирог', 'печенье', 'мёд', 'мед', 'вино', 'морковь', 'картоф',
-        'капуст', 'помидор', 'лук', 'тыкв', 'молок', 'батат',
+        'пирог', 'печенье', 'мёд', 'вино', 'морковь', 'картоф',
+        'капуст', 'помидор', 'тыкв', 'молок', 'батат',
         'рулет', 'орех', 'слойка', 'грудка', 'окорок', 'ножка',
         'лососин', 'оленин', 'конин', 'собачатин', 'кабанин', 'устриц',
         'порей', 'ягод', 'банан', 'виноград'
     ];
+    // "мед" (без ё) убран — совпадал по подстроке с "медведь" (шкура пещерного МЕДведя ловилась
+    // как еда). "лук" убран целиком — слово-омоним, совпадает и с луком-овощем, и с ЛЮБЫМ луком-
+    // оружием ("Длинный лук", "Орочий лук" и т.д.) по той же подстроке.
     for (const k of nameKeywords) if (name.includes(k)) return true;
 
     return false;
@@ -2885,6 +2929,7 @@ window.toggleSkillPanel = function (idx) {
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${escHtml(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${escHtml(item.itemId)}')">Читать</button>` : ''}
                     ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${escHtml(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
+                    ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${escHtml(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
@@ -3419,7 +3464,35 @@ window.toggleSkillPanel = function (idx) {
             : '<option value="">Нет подходящих предметов в инвентаре</option>';
         renderEquippedSummary();
         renderAllSlotPickers();
+        renderAmmoSelect();
     }
+
+    // Задача "стрелы расходуются при выстреле" — раньше слота боеприпасов не было вообще,
+    // выстрелы ничего не тратили. Список — всё, что похоже на стрелы/болты в инвентаре.
+    function renderAmmoSelect() {
+        const select = document.getElementById('ammo-select');
+        const countEl = document.getElementById('ammo-count-display');
+        if (!select) return;
+        const ammoItems = playerInventory.filter(i => i.count > 0 && (i.category === 'Боеприпасы' || /стрел|болт/i.test(i.name)));
+        const prev = select.value;
+        select.innerHTML = '<option value="">— не заряжено —</option>' +
+            ammoItems.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('');
+        if (equippedSlots.ammo && ammoItems.some(i => i.itemId === equippedSlots.ammo)) {
+            select.value = equippedSlots.ammo;
+        } else if (ammoItems.some(i => i.itemId === prev)) {
+            select.value = prev;
+        } else {
+            equippedSlots.ammo = null;
+        }
+        const equipped = ammoItems.find(i => i.itemId === equippedSlots.ammo);
+        if (countEl) countEl.textContent = equipped ? `осталось: ${equipped.count}` : 'не выбрано';
+    }
+
+    window.equipAmmo = function (itemId) {
+        equippedSlots.ammo = itemId || null;
+        renderAmmoSelect();
+        saveLocalStorage();
+    };
 
     function getEffectDescriptionForItem(item) {
         if (!item) return '';
@@ -3569,7 +3642,14 @@ window.toggleSkillPanel = function (idx) {
         const itemId = equippedSlots.pouch;
         if (!itemId) return 0;
         const item = playerInventory.find(i => i.itemId === itemId);
-        return item ? (item.capacity || 0) : 0;
+        if (!item) return 0;
+        if (item.capacity) return item.capacity;
+        // Самолечение: у игроков, которым подсумок выдали ДО фикса дубля в базе предметов
+        // (старая запись без capacity), сохранённый предмет так и остаётся без capacity —
+        // код-фикс не чинит задним числом уже сохранённые данные. Ищем правильное значение по
+        // имени в актуальной базе, а не молча считаем вместимость нулевой.
+        const canonical = (window.allItems || []).find(i => i.name === item.name && i.category === 'Подсумки');
+        return canonical ? canonical.capacity : 0;
     }
 
     // ========================================================================
@@ -5723,11 +5803,29 @@ function updateHungerPenalty() {
         let penetrationPct = 0;
 
         if (actionVal === 'melee' || actionVal === 'ranged') {
+            // Стрелы теперь реально расходуются — раньше выстрелы были бесконечными, слота
+            // боеприпасов не существовало вообще.
+            if (actionVal === 'ranged') {
+                const ammoItem = playerInventory.find(i => i.itemId === equippedSlots.ammo);
+                if (!ammoItem || ammoItem.count <= 0) {
+                    alert('Нет заряженных боеприпасов — выбери стрелы/болты в разделе экипировки (вкладка Инвентарь).');
+                    return;
+                }
+                removeFromInventoryByName(ammoItem.itemId, 1);
+                renderAmmoSelect();
+                renderInventoryList();
+            }
             document.getElementById('active-combat-weapon').value = actionVal;
             updateCombat();
             const calc = window.lastWeaponCombatCalc || { totalDmg: 0, hitModifier: 0 };
             mod = calc.hitModifier;
             dmg = calc.totalDmg;
+            // Урон экипированных стрел (если у конкретной стрелы прописан свой урон) прибавляется
+            // поверх урона лука — раньше вообще не учитывался.
+            if (actionVal === 'ranged') {
+                const equippedAmmo = playerInventory.find(i => i.itemId === equippedSlots.ammo);
+                if (equippedAmmo && typeof equippedAmmo.dmg === 'number') dmg += equippedAmmo.dmg;
+            }
             lifestealPct += gb('weaponVamp');
             penetrationPct = gb('armorPenetration');
             actionLabel = actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием';
@@ -5815,13 +5913,14 @@ function updateHungerPenalty() {
 
         pendingPlayerAttack = hit ? {
             targetId, dmg, dmgType, healPct, penetrationPct,
-            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
+            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${penetrationPct ? ` (пробитие защиты цели: ${penetrationPct}%)` : ''}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
         } : null;
 
         let html = `<strong>Игрок:</strong> 1d20 (${playerRoll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${playerTotal}</strong><br>` +
             `<strong>Мастер:</strong> 1d20 = <strong style="color:var(--accent-color);">${gmRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>`;
         if (hit) {
             html += `<strong style="color:#2ecc71;">✅ Попадание!</strong> Урон: <span style="color:#e74c3c; font-size:17px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
+            if (penetrationPct) html += `<br><span style="font-size:12px; opacity:.75;">🗡️ Пробитие защиты цели: ${penetrationPct}% (снижает её резист на этот удар)</span>`;
         } else {
             html += `<strong style="color:#e74c3c;">❌ Промах.</strong>`;
         }
@@ -5880,7 +5979,7 @@ function updateHungerPenalty() {
             alert(`Найдено: 💰${corpseLoot.gold || 0} золота` + (corpseLoot.items || []).map(i => ', ' + i.name).join(''));
             renderInventoryList();
             updateAll();
-            saveLocalStorage();
+            saveLocalStorage(true); // немедленно — без окна гонки с мастером сразу после лута
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -6473,7 +6572,7 @@ function updateHungerPenalty() {
 }
     
     // Сохранение всех параметров листа в LocalStorage
-    function saveLocalStorage() {
+    function saveLocalStorage(immediate) {
         let perkStates = {};
         document.querySelectorAll('.perk-checkbox').forEach(chk => {
             let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
@@ -6578,7 +6677,7 @@ function updateHungerPenalty() {
             resistances: computeTotalResistances()
         };
         localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
-        if (window.CloudSync) window.CloudSync.saveCharacter(data);
+        if (window.CloudSync) window.CloudSync.saveCharacter(data, immediate);
     }
 
     // Поля, которые правит МАСТЕР (гильдии/сверхъестественное/репутация) — вынесены отдельно,

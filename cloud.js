@@ -152,10 +152,14 @@
     let lastSessionData = null;
 
     window.CloudSync = {
-        saveCharacter: function (data) {
+        // immediate:true — обходит обычную задержку 800мс и пишет сразу. Нужно для действий,
+        // после которых мастер может СРАЗУ ЖЕ что-то записать поверх (обыск трупа игроком,
+        // например) — раньше стандартная задержка давала окно гонки: мастер успевал прочитать
+        // ещё-старые данные из Firestore и своей записью (или наоборот, задержанной записью
+        // игрока чуть позже) стирал только что залутанное золото/предметы.
+        saveCharacter: function (data, immediate) {
             if (!currentUser || !db || !cloudDataReady) return;
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => {
+            const doSave = () => {
                 db.collection('characters').doc(currentUser.uid).set(data, { merge: true })
                     .catch(e => console.error('Ошибка сохранения в облако:', e));
 
@@ -174,7 +178,10 @@
                     db.collection('sessions').doc(currentSessionCode).update(patch)
                         .catch(e => console.error('Ошибка синхронизации с сессией:', e));
                 }
-            }, 800);
+            };
+            clearTimeout(saveTimer);
+            if (immediate) doSave();
+            else saveTimer = setTimeout(doSave, 800);
         },
 
         // "Сброс персонажа" раньше чистил только localStorage — Firebase-авторизация переживает
