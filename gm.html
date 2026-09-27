@@ -78,6 +78,12 @@
                         <div><label>Макс. HP</label><input type="number" id="enemy-hp-input" value="10" min="0"></div>
                         <div><label>Макс. MP</label><input type="number" id="enemy-mp-input" value="0" min="0"></div>
                     </div>
+                    <div class="grid-2">
+                        <div><label>Урон оружием</label><input type="number" id="enemy-dmg-input" value="0" min="0"></div>
+                        <div><label>Физ. резист (%)</label><input type="number" id="enemy-resist-input" value="0" min="0" max="85"></div>
+                    </div>
+                    <label>Лут (текстом, необязательно — можно поправить и потом)</label>
+                    <input type="text" id="enemy-loot-input" placeholder="Например: 20 золота, шкура, кинжал">
                     <button class="btn-success" style="margin-top:8px; width:100%;" onclick="addEnemy()">Добавить противника</button>
                 </div>
             </div>
@@ -595,6 +601,7 @@
 <script src="holidays-data.js"></script>
 <script src="random-events-data.js"></script>
 <script src="skill-books-data.js"></script>
+<script src="unique-weapons-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>
 <script src="spell-data.js"></script>

@@ -1148,6 +1148,21 @@ body::after {
     padding: 20px 22px 18px;
 }
 
+/* .grid-2/.grid-3 использовались по всему index.html (13 раз) для 2- и 3-колоночных раскладок
+   (панель ХП/МП+боги, ветки перков и т.д.), но НИ РАЗУ не были определены в CSS — рендерились
+   как обычные блоки без всякой раскладки в колонки. Добавлено с нуля + сжатие в 1 колонку на
+   мобильном (см. медиа-запрос ниже), чтобы страница вообще была пригодна для телефона. */
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
 .tab-content {
     padding: 16px 14px 22px;
     border-color: rgba(184,189,185,.58);
@@ -1457,6 +1472,40 @@ input[type="number"] {
     .tab-link::after { right: 3px; }
     .panel { padding: 15px 14px 13px; }
     h1 { font-size: 23px; }
+
+    /* Раньше на узком экране .grid-2/.grid-3 (теперь настоящий грид, см. выше) сжимал 2-3
+       колонки в узкие полоски вместо переноса — на телефоне это нечитаемо. Одна колонка. */
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+
+    /* 12+ вкладок в ряд не помещаются на телефон — раньше .nav-tabs просто сжимала каждую вкладку
+       до пары пикселей текста. Прокрутка вбок вместо сжатия — обычный мобильный паттерн. */
+    .nav-tabs {
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        -webkit-overflow-scrolling: touch;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    .nav-tabs::before, .nav-tabs::after { display: none; } /* декоративные уголки мешают скроллу */
+    .tab-link { flex-shrink: 0; white-space: nowrap; }
+
+    /* Поля ХП/МП/характеристик — по умолчанию довольно широкие, на телефоне занимают пол-экрана
+       на одно число. */
+    .vital-inputs input { width: 46px; font-size: 14px; }
+    input[type="number"], input[type="text"] { font-size: 14px; }
+
+    /* Длинные горизонтальные ряды (день+сброс, ход+круг и т.п.) переносятся, но кнопки внутри
+       слишком большие для телефона в ряд — уменьшаем, а не оставляем "вылезать" за край. */
+    .day-controls button, .day-controls span { font-size: 13px; }
+
+    /* Широкие таблицы/списки не должны раздвигать всю страницу вбок — прокрутка внутри себя. */
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+
+    /* Строки предметов (покупка/продажа/инвентарь) — flex без переноса, длинное имя+цена+кнопка
+       обрезались на узком экране вместо переноса кнопки на новую строку. */
+    .stat-block { flex-wrap: wrap; }
 }
 .section-header {
     cursor: pointer;
@@ -1499,6 +1548,14 @@ input[type="number"] {
     border: 1px solid #363025;
     padding: 8px 10px !important;
     margin-bottom: 6px !important;
+}
+
+/* Декоративный уголок (.panel::before/after, см. выше) тут только мешает — при таком маленьком
+   отступе панели (10px) он перекрывает первую букву названия навыка. У обычных (крупных) панелей
+   отступ больше, там уголок не накладывается. */
+.skill-panel::before,
+.skill-panel::after {
+    display: none;
 }
 
 .skill-panel .skill-header {

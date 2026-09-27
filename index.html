@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
     
     <!-- Системный блок хранения баз данных игры -->
@@ -389,7 +390,7 @@
             armor: { label: 'Броня', suffix: '', auto: true },
             speed: { label: 'Скорость', suffix: ' фт.', auto: true },
             powerAttackDmg: { label: 'Урон силовых атак', suffix: '%', auto: true },
-            smithing: { label: 'Кузнечное дело (эффективность)', suffix: '%' },
+            smithing: { label: 'Кузнечное дело (эффективность)', suffix: '%', auto: true },
             prices: { label: 'Цены у торговцев выгоднее', suffix: '%', auto: true },
             armorSpell: { label: 'Заклинания «плоти»', suffix: '%' },
             arrowResist: { label: 'Резист стрелам', suffix: '%', auto: true },
@@ -400,7 +401,7 @@
             spellPower: { label: 'Сила заклинаний', suffix: '%', auto: true },
             restorationLivingDmg: { label: 'Заклинания Восстановления по живым целям', suffix: '%', auto: true },
             daedraUndeadResist: { label: 'Резист урону от даэдра/нежити', suffix: '%' },
-            daedraUndeadDmg: { label: 'Урон по даэдра/нежити', suffix: '%' },
+            daedraUndeadDmg: { label: 'Урон по даэдра/нежити', suffix: '%', auto: true },
             meleeDmg: { label: 'Урон ближним оружием', suffix: '%', auto: true },
             magicResist: { label: 'Сопротивление магии', suffix: '%', auto: true },
             spellCost: { label: 'Стоимость каста заклинаний', suffix: '% дешевле', auto: true },
@@ -422,15 +423,15 @@
             diseaseBuff: { label: 'Сила баффа от болезни (Периайт превращает болезнь в мощь)', suffix: '%' },
             spellVampire: { label: 'Похищение здоровья заклинаниями', suffix: '%', auto: true },
             allSchoolsBonus: { label: 'Сила заклинаний всех школ', suffix: '%', auto: true },
-            sneakSpeed: { label: 'Скорость в скрытности', suffix: '%' },
-            sneakMult: { label: 'Множитель урона из скрытности', suffix: 'х доп.' },
+            sneakSpeed: { label: 'Скорость в скрытности', suffix: '%', auto: true },
+            sneakMult: { label: 'Множитель урона из скрытности', suffix: 'х доп.', auto: true },
             harderToDetect: { label: 'Труднее обнаружить в скрытности', suffix: '', bool: true },
             powerAttackHeal: { label: 'Лечение при силовой атаке', suffix: '%', auto: true },
             enchantingPower: { label: 'Сила зачарования', suffix: '%', auto: true },
             elementalResist: { label: 'Резист стихиям (огонь/холод/электро)', suffix: '%', auto: true },
             elementalWeaponDmg: { label: 'Урон стихийным оружием', suffix: '%' },
             ignoreMagicDmg: { label: 'Игнорирование магической защиты цели', suffix: '%', auto: true },
-            undeadDmg: { label: 'Урон по нежити', suffix: '%' },
+            undeadDmg: { label: 'Урон по нежити', suffix: '%', auto: true },
             undeadAuraBonus: { label: 'Аура урона по нежити рядом', suffix: '' },
             destructionSkill: { label: 'Навык Разрушение (эффективность)', suffix: '%', auto: true },
             fireWeaponDmg: { label: 'Урон огненным оружием/заклинанием', suffix: '%', auto: true },
@@ -487,6 +488,7 @@
     <script src="alchemy-data.js"></script>
     <script src="holidays-data.js"></script>
     <script src="skill-books-data.js"></script>
+    <script src="unique-weapons-data.js"></script>
 </head>
 <body>
 
@@ -573,6 +575,10 @@
                     <option value="lady">Леди (+2 Мудрость, +2 Телосложение)</option>
                     <option value="lord">Лорд (Кровь Севера, уязвимость к огню)</option>
                     <option value="zmey">Змей (Исцеление / Медленный мощный яд)</option>
+                    <option value="ritual">Ритуал (раз в день поднять всех мёртвых рядом на 60 сек. — решает мастер)</option>
+                    <option value="lover">Любовник (+15% к скорости прокачки всех навыков)</option>
+                    <option value="shadow">Тень (раз в день невидимость на 60 сек. — решает мастер)</option>
+                    <option value="tower">Башня (раз в день открыть любой замок без взлома — решает мастер)</option>
                 </select>
 
                 <div class="grid-2" style="margin-top:10px;">
@@ -1102,6 +1108,10 @@
                     <select id="attack-target-select"></select>
                     <label>Чем атаковать</label>
                     <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
+                    <div class="checkbox-group" style="margin-top:4px;">
+                        <input type="checkbox" id="chk-enhanced-cast" onchange="updateAttackActionInfo()">
+                        <label for="chk-enhanced-cast">✨ Усиленный каст (только для заклинаний — х2 маны, урон из «Усиленного эффекта» описания)</label>
+                    </div>
                     <div id="attack-action-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
                     <button class="btn-success" style="width:100%;" onclick="rollPlayerAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
                     <div id="attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
@@ -3116,17 +3126,26 @@ window.toggleSkillPanel = function (idx) {
         recipe.ingredients.forEach(i => removeFromInventoryByName(i.name, i.qty));
         const yieldCount = recipe.yieldCount || 1;
 
+        // Зенитар — "эффективность кузни" %, увеличивает итоговое значение скованной вещи
+        // (было только текстом в описании бога).
+        const smithBonus = gb('smithing');
+        let dmgVal = recipe.damage, resVal = recipe.resistance;
+        if (smithBonus) {
+            if (typeof dmgVal === 'number') dmgVal = Math.round(dmgVal * (1 + smithBonus / 100));
+            if (typeof resVal === 'number') resVal = Math.round(resVal * (1 + smithBonus / 100));
+        }
+
         let desc, extra;
         if (recipe.hasOwnProperty('damage')) {
             // Оружие или боеприпасы
-            desc = recipe.isAmmo ? `Урон ${recipe.damage} (боеприпас)` : `Урон ${recipe.damage}`;
-            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: 'melee', weaponDmg: recipe.damage, price: recipe.price };
+            desc = recipe.isAmmo ? `Урон ${dmgVal} (боеприпас)` : `Урон ${dmgVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
+            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: 'melee', weaponDmg: dmgVal, price: recipe.price };
         } else if (recipe.slot === 'jewelry') {
             desc = 'Ювелирное изделие';
             extra = { slot: recipe.name.includes('кольцо') ? 'ring' : 'amulet', price: recipe.price || 0 };
         } else {
-            desc = `Сопротивление ${recipe.resistance}`;
-            extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: recipe.resistance, price: recipe.price };
+            desc = `Сопротивление ${resVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
+            extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: resVal, price: recipe.price };
         }
         addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, extra.category || 'Скованное', desc, extra);
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кузнечное дело');
@@ -5007,7 +5026,11 @@ window.toggleSkillPanel = function (idx) {
     // Формулы — моя оценка, подогнанная под пример игрока (4→5 уровень за 10 очков навыков)
     // и под пример из правил (навык 75→76 нужно ~15 успехов).
     function getSuccessesNeededForSkill(skillValue) {
-        return Math.max(1, Math.ceil(skillValue / 5));
+        const base = Math.max(1, Math.ceil(skillValue / 5));
+        // Знак «Любовник» — +15% к скорости прокачки ВСЕХ навыков (было только текстом в описании).
+        const signEl = document.getElementById('char-sign');
+        if (signEl && signEl.value === 'lover') return Math.max(1, Math.ceil(base * 0.85));
+        return base;
     }
     function getSkillUpsNeededForLevel(level) {
         return level * 2 + 2;
@@ -5296,15 +5319,29 @@ window.toggleSkillPanel = function (idx) {
 
     // Достаёт число урона из описания заклинания (в тексте почти всегда явно
     // указано "наносит N урона" — берём первое такое совпадение).
-    function parseSpellDamageFromDesc(desc) {
+    // enhanced:true — 190 из 191 заклинания имеют отдельный блок "Усиленный эффект" с ДРУГИМ
+    // (обычно большим) числом урона, раньше урон всегда брался только из БАЗОВОГО описания —
+    // инструмент атаки не мог достать усиленное число вообще, даже если игрок кастовал усиленно
+    // (х2 маны) на заклинания-баффы (resolveSpellEffect), но не на прямой урон в бою.
+    function parseSpellDamageFromDesc(desc, enhanced) {
         if (!desc) return null;
+        let text = desc;
+        const splitIdx = desc.search(/усилен[а-я]*\s+эффект/i);
+        if (enhanced && splitIdx !== -1) {
+            const after = desc.slice(splitIdx).replace(/усилен[а-я]*\s+эффект/i, '');
+            if (after.trim()) text = after; // если после "Усиленный эффект" пусто — падаем на базовый текст
+        } else if (!enhanced && splitIdx !== -1) {
+            text = desc.slice(0, splitIdx);
+        }
         // [а-я] вместо \w — \w не матчит кириллицу. "нанос[а-я]*" покрывает наносит/наносящий/
         // нанося и т.п. одним паттерном. (ед.?|единиц) — раньше "N единиц урона" не понималось,
         // только сокращённое "ед.". Опциональное слово перед "урон" — "физ/огненн/ледян/..." —
         // раньше "наносит 40 физ урона" не матчилось, т.к. между числом и "урон" было слово.
-        const m = desc.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
-                  desc.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
-        return m ? parseInt(m[1]) : null;
+        const m = text.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
+                  text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
+        if (m) return parseInt(m[1]);
+        // Ничего не нашли в усиленном тексте (напр. "Усиленный эффект" пустой) — пробуем базовый.
+        return enhanced ? parseSpellDamageFromDesc(desc, false) : null;
     }
 
     // ========================================================================
@@ -5530,9 +5567,11 @@ window.toggleSkillPanel = function (idx) {
             // обычную кнопку "Каст" на карточке заклинания, не через этот инструмент.
             if (findSummonTemplateBySpellName(s.name)) return;
             const dmg = parseSpellDamageFromDesc(s.desc);
+            const enhDmg = parseSpellDamageFromDesc(s.desc, true);
             if (dmg) {
                 const schoolLabel = SCHOOL_CODE_TO_SKILL[s.school] || '';
-                opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)}${schoolLabel ? ' [' + escHtml(schoolLabel) + ']' : ''} (заклинание, ~${dmg} урона)</option>`;
+                const enhSuffix = (enhDmg && enhDmg !== dmg) ? `, усиленно ~${enhDmg}` : '';
+                opts += `<option value="spell:${escHtml(s.id)}">${escHtml(s.name)}${schoolLabel ? ' [' + escHtml(schoolLabel) + ']' : ''} (заклинание, ~${dmg} урона${enhSuffix})</option>`;
             }
         });
         // Свитки с уроном — раньше их вообще не было в списке, "Читать" всегда бил по себе,
@@ -5844,7 +5883,21 @@ function updateHungerPenalty() {
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
-            const baseDmg = parseSpellDamageFromDesc(spell.desc) || 0;
+            const enhancedCast = document.getElementById('chk-enhanced-cast').checked;
+            const baseDmg = parseSpellDamageFromDesc(spell.desc, enhancedCast) || 0;
+            // Стоимость каста — та же цепочка скидок, что и на карточке заклинания в книге
+            // (броня/школа-перк/навык-от-снаряжения/актив.баффы/бог), просто читаем уже готовое
+            // посчитанное значение из самой карточки, х2 при усиленном касте. Раньше атака
+            // заклинанием вообще не тратила ману — это было первым проблемным местом.
+            const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
+            const baseCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
+            const finalCost = enhancedCast ? baseCost * 2 : baseCost;
+            const curMpEl = document.getElementById('cur-mp');
+            const curMp = parseInt(curMpEl.value) || 0;
+            if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+            curMpEl.value = curMp - finalCost;
+            updateVitalBars();
+            saveLocalStorage();
             const spellPowerPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0;
             dmg = Math.round(baseDmg * (1 + spellPowerPct / 100));
             dmgType = detectDmgTypeFromName(spell.name);
@@ -5864,7 +5917,7 @@ function updateHungerPenalty() {
             if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) dmg = Math.round(dmg * sheogorathRoll.dmgMult);
             lifestealPct += gb('spellVampire');
             penetrationPct = gb('ignoreMagicDmg');
-            actionLabel = `заклинанием «${spell.name}»${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}${godSpellPct ? ` (+${godSpellPct}% от бога)` : ''}${(typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) ? ` (Шеогорат ×${sheogorathRoll.dmgMult})` : ''}`;
+            actionLabel = `заклинанием «${spell.name}»${enhancedCast ? ' (усиленно)' : ''} (−${finalCost} маны)${spellPowerPct ? ` (+${spellPowerPct}% от актив. баффа)` : ''}${godSpellPct ? ` (+${godSpellPct}% от бога)` : ''}${(typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) ? ` (Шеогорат ×${sheogorathRoll.dmgMult})` : ''}`;
             skillNameForProgress = skillName;
         } else if (actionVal.indexOf('scroll:') === 0) {
             const itemId = actionVal.slice(7);
@@ -5889,6 +5942,20 @@ function updateHungerPenalty() {
             return;
         }
         if (dmgType === 'poison') lifestealPct += gb('poisonLifeSteal');
+
+        // Урон по нежити/даэдра (Стендарр/Аркей/Меридия/Молаг Бал и др.) — раньше не подключался
+        // вообще, не было способа узнать "тип" цели. Определяем по имени, той же логикой, что уже
+        // работает у мастера для иконок противников (драугр/скелет/нежить → нежить; дремора/атронах
+        // /даэдра → даэдра).
+        const targetNameLower = (target.name || '').toLowerCase();
+        const isUndeadTarget = /скелет|драугр|нежить|привед|зомби/.test(targetNameLower);
+        const isDaedraTarget = /дремора|атронах|даэдр/.test(targetNameLower);
+        if (dmg && (isUndeadTarget || isDaedraTarget)) {
+            let pct = 0;
+            if (isUndeadTarget) pct += gb('undeadDmg');
+            if (isUndeadTarget || isDaedraTarget) pct += gb('daedraUndeadDmg');
+            if (pct) dmg = Math.round(dmg * (1 + pct / 100));
+        }
 
         // Опозный бросок: игрок 1к20+модификатор против мастера "голым" 1к20 (без модификаторов).
         // Ничья = перекид обеих костей (не провал и не успех — просто бросаем заново),
@@ -6213,6 +6280,11 @@ function updateHungerPenalty() {
             }
             speed += activeEffectBonuses.speed || 0;
             if (godB.speed) speed += godB.speed;
+            // Скорость в скрытности (Ноктюрнал) — условно, пока нет отдельного тумблера "крадусь
+            // прямо сейчас", используем чекбокс скрытной атаки как показатель этого состояния.
+            if (gb('sneakSpeed') && document.getElementById('chk-sneak-attack').checked) {
+                speed = Math.round(speed * (1 + gb('sneakSpeed') / 100));
+            }
             speed += (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().speed : 0;
             if (isOverweight) {
                 document.getElementById('overweight-alert').style.display = 'block';
@@ -6535,6 +6607,8 @@ function updateHungerPenalty() {
     let sneakMult = 2;
     if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
     else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
+    // Бонус бога (Боэтия/Ноктюрнал) к множителю урона из скрытности — было только текстом.
+    sneakMult += gb('sneakMult');
 
     // Формула по составным частям (до множителей силовой атаки/рывка/скрытности)
     let formulaParts = [`${statLabelForFormula} ${statModForFormula >= 0 ? '+' : ''}${statModForFormula}`, `оружие ${baseDmg}`];

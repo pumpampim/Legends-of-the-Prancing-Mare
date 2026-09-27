@@ -345,7 +345,8 @@
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
                     '<input type="number" value="' + (s.cost || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'cost\',this.value)"> МП</div>').join('')
                 : '';
-            const lootLine = e.loot ? '<div style="font-size:11px; opacity:.6; margin-top:2px;">🎒 ' + escapeHtml(e.loot) + '</div>' : '';
+            const lootLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">🎒 ' +
+                '<input type="text" value="' + escapeHtml(e.loot || '') + '" placeholder="лут текстом" style="flex:1; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'loot\',this.value)"></div>';
             const shoutsHtml = (e.shouts && e.shouts.length)
                 ? e.shouts.map((s, si) => {
                     const cdKey = 'shoutCd_' + si;
@@ -421,7 +422,15 @@
         const maxHp = Number(el('enemy-hp-input').value) || 0;
         const maxMp = Number(el('enemy-mp-input').value) || 0;
         const enemies = (lastData.enemies || []).slice();
+        // Ручной ввод урона/резиста/лута — раньше их вообще не было в форме создания, только
+        // имя+ХП+МП, править приходилось уже ПОСЛЕ добавления через отдельные поля в списке боя.
+        const manualDmg = Number(el('enemy-dmg-input').value) || 0;
+        const manualResist = Number(el('enemy-resist-input').value) || 0;
+        const manualLoot = el('enemy-loot-input').value.trim();
         const extra = {};
+        if (manualDmg) extra.weaponDmg = manualDmg;
+        if (manualResist) extra.resist = { physical: manualResist };
+        if (manualLoot) extra.loot = manualLoot;
         if (currentEnemyDbPick && currentEnemyDbPick.name === name) {
             if (currentEnemyDbPick.weaponDmg) extra.weaponDmg = currentEnemyDbPick.weaponDmg;
             // Рандомайзер оружия — у драугров/подобных несколько вариантов оружия в источнике
@@ -443,14 +452,23 @@
         enemies.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             el('enemy-name-input').value = '';
+            el('enemy-hp-input').value = 10;
+            el('enemy-mp-input').value = 0;
+            el('enemy-dmg-input').value = 0;
+            el('enemy-resist-input').value = 0;
+            el('enemy-loot-input').value = '';
             el('enemy-db-select').value = '';
             el('enemy-db-info').innerHTML = '';
             currentEnemyDbPick = null;
         }).catch(e => console.error(e));
     };
 
+    // TEXT_ENEMY_FIELDS — поля, которые НЕ надо принудительно приводить к числу (раньше
+    // Number(value)||0 стояло безусловно для любого поля — для текста типа "лут" это дало бы 0).
+    const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name'];
     window.setEnemyField = function (id, field, value) {
-        const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: Number(value) || 0 } : e);
+        const finalVal = TEXT_ENEMY_FIELDS.includes(field) ? value : (Number(value) || 0);
+        const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: finalVal } : e);
         db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
     };
 
@@ -694,6 +712,7 @@
             // Броня/оружие/украшения из кузницы — всегда добавляем поверх (не хранятся в Firestore).
             gmAllItems = gmAllItems.concat(getSmithingGiveableItems());
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
+            gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
             // Заполняем фильтр категорий
             const catSelect = document.getElementById('gm-item-category');
             const cats = [...new Set(gmAllItems.map(i => i.category || 'Разное'))];
@@ -2259,30 +2278,52 @@
         const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
 
-        let dmg = 0, dmgType = 'physical', actionLabel = '';
+        let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0;
         if (actionVal === 'weapon') {
             dmg = enemy.weaponDmg || 0;
             actionLabel = 'оружием';
+            // Модификатор атаки — СИЛ для ближнего, ЛОВ для дальнего (если у противника вообще
+            // есть характеристики — генератор бандитов их теперь даёт, база enemies-data.js нет,
+            // тогда 0). Тот же принцип, что у самого игрока: атакующий с модификатором против
+            // ГОЛОГО броска защищающегося.
+            atkMod = enemy.isRanged ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.str || 10);
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             dmg = s ? s.dmg : 0;
             dmgType = mapEnemyDmgType(s ? s.name : '');
             actionLabel = `заклинанием «${s ? s.name : '?'}»`;
+            atkMod = calcAbilityMod(enemy.int || 10);
         } else if (actionVal.indexOf('shout:') === 0) {
             const s = enemy.shouts[parseInt(actionVal.slice(6))];
             dmg = 0;
             actionLabel = `криком «${s ? s.name : '?'}» (${s ? s.effect : ''})`;
         }
-        const roll = Math.floor(Math.random() * 20) + 1;
+
+        // Встречный бросок 2д20 — как и у самой атаки игрока: атакующий (враг) кидает 1д20+мод,
+        // защищающийся (игрок) — голый 1д20, ничья не считается ни попаданием ни промахом (перекид
+        // обеих костей). Раньше тут был просто один голый d20 без всякого сравнения — по сути,
+        // "бросок ради галочки", не влиявший ни на что.
+        let enemyRoll, enemyTotal, playerRoll, rerolls = 0;
+        do {
+            enemyRoll = Math.floor(Math.random() * 20) + 1;
+            enemyTotal = enemyRoll + atkMod;
+            playerRoll = Math.floor(Math.random() * 20) + 1;
+            if (enemyTotal !== playerRoll) break;
+            rerolls++;
+        } while (rerolls < 20);
+        const hit = enemyTotal > playerRoll;
+
         const statusKey = el('gm-attack-status-select') ? el('gm-attack-status-select').value : '';
 
         pendingGmAttack = {
-            targetUid, dmg, dmgType, statusKey, enemyName: enemy.name, targetName,
-            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: к20=${roll}`
+            targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
+            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRoll}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
-            `Бросок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${roll}</strong><br>` +
-            (dmg ? `Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` : '<span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
+            `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
+            (!hit ? `<strong style="color:#7a7a7a;">❌ Промах — урона нет.</strong>` :
+                dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` :
+                    '<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
         resultBox.style.display = 'block';
     };
 
