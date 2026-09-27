@@ -270,6 +270,14 @@
                     <input type="number" value="${p.curMp || 0}" style="width:50px; padding:1px; font-size:12px;" onchange="setParticipantField('${uid}','curMp',this.value)">
                     <span style="font-size:11px; opacity:.6; width:34px;">/${maxMp}</span>
                 </div>
+                ${(p.summons || []).map(s => {
+                    const sHpPct = Math.max(0, Math.min(100, (s.curHp || 0) / (s.maxHp || 1) * 100));
+                    return `<div style="display:flex; align-items:center; gap:4px; margin-top:4px; padding-left:8px; border-left:2px solid var(--border-color);">
+                        <span style="font-size:11px; opacity:.75; white-space:nowrap;">👻 ${escapeHtml(s.name)}</span>
+                        <div class="bar-track" style="flex:1; margin-bottom:0;"><div class="bar-fill-hp" style="width:${sHpPct}%;"></div></div>
+                        <span style="font-size:11px; opacity:.6; white-space:nowrap;">${s.curHp || 0}/${s.maxHp || 0}</span>
+                    </div>`;
+                }).join('')}
             </div>`;
         }).join('');
     }
@@ -335,6 +343,13 @@
             const statsLine = (e.str || e.dex)
                 ? `<div style="font-size:11px; opacity:.65;">СИЛ ${e.str || '—'} · ЛОВ ${e.dex || '—'} · ТЕЛ ${e.con || '—'}</div>`
                 : (e.int || e.wis) ? `<div style="font-size:11px; opacity:.65;">ИНТ ${e.int || '—'} · ДУХ ${e.wis || '—'} · ТЕЛ ${e.con || '—'}</div>` : '';
+            // Статус-эффекты (Страх/Успокоение/Ярость/Полиморф и т.п.) — раньше эти заклинания были
+            // чистым текстом, теперь реально накладываются сюда. Тикаются вручную (кнопка "Снять") —
+            // не завязано на автоматический счётчик ходов, чтобы не требовать точной синхронизации
+            // между листом игрока и сессией.
+            const statusLine = (e.statusEffects && e.statusEffects.length)
+                ? e.statusEffects.map((s, si) => `<div style="font-size:12px; color:#c9986c; margin-top:2px; display:flex; align-items:center; gap:4px;">🌀 <strong>${escapeHtml(s.name)}</strong>${s.turns ? ` (${s.turns} х.)` : ''} — ${escapeHtml(s.desc || '')} <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:11px;" onclick="removeEnemyStatus('${e.id}','${s.id}')">Снять</button></div>`).join('')
+                : '';
             // Урон оружием — теперь редактируемое поле, не просто текст. Раньше поправить урон
             // можно было только удалив и заново добавив противника с нуля.
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
@@ -361,7 +376,7 @@
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                statsLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
+                statsLine + statusLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -469,6 +484,16 @@
     window.setEnemyField = function (id, field, value) {
         const finalVal = TEXT_ENEMY_FIELDS.includes(field) ? value : (Number(value) || 0);
         const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: finalVal } : e);
+        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+    };
+
+    // Снятие статус-эффекта (Страх/Успокоение/Ярость/Полиморф) — тикается вручную мастером,
+    // не по автоматическому счётчику ходов.
+    window.removeEnemyStatus = function (enemyId, statusId) {
+        const enemies = (lastData.enemies || []).map(e => {
+            if (e.id !== enemyId || !Array.isArray(e.statusEffects)) return e;
+            return { ...e, statusEffects: e.statusEffects.filter(s => s.id !== statusId) };
+        });
         db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
     };
 
@@ -1106,13 +1131,13 @@
             givers: [{ name: 'Феридар (судья/комментатор)', note: 'Запись на турнир — 200 септимов залог, жетон для входа. Может подсказать про будущих противников за деньги.' }],
             perks: 'Турниры по группам ПО УРОВНЮ ПЕРСОНАЖА (не по заказам гильдии): Новички 1-5, Ученики 5-10, Адепты 10-15, Эксперты 15-20. Сетки 1на1 и 3на3, 5 боёв. Запрещены крики/артефакты даэдра/больше 4 зелий. Победитель забирает всё имущество проигравшего. Награды младших групп — золото/самоцветы/ювелирка/зачарованное оружие и броня. Главный приз (только в группе Эксперты) — "Выбитые зубы" (эбонитовые перчатки с уникальным зачарованием).',
             armorRewards: [],
-            note: 'Эта гильдия не подходит под общую систему "ранг по заказам" — награды привязаны к победе в конкретном турнире, а не к счётчику orders. Можно обсудить отдельную механику.'
+            note: 'Эта гильдия не подходит под общую систему "ранг по заказам" — награды привязаны к победе в конкретном турнире, а не к счётчику orders. Реализовано отдельной панелью "🥊 Турниры Бойцовского клуба" (запись+залог+выдача награды).'
         },
         'Коллегия бардов': {
             givers: [{ name: 'Музей коллегии', note: 'Сдать историческое/мифическое оружие или броню = 1 легендарная песня + 800 септимов. За 25 сданных предметов — 5000 септимов + титул тана Солитьюда + возможность купить дом.' }],
             perks: 'Оплата выступления: 30 септимов база + 10×к10 + (Красноречие×0.1), зависит от репутации. За 4 легендарные песни — "Бардовская баллада" (+1 к кубам всем живым союзникам, пока играешь). За 12 — "Сила слова" (+1 убеждение, +1 к попытке скидки). За 18 (+2 исторических артефакта) — "Воодушевление" (+3 к кубам цели 2 раза в день).',
             armorRewards: [],
-            note: 'Прогресс этой гильдии считается ЛЕГЕНДАРНЫМИ ПЕСНЯМИ, не заказами — отдельный счётчик, пока не реализован.'
+            note: 'Прогресс этой гильдии считается ЛЕГЕНДАРНЫМИ ПЕСНЯМИ, не заказами — использует то же поле orders (не отдельный счётчик, но пороги рангов пересчитаны на реальные 4/12/18). Сдача в музей — кнопка на листе игрока (donateToBardMuseum, +1 orders +1 artifacts +800 золота атомарно через CloudSync.donateBardArtifact). "Сила слова" подключена механически (+1 красноречие при orders>=12).'
         }
     };
 
@@ -1124,7 +1149,7 @@
         'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный член' }, { at: 25, name: 'Тёмный брат/сестра' }],
         'Стража Рассвета': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Страж' }, { at: 15, name: 'Охотник на вампиров' }, { at: 25, name: 'Ветеран Стражи' }],
         'Бойцовский клуб': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Боец' }, { at: 15, name: 'Чемпион группы' }, { at: 25, name: 'Легенда арены' }],
-        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Бард' }, { at: 15, name: 'Мастер баллад' }, { at: 25, name: 'Хранитель Бардовской баллады' }]
+        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 4, name: 'Бардовская баллада' }, { at: 12, name: 'Сила слова' }, { at: 18, name: 'Воодушевление' }]
     };
 
     function getGuildRank(guildName, orders) {
@@ -1504,6 +1529,59 @@
         sel.innerHTML = GUILD_NAMES.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
     }
 
+    // Задача "Бойцовский клуб — турниры": эта гильдия не подходит под общую систему {member,orders}
+    // — награды привязаны к победе в конкретном турнире по УРОВНЮ ПЕРСОНАЖА, не к счётчику заказов
+    // гильдии. Сами бои разыгрываются обычным боевым инструментом; тут только запись+награда.
+    const TOURNAMENT_BRACKETS = {
+        'Новички': { levelRange: '1-5', rewards: ['50 золота', 'Мешочек самоцветов (~100 золота)', 'Серебряное украшение'] },
+        'Ученики': { levelRange: '5-10', rewards: ['150 золота', 'Мешочек самоцветов (~250 золота)', 'Золотое украшение', 'Зачарованное стальное оружие'] },
+        'Адепты': { levelRange: '10-15', rewards: ['300 золота', 'Крупный самоцвет (~400 золота)', 'Зачарованное эльфийское/двемерское оружие', 'Зачарованная броня (соответствующего материала)'] },
+        'Эксперты': { levelRange: '15-20', rewards: ['600 золота', 'Зачарованное стеклянное/эбонитовое оружие', 'Зачарованная броня высокого уровня', '🏆 «Выбитые зубы» (эбонитовые перчатки, уникальное зачарование) — только чемпиону группы'] }
+    };
+
+    window.renderTournBracketInfo = function () {
+        const box = el('tourn-bracket-info');
+        if (!box) return;
+        const b = TOURNAMENT_BRACKETS[el('tourn-bracket-select').value];
+        box.innerHTML = b ? `Уровень персонажа: ${b.levelRange}. Награды: ${b.rewards.join(', ')}` : '';
+    };
+
+    window.tournChargeEntryFee = function () {
+        const uid = el('tourn-player-select').value;
+        if (!uid) { alert('Выбери игрока.'); return; }
+        db.collection('characters').doc(uid).set({ gold: firebase.firestore.FieldValue.increment(-200) }, { merge: true }).then(() => {
+            el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Залог 200 золота списан.</span>`;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.tournGrantReward = function () {
+        const uid = el('tourn-player-select').value;
+        const bracket = el('tourn-bracket-select').value;
+        if (!uid) { alert('Выбери игрока.'); return; }
+        const rewards = TOURNAMENT_BRACKETS[bracket].rewards;
+        const choice = prompt('Какую награду выдать?\n' + rewards.map((r, i) => `${i + 1}. ${r}`).join('\n'), '1');
+        const idx = parseInt(choice) - 1;
+        if (isNaN(idx) || !rewards[idx]) return;
+        const rewardText = rewards[idx];
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+            // Золотые награды просто прибавляем к золоту; предметные — кладём в инвентарь текстом,
+            // как и остальные гильдийские награды (без обязательной регистрации в общем каталоге).
+            const goldMatch = rewardText.match(/^(\d+)\s*золота/);
+            const patch = {};
+            if (goldMatch) {
+                patch.gold = firebase.firestore.FieldValue.increment(parseInt(goldMatch[1]));
+            } else {
+                inv.push({ itemId: rewardText + '_tourn_' + Date.now(), name: rewardText, count: 1, weight: 1, category: 'Награда турнира', effect: `Приз группы «${bracket}» Бойцовского клуба` });
+                patch.inventory = inv;
+            }
+            return db.collection('characters').doc(uid).update(patch);
+        }).then(() => {
+            el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Выдано: ${escapeHtml(rewardText)}.</span>`;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     window.renderGuildInfoPanel = function () {
         const box = el('guild-info-body');
         const sel = el('guild-info-select');
@@ -1852,6 +1930,22 @@
         el('ci-weapon-fields').style.display = cat === 'weapon' ? 'block' : 'none';
         el('ci-armor-fields').style.display = cat === 'armor' ? 'block' : 'none';
         el('ci-jewelry-fields').style.display = cat === 'jewelry' ? 'block' : 'none';
+        el('ci-potion-fields').style.display = cat === 'potion' ? 'block' : 'none';
+
+        // Зелье/яд — раньше был только общий текст, без структурированного эффекта/величины/
+        // длительности. Список эффектов — та же база, что у реальной алхимии (alchemyBaseEffects),
+        // отфильтрован по знаку (положительный для зелья, отрицательный для яда).
+        if (cat === 'potion') {
+            const kind = el('ci-potion-kind').value;
+            const wantPolarity = kind === 'poison' ? 'negative' : 'positive';
+            const effSelect = el('ci-potion-effect');
+            const prevVal = effSelect.value;
+            const names = Object.keys(window.alchemyBaseEffects || {}).filter(n => window.alchemyBaseEffects[n].polarity === wantPolarity);
+            effSelect.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+            if (names.includes(prevVal)) effSelect.value = prevVal;
+            const info = window.alchemyBaseEffects[effSelect.value];
+            el('ci-potion-duration-wrap').style.display = (info && info.hasDuration) ? 'block' : 'none';
+        }
 
         const enchanted = el('ci-enchanted').checked;
         el('ci-enchant-fields').style.display = enchanted ? 'block' : 'none';
@@ -1886,12 +1980,35 @@
 
         if (cat === 'weapon') {
             item.dmg = parseInt(el('ci-damage').value) || 0;
-            item.slot = el('ci-weapon-type').value; // 'melee' | 'ranged'
+            // Значение выбора может быть "onehand:топор" (для распознавания топора/булавы по имени
+            // в бою) — базовый slot всё равно 'melee'/'ranged'/'dagger'/'onehand'/'twohand_*',
+            // сама подсказка попадает в effect текстом, т.к. переключатель типа на листе игрока —
+            // отдельное поле на другой вкладке, сюда не дотянуться напрямую.
+            const rawType = el('ci-weapon-type').value;
+            const [wepType, wepSub] = rawType.split(':');
+            item.slot = wepType === 'ranged' ? 'ranged' : (wepType === 'dagger' ? 'melee' : 'melee');
+            item.weaponType = wepType;
+            const typeLabel = el('ci-weapon-type').selectedOptions[0].textContent;
+            item.effect = item.effect ? item.effect + `; Тип: ${typeLabel}` : `Тип: ${typeLabel}`;
         } else if (cat === 'armor') {
             item.slot = el('ci-armor-slot').value;
             item.armor = parseInt(el('ci-armor-value').value) || 0;
         } else if (cat === 'jewelry') {
             item.slot = el('ci-jewelry-slot').value;
+        } else if (cat === 'potion') {
+            // Структурированный эффект зелья/яда — раньше был только свободный текст без
+            // конкретной величины/длительности, теперь та же база эффектов, что у реальной алхимии.
+            const kind = el('ci-potion-kind').value;
+            const effName = el('ci-potion-effect').value;
+            const magnitude = parseFloat(el('ci-potion-magnitude').value) || 0;
+            const info = window.alchemyBaseEffects ? window.alchemyBaseEffects[effName] : null;
+            const unit = info ? info.unit : '';
+            const hasDur = info ? info.hasDuration : false;
+            const duration = hasDur ? (parseInt(el('ci-potion-duration').value) || 0) : null;
+            item.category = kind === 'poison' ? 'Яды' : 'Зелья';
+            item.alchemyEffects = [{ name: effName, magnitude, duration, unit }];
+            const potDesc = `${effName}: ${magnitude}${unit}${duration ? ` на ${duration} ход.` : ''}`;
+            item.effect = item.effect ? item.effect + '; ' + potDesc : potDesc;
         }
 
         if (el('ci-enchanted').checked) {
@@ -1986,7 +2103,7 @@
         const uids = Object.keys(lastData.participants || {});
         const opts = '<option value="">— выбери игрока —</option>' +
             uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
-        ['calc-alch-player', 'calc-ench-player'].forEach(id => {
+        ['calc-alch-player', 'calc-ench-player', 'tourn-player-select'].forEach(id => {
             const select = el(id);
             if (!select) return;
             const prev = select.value;
@@ -2082,6 +2199,7 @@
     if (typeof renderHolidaySelect === 'function') renderHolidaySelect();
     if (typeof renderGroupCheckSkillSelect === 'function') renderGroupCheckSkillSelect();
     if (typeof renderGuildInfoSelect === 'function') { renderGuildInfoSelect(); renderGuildInfoPanel(); }
+    if (typeof renderTournBracketInfo === 'function') renderTournBracketInfo();
     if (typeof renderAllWeatherReference === 'function') renderAllWeatherReference();
     if (typeof renderAllEnchantsReference === 'function') renderAllEnchantsReference();
     if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();

@@ -173,8 +173,15 @@
                     patch['participants.' + currentUser.uid + '.maxMp'] = Number(vitals[3]) || 0;
                     // Задача "порядок ходов": лёгкий список имён призванных/поднятых существ игрока,
                     // чтобы мастер видел их и мог включить в порядок ходов, не зная деталей.
-                    patch['participants.' + currentUser.uid + '.summonNames'] = Array.isArray(data.activeSummons)
-                        ? data.activeSummons.map(s => s.name).filter(Boolean) : [];
+                    const summons = Array.isArray(data.activeSummons) ? data.activeSummons.filter(s => s.category !== 'weapon') : [];
+                    patch['participants.' + currentUser.uid + '.summonNames'] = summons.map(s => s.name).filter(Boolean);
+                    // Задача "существа должны попадать в отряд" — раньше синхронизировались только
+                    // имена (для порядка ходов), без ХП, поэтому мастер не видел их в панели "Отряд"
+                    // с полосками жизни как у самих игроков. Оружие (category:'weapon') не входит —
+                    // это экипируемый предмет, не боевой юнит сам по себе.
+                    patch['participants.' + currentUser.uid + '.summons'] = summons.map(s => ({
+                        id: s.id, name: s.name, curHp: s.curHp || 0, maxHp: s.maxHp || 1, dmgType: s.dmgType || ''
+                    }));
                     db.collection('sessions').doc(currentSessionCode).update(patch)
                         .catch(e => console.error('Ошибка синхронизации с сессией:', e));
                 }
@@ -232,6 +239,30 @@
                     update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: finalLogText });
                 }
                 return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name, finalDmg, resist }));
+            });
+        },
+
+        // Статус-эффекты на врагах (Страх/Успокоение/Ярость/Полиморф и т.п.) — раньше у объекта
+        // врага вообще не было такого поля, эти заклинания были чистым текстом без последствий.
+        // Тикаются вручную мастером (кнопка "Убрать" на статусе в списке боя) — не завязано на
+        // автоматический тик ходов, чтобы не требовать точной синхронизации между игроком и мастером.
+        applyStatusToEnemy: function (enemyId, statusName, statusDesc, turns, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
+                const statuses = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects.slice() : [];
+                statuses.push({ id: 'st' + Date.now(), name: statusName, desc: statusDesc, turns: turns || null });
+                enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });
+                const logText = `✨ ${authorName || 'Игрок'} накладывает на «${enemies[idx].name}»: ${statusName}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}`;
+                return ref.update({
+                    enemies: enemies,
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText })
+                }).then(() => ({ enemyName: enemies[idx].name }));
             });
         },
 
@@ -350,6 +381,19 @@
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
             const patch = {};
             patch['guildsData.' + guildName + '.orders'] = firebase.firestore.FieldValue.increment(1);
+            return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
+        },
+
+        // Сдача артефакта в музей коллегии бардов — +1 легендарная песня (orders), +1 к
+        // отдельному счётчику артефактов, +800 золота. Всё через FieldValue.increment (та же
+        // защита от гонки с debounced-автосохранением, что и у обычного золота/заказов — не
+        // читает "старое" значение вообще, что бы игрок ни делал параллельно на своём листе).
+        donateBardArtifact: function () {
+            if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            const patch = {};
+            patch['guildsData.Коллегия бардов.orders'] = firebase.firestore.FieldValue.increment(1);
+            patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
+            patch['gold'] = firebase.firestore.FieldValue.increment(800);
             return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
         },
 

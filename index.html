@@ -473,7 +473,7 @@
         }
     </script>
 
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -1172,6 +1172,10 @@
             <div class="profession-body" id="prof-body-smithing">
                 <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
                 <p style="font-size:14px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+                <label>Показать</label>
+                <select id="smithing-subcat-filter" onchange="renderSmithingList()">
+                    <option value="all">Все категории</option>
+                </select>
                 <div id="smithing-list"></div>
 
                 <h3 style="margin-top:16px;">🔧 Заточка / Улучшение</h3>
@@ -2532,7 +2536,10 @@ window.toggleSkillPanel = function (idx) {
 
     function getSpeechPriceMultiplier() {
         const perks = window.perkBonuses || {};
-        const speech = getSkillRawValue('Красноречие') + gb('speech');
+        // "Сила слова" (Коллегия бардов, 12+ легендарных песен) — +1 к красноречию, было только
+        // текстом в справочнике мастера, нигде не применялось.
+        const bardBonus = normalizePlayerGuildEntry((playerGuildsData || {})['Коллегия бардов']).orders >= 12 ? 1 : 0;
+        const speech = getSkillRawValue('Красноречие') + gb('speech') + bardBonus;
         return (speech * 0.01) * (1 + (perks.merchantPriceBonus || 0) + getRacialPriceBonus());
     }
 
@@ -3081,7 +3088,24 @@ window.toggleSkillPanel = function (idx) {
             el.innerHTML = '<p style="opacity:.7; font-size:15px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
             return;
         }
-        el.innerHTML = known.map((r, idx) => {
+        // Подкатегория (Кинжалы/Мечи/Секиры/Булавы/Луки и т.д.) уже была в данных рецептов
+        // (subcat), но интерфейс её вообще не читал — один плоский список из всего сразу, без
+        // возможности отфильтровать "покажи только кинжалы, которые я умею ковать".
+        const filterEl = document.getElementById('smithing-subcat-filter');
+        const subcats = [...new Set(known.map(r => r.subcat).filter(Boolean))].sort();
+        if (filterEl && filterEl.options.length <= 1) {
+            filterEl.innerHTML = '<option value="all">Все категории</option>' +
+                subcats.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+        }
+        const activeFilter = filterEl ? filterEl.value : 'all';
+        const filtered = activeFilter === 'all' ? known : known.filter(r => r.subcat === activeFilter);
+        if (!filtered.length) {
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">В этой категории у тебя нет известных рецептов.</p>';
+            el.dataset.knownList = JSON.stringify(known.map(r => r.name));
+            return;
+        }
+        el.innerHTML = filtered.map((r) => {
+            const idx = known.indexOf(r); // индекс относительно ПОЛНОГО known-списка — так craftSmithingItem(idx) находит рецепт верно и при активном фильтре
             const hasMatPerk = !r.perkHint || isPerkChecked(r.perkHint);
             const canMake = hasMatPerk && r.ingredients.every(i => countInInventory(i.name) >= i.qty);
             const ingList = r.ingredients.map(i => {
@@ -3099,7 +3123,7 @@ window.toggleSkillPanel = function (idx) {
             }
             const perkNote = !hasMatPerk ? `<div style="font-size:13px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : '';
             return `<div class="party-row">
-                <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:13px; opacity:.7;">${escHtml(statLine)}</span></div>
+                <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:13px; opacity:.7;">${r.subcat ? escHtml(r.subcat) + ' · ' : ''}${escHtml(statLine)}</span></div>
                 <div style="font-size:14px; margin:4px 0;">${ingList}</div>
                 ${perkNote}
                 <button class="btn-success" style="width:100%;" ${canMake ? '' : 'disabled'} onclick="craftSmithingItem(${idx})">Сковать</button>
@@ -3136,10 +3160,23 @@ window.toggleSkillPanel = function (idx) {
         }
 
         let desc, extra;
+        // Конкретный тип оружия по подкатегории рецепта (subcat уже был в данных, просто нигде
+        // не читался при ковке) — та же схема weaponType, что у ручного создания предмета
+        // мастером, чтобы "выковал кинжал" не превращалось в безликое "оружие ближнего боя".
+        const SUBCAT_TO_WEAPON_TYPE = {
+            'Кинжалы': 'dagger', 'Мечи': 'onehand', 'Секиры': 'onehand:топор', 'Булавы': 'onehand:булава',
+            'Боевые топоры': 'twohand_axe', 'Двуручные мечи': 'twohand_sword', 'Молоты': 'twohand_hammer',
+            'Копья': 'onehand:копьё', 'Пики': 'twohand:пика', 'Кастеты': 'onehand:кастет',
+            'Луки (обычные)': 'ranged', 'Луки (особые)': 'ranged', 'Арбалеты': 'ranged:арбалет'
+        };
         if (recipe.hasOwnProperty('damage')) {
             // Оружие или боеприпасы
             desc = recipe.isAmmo ? `Урон ${dmgVal} (боеприпас)` : `Урон ${dmgVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
-            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: 'melee', weaponDmg: dmgVal, price: recipe.price };
+            const wepType = SUBCAT_TO_WEAPON_TYPE[recipe.subcat] || 'onehand';
+            // Слот раньше был жёстко "melee" даже для луков (subcat "Луки (обычные/особые)") —
+            // экип-слот для лука должен быть "ranged", иначе он попадал бы не в тот выпадающий
+            // список при экипировке.
+            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: wepType.startsWith('ranged') ? 'ranged' : 'melee', weaponDmg: dmgVal, weaponType: wepType, price: recipe.price };
         } else if (recipe.slot === 'jewelry') {
             desc = 'Ювелирное изделие';
             extra = { slot: recipe.name.includes('кольцо') ? 'ring' : 'amulet', price: recipe.price || 0 };
@@ -3754,7 +3791,7 @@ window.toggleSkillPanel = function (idx) {
         'Тёмное братство': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Проверенный член' }, { at: 25, name: 'Тёмный брат/сестра' }],
         'Стража Рассвета': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Страж' }, { at: 15, name: 'Охотник на вампиров' }, { at: 25, name: 'Ветеран Стражи' }],
         'Бойцовский клуб': [{ at: 0, name: 'Новичок' }, { at: 5, name: 'Боец' }, { at: 15, name: 'Чемпион группы' }, { at: 25, name: 'Легенда арены' }],
-        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 5, name: 'Бард' }, { at: 15, name: 'Мастер баллад' }, { at: 25, name: 'Хранитель Бардовской баллады' }]
+        'Коллегия бардов': [{ at: 0, name: 'Ученик' }, { at: 4, name: 'Бардовская баллада' }, { at: 12, name: 'Сила слова' }, { at: 18, name: 'Воодушевление' }]
     };
     function getGuildRank(guildName, orders) {
         const tiers = GUILD_RANK_TIERS[guildName] || [{ at: 0, name: 'Новичок' }];
@@ -3785,13 +3822,40 @@ window.toggleSkillPanel = function (idx) {
         el.innerHTML = joined.map(g => {
             const gd = normalizePlayerGuildEntry(data[g]);
             const rank = getGuildRank(g, gd.orders);
+            // Коллегия бардов считает прогресс ЛЕГЕНДАРНЫМИ ПЕСНЯМИ (используем то же поле orders),
+            // а не заказами — сдача историй. предмета в музей коллегии даёт +1 песню + 800 золота,
+            // раньше эта механика была только текстом в справочнике мастера.
+            const museumBtn = g === 'Коллегия бардов'
+                ? `<button class="btn-success" style="width:100%; margin-top:4px; font-size:12px;" onclick="donateToBardMuseum()">🏛️ Сдать историческое оружие/броню в музей (+1 песня, +800 золота)</button>
+                   <div style="font-size:11px; opacity:.6; margin-top:2px;">Артефактов сдано: ${gd.artifacts || 0}${(gd.artifacts || 0) >= 25 ? ' — макс! (тан Солитьюда, см. мастера)' : ''}</div>`
+                : '';
             return `
             <div class="party-row">
                 <div class="row-name"><strong>${escHtml(g)}</strong><span>${escHtml(rank.rankName)}${rank.next ? ` (ещё ${rank.next.at - gd.orders} до «${escHtml(rank.next.name)}»)` : ' (макс. ранг)'}</span></div>
-                <div style="font-size:12px; opacity:.7;">Заказов выполнено: ${gd.orders}</div>
+                <div style="font-size:12px; opacity:.7;">${g === 'Коллегия бардов' ? 'Легендарных песен' : 'Заказов выполнено'}: ${gd.orders}</div>
+                ${museumBtn}
             </div>`;
         }).join('');
     }
+
+    // Сдать предмет в музей коллегии бардов — +1 легендарная песня (тот же счётчик orders) +
+    // 800 золота, +1 к отдельному счётчику артефактов (нужен для порога "18 песен + 2 артефакта"
+    // и главного приза за 25 сданных предметов). guildsData НЕ входит в обычное сохранение
+    // игрока (это поле обычно правит только мастер) — пишем напрямую через CloudSync, атомарно.
+    window.donateToBardMuseum = function () {
+        if (!window.CloudSync || !window.CloudSync.donateBardArtifact) return;
+        if (!confirm('Сдать историческое или мифическое оружие/броню в музей коллегии? Предмет нужно будет отдать мастеру лично (это не списывает конкретный предмет из инвентаря автоматически).')) return;
+        window.CloudSync.donateBardArtifact().then(() => {
+            // Локально прибавляем золото сразу для отклика — следующий живой снапшот от мастера
+            // подтвердит/поправит точное значение, если что-то шло параллельно.
+            document.getElementById('char-gold').value = (parseInt(document.getElementById('char-gold').value) || 0) + 800;
+            const gd = normalizePlayerGuildEntry((playerGuildsData || {})['Коллегия бардов']);
+            const newArtifacts = (gd.artifacts || 0) + 1;
+            let msg = `Сдано! +1 легендарная песня, +800 золота. Всего артефактов: ${newArtifacts}.`;
+            if (newArtifacts === 25) msg += '\n🎉 25 артефактов — можно получить у мастера 5000 золота и титул тана Солитьюда!';
+            alert(msg);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
 
     function renderQuestList() {
         const el = document.getElementById('quest-list');
@@ -5554,6 +5618,28 @@ window.toggleSkillPanel = function (idx) {
         return Math.round(dmg * mult);
     }
 
+    // Управляющие заклинания (Страх/Успокоение/Ярость/Полиморф и семья "отпугивание нежити") —
+    // раньше были чистым текстом без всякого механического следа: применяются к ВРАГУ (не к
+    // игроку, поэтому не подходят под GM_STATUS_EFFECTS), урона не наносят. Цифры (длительность,
+    // ограничение по уровню цели — мастер сам решает, подходит ли цель) — из реальных описаний
+    // заклинаний. Уровень цели не проверяется автоматически (у врагов в базе нет поля "уровень"
+    // как числа у большинства) — мастер применяет по своему усмотрению.
+    const PLAYER_CONTROL_SPELLS = {
+        'Отпугивание младшей нежити': { status: 'Бегство', turns: 7, desc: 'Обращена в бегство (нежить до 6 ур.)' },
+        'Отталкивание младшей нежити': { status: 'Бегство', turns: 7, desc: 'Обращена в бегство (нежить до 8 ур.)' },
+        'Отпугивание нежити': { status: 'Бегство', turns: 7, desc: 'Обращена в бегство (нежить до 10 ур.)' },
+        'Отталкивание нежити': { status: 'Бегство', turns: 5, desc: 'Обращена в бегство (нежить до 13 ур.)' },
+        'Отпугивание старшей нежити': { status: 'Бегство', turns: 5, desc: 'Обращена в бегство (нежить до 16 ур.)' },
+        'Страх': { status: 'Страх', turns: 7, desc: 'Бежит с поля боя (существа/люди до 9 ур.)' },
+        'Бегство': { status: 'Бегство', turns: 5, desc: 'Бежит с поля боя (существа/люди до 18 ур.)' },
+        'Успокоение': { status: 'Успокоение', turns: 7, desc: 'Не атакует (существа/люди до 9 ур.)' },
+        'Умиротворение': { status: 'Успокоение', turns: 11, desc: 'Не атакует (существа/люди до 17 ур.)' },
+        'Ярость': { status: 'Ярость', turns: 7, desc: 'Атакует любую ближайшую цель, включая союзников (до 6 ур.)' },
+        'Бешенство': { status: 'Ярость', turns: 9, desc: 'Атакует любую ближайшую цель, включая союзников (до 12 ур.)' },
+        'Руна бешенства': { status: 'Ярость', turns: 8, desc: 'При срабатывании руны атакует любую цель (до 17 ур.)' },
+        'Полиморф': { status: 'Полиморф', turns: 2, desc: 'Превращена в овцу — любой урон по ней снимает эффект (до 15 ур.)' }
+    };
+
     function renderAttackActionSelect() {
         const select = document.getElementById('attack-action-select');
         if (!select) return;
@@ -5582,7 +5668,16 @@ window.toggleSkillPanel = function (idx) {
             if (dmg) opts += `<option value="scroll:${escHtml(i.itemId)}">📜 ${escHtml(i.name)} (свиток, ~${dmg} урона, есть: ${i.count})</option>`;
         });
         (activeSummons || []).forEach(s => {
+            // "кроме оружий" — призванное оружие (category:'weapon', Клинок Азуры и т.п.) не
+            // атакует САМО — его экипируют и бьют обычным ближним/дальним боем, оно не "существо".
+            if (s.category === 'weapon') return;
             if (s.dmg) opts += `<option value="summon:${escHtml(s.id)}">${escHtml(s.name)} (существо, ${s.dmg} урона)</option>`;
+        });
+        // Управляющие заклинания (Страх/Успокоение/Ярость/Полиморф и т.п.) — раньше были только
+        // текстом, теперь применяют реальный статус к цели вместо урона.
+        (customSpells || []).forEach(s => {
+            const ctrl = PLAYER_CONTROL_SPELLS[s.name];
+            if (ctrl) opts += `<option value="control:${escHtml(s.id)}">🌀 ${escHtml(s.name)} (${escHtml(ctrl.desc)})</option>`;
         });
         select.innerHTML = opts;
         updateAttackActionInfo();
@@ -5838,6 +5933,7 @@ function updateHungerPenalty() {
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
 
         let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null, dmgType = 'physical';
+        let controlStatus = null; // {name, turns, desc} — для заклинаний Страх/Полиморф и т.п., см. ниже
         let lifestealPct = gb('physMagicVamp'); // Молаг Бал — универсальный вампиризм, добавляется всегда
         let penetrationPct = 0;
 
@@ -5937,6 +6033,26 @@ function updateHungerPenalty() {
             dmgType = detectDmgTypeFromName(summon.dmgType || summon.name);
             mod = 0; // у существ нет характеристик игрока — бьют "как есть"
             actionLabel = `существом «${summon.name}»`;
+        } else if (actionVal.indexOf('control:') === 0) {
+            const spell = customSpells.find(s => s.id === actionVal.slice(8));
+            const ctrl = spell ? PLAYER_CONTROL_SPELLS[spell.name] : null;
+            if (!spell || !ctrl) { alert('Заклинание не найдено.'); return; }
+            const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
+            const finalCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
+            const curMpEl = document.getElementById('cur-mp');
+            const curMp = parseInt(curMpEl.value) || 0;
+            if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+            curMpEl.value = curMp - finalCost;
+            updateVitalBars();
+            saveLocalStorage();
+            const statKey = SKILL_TO_STAT[SCHOOL_CODE_TO_SKILL[spell.school]] || 'int';
+            const statInput = document.getElementById('stat-' + statKey);
+            const rawStat = statInput ? (parseInt(statInput.getAttribute('data-raw-stat')) || 10) : 10;
+            mod = calcAbilityMod(rawStat) + gb('spellHitBonus');
+            dmg = 0; // управляющие заклинания не наносят урон — только статус при попадании
+            controlStatus = ctrl;
+            actionLabel = `заклинанием «${spell.name}» (−${finalCost} маны, ${ctrl.desc})`;
+            skillNameForProgress = SCHOOL_CODE_TO_SKILL[spell.school] || null;
         } else {
             alert('Выбери способ атаки.');
             return;
@@ -5979,8 +6095,10 @@ function updateHungerPenalty() {
         const healPct = lifestealPct + ((document.getElementById('chk-power-attack').checked && (actionVal === 'melee' || actionVal === 'ranged')) ? gb('powerAttackHeal') : 0);
 
         pendingPlayerAttack = hit ? {
-            targetId, dmg, dmgType, healPct, penetrationPct,
-            logText: `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${penetrationPct ? ` (пробитие защиты цели: ${penetrationPct}%)` : ''}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
+            targetId, dmg, dmgType, healPct, penetrationPct, controlStatus,
+            logText: controlStatus
+                ? `🌀 ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ${rerolls ? ` (перекид ×${rerolls})` : ''}.`
+                : `⚔️ Атака ${actionLabel} по «${target.name}»: игрок ${playerTotal} (к20 ${playerRoll}${mod >= 0 ? '+' : ''}${mod}) vs мастер ${gmRoll} — ПОПАДАНИЕ, урон ${dmg}${penetrationPct ? ` (пробитие защиты цели: ${penetrationPct}%)` : ''}${rerolls ? ` (перекид ×${rerolls})` : ''}.`
         } : null;
 
         let html = `<strong>Игрок:</strong> 1d20 (${playerRoll}) ${mod >= 0 ? '+' : ''}${mod} = <strong style="color:var(--accent-color);">${playerTotal}</strong><br>` +
@@ -6003,6 +6121,18 @@ function updateHungerPenalty() {
     window.applyPlayerAttackDamage = function () {
         if (!pendingPlayerAttack || !window.CloudSync) return;
         const playerName = document.getElementById('char-name') ? document.getElementById('char-name').value : 'Игрок';
+        if (pendingPlayerAttack.controlStatus) {
+            const cs = pendingPlayerAttack.controlStatus;
+            window.CloudSync.applyStatusToEnemy(pendingPlayerAttack.targetId, cs.status, cs.desc, cs.turns, playerName)
+                .then(res => {
+                    alert(`Статус применён! «${res.enemyName}»: ${cs.status} (${cs.turns} х.) — ${cs.desc}`);
+                    pendingPlayerAttack = null;
+                    document.getElementById('attack-roll-result').style.display = 'none';
+                    window.renderAttackTargetSelect();
+                })
+                .catch(e => alert('Ошибка: ' + e.message));
+            return;
+        }
         window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType, pendingPlayerAttack.penetrationPct)
             .then(res => {
                 let healMsg = '';

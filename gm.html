@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Экран Мастера — «Скурим» TTRPG</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -313,10 +313,24 @@
 
             <div id="ci-weapon-fields">
                 <label>Тип оружия</label>
-                <select id="ci-weapon-type">
-                    <option value="melee">Ближний бой</option>
-                    <option value="ranged">Дальний бой</option>
+                <select id="ci-weapon-type" onchange="updateCustomItemFields()">
+                    <optgroup label="Одноручное (ближний бой)">
+                        <option value="onehand">Одноручный меч</option>
+                        <option value="onehand:топор">Одноручный топор</option>
+                        <option value="onehand:булава">Булава</option>
+                        <option value="dagger">Кинжал</option>
+                    </optgroup>
+                    <optgroup label="Двуручное (ближний бой)">
+                        <option value="twohand_sword">Двуручный меч</option>
+                        <option value="twohand_axe">Двуручный топор/секира</option>
+                        <option value="twohand_hammer">Боевой молот</option>
+                    </optgroup>
+                    <optgroup label="Дальний бой">
+                        <option value="ranged">Лук</option>
+                        <option value="ranged:арбалет">Арбалет</option>
+                    </optgroup>
                 </select>
+                <p style="font-size:11px; opacity:.6; margin:2px 0;">Тип попадёт в описание предмета — игроку нужно будет самому выставить тот же тип в своём выпадающем списке оружия на листе (автоматически это не переключается, вкладки разные).</p>
                 <label>Урон</label>
                 <input type="number" id="ci-damage" value="5">
             </div>
@@ -342,6 +356,26 @@
                     <option value="amulet">Амулет/Ожерелье</option>
                     <option value="circlet">Обруч</option>
                 </select>
+            </div>
+
+            <div id="ci-potion-fields" style="display:none;">
+                <label>Тип</label>
+                <select id="ci-potion-kind" onchange="updateCustomItemFields()">
+                    <option value="potion">Зелье (положительный эффект)</option>
+                    <option value="poison">Яд (отрицательный эффект)</option>
+                </select>
+                <label>Эффект</label>
+                <select id="ci-potion-effect" onchange="updateCustomItemFields()"></select>
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label>Величина</label>
+                        <input type="number" id="ci-potion-magnitude" value="10">
+                    </div>
+                    <div style="flex:1;" id="ci-potion-duration-wrap">
+                        <label>Длительность (ходов)</label>
+                        <input type="number" id="ci-potion-duration" value="10">
+                    </div>
+                </div>
             </div>
 
             <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
@@ -474,6 +508,27 @@
             <p style="font-size:12px; opacity:.75;">Квестодатели, плюшки гильдии и пороги наград бронёй — из Фракции.xlsx. Игрок этого не видит.</p>
             <select id="guild-info-select" onchange="renderGuildInfoPanel()"></select>
             <div id="guild-info-body" style="margin-top:8px;"></div>
+        </div>
+
+        <!-- ===== ТУРНИРЫ БОЙЦОВСКОГО КЛУБА ===== -->
+        <div class="panel">
+            <h2>🥊 Турниры Бойцовского клуба</h2>
+            <p style="font-size:12px; opacity:.75;">Группа по УРОВНЮ ПЕРСОНАЖА, не по заказам гильдии. Сами бои — обычным боевым инструментом (1на1/3на3, 5 боёв); эта панель — только запись (залог 200) и выдача награды победителю.</p>
+            <label>Группа</label>
+            <select id="tourn-bracket-select" onchange="renderTournBracketInfo()">
+                <option value="Новички">Новички (уровень 1-5)</option>
+                <option value="Ученики">Ученики (уровень 5-10)</option>
+                <option value="Адепты">Адепты (уровень 10-15)</option>
+                <option value="Эксперты">Эксперты (уровень 15-20) — тут разыгрывается главный приз</option>
+            </select>
+            <div id="tourn-bracket-info" style="font-size:12px; opacity:.75; margin:4px 0;"></div>
+            <label>Игрок</label>
+            <select id="tourn-player-select"></select>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <button class="btn-danger" style="flex:1;" onclick="tournChargeEntryFee()">Списать залог (200)</button>
+                <button class="btn-success" style="flex:1;" onclick="tournGrantReward()">🏆 Выдать награду победителю</button>
+            </div>
+            <div id="tourn-result" style="margin-top:6px; font-size:13px;"></div>
         </div>
 
         <!-- ===== СПРАВОЧНИК ЗАЧАРОВАНИЙ (только мастер, полный список) ===== -->
