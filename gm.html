@@ -345,6 +345,11 @@
                     <option value="boots">Сапоги</option>
                     <option value="shield">Щит</option>
                 </select>
+                <label>Тип брони</label>
+                <select id="ci-armor-type">
+                    <option value="Легкая броня">Лёгкая</option>
+                    <option value="Тяжелая броня">Тяжёлая</option>
+                </select>
                 <label>Значение брони</label>
                 <input type="number" id="ci-armor-value" value="10">
             </div>
@@ -356,6 +361,14 @@
                     <option value="amulet">Амулет/Ожерелье</option>
                     <option value="circlet">Обруч</option>
                 </select>
+            </div>
+
+            <div id="ci-upgrade-fields" style="display:none;">
+                <label>Материал улучшения (что нужно, чтобы наточить/поправить эту вещь у точила/верстака)</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="ci-upgrade-material" placeholder="Например: Железный слиток" style="flex:2;">
+                    <input type="number" id="ci-upgrade-qty" value="1" min="1" style="flex:1;">
+                </div>
             </div>
 
             <div id="ci-potion-fields" style="display:none;">
@@ -441,13 +454,12 @@
         <!-- ===== ОТКРЫТИЕ РЕЦЕПТОВ КУЗНИЦЫ ===== -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Открыть рецепты кузницы игроку</h2>
-            <p style="font-size:14px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит».</p>
+            <p style="font-size:14px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит». Использует того же игрока, что выбран ниже в панели «Инвентарь».</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                <select id="recipe-player-select" style="flex:1; min-width:150px;" onchange="loadPlayerKnownRecipes()"></select>
                 <input type="text" id="recipe-search" placeholder="Поиск рецепта..." style="flex:1; min-width:150px;" oninput="renderRecipeChecklist()">
             </div>
             <div id="recipe-checklist" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; padding:6px;">
-                <p style="opacity:.6; font-size:14px;">Выбери игрока выше.</p>
+                <p style="opacity:.6; font-size:14px;">Выбери игрока в панели «Инвентарь» ниже.</p>
             </div>
         </div>
 
@@ -513,7 +525,7 @@
         <!-- ===== ТУРНИРЫ БОЙЦОВСКОГО КЛУБА ===== -->
         <div class="panel">
             <h2>🥊 Турниры Бойцовского клуба</h2>
-            <p style="font-size:12px; opacity:.75;">Группа по УРОВНЮ ПЕРСОНАЖА, не по заказам гильдии. Сами бои — обычным боевым инструментом (1на1/3на3, 5 боёв); эта панель — только запись (залог 200) и выдача награды победителю.</p>
+            <p style="font-size:12px; opacity:.75;">Группа по УРОВНЮ ПЕРСОНАЖА, не по заказам гильдии. Сами бои — обычным боевым инструментом (1на1/3на3, 5 боёв); эта панель — только запись (залог 200) и выдача награды. Использует того же игрока, что выбран в панели «Инвентарь».</p>
             <label>Группа</label>
             <select id="tourn-bracket-select" onchange="renderTournBracketInfo()">
                 <option value="Новички">Новички (уровень 1-5)</option>
@@ -522,8 +534,6 @@
                 <option value="Эксперты">Эксперты (уровень 15-20) — тут разыгрывается главный приз</option>
             </select>
             <div id="tourn-bracket-info" style="font-size:12px; opacity:.75; margin:4px 0;"></div>
-            <label>Игрок</label>
-            <select id="tourn-player-select"></select>
             <div style="display:flex; gap:8px; margin-top:6px;">
                 <button class="btn-danger" style="flex:1;" onclick="tournChargeEntryFee()">Списать залог (200)</button>
                 <button class="btn-success" style="flex:1;" onclick="tournGrantReward()">🏆 Выдать награду победителю</button>
@@ -657,6 +667,7 @@
 <script src="random-events-data.js"></script>
 <script src="skill-books-data.js"></script>
 <script src="unique-weapons-data.js"></script>
+<script src="spell-tomes-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>
 <script src="spell-data.js"></script>

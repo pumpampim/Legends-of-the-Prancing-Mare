@@ -489,6 +489,7 @@
     <script src="holidays-data.js"></script>
     <script src="skill-books-data.js"></script>
     <script src="unique-weapons-data.js"></script>
+    <script src="spell-tomes-data.js"></script>
 </head>
 <body>
 
@@ -502,6 +503,10 @@
         <input type="email" id="auth-email" placeholder="you@example.com">
         <label>Пароль</label>
         <input type="password" id="auth-password" placeholder="Минимум 6 символов">
+        <div class="checkbox-group" style="margin-top:6px;">
+            <input type="checkbox" id="auth-remember-me" checked>
+            <label for="auth-remember-me">Запомнить меня на этом устройстве</label>
+        </div>
 
         <div id="auth-error" class="auth-error" style="display:none;"></div>
 
@@ -573,8 +578,8 @@
                     <option value="apprentice">Ученик (+10 Маны, +10 Маны/лвл, уязвимость 10%)</option>
                     <option value="steed">Конь (+2 Телосложение, +10 фт. к скорости)</option>
                     <option value="lady">Леди (+2 Мудрость, +2 Телосложение)</option>
-                    <option value="lord">Лорд (Кровь Севера, уязвимость к огню)</option>
-                    <option value="zmey">Змей (Исцеление / Медленный мощный яд)</option>
+                    <option value="lord">Лорд (Кровь Севера: +30 брони, +15% резист холоду; но −15% резист огню)</option>
+                    <option value="zmey">Змей (раз в день: ЛИБО Исцеление — восстановить себе 50 ХП, ЛИБО Медленный яд — 40 урона за 4 хода на цель; выбор решает игрок в моменте)</option>
                     <option value="ritual">Ритуал (раз в день поднять всех мёртвых рядом на 60 сек. — решает мастер)</option>
                     <option value="lover">Любовник (+15% к скорости прокачки всех навыков)</option>
                     <option value="shadow">Тень (раз в день невидимость на 60 сек. — решает мастер)</option>
@@ -2948,6 +2953,7 @@ window.toggleSkillPanel = function (idx) {
                     ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${escHtml(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
                     ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${escHtml(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
+                    ${item.upgradeMaterial ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -3181,8 +3187,13 @@ window.toggleSkillPanel = function (idx) {
             desc = 'Ювелирное изделие';
             extra = { slot: recipe.name.includes('кольцо') ? 'ring' : 'amulet', price: recipe.price || 0 };
         } else {
-            desc = `Сопротивление ${resVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
-            extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: resVal, price: recipe.price };
+            // armorType (Лёгкая/Тяжёлая) и upgradeMaterial — оба поля УЖЕ были в armorRecipes,
+            // просто нигде не читались при ковке. armorType нужен игроку, чтобы знать, какой
+            // переключатель "во что одет" (#eq-armor) себе выставить — сама система не может
+            // сделать это автоматически (тот переключатель общий на весь комплект, не по вещи).
+            const upgradeNote = recipe.upgradeMaterial ? ` · Улучшается «${recipe.upgradeMaterial}»` : '';
+            desc = `Сопротивление ${resVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''} · ${recipe.armorType || '?'}${upgradeNote}`;
+            extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: resVal, price: recipe.price, armorType: recipe.armorType, upgradeMaterial: recipe.upgradeMaterial };
         }
         addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, extra.category || 'Скованное', desc, extra);
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кузнечное дело');
@@ -3245,6 +3256,47 @@ window.toggleSkillPanel = function (idx) {
 
     // Разрушение зачарованного предмета — как в ваниле: вещь пропадает, а зачарование
     // становится узнанным навсегда (можно применять самому при зачаровании других вещей).
+    // Улучшение предмета (наточить/поправить у точила-верстака) — раньше upgradeMaterial/
+    // upgradeQty были только текстом в описании ("Улучшается: X ×N"), сама возможность улучшить
+    // не существовала вообще. +10% к базовому значению за раз, максимум 5 улучшений (как тиры
+    // перков кузнечного дела в ваниле — точило без перка тоже не даёт бесконечно улучшать).
+    window.improveItem = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.upgradeMaterial) return;
+        const upgradeCount = item.upgradeCount || 0;
+        if (upgradeCount >= 5) { alert('Эта вещь уже улучшена по максимуму (5/5).'); return; }
+        const need = item.upgradeQty || 1;
+        if (countInInventory(item.upgradeMaterial) < need) {
+            alert(`Не хватает материала: нужно «${item.upgradeMaterial}» ×${need}, есть ${countInInventory(item.upgradeMaterial)}.`);
+            return;
+        }
+        removeFromInventoryByName(item.upgradeMaterial, need);
+        item.upgradeCount = upgradeCount + 1;
+        if (typeof item.weaponDmg === 'number') {
+            item.baseWeaponDmg = item.baseWeaponDmg || item.weaponDmg; // запоминаем изначальное значение для честного пересчёта
+            item.weaponDmg = Math.round(item.baseWeaponDmg * (1 + item.upgradeCount * 0.1));
+            // Если эта вещь сейчас экипирована — обновляем сразу видимое поле урона в бою, иначе
+            // игрок продолжал бы видеть старое число, пока не переэкипирует вещь вручную.
+            if (equippedSlots.meleeWeapon === itemId) document.getElementById('wep-melee-dmg').value = item.weaponDmg;
+            if (equippedSlots.rangedWeapon === itemId) document.getElementById('wep-ranged-dmg').value = item.weaponDmg;
+        }
+        if (typeof item.armorValue === 'number') {
+            item.baseArmorValue = item.baseArmorValue || item.armorValue;
+            item.armorValue = Math.round(item.baseArmorValue * (1 + item.upgradeCount * 0.1));
+            // Та же логика, что у оружия — если броня сейчас экипирована в какой-то слот,
+            // обновляем видимое число сразу, а не только внутри объекта предмета.
+            Object.keys(SLOT_FIELD_MAP).forEach(slotKey => {
+                if (equippedSlots[slotKey] === itemId) {
+                    document.getElementById(SLOT_FIELD_MAP[slotKey][1]).value = item.armorValue;
+                }
+            });
+        }
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+        alert(`Улучшено (${item.upgradeCount}/5)! ${typeof item.weaponDmg === 'number' ? `Новый урон: ${item.weaponDmg}` : `Новое сопротивление: ${item.armorValue}`}.`);
+    };
+
     window.disenchantItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || !item.enchantment) return;
@@ -4537,6 +4589,8 @@ window.toggleSkillPanel = function (idx) {
         // обычного резиста это НЕ клампится до 0 — именно доп. урон сверху, а не "просто нет резиста".
         const sign = document.getElementById('char-sign').value;
         if (sign === 'apprentice') res.magic -= 10;
+        // Знак «Лорд» — Кровь Севера, +15% резист холоду, -15% резист огню (было только текстом).
+        if (sign === 'lord') { res.frost += 15; res.fire -= 15; }
         // Шеогорат — качели физ. защиты за ход, тоже без клампа до 0 (может УМЕНЬШИТЬ реальный
         // резист ниже нуля в "плохой" ход, не просто занулить).
         if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.defSwing) res.physical += sheogorathRoll.defSwing;
@@ -6357,6 +6411,8 @@ function updateHungerPenalty() {
         let totalArmor = Math.round(bodyArmorBase * (1 + armorPercentBonus)) + shieldArmorBonused +
                          (parseInt(document.getElementById('armor-buff').value) || 0);
         if (godB.armor) totalArmor += godB.armor;
+        // Знак «Лорд» — +30 брони (было только текстом).
+        if (document.getElementById('char-sign').value === 'lord') totalArmor += 30;
         totalArmor += equipBonuses.armor;
         totalArmor += activeEffectBonuses.armor || 0;
         document.getElementById('armor-total').innerText = totalArmor;

@@ -64,12 +64,21 @@
 
     // ---------- Авторизация ----------
 
+    // "Запомнить меня" — раньше нигде не задавалось явно, персистентность входа зависела от
+    // дефолтного поведения Firebase (обычно и так LOCAL, но чекбокс даёт явный контроль и чинит
+    // редкие случаи, когда дефолт не срабатывает — некоторые мобильные браузеры/приватные вкладки).
+    function applyAuthPersistence() {
+        const remember = el('auth-remember-me') ? el('auth-remember-me').checked : true;
+        const mode = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
+        return auth.setPersistence(mode);
+    }
+
     window.cloudRegister = function () {
         if (!window.FIREBASE_CONFIGURED) { showAuthError('Firebase ещё не настроен — см. README-FIREBASE.md'); return; }
         const email = el('auth-email').value.trim();
         const pass = el('auth-password').value;
         showAuthError('');
-        auth.createUserWithEmailAndPassword(email, pass).catch(e => showAuthError(translateAuthError(e)));
+        applyAuthPersistence().then(() => auth.createUserWithEmailAndPassword(email, pass)).catch(e => showAuthError(translateAuthError(e)));
     };
 
     window.cloudLogin = function () {
@@ -77,14 +86,14 @@
         const email = el('auth-email').value.trim();
         const pass = el('auth-password').value;
         showAuthError('');
-        auth.signInWithEmailAndPassword(email, pass).catch(e => showAuthError(translateAuthError(e)));
+        applyAuthPersistence().then(() => auth.signInWithEmailAndPassword(email, pass)).catch(e => showAuthError(translateAuthError(e)));
     };
 
     window.cloudLoginGoogle = function () {
         if (!window.FIREBASE_CONFIGURED) { showAuthError('Firebase ещё не настроен — см. README-FIREBASE.md'); return; }
         showAuthError('');
         const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(e => {
+        applyAuthPersistence().then(() => auth.signInWithPopup(provider)).catch(e => {
             if (e.code === 'auth/popup-closed-by-user') return;
             showAuthError(translateAuthError(e));
         });

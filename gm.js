@@ -738,6 +738,7 @@
             gmAllItems = gmAllItems.concat(getSmithingGiveableItems());
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
             gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
+            gmAllItems = gmAllItems.concat(window.spellTomesData || []);
             // Заполняем фильтр категорий
             const catSelect = document.getElementById('gm-item-category');
             const cats = [...new Set(gmAllItems.map(i => i.category || 'Разное'))];
@@ -934,28 +935,17 @@
     }
 
     function populateRecipePlayerSelect() {
-        const select = el('recipe-player-select');
-        if (!select) return;
-        const uids = Object.keys(lastData.participants || {});
-        const prevValue = select.value;
-        select.innerHTML = '<option value="">— выбери игрока —</option>' +
-            uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
-        if (uids.includes(prevValue)) {
-            select.value = prevValue;
-        } else {
-            currentRecipePlayerUid = null;
-            currentPlayerKnownRecipes = [];
-            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
-        }
+        // Убрано — отдельного select для рецептов больше нет, используется тот же игрок, что
+        // выбран в панели "Инвентарь" (currentInvPlayerUid). Функция оставлена пустой заглушкой,
+        // чтобы не искать и не чистить все места, где она вызывается.
     }
 
     window.loadPlayerKnownRecipes = function () {
-        const select = el('recipe-player-select');
-        const uid = select.value;
+        const uid = currentInvPlayerUid;
         if (!uid) {
             currentRecipePlayerUid = null;
             currentPlayerKnownRecipes = [];
-            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>';
+            el('recipe-checklist').innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока в панели «Инвентарь» ниже.</p>';
             return;
         }
         currentRecipePlayerUid = uid;
@@ -1348,11 +1338,14 @@
         alchemist2: { label: 'Алхимик', gold: 1250, categories: ['Ингредиенты для алхимии'] },
         grocer: { label: 'Бакалейщик', gold: 1250, categories: ['Сырые продукты', 'Шкуры', 'Бытовые предметы'] },
         blacksmith2: { label: 'Кузнец', gold: 1500, categories: ['Легкая броня (лут)', 'Тяжелая броня (лут)', 'Одноручное (лут)', 'Двуручное (лут)'] },
-        clothier: { label: 'Торговец одеждой', gold: 1250, categories: ['Магические одеяния'] },
+        // "Торговец одеждой" (clothier) убран из списка по прямой просьбе — объединён с придворным
+        // колдуном (магические одеяния теперь в его ассортименте). Тип вернётся отдельно, когда
+        // появится база ПРОСТОЙ (не магической) одежды — пока такого файла нет.
         fletcher: { label: 'Торговец луками и стрелами', gold: 1500, categories: ['Луки (лут)'] },
         jeweler: { label: 'Ювелир', gold: 1500, categories: ['Ювелирное изделие (лут)', 'Ювелирные изделия', 'Драгоценные камни'] },
         foodVendor: { label: 'Торговец едой', gold: 750, categories: ['Сырые продукты'] },
-        courtWizard: { label: 'Придворный колдун', gold: 1500, categories: ['Свитки (прописанные)', 'Посохи'] }
+        courtWizard: { label: 'Придворный колдун', gold: 1500, categories: ['Свитки (прописанные)', 'Посохи', 'Магические одеяния'] },
+        khajiitCaravan: { label: 'Каджитский караван', gold: 1500, categories: ['Сырые продукты', 'Бытовые предметы', 'Ювелирные изделия', 'Шкуры'] }
     };
     window.LIVING_MERCHANT_TYPES = LIVING_MERCHANT_TYPES;
 
@@ -1366,7 +1359,10 @@
         'Человечье мясо',
         'Перчатки магистра (школы)', 'Роба разрушения', 'Великий созидатель', 'Создатель обмана',
         'Мастер даэдра', 'Великий свет', 'Выпускник Коллегии Магов Винтерхолда',
-        'Одение повара', 'Колпак повара'
+        'Одение повара', 'Колпак повара',
+        // Скума и лунный сахар — эксклюзив каджитского каравана, у остальных торговцев их быть
+        // не должно (по прямой просьбе).
+        'Красноводная скума', 'Лунный сахар'
     ]);
 
     function getMerchantItemPool(typeKey) {
@@ -1385,6 +1381,14 @@
             // weaponRecipes/weaponsNonCraftable, раньше торговец луками их вообще не продавал.
             pool = pool.concat((window.weaponRecipes || []).filter(w => /лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.weaponsNonCraftable || []).filter(w => /лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+        }
+        if (typeKey === 'khajiitCaravan') {
+            // Скума и лунный сахар — эксклюзив каравана (исключены у всех остальных выше через
+            // MERCHANT_EXCLUDED_ITEMS), добавляем их сюда напрямую в обход этого исключения.
+            const skooma = (window.allItems || gmAllItems).find(i => i.name === 'Красноводная скума');
+            const moonSugar = (window.allItems || gmAllItems).find(i => i.name === 'Лунный сахар');
+            if (skooma) pool.push(skooma);
+            if (moonSugar) pool.push(moonSugar);
         }
         return pool;
     }
@@ -1547,7 +1551,7 @@
     };
 
     window.tournChargeEntryFee = function () {
-        const uid = el('tourn-player-select').value;
+        const uid = currentInvPlayerUid;
         if (!uid) { alert('Выбери игрока.'); return; }
         db.collection('characters').doc(uid).set({ gold: firebase.firestore.FieldValue.increment(-200) }, { merge: true }).then(() => {
             el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Залог 200 золота списан.</span>`;
@@ -1555,7 +1559,7 @@
     };
 
     window.tournGrantReward = function () {
-        const uid = el('tourn-player-select').value;
+        const uid = currentInvPlayerUid;
         const bracket = el('tourn-bracket-select').value;
         if (!uid) { alert('Выбери игрока.'); return; }
         const rewards = TOURNAMENT_BRACKETS[bracket].rewards;
@@ -1731,9 +1735,11 @@
             renderGuildsPanel();
             renderSupernaturalPanel();
             renderReputationPanel();
+            if (typeof loadPlayerKnownRecipes === 'function') window.loadPlayerKnownRecipes();
             return;
         }
         currentInvPlayerUid = uid;
+        if (typeof window.loadPlayerKnownRecipes === 'function') window.loadPlayerKnownRecipes();
         el('inv-items-list').innerHTML = '<p style="opacity:.6; font-size:13px;">Загрузка...</p>';
         let firstSnapshot = true;
         // Живой листенер вместо одноразового .get() — если игрок сам меняет инвентарь/экипировку
@@ -1931,6 +1937,7 @@
         el('ci-armor-fields').style.display = cat === 'armor' ? 'block' : 'none';
         el('ci-jewelry-fields').style.display = cat === 'jewelry' ? 'block' : 'none';
         el('ci-potion-fields').style.display = cat === 'potion' ? 'block' : 'none';
+        el('ci-upgrade-fields').style.display = (cat === 'weapon' || cat === 'armor') ? 'block' : 'none';
 
         // Зелье/яд — раньше был только общий текст, без структурированного эффекта/величины/
         // длительности. Список эффектов — та же база, что у реальной алхимии (alchemyBaseEffects),
@@ -1993,6 +2000,10 @@
         } else if (cat === 'armor') {
             item.slot = el('ci-armor-slot').value;
             item.armor = parseInt(el('ci-armor-value').value) || 0;
+            // armorType (Лёгкая/Тяжёлая) — раньше вообще не спрашивалось при создании, хотя
+            // данные реальных кузнечных рецептов этим полем уже пользуются.
+            item.armorType = el('ci-armor-type').value;
+            item.effect = item.effect ? item.effect + `; ${item.armorType}` : item.armorType;
         } else if (cat === 'jewelry') {
             item.slot = el('ci-jewelry-slot').value;
         } else if (cat === 'potion') {
@@ -2009,6 +2020,18 @@
             item.alchemyEffects = [{ name: effName, magnitude, duration, unit }];
             const potDesc = `${effName}: ${magnitude}${unit}${duration ? ` на ${duration} ход.` : ''}`;
             item.effect = item.effect ? item.effect + '; ' + potDesc : potDesc;
+        }
+
+        // Материал улучшения (наточить у точила/верстака) — общий и для оружия, и для брони.
+        // Раньше в форме создания этого поля не было вообще; у реальных кузнечных рецептов
+        // (armorRecipes) такое поле уже есть (upgradeMaterial), но тоже нигде не отображалось.
+        if ((cat === 'weapon' || cat === 'armor') && el('ci-upgrade-material').value.trim()) {
+            const mat = el('ci-upgrade-material').value.trim();
+            const qty = parseInt(el('ci-upgrade-qty').value) || 1;
+            item.upgradeMaterial = mat;
+            item.upgradeQty = qty;
+            const upgDesc = `Улучшается: ${mat} ×${qty}`;
+            item.effect = item.effect ? item.effect + '; ' + upgDesc : upgDesc;
         }
 
         if (el('ci-enchanted').checked) {
@@ -2103,7 +2126,7 @@
         const uids = Object.keys(lastData.participants || {});
         const opts = '<option value="">— выбери игрока —</option>' +
             uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('');
-        ['calc-alch-player', 'calc-ench-player', 'tourn-player-select'].forEach(id => {
+        ['calc-alch-player', 'calc-ench-player'].forEach(id => {
             const select = el(id);
             if (!select) return;
             const prev = select.value;
@@ -3122,6 +3145,10 @@
     // ---------- Шторки для всех панелей мастера (gm.html стал очень длинным) ----------
     // Тот же механизм, что и у игрока (initSectionAccordions в index.html), но без привязки к
     // вкладкам — тут одна длинная страница, просто берём все .panel целиком.
+    // По жалобе "сайт визуально перегружен" — панелей у мастера накопилось уже больше 20, и все
+    // раньше открывались развёрнутыми по умолчанию при каждой загрузке страницы. Теперь свёрнуты
+    // все, КРОМЕ самых нужных в бою постоянно (Отряд/Противники) — остальные открываются по клику.
+    const GM_PANELS_OPEN_BY_DEFAULT = ['Отряд', 'Противники'];
     function initGmSectionAccordions() {
         let counter = 0;
         document.querySelectorAll('.panel').forEach(panel => {
@@ -3143,8 +3170,12 @@
             });
             panel.appendChild(body);
 
+            const titleText = h2.textContent.trim();
+            const keepOpen = GM_PANELS_OPEN_BY_DEFAULT.some(t => titleText.includes(t));
+            if (!keepOpen) body.style.display = 'none';
+
             h2.classList.add('section-header');
-            h2.innerHTML = `<span class="section-title">${h2.innerHTML}</span><span class="section-chevron">▾</span>`;
+            h2.innerHTML = `<span class="section-title">${h2.innerHTML}</span><span class="section-chevron">${keepOpen ? '▾' : '▸'}</span>`;
             h2.addEventListener('click', () => toggleGmSectionById(panelId));
         });
     }
