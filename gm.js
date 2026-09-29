@@ -1390,6 +1390,20 @@
             if (skooma) pool.push(skooma);
             if (moonSugar) pool.push(moonSugar);
         }
+        if (typeKey === 'courtWizard') {
+            // Тома заклинаний (новичок/ученик) — по прямой просьбе, ~в 1.5 раза больше в продаже,
+            // чем посохов. Отбор идёт по УНИКАЛЬНЫМ именам (в refreshMerchantStock), поэтому
+            // дублирование записей тут не работает — увеличивает лишь шанс попасть хоть раз, а не
+            // количество копий в итоге. Вместо этого напрямую уменьшаем число РАЗНЫХ посохов в
+            // пуле (было 42) — меньше вариантов физически означает меньше посохов в ассортименте,
+            // пока рядом лежат 85 разных томов, которые никто не трогал.
+            pool = pool.concat(window.spellTomesData || []);
+            const staves = pool.filter(i => i.category === 'Посохи');
+            const otherItems = pool.filter(i => i.category !== 'Посохи');
+            const keepStaffCount = Math.max(3, Math.round(staves.length * 0.4)); // 42 → ~17 видов
+            const shuffledStaves = staves.slice().sort(() => Math.random() - 0.5).slice(0, keepStaffCount);
+            pool = otherItems.concat(shuffledStaves);
+        }
         return pool;
     }
 
@@ -1480,9 +1494,20 @@
             const s = stocks[k];
             const daysAgo = currentDay - (s.generatedOnDay || 0);
             const stale = daysAgo >= 7;
-            return `<div style="font-size:13px; ${stale ? 'color:#e67e22;' : ''}">${stale ? '⚠️ ' : ''}${escapeHtml(s.label)} — ${escapeHtml(s.hold)}: ${daysAgo} игр. дн. назад${stale ? ' (пора обновить)' : ''}</div>`;
+            return `<div style="font-size:13px; display:flex; justify-content:space-between; align-items:center; gap:6px; ${stale ? 'color:#e67e22;' : ''}">
+                <span>${stale ? '⚠️ ' : ''}${escapeHtml(s.label)} — ${escapeHtml(s.hold)}: ${daysAgo} игр. дн. назад${stale ? ' (пора обновить)' : ''}</span>
+                <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:11px; flex-shrink:0;" onclick="removeMerchant('${escapeHtml(k)}')">Убрать</button>
+            </div>`;
         }).join('');
     }
+
+    // Убрать торговца совсем (не просто обновить ассортимент) — раньше такой возможности не
+    // было вообще, только сброс товара у уже существующего.
+    window.removeMerchant = function (key) {
+        if (!confirm('Убрать этого торговца из сессии? Игроки перестанут видеть его в списке для покупки.')) return;
+        db.collection('sessions').doc(currentCode).update({ ['merchantStocks.' + key]: firebase.firestore.FieldValue.delete() })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
 
     function renderMerchantHoldSelect() {
         const sel = el('merchant-hold-select');
