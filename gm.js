@@ -32,6 +32,7 @@
     };
 
     let gmAllItems = [];
+    let gmAllItemsByKey = new Map(); // id/name → предмет, для O(1) поиска (см. loadGmItems)
     let gmFilteredItems = [];
     let currentRecipePlayerUid = null;
     let currentPlayerKnownRecipes = [];
@@ -371,6 +372,7 @@
                         '<div style="display:flex; gap:4px; align-items:center; margin-top:2px;">' +
                         '<span>Осталось КД: ' + cdLeft + '</span>' +
                         '<button style="width:auto; padding:1px 6px; font-size:11px;" onclick="useShout(\'' + e.id + '\',' + si + ',' + s.cooldown + ')" ' + (cdLeft > 0 ? 'disabled' : '') + '>Крикнуть</button>' +
+                        '<button style="width:auto; padding:1px 6px; font-size:11px;" onclick="tickShoutCd(\'' + e.id + '\',' + si + ')" ' + (cdLeft <= 0 ? 'disabled' : '') + '>−1 ход КД</button>' +
                         '</div></div>';
                 }).join('') : '';
             return '<div class="enemy-row">' +
@@ -400,6 +402,18 @@
         const enemy = enemies.find(e => e.id === enemyId);
         const shout = enemy && enemy.shouts && enemy.shouts[shoutIdx];
         if (shout) gmPostLogEntryText(`🗣️ ${enemy.name} кричит «${shout.name}»: ${shout.effect}`);
+    };
+
+    // Раньше ничего не декрементировало shoutCd_* вообще — крик срабатывал один раз за весь бой,
+    // кнопка оставалась серой навсегда. Ручной тик за ход мастера (не привязан к действиям
+    // игрока на другой вкладке — проще и надёжнее автотика между разными сессионными контекстами).
+    window.tickShoutCd = function (enemyId, shoutIdx) {
+        const enemies = (lastData.enemies || []).map(e => {
+            if (e.id !== enemyId) return e;
+            const key = 'shoutCd_' + shoutIdx;
+            return { ...e, [key]: Math.max(0, (e[key] || 0) - 1) };
+        });
+        db.collection('sessions').doc(currentCode).update({ enemies }).catch(err => console.error(err));
     };
 
     let currentEnemyDbPick = null;
@@ -739,6 +753,11 @@
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
             gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
             gmAllItems = gmAllItems.concat(window.spellTomesData || []);
+            // O(1) поиск по id/имени вместо O(n) .find() на каждый клик "Передать" — gmAllItems
+            // уже перевалил за 400+ записей. gmAllItems как массив оставлен как есть (нужен для
+            // рендера таблицы и .filter()-поисков, которым Map не поможет — там всё равно нужен
+            // полный перебор).
+            gmAllItemsByKey = new Map(gmAllItems.map(i => [i.id || i.name, i]));
             // Заполняем фильтр категорий
             const catSelect = document.getElementById('gm-item-category');
             const cats = [...new Set(gmAllItems.map(i => i.category || 'Разное'))];
@@ -794,7 +813,7 @@
     };
 
     window.gmGiveItemFromTable = function(itemId) {
-        const sourceItem = (gmAllItems || []).find(i => (i.id || i.name) === itemId);
+        const sourceItem = gmAllItemsByKey.get(itemId); // O(1) вместо O(n) — см. loadGmItems
         if (!sourceItem) { alert('Предмет не найден.'); return; }
         const uids = Object.keys(lastData.participants || {});
         if (uids.length === 0) {
@@ -2331,7 +2350,7 @@
         if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
         if (!gold && !itemId) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи золото или предмет.</span>'; return; }
 
-        const sourceItem = itemId ? (gmAllItems || []).find(i => (i.id || i.name) === itemId) : null;
+        const sourceItem = itemId ? gmAllItemsByKey.get(itemId) : null; // O(1) вместо O(n) — см. loadGmItems
         const itemExtra = {};
         if (sourceItem) {
             if (sourceItem.slot) itemExtra.slot = sourceItem.slot;
@@ -2385,9 +2404,9 @@
 
     function parseSpellDamageForGm(desc) {
         if (!desc) return null;
-        // [а-я] вместо \w — та же кириллическая ловушка, что чинил в index.html.
-        const m = desc.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
-                  desc.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
+        // [а-яёА-ЯЁ] вместо \w — та же кириллическая ловушка, что чинил в index.html.
+        const m = desc.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+|огненн[а-яёА-ЯЁ]*\s+|ледян[а-яёА-ЯЁ]*\s+|электрич[а-яёА-ЯЁ]*\s+|яд[а-яёА-ЯЁ]*\s+)?урон/i) ||
+                  desc.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
         return m ? parseInt(m[1]) : null;
     }
 
@@ -2539,6 +2558,7 @@
                 const statusDef = GM_STATUS_EFFECTS[statusKey];
                 const patch = {};
                 patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                    id: 'st-' + Date.now() + Math.random().toString(36).slice(2, 8),
                     name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns
                 });
                 chores.push(db.collection('sessions').doc(currentCode).update(patch));

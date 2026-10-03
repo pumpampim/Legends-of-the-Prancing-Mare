@@ -4,7 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
-    
+
+    <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css, чтобы класс
+         .no-webp успел попасть в <html> до того, как браузер начнёт применять фоновые картинки
+         (иначе был бы короткий флеш неправильного фона на очень старых браузерах). -->
+    <script>
+        if (!document.createElement('canvas').toDataURL('image/webp').includes('data:image/webp')) {
+            document.documentElement.classList.add('no-webp');
+        }
+    </script>
+
+    <!-- window.onerror → баннер сверху страницы. У игрока/мастера нет F12 — без этого
+         единственный способ узнать, что что-то сломалось, это console.error, который никто не
+         видит. Ставится МАКСИМАЛЬНО рано (до остальных скриптов), чтобы поймать ошибки с самого
+         начала загрузки, включая возможные сбои в последующих <script> тегах. Не спамит повторно
+         на ту же самую ошибку подряд (иначе один and тот же баг, срабатывающий в цикле, завалил
+         бы экран десятками баннеров). -->
+    <style>
+        #js-error-banner { display:none; position:fixed; top:0; left:0; right:0; z-index:99999;
+            background:#5c1a1a; color:#f5e6c8; padding:10px 16px; font-family:sans-serif; font-size:14px;
+            box-shadow:0 2px 10px rgba(0,0,0,.5); }
+        #js-error-banner button { margin-left:12px; background:#2a0d0d; color:#f5e6c8; border:1px solid #f5e6c8;
+            border-radius:3px; padding:3px 10px; cursor:pointer; }
+    </style>
+    <div id="js-error-banner">⚠ Что-то пошло не так на странице. Скажи мастеру/разработчику, что сломалось (и что ты делал перед этим). <button onclick="document.getElementById('js-error-banner').style.display='none'">Закрыть</button></div>
+    <script>
+        (function () {
+            var lastErrorMsg = '';
+            var lastErrorAt = 0;
+            window.onerror = function (message) {
+                var now = Date.now();
+                // Не показываем баннер заново, если это та же ошибка меньше 5 секунд назад
+                // (защита от спама, если один и тот же баг срабатывает в цикле/на каждый рендер).
+                if (message === lastErrorMsg && now - lastErrorAt < 5000) return false;
+                lastErrorMsg = message; lastErrorAt = now;
+                var banner = document.getElementById('js-error-banner');
+                if (banner) banner.style.display = 'block';
+                return false; // не подавляем вывод в консоль — он всё ещё полезен для разработчика
+            };
+        })();
+    </script>
+
     <!-- Системный блок хранения баз данных игры -->
     <script id="database-core">
         // Исправленная база расовых бонусов к навыкам (полностью по документам)
@@ -473,7 +513,14 @@
         }
     </script>
 
-    <link rel="stylesheet" href="style.css?v=4">
+    <!-- Шрифты — раньше два отдельных @import внутри style.css (блокировали разбор остального
+         CSS, пока сами не докачаются). preconnect заранее открывает соединение с обоих доменов,
+         &display=swap не даёт тексту быть невидимым, пока шрифт не скачался (FOIT → FOUT). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="style.css?v=6">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -492,6 +539,19 @@
     <script src="spell-tomes-data.js"></script>
 </head>
 <body>
+
+<!-- Онбординг первого запуска — показывается только новым игрокам (нет ни localStorage, ни
+     облачного сейва), см. loadLocalStorage(). Серая плашка поверх страницы, не блокирует её. -->
+<div id="onboarding-banner" style="display:none; position:fixed; bottom:16px; left:16px; right:16px; max-width:420px; margin:0 auto; z-index:9000; background:#241c10; border:1px solid #765d35; border-radius:6px; padding:14px 16px; color:#f0e6d2; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.5);">
+    <strong>Добро пожаловать в «Скурим»!</strong> Похоже, ты тут впервые. С чего начать:
+    <ol style="margin:8px 0; padding-left:20px;">
+        <li>Выбери расу и камень судьбы (знак) — вкладка «Главная и статы»</li>
+        <li>Распредели характеристики</li>
+        <li>Выбери перки на вкладке «Ветки перков»</li>
+        <li>Лист сохраняется сам — просто заполняй поля</li>
+    </ol>
+    <button onclick="dismissOnboarding()" style="width:auto; padding:4px 14px;">Понятно, скрыть</button>
+</div>
 
 <!-- Оверлей авторизации: показывается, пока пользователь не вошёл и не выбрал офлайн-режим -->
 <div id="auth-overlay" class="auth-overlay">
@@ -728,6 +788,11 @@
                 <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
                 <button class="btn btn-danger" style="width:auto; margin:0; padding:6px 14px;" onclick="resetData()">🗑️ Сброс персонажа</button>
+                <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="exportCharacterToFile()" title="Скачать персонажа в файл — на случай если облако отвалится или пропадёт доступ к аккаунту">💾 Скачать в файл</button>
+                <label class="btn" style="width:auto; margin:0; padding:6px 14px; display:inline-block; cursor:pointer;">
+                    📂 Загрузить из файла
+                    <input type="file" accept="application/json" style="display:none;" onchange="importCharacterFromFile(this)">
+                </label>
             </div>
             <div class="day-controls" style="margin-top:6px;">
                 <span id="turn-round-display-main" style="font-size:15px; font-weight:bold; color:var(--accent-color);">Ход: 0 | Круг: 0</span>
@@ -1919,14 +1984,12 @@ window.toggleSkillPanel = function (idx) {
     };
 
     // Проверка перка "Боевой маг" в ветке Тяжелой брони (индекс 7)
+    // Раньше это была отдельная ручная проверка по жёстким координатам (skillIdx=4, perkIdx=7
+    // — "Боевой маг" в дереве Тяжёлой брони). Если порядок перков в fullPerksManifest когда-
+    // нибудь поменяется, тот вариант сломался бы молча. Теперь использует уже существующую
+    // isPerkChecked() по ИМЕНИ перка — единый источник правды для "отмечен ли этот перк где-то".
     function hasBattleMagePerk() {
-        let checkboxes = document.querySelectorAll('.perk-checkbox');
-        for (let chk of checkboxes) {
-            let skillIdx = parseInt(chk.dataset.skillidx);
-            let perkIdx = parseInt(chk.dataset.perkidx);
-            if (skillIdx === 4 && perkIdx === 7 && chk.checked) return true;
-        }
-        return false;
+        return isPerkChecked('Боевой маг');
     }
 
     // Динамическое добавление заклинаний в кастомную книгу мага
@@ -1941,7 +2004,12 @@ window.toggleSkillPanel = function (idx) {
     function buildSpellOptions(school, selectedName) {
         const tierLabels = { 1: 'Новичок', 2: 'Ученик', 3: 'Адепт', 4: 'Эксперт' };
         const data = (window.spellsData && window.spellsData[school]) || {};
-        let html = `<option value="__custom__" ${!selectedName ? '' : ''}>✏️ Своё название (ввести вручную)</option>`;
+        // Раньше тут было `${!selectedName ? '' : ''}` — тернарка всегда давала пустую строку
+        // независимо от условия, "своё название" не подсвечивалось при загрузке кастомного
+        // заклинания из сейва (визуально маскировалось тем, что это первый <option> в списке,
+        // и браузер по умолчанию показывает первый без selected — но полагаться на это нельзя).
+        const isCustom = selectedName && !isKnownSpellName(school, selectedName);
+        let html = `<option value="__custom__" ${isCustom ? 'selected' : ''}>✏️ Своё название (ввести вручную)</option>`;
         [1, 2, 3, 4].forEach(tier => {
             const list = data[tier] || [];
             if (!list.length) return;
@@ -2229,7 +2297,11 @@ window.toggleSkillPanel = function (idx) {
             const percentEffects = heal ? [] : parsePercentEffects(desc);
             if (window.CloudSync && typeof window.CloudSync.pushEffectToPlayer === 'function') {
                 const myName = document.getElementById('char-name').value || 'Союзник';
+                // id обязателен — Firestore arrayUnion сравнивает элементы по глубокому равенству
+                // и молча НЕ добавляет объект, если в массиве уже есть идентичный по значениям
+                // (например, два одинаковых лечения подряд от одного кастера на одну цель).
                 const payload = {
+                    id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 8),
                     name: myName, effectName: spellName, description: desc || '', turnsRemaining: duration
                 };
                 if (heal) {
@@ -3169,9 +3241,13 @@ window.toggleSkillPanel = function (idx) {
         // Конкретный тип оружия по подкатегории рецепта (subcat уже был в данных, просто нигде
         // не читался при ковке) — та же схема weaponType, что у ручного создания предмета
         // мастером, чтобы "выковал кинжал" не превращалось в безликое "оружие ближнего боя".
+        // Секиры (subcat "Секиры") в smithing-data.js — ДВУРУЧНОЕ (category:"Двуручное"), а
+        // боевые топоры (subcat "Боевые топоры") — ОДНОРУЧНОЕ (category:"Одноручное"). Раньше
+        // тут было перепутано местами — при ковке секиры игрок получал одноручное оружие с
+        // неверным расчётом бонуса Силы и штрафа к броску.
         const SUBCAT_TO_WEAPON_TYPE = {
-            'Кинжалы': 'dagger', 'Мечи': 'onehand', 'Секиры': 'onehand:топор', 'Булавы': 'onehand:булава',
-            'Боевые топоры': 'twohand_axe', 'Двуручные мечи': 'twohand_sword', 'Молоты': 'twohand_hammer',
+            'Кинжалы': 'dagger', 'Мечи': 'onehand', 'Секиры': 'twohand_axe', 'Булавы': 'onehand:булава',
+            'Боевые топоры': 'onehand:топор', 'Двуручные мечи': 'twohand_sword', 'Молоты': 'twohand_hammer',
             'Копья': 'onehand:копьё', 'Пики': 'twohand:пика', 'Кастеты': 'onehand:кастет',
             'Луки (обычные)': 'ranged', 'Луки (особые)': 'ranged', 'Арбалеты': 'ranged:арбалет'
         };
@@ -3218,7 +3294,7 @@ window.toggleSkillPanel = function (idx) {
     const SOUL_GEM_CHARGE_DAYS = { 'Крохотный': 1, 'Маленький': 3, 'Обычный': 5, 'Большой': 7, 'Великий': 10 };
 
     function getChargeDays(soulGem) {
-        const base = getChargeDays(soulGem);
+        const base = SOUL_GEM_CHARGE_DAYS[soulGem] || 0;
         const perks = window.perkBonuses || {};
         return base + (perks.enchantSoulEconomy || 0);
     }
@@ -3290,6 +3366,13 @@ window.toggleSkillPanel = function (idx) {
                     document.getElementById(SLOT_FIELD_MAP[slotKey][1]).value = item.armorValue;
                 }
             });
+            // SLOT_FIELD_MAP не покрывает ювелирку (ring/neck/circlet — там просто текстовые
+            // поля, не числовое armorValue). Сейчас ни один предмет-ювелирка в базе не имеет
+            // upgradeMaterial, так что этот код не достижим на практике — но на будущее, если
+            // такая вещь появится, обновляем сводку экипировки, а не оставляем её немой.
+            if (equippedSlots.ring === itemId || equippedSlots.neck === itemId || equippedSlots.circlet === itemId) {
+                if (typeof renderEquippedSummary === 'function') renderEquippedSummary();
+            }
         }
         renderInventoryList();
         updateAll();
@@ -4232,7 +4315,7 @@ window.toggleSkillPanel = function (idx) {
     // либо игрок сам не снимет бафф, либо не кончится мана — у них нет фиксированной длительности
     // в ходах, поэтому turnsRemaining для них не 75/дефолт, а "бесконечность" (см. ниже).
     function parseManaPerTurn(text) {
-        const m = (text || '').match(/поддержани[а-я]*\s+(\d+)[\d\/]*\s*маны\s+за\s+ход/i);
+        const m = (text || '').match(/поддержани[а-яёА-ЯЁ]*\s+(\d+)[\d\/]*\s*маны\s+за\s+ход/i);
         return m ? parseInt(m[1]) : 0;
     }
 
@@ -4295,11 +4378,16 @@ window.toggleSkillPanel = function (idx) {
             el.innerHTML = '<p style="opacity:.6; font-size:14px;">Нет активных эффектов.</p>';
             return;
         }
-        el.innerHTML = activeTimedEffects.map(e => `
+        el.innerHTML = activeTimedEffects.map(e => {
+            // Эффекты "на поддержании" (тратят ману каждый ход) имеют turnsRemaining: Infinity —
+            // раньше это просто подставлялось в шаблон строки и показывало "Infinity х.".
+            const turnsLabel = e.turnsRemaining === Infinity ? '∞ (пока есть мана)' : e.turnsRemaining + ' х.';
+            return `
             <div class="party-row">
-                <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${e.turnsRemaining} х.</span></div>
+                <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${turnsLabel}</span></div>
                 <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px; margin-top:2px;" onclick="removeActiveEffect('${escHtml(e.id)}')">Снять</button>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     }
 
     // Игрок сам снимает с себя эффект (бафф или дебафф) — без необходимости ждать, пока
@@ -4499,17 +4587,17 @@ window.toggleSkillPanel = function (idx) {
         if (m) found.push({ type: 'spellCostReduction', value: parseInt(m[1]) });
         m = text.match(/сопротивлени[ея]\s+стихи[ям][^.]*?на\s+(\d+)\s*%/i);
         if (m) found.push({ type: 'resistElemental', value: parseInt(m[1]) });
-        m = text.match(/сопротивлени[ея]\s+яд[а-я]*[,\s]+болезн[а-я]*[,\s]+крик[а-я]*[^.]*?на\s+(\d+)\s*%/i);
+        m = text.match(/сопротивлени[ея]\s+яд[а-яёА-ЯЁ]*[,\s]+болезн[а-яёА-ЯЁ]*[,\s]+крик[а-яёА-ЯЁ]*[^.]*?на\s+(\d+)\s*%/i);
         if (m) found.push({ type: 'resistPoisonDiseaseShout', value: parseInt(m[1]) });
         m = text.match(/скорост[ьи][^.]*?на\s+(\d+)\s*фут/i);
         if (m) found.push({ type: 'speed', value: parseInt(m[1]) });
         // "Повышает базовый урон оружия на N%" / "Увеличивает физ урон на N%" — раньше нигде не
         // разбиралось и не применялось.
-        m = text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?урон[а-я]*\s+оружия[^.]*?на\s+(\d+)\s*%/i) ||
-            text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?физ[а-я]*\s+урон[а-я]*[^.]*?на\s+(\d+)\s*%/i);
+        m = text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?урон[а-яёА-ЯЁ]*\s+оружия[^.]*?на\s+(\d+)\s*%/i) ||
+            text.match(/(?:повышает|повышаете|увеличивает)\s+(?:базовый\s+)?физ[а-яёА-ЯЁ]*\s+урон[а-яёА-ЯЁ]*[^.]*?на\s+(\d+)\s*%/i);
         if (m) found.push({ type: 'weaponDamagePercent', value: parseInt(m[1]) });
         // "Аура - Сила": "повышает пробивание брони на N" (плоское число, не %).
-        m = text.match(/пробивани[ея]\s+брон[а-я]*\s+на\s+(\d+)/i);
+        m = text.match(/пробивани[ея]\s+брон[а-яёА-ЯЁ]*\s+на\s+(\d+)/i);
         if (m) found.push({ type: 'armorPenetrationFlat', value: parseInt(m[1]) });
         return found;
     }
@@ -5444,19 +5532,19 @@ window.toggleSkillPanel = function (idx) {
     function parseSpellDamageFromDesc(desc, enhanced) {
         if (!desc) return null;
         let text = desc;
-        const splitIdx = desc.search(/усилен[а-я]*\s+эффект/i);
+        const splitIdx = desc.search(/усилен[а-яёА-ЯЁ]*\s+эффект/i);
         if (enhanced && splitIdx !== -1) {
-            const after = desc.slice(splitIdx).replace(/усилен[а-я]*\s+эффект/i, '');
+            const after = desc.slice(splitIdx).replace(/усилен[а-яёА-ЯЁ]*\s+эффект/i, '');
             if (after.trim()) text = after; // если после "Усиленный эффект" пусто — падаем на базовый текст
         } else if (!enhanced && splitIdx !== -1) {
             text = desc.slice(0, splitIdx);
         }
-        // [а-я] вместо \w — \w не матчит кириллицу. "нанос[а-я]*" покрывает наносит/наносящий/
+        // [а-яёА-ЯЁ] вместо \w — \w не матчит кириллицу. "нанос[а-яёА-ЯЁ]*" покрывает наносит/наносящий/
         // нанося и т.п. одним паттерном. (ед.?|единиц) — раньше "N единиц урона" не понималось,
         // только сокращённое "ед.". Опциональное слово перед "урон" — "физ/огненн/ледян/..." —
         // раньше "наносит 40 физ урона" не матчилось, т.к. между числом и "урон" было слово.
-        const m = text.match(/нанос[а-я]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+|огненн[а-я]*\s+|ледян[а-я]*\s+|электрич[а-я]*\s+|яд[а-я]*\s+)?урон/i) ||
-                  text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-я]*\s+)?урон/i);
+        const m = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+|огненн[а-яёА-ЯЁ]*\s+|ледян[а-яёА-ЯЁ]*\s+|электрич[а-яёА-ЯЁ]*\s+|яд[а-яёА-ЯЁ]*\s+)?урон/i) ||
+                  text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
         if (m) return parseInt(m[1]);
         // Ничего не нашли в усиленном тексте (напр. "Усиленный эффект" пустой) — пробуем базовый.
         return enhanced ? parseSpellDamageFromDesc(desc, false) : null;
@@ -7006,8 +7094,33 @@ function updateHungerPenalty() {
     window.applyGmControlledFields = applyGmControlledFields;
 
     // Применяет объект сохранения к DOM (используется и локальным, и облачным сохранением)
+    // Текущая версия формата сейва. Раньше поле data.version писалось при сохранении, но нигде
+    // не проверялось при загрузке — если формат когда-нибудь поменяется несовместимо (например,
+    // activeSummons станет объектом вместо массива), у старых игроков всё молча поедет без
+    // предупреждения. Реестр миграций пока пуст (менять пока нечего), но инфраструктура готова:
+    // чтобы добавить миграцию с 3.6 на 3.7, пишем SAVE_MIGRATIONS['3.6'] = function(data) {
+    // ...меняет data и возвращает его...; return data; } и поднимаем CURRENT_SAVE_VERSION.
+    const CURRENT_SAVE_VERSION = '3.6';
+    const SAVE_MIGRATIONS = {};
+    function migrateSaveData(data) {
+        if (!data) return data;
+        let version = data.version || '3.6'; // сейвы совсем без поля version — считаем самыми старыми из известных
+        let guard = 0;
+        while (version !== CURRENT_SAVE_VERSION && SAVE_MIGRATIONS[version] && guard < 20) {
+            console.warn(`Миграция сейва: ${version} → ...`);
+            data = SAVE_MIGRATIONS[version](data);
+            version = data.version;
+            guard++;
+        }
+        if (version !== CURRENT_SAVE_VERSION) {
+            console.warn(`Сейв версии "${version}" не совпадает с текущей "${CURRENT_SAVE_VERSION}", и миграция для неё не зарегистрирована — загружаем как есть.`);
+        }
+        return data;
+    }
+
     function applyCharacterData(data) {
         if (!data) return;
+        data = migrateSaveData(data);
         applyGmControlledFields(data);
         try {
             document.getElementById('char-name').value = data.name || '';
@@ -7223,7 +7336,22 @@ function updateHungerPenalty() {
             } catch(e) {}
         }
 
-        if (!saved) return;
+        if (!saved) {
+            // Онбординг для первого запуска — localStorage пуст, но у залогиненного игрока
+            // данные МОГЛИ БЫ прийти из облака чуть позже (асинхронно). Поэтому не показываем
+            // сразу — ждём короткую паузу и проверяем, заполнилось ли имя персонажа тем временем
+            // (облачной загрузкой); если нет — это действительно новый игрок.
+            if (!localStorage.getItem('skyrim_onboarding_dismissed')) {
+                setTimeout(() => {
+                    const nameEl = document.getElementById('char-name');
+                    if (nameEl && !nameEl.value) {
+                        const banner = document.getElementById('onboarding-banner');
+                        if (banner) banner.style.display = 'block';
+                    }
+                }, 1200);
+            }
+            return;
+        }
         try {
             let data = JSON.parse(saved);
             applyCharacterData(data);
@@ -7231,6 +7359,53 @@ function updateHungerPenalty() {
             console.warn('Ошибка загрузки сохранения:', e);
         }
     }
+
+    window.dismissOnboarding = function () {
+        localStorage.setItem('skyrim_onboarding_dismissed', '1');
+        const banner = document.getElementById('onboarding-banner');
+        if (banner) banner.style.display = 'none';
+    };
+
+    // Экспорт/импорт персонажа в файл — на случай отвала Firebase или потери доступа к аккаунту.
+    // Переиспользует существующую saveLocalStorage(true) вместо дублирования построения объекта
+    // data заново (там ~100 полей) — сохраняем немедленно, потом читаем тот же JSON обратно из
+    // localStorage и отдаём файлом. Ноль риска сломать рабочее сохранение.
+    window.exportCharacterToFile = function () {
+        saveLocalStorage(true);
+        const json = localStorage.getItem('skyrim_ttrpg_save_v3_6');
+        if (!json) { alert('Нечего экспортировать — сначала заполни лист персонажа.'); return; }
+        const name = (document.getElementById('char-name').value || 'character').replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g, '_');
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `skyrim_ttrpg_${name}_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    window.importCharacterFromFile = function (input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!confirm('Загрузить персонажа из файла? Это заменит текущие данные на листе.')) { input.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
+                if (typeof applyCharacterData === 'function') applyCharacterData(data);
+                if (typeof updateAll === 'function') updateAll();
+                saveLocalStorage(true);
+                alert('Персонаж загружен из файла.');
+            } catch (err) {
+                alert('Не удалось прочитать файл: ' + err.message);
+            }
+            input.value = '';
+        };
+        reader.readAsText(file);
+    };
 
     // Полный сброс
     function resetData() {

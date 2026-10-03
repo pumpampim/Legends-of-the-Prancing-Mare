@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&display=swap');
+/* Шрифты (Cinzel/EB Garamond/Barlow Condensed) раньше грузились через @import — это блокирует
+   разбор ОСТАЛЬНОГО CSS до тех пор, пока сам @import не докачается (отдельный round-trip,
+   причём последовательный, не параллельный). Теперь — через <link rel="stylesheet"> в <head>
+   каждой html-страницы, с preconnect заранее, см. index.html/gm.html/holds.html. */
 
 
 :root {
@@ -62,8 +65,9 @@ body::before {
     inset: 0;
     pointer-events: none;
     z-index: -2;
-    /* Твоя картинка как основной фон */
-    background-image: url('skyrim-bg.gif');
+    /* Твоя картинка как основной фон (WebP — см. пояснение у второго, активного по каскаду
+       body::before ниже в файле) */
+    background-image: url('skyrim-bg.webp');
     background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
@@ -931,12 +935,12 @@ select {
 
 /* ---------- КАЖДАЯ ВКЛАДКА ИМЕЕТ СВОЁ НАСТРОЕНИЕ ---------- */
 .tab-content{position:relative;padding:10px 8px 18px;border:1px solid rgba(125,98,55,.35);background-color:rgba(7,8,12,.52);box-shadow:0 12px 35px rgba(0,0,0,.22);}
-#tab1{background:linear-gradient(rgba(13,20,28,.66),rgba(5,8,12,.76)),url('skyrim-bg.gif') center/cover fixed;}
+#tab1{background:linear-gradient(rgba(13,20,28,.66),rgba(5,8,12,.76)),url('skyrim-bg.webp') center/cover fixed;}
 #tab2{background:linear-gradient(rgba(31,24,13,.78),rgba(8,7,5,.84)),radial-gradient(circle at 50% 0,#695331,transparent 60%);}
-#tab3{background:linear-gradient(rgba(22,17,14,.68),rgba(5,7,10,.86)),url('skyrim-bg.gif') 20% center/cover fixed;}
+#tab3{background:linear-gradient(rgba(22,17,14,.68),rgba(5,7,10,.86)),url('skyrim-bg.webp') 20% center/cover fixed;}
 #tab4{background:linear-gradient(rgba(22,26,36,.78),rgba(5,7,12,.88)),radial-gradient(circle at 50% 15%,#52627b,transparent 55%);}
 #tab5{background:linear-gradient(rgba(19,28,20,.72),rgba(5,8,7,.88)),radial-gradient(circle at 20% 10%,#506347,transparent 52%);}
-#tab6{background:linear-gradient(rgba(28,24,17,.72),rgba(6,7,8,.9)),url('skyrim-bg.gif') 80% center/cover fixed;}
+#tab6{background:linear-gradient(rgba(28,24,17,.72),rgba(6,7,8,.9)),url('skyrim-bg.webp') 80% center/cover fixed;}
 #tab7{background:linear-gradient(rgba(33,25,15,.74),rgba(8,7,5,.9)),radial-gradient(circle at 70% 15%,#795d35,transparent 48%);}
 #tab10{background:linear-gradient(rgba(21,19,28,.74),rgba(5,6,10,.9)),radial-gradient(circle at 50% 15%,#625477,transparent 50%);}
 
@@ -996,7 +1000,8 @@ button, input, select, textarea, .tab-link, .panel, .profession-header {
    pale silver text, angular frames and ornamental corners.
    ========================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Cinzel:wght@500;600;700&display=swap');
+/* Второй @import (Barlow Condensed + повтор Cinzel) убран туда же — см. комментарий в начале
+   файла. Оба @import объединены в ОДИН <link> на все три семейства разом. */
 
 :root {
     --sk-text: #e7e7e2;
@@ -1022,12 +1027,19 @@ body {
 }
 
 /* The reference has a blurred world behind the menu. */
+/* Раньше тут был skyrim-bg.gif (анимированный, 11 кадров, ~980КБ) — на мобильном это и тяжёлая
+   закачка, и постоянный repaint от анимации. Статичный кадр в WebP — ~9КБ, >99% экономии.
+   .no-webp — на очень старых браузерах без поддержки WebP (определяется инлайн-скриптом в
+   начале <head> каждой страницы). */
 body::before {
-    background-image: url('skyrim-bg.gif');
+    background-image: url('skyrim-bg.webp');
     background-size: cover;
     background-position: center;
     filter: blur(1.2px) brightness(.58) saturate(.72);
     transform: scale(1.025);
+}
+.no-webp body::before {
+    background-image: url('skyrim-bg.jpg');
 }
 
 body::after {
@@ -1473,6 +1485,10 @@ input[type="number"] {
 /* Small screen */
 @media (max-width: 700px) {
     body { padding: 9px; }
+    /* background-attachment:fixed — на iOS Safari это заставляет браузер пересчитывать фон на
+       каждый кадр скролла (фон "не двигается" относительно viewport, а не относительно страницы,
+       что требует отдельного композитного слоя). На телефоне это ощутимый лаг при прокрутке. */
+    body::before, #tab1, #tab3, #tab6 { background-attachment: scroll !important; }
     .nav-tabs { padding: 0 23px; min-height: 48px; }
     .tab-link { min-height: 46px; padding: 12px 8px; font-size: 15px; }
     .tab-link::before { left: 3px; }

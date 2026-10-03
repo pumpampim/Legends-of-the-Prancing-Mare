@@ -4,7 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Экран Мастера — «Скурим» TTRPG</title>
-    <link rel="stylesheet" href="style.css?v=4">
+
+    <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css (см. пояснение
+         в index.html). -->
+    <script>
+        if (!document.createElement('canvas').toDataURL('image/webp').includes('data:image/webp')) {
+            document.documentElement.classList.add('no-webp');
+        }
+    </script>
+
+    <!-- Шрифты — см. пояснение в index.html -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="style.css?v=6">
+
+    <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
+         в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
+    <style>
+        #js-error-banner { display:none; position:fixed; top:0; left:0; right:0; z-index:99999;
+            background:#5c1a1a; color:#f5e6c8; padding:10px 16px; font-family:sans-serif; font-size:14px;
+            box-shadow:0 2px 10px rgba(0,0,0,.5); }
+        #js-error-banner button { margin-left:12px; background:#2a0d0d; color:#f5e6c8; border:1px solid #f5e6c8;
+            border-radius:3px; padding:3px 10px; cursor:pointer; }
+    </style>
+    <div id="js-error-banner">⚠ Что-то пошло не так на странице. Запомни, что ты делал перед этим — пригодится для починки. <button onclick="document.getElementById('js-error-banner').style.display='none'">Закрыть</button></div>
+    <script>
+        (function () {
+            var lastErrorMsg = '';
+            var lastErrorAt = 0;
+            window.onerror = function (message) {
+                var now = Date.now();
+                if (message === lastErrorMsg && now - lastErrorAt < 5000) return false;
+                lastErrorMsg = message; lastErrorAt = now;
+                var banner = document.getElementById('js-error-banner');
+                if (banner) banner.style.display = 'block';
+                return false;
+            };
+        })();
+    </script>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>

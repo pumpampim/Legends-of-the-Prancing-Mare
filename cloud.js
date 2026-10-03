@@ -12,6 +12,7 @@
     let db = null;
     let currentUser = null;
     let currentSessionCode = null;
+    let lastTurnBumpAt = 0; // троттлинг bumpSessionTurnCounter — см. ниже
     let unsubSession = null;
     let unsubWatchedCharacter = null;
     let saveTimer = null;
@@ -35,7 +36,12 @@
         const info = el('cloud-user-info');
         const btn = el('btn-logout');
         if (currentUser) {
-            info.textContent = '☁ Вошёл как ' + currentUser.email;
+            // cloudDataReady становится true только ПОСЛЕ первой загрузки персонажа из облака —
+            // до этого saveCharacter молча ничего не сохраняет (её собственная защита: if
+            // (!currentUser || !db || !cloudDataReady) return;). Раньше статус-бар сразу писал
+            // "Вошёл как..." в момент входа, не дожидаясь этого — игрок мог начать править лист
+            // в окне, когда правки никуда не улетали бы.
+            info.textContent = cloudDataReady ? ('☁ Вошёл как ' + currentUser.email) : '⏳ Синхронизация...';
             btn.style.display = 'inline-block';
         } else {
             info.textContent = '⚠ Офлайн-режим (данные только в этом браузере)';
@@ -137,11 +143,13 @@
                 if (window.updateAll) window.updateAll();
             }
             cloudDataReady = true;
+            updateStatusBar();
         }).catch(e => {
             console.error('Ошибка загрузки персонажа из облака:', e);
             // Даже при ошибке загрузки разрешаем сохранение — иначе персонаж
             // навсегда останется нередактируемым при сбое сети.
             cloudDataReady = true;
+            updateStatusBar();
         });
 
         // Живой листенер ТОЛЬКО на поля, которые правит мастер (гильдии/сверхъестественное/
@@ -265,7 +273,7 @@
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 const statuses = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects.slice() : [];
-                statuses.push({ id: 'st' + Date.now(), name: statusName, desc: statusDesc, turns: turns || null });
+                statuses.push({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null });
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });
                 const logText = `✨ ${authorName || 'Игрок'} накладывает на «${enemies[idx].name}»: ${statusName}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}`;
                 return ref.update({
@@ -277,8 +285,14 @@
 
         // Увеличивает общий счётчик ходов сессии на 1 — вызывается при "Следующий ход"/"Следующий
         // круг" у любого игрока. Нужен для окна "поднять труп можно только 5 ходов после смерти".
+        // Троттлинг раз в 2 секунды — без него случайный спам по кнопке (100 кликов подряд = 100
+        // отдельных FieldValue.increment() записей) мог бы выбить дневной лимит бесплатного
+        // тарифа Firestore (20k записей/день) за один долгий бой группы из 5 человек.
         bumpSessionTurnCounter: function () {
             if (!currentSessionCode || !db) return Promise.resolve();
+            const now = Date.now();
+            if (now - lastTurnBumpAt < 2000) return Promise.resolve();
+            lastTurnBumpAt = now;
             return db.collection('sessions').doc(currentSessionCode).update({
                 sessionTurnCounter: firebase.firestore.FieldValue.increment(1)
             }).catch(e => console.error('Ошибка счётчика ходов сессии:', e));
@@ -522,6 +536,20 @@
             const maxHp = Number((el('max-hp') || {}).value) || 0;
             const maxMp = Number((el('max-mp') || {}).value) || 0;
             const name = (el('char-name') || {}).value || 'Без имени';
+
+            // Предупреждение (не блокировка) о совпадении имени с ДРУГИМ игроком — иначе в
+            // боевом журнале не разобрать, кто есть кто ("два Довакина"). Не блокируем вход, т.к.
+            // это может быть просто переподключение того же игрока после сбоя — сверяем по uid,
+            // не по факту самого имени у себя же.
+            const existingParticipants = doc.data().participants || {};
+            const nameTaken = Object.keys(existingParticipants).some(uid =>
+                uid !== currentUser.uid && (existingParticipants[uid].name || '') === name);
+            if (nameTaken && !silent) {
+                const errEl = el('session-join-error');
+                errEl.textContent = `⚠ Внимание: в сессии уже есть другой игрок с именем «${name}» — в журнале будет трудно их различить. Рекомендуем изменить имя на вкладке "Главная".`;
+                errEl.style.color = '#e67e22';
+                errEl.style.display = 'block';
+            }
 
             const patch = {};
             patch['participants.' + currentUser.uid] = {
