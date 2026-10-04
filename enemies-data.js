@@ -6,7 +6,7 @@
 
 const enemiesData = [
     {
-        name: "Волк", category: "Животные", hp: 50,
+        name: "Волк", category: "Животные", hp: 50, carrierOfDisease: "Каменная подагра", diseaseChance: 15,
         weaponDmg: 30, weaponNote: "",
         resist: {  },
         spells: [],
@@ -22,7 +22,7 @@ const enemiesData = [
         loot: "Шкура снежного волка, маленький шанс на до 15 монет"
     },
     {
-        name: "Злокрыс", category: "Животные", hp: 20,
+        name: "Злокрыс", category: "Животные", hp: 20, carrierOfDisease: "Атаксия", diseaseChance: 30,
         weaponDmg: 10, weaponNote: "",
         resist: {  },
         spells: [],
@@ -38,7 +38,7 @@ const enemiesData = [
         loot: "Чешуя рыбы убийцы и ее икра"
     },
     {
-        name: "Медведь", category: "Животные", hp: 290,
+        name: "Медведь", category: "Животные", hp: 290, carrierOfDisease: "Кровавая лихорадка", diseaseChance: 15,
         weaponDmg: 40, weaponNote: "40 ,удар 2 лапами",
         resist: {  },
         spells: [],
@@ -70,7 +70,7 @@ const enemiesData = [
         loot: "Клещня гр.краба, Крабовые ноги"
     },
     {
-        name: "Саблезуб", category: "Животные", hp: 170,
+        name: "Саблезуб", category: "Животные", hp: 170, carrierOfDisease: "Насморк Пелиниала", diseaseChance: 10,
         weaponDmg: 35, weaponNote: "35 удар 2 раза подряд",
         resist: {  },
         spells: [],
@@ -166,7 +166,7 @@ const enemiesData = [
         loot: "Стержневой корень, Живица сприганов"
     },
     {
-        name: "Корус", category: "Монстры", hp: 300,
+        name: "Корус", category: "Монстры", hp: 300, carrierOfDisease: "Заумь", diseaseChance: 20,
         weaponDmg: 70, weaponNote: "",
         resist: {  },
         spells: [],

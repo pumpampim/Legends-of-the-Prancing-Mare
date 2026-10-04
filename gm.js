@@ -6,6 +6,7 @@
     let auth = null;
     let db = null;
     let currentUser = null;
+    let _gmHeartbeatTimer = null; // heartbeat "мастер онлайн" — см. enterSessionView
     let currentCode = null;
     let unsubSession = null;
     let unsubGmWatchedCharacter = null; // подписка на инвентарь выбранного игрока (своя, не через
@@ -174,8 +175,30 @@
     // ---------- Создание / закрытие сессии ----------
 
     window.createSession = function () {
+        cleanupOldClosedSessions(); // не ждём завершения — не блокирует создание новой сессии
         attemptCreate(0);
     };
+
+    // Закрытые сессии раньше копились в Firestore навсегда (status:'closed', документ остаётся).
+    // Настоящий TTL (авто-удаление через N дней) настраивается в консоли Firebase, программно
+    // недоступен — вместо этого при каждом создании новой сессии попутно удаляем СВОИ ЖЕ старые
+    // закрытые (7+ дней). Фильтруем по status+возрасту НА КЛИЕНТЕ, не в запросе — простой запрос
+    // по одному полю (gmUid) не требует составного индекса в Firestore, а два where() рядом (status
+    // + диапазон по дате) потребовали бы его настройки в консоли.
+    function cleanupOldClosedSessions() {
+        if (!currentUser) return;
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        db.collection('sessions').where('gmUid', '==', currentUser.uid).get().then(snap => {
+            snap.forEach(doc => {
+                const d = doc.data();
+                if (d.status !== 'closed' || !d.closedAt) return;
+                const closedMs = d.closedAt.toMillis ? d.closedAt.toMillis() : 0;
+                if (closedMs && closedMs < weekAgo) {
+                    doc.ref.delete().catch(e => console.error('Ошибка чистки старой сессии:', e));
+                }
+            });
+        }).catch(e => console.error('Ошибка поиска старых сессий для чистки:', e));
+    }
 
     function attemptCreate(tries) {
         if (tries > 5) { alert('Не удалось сгенерировать свободный код, попробуй ещё раз.'); return; }
@@ -201,7 +224,8 @@
     window.closeSession = function () {
         if (!currentCode) return;
         if (!confirm('Закрыть сессию? Игроки больше не смогут в неё зайти (текущие данные сохранятся).')) return;
-        db.collection('sessions').doc(currentCode).update({ status: 'closed' }).finally(() => {
+        db.collection('sessions').doc(currentCode).update({ status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp() }).finally(() => {
+            if (_gmHeartbeatTimer) { clearInterval(_gmHeartbeatTimer); _gmHeartbeatTimer = null; }
             if (unsubSession) { unsubSession(); unsubSession = null; }
             localStorage.removeItem(GM_SESSION_KEY);
             currentCode = null;
@@ -222,7 +246,164 @@
         lastData = doc.data();
         renderAll();
     });
+    // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
+    // Игрок видит по gmLastSeen в том же документе, давно ли мастер был на связи (техдолг,
+    // пункт "индикатор мастер онлайн/отошёл").
+    if (_gmHeartbeatTimer) clearInterval(_gmHeartbeatTimer);
+    const sendHeartbeat = () => db.collection('sessions').doc(code).update({
+        gmLastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+    sendHeartbeat();
+    _gmHeartbeatTimer = setInterval(sendHeartbeat, 20000);
 }
+
+    function renderCampStatusGm(campState) {
+        const box = el('gm-camp-status');
+        if (!box) return;
+        if (!campState || !campState.active) { box.innerHTML = '<span style="opacity:.6;">Лагерь не разбит.</span>'; return; }
+        box.innerHTML = `⛺ Разбит игроком «${escapeHtml(campState.deployedBy || '?')}»${campState.isMagicallySafe ? ' · 🔮 магически безопасен (засады не будет)' : ''}`;
+    }
+
+    // Бросок на ночную засаду + разрешение отдыха — ядро механики похода/лагеря. Магически
+    // безопасный лагерь (isMagicallySafe) пропускает бросок полностью. При засаде лагерь
+    // прерывается (campState.active=false) и мастер добавляет врагов обычным инструментом ниже —
+    // этот бросок НЕ генерирует бой сам, только решает, нужен ли он.
+    // ---------- Активный блок (скрытые кубы) ----------
+    // ОТДЕЛЬНЫЙ инструмент от обычной атаки (rollGmAttack/applyGmAttackDamage) — та функция НЕ
+    // трогается этим кодом вообще. Нужен полный документ игрока (stats/skills/perkStates) — этих
+    // полей нет в lastData.participants (там только имя+ХП+МП, синхронизируемые отдельно), поэтому
+    // читаем characters/{uid} напрямую в момент броска, не заранее.
+    let pendingBlockResult = null;
+
+    function populateBlockSelects() {
+        const atkSel = el('block-attacker-select');
+        const tgtSel = el('block-target-select');
+        if (atkSel && !atkSel.options.length) {
+            atkSel.innerHTML = (lastData.enemies || []).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('') || '<option value="">Нет врагов в бою</option>';
+        }
+        if (tgtSel && !tgtSel.options.length) {
+            tgtSel.innerHTML = Object.keys(lastData.participants || {}).map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('') || '<option value="">Нет игроков</option>';
+        }
+    }
+
+    window.rollActiveBlock = function () {
+        const enemyId = el('block-attacker-select').value;
+        const targetUid = el('block-target-select').value;
+        const shieldType = el('block-shield-type').value;
+        const enemy = (lastData.enemies || []).find(e => e.id === enemyId);
+        if (!enemy || !targetUid) { alert('Выбери атакующего и защищающегося.'); return; }
+
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            if (!doc.exists) { alert('Не нашёл документ игрока.'); return; }
+            const data = doc.data();
+            const stats = data.stats || [10, 10, 10, 10, 10, 10]; // str,dex,con,int,wis,cha
+            const statMod = shieldType === 'heavy' ? calcAbilityMod(parseInt(stats[2]) || 10) : calcAbilityMod(parseInt(stats[1]) || 10);
+            const blockSkill = parseInt((data.skills || [])[3]) || 10; // Блокирование — индекс 3 в skillNames
+            const skillMod = Math.floor(blockSkill / 10);
+            // "Щитоносец" — skillIdx 3 (Блокирование), perkIdx 0, 5 ступеней → 20/25/30/35/40% среза урона.
+            const SHIELDBEARER_PCT = [0, 20, 25, 30, 35, 40];
+            let shieldbearerSteps = 0;
+            for (let s = 1; s <= 5; s++) { if ((data.perkStates || {})['skill3-perk0-step' + s]) shieldbearerSteps = s; }
+            const blockReductionPct = SHIELDBEARER_PCT[shieldbearerSteps];
+
+            // Атака врага: 1д20 + атакующий мод (СИЛ/ЛОВ, как у обычной атаки) + прогрессирующий
+            // бонус от урона оружия — floor((урон-10)/10), по прямой формуле из документа.
+            const atkMod = calcAbilityMod(enemy.isRanged ? (enemy.dex || 10) : (enemy.str || 10));
+            const progressiveBonus = Math.max(0, Math.floor(((enemy.weaponDmg || 0) - 10) / 10));
+            const enemyRoll = Math.floor(Math.random() * 20) + 1;
+            const enemyTotal = enemyRoll + atkMod + progressiveBonus;
+
+            const playerRoll = Math.floor(Math.random() * 20) + 1;
+            const playerTotal = playerRoll + statMod + skillMod;
+
+            const diff = enemyTotal - playerTotal;
+            let outcome, outcomeLabel;
+            if (diff <= 0) { outcome = 'success'; outcomeLabel = '✅ Блок успешен'; }
+            else if (diff <= 4) { outcome = 'partial'; outcomeLabel = '🟡 Частичный блок'; }
+            else { outcome = 'broken'; outcomeLabel = '❌ Блок пробит'; }
+
+            pendingBlockResult = { enemy, targetUid, outcome, blockReductionPct, enemyTotal, playerTotal };
+            const resBox = el('block-result');
+            resBox.style.display = 'block';
+            resBox.innerHTML = `<div style="font-size:13px;">Враг: 1d20(${enemyRoll})+${atkMod}+${progressiveBonus}(прогресс.) = <strong>${enemyTotal}</strong><br>` +
+                `Игрок: 1d20(${playerRoll})+${statMod}(хар-ка)+${skillMod}(навык) = <strong>${playerTotal}</strong><br>` +
+                `<strong style="font-size:15px;">${outcomeLabel}</strong> (разница ${diff})<br>` +
+                (outcome === 'success' ? `Урон срезан на ${blockReductionPct}% (перк «Щитоносец»), враг получает −2 к следующему броску.` :
+                 outcome === 'partial' ? `Урон снижается только на сопротивление щита/брони самого по себе — примени как обычный урон с резистом.` :
+                 `Игрок получает ПОЛНЫЙ урон (только бронёй) + статус «Ошеломление» (−3 к следующему броску).`);
+            el('block-apply-btn').style.display = 'block';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.applyActiveBlockResult = function () {
+        if (!pendingBlockResult) return;
+        const { enemy, targetUid, outcome, blockReductionPct } = pendingBlockResult;
+        const baseDmg = enemy.weaponDmg || 0;
+        let finalDmgNote = '';
+        const patch = {};
+        if (outcome === 'success') {
+            const dmg = Math.round(baseDmg * (1 - blockReductionPct / 100));
+            finalDmgNote = `Урон после среза блоком: ${dmg} (из ${baseDmg}, срез ${blockReductionPct}%) — резист/броня цели по обычным правилам применяются сверху вручную.`;
+            // Дебафф врагу — через statusEffects на самом враге (та же структура, что у управляющих заклинаний игрока).
+            const enemies = (lastData.enemies || []).map(e => e.id === enemy.id ? { ...e, statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску (блок отбил атаку).', turns: 1 }] } : e);
+            patch.enemies = enemies;
+        } else if (outcome === 'partial') {
+            finalDmgNote = `Урон снижается только сопротивлением самого щита/брони (не процентом блока) — реши сопротивление щита сам и примени урон как обычно.`;
+        } else {
+            finalDmgNote = `Игрок получает ПОЛНЫЙ урон ${baseDmg} (срез только бронёй по обычным правилам) + статус «Ошеломление».`;
+            patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                id: 'stag-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                name: enemy.name, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1
+            });
+        }
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🛡️ Активный блок: ${enemy.name} vs блокирующий — ${outcome === 'success' ? 'успех' : outcome === 'partial' ? 'частично' : 'пробит'}. ${finalDmgNote}` });
+        db.collection('sessions').doc(currentCode).update(patch).then(() => {
+            el('block-result').style.display = 'none';
+            el('block-apply-btn').style.display = 'none';
+            pendingBlockResult = null;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.resolveCampNight = function () {
+        const campState = lastData.campState;
+        if (!campState || !campState.active) { alert('Лагерь сейчас не разбит.'); return; }
+        const terrainChances = { dungeon: 40, forest: 25, plains: 15 };
+        const chance = campState.isMagicallySafe ? 0 : (terrainChances[el('camp-terrain-select').value] || 25);
+        const roll = Math.floor(Math.random() * 100) + 1;
+        const ambush = roll <= chance;
+        if (ambush) {
+            db.collection('sessions').doc(currentCode).update({
+                'campState.active': false,
+                combatLog: firebase.firestore.FieldValue.arrayUnion({
+                    ts: Date.now(), author: 'Мастер',
+                    text: `🚨 Ночная засада! (бросок ${roll} ≤ ${chance}%) Лагерь прерван — добавь врагов обычным способом.`
+                })
+            }).catch(e => alert('Ошибка: ' + e.message));
+            return;
+        }
+        // Спокойная ночь — ХП/МП всех УЧАСТНИКОВ сессии до максимума + статус "Полноценный отдых".
+        const participants = lastData.participants || {};
+        const uids = Object.keys(participants);
+        const writes = uids.map(uid => {
+            const p = participants[uid];
+            return db.collection('characters').doc(uid).update({
+                'vitals.0': p.maxHp || 0, 'vitals.1': p.maxMp || 0,
+                pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({
+                    id: 'rest-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                    name: 'Лагерь', effectName: 'Полноценный отдых', description: '+1 к кубам на все проверки навыков (весь следующий игровой день).', turnsRemaining: 20
+                })
+            }).catch(e => console.error('Ошибка отдыха для', uid, e));
+        });
+        Promise.all(writes).then(() => {
+            db.collection('sessions').doc(currentCode).update({
+                'campState.active': false,
+                combatLog: firebase.firestore.FieldValue.arrayUnion({
+                    ts: Date.now(), author: 'Мастер',
+                    text: `😴 Ночь прошла спокойно (бросок ${roll} > ${chance}%). ХП/МП группы восстановлены, статус «Полноценный отдых» применён.`
+                })
+            });
+        });
+    };
 
     function renderAll() {
         renderParty(lastData.participants || {});
@@ -230,6 +411,9 @@
         renderTurnOrder(lastData.turnOrder || []);
         renderTurnOrderPickSelect();
         renderLog(lastData.combatLog || []);
+        renderWhispers(lastData.whispers || []);
+        renderCampStatusGm(lastData.campState);
+        populateBlockSelects();
         populateRecipePlayerSelect();
         populateInvPlayerSelect();
         populateCalcPlayerSelects();
@@ -307,8 +491,15 @@
         }
     };
 
+    // Кэш по имени — enemyAvatarData чистая (одно и то же имя всегда даёт один и тот же SVG),
+    // поэтому кэшировать безопасно: не может устареть, инвалидация не нужна вообще. Раньше
+    // пересчитывалась на КАЖДОГО врага при КАЖДОМ рендере списка боя (а это на каждый snapshot
+    // сессии, не только при реальных изменениях) — строка хэша+regex+сборка SVG+encodeURIComponent
+    // на ~1000-символьную строку, не бесплатно при большом бое.
+    const _avatarCache = new Map();
     function enemyAvatarData(enemy) {
         const name = String(enemy && enemy.name || '?');
+        if (_avatarCache.has(name)) return _avatarCache.get(name);
         let hash = 0; for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
         const kind = /волк|саблезуб|медвед|мамонт|краб|рыба|злокрыс|паук|корус/i.test(name) ? 'beast' :
                      /скелет|драугр|нежить|привед/i.test(name) ? 'undead' :
@@ -327,7 +518,9 @@
         else if(kind==='witch') features='<path d="M27 31 Q50 4 73 31 L67 28 Q50 18 33 28Z" fill="#332c2a"/><path d="M42 58 Q50 63 58 58" fill="none" stroke="#4d2d27" stroke-width="3"/>';
         else features='<path d="M29 38 Q31 15 50 13 Q69 15 71 38 L65 28 Q50 22 35 28Z" fill="'+hair+'"/><path d="M42 63 Q50 68 58 63" fill="none" stroke="#3a2822" stroke-width="3"/>';
         const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="bg"><stop stop-color="#6f6045"/><stop offset="1" stop-color="#17130e"/></radialGradient></defs><rect width="100" height="100" rx="50" fill="url(#bg)"/><circle cx="50" cy="52" r="32" fill="${skin}" stroke="#c5a568" stroke-width="2"/>${features}<ellipse cx="39" cy="48" rx="4" ry="5" fill="#16130f"/><ellipse cx="61" cy="48" rx="4" ry="5" fill="#16130f"/><path d="M46 55 Q50 58 54 55" fill="none" stroke="#3a2922" stroke-width="2"/><path d="M23 92 Q50 72 77 92" fill="${dark}"/></svg>`;
-        return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        const result = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        _avatarCache.set(name, result);
+        return result;
     }
 
     // ---------- Противники ----------
@@ -601,7 +794,56 @@
         db.collection('sessions').doc(currentCode).update({ turnOrder: [] }).catch(e => console.error(e));
     };
 
+    // Раньше у мастера вообще не было кнопки "следующий ход" — только у игроков (их собственная
+    // bumpSessionTurnCounter тикает ТОЛЬКО общий счётчик, личные эффекты на листе игрока
+    // decrement'ятся у НЕГО локально). Эта кнопка — для серверной части, которую контролирует
+    // мастер: статус-эффекты и кулдауны криков на врагах, и общий счётчик ходов сессии (тот же
+    // sessionTurnCounter, что уже используют игроки — не отдельный, чтобы не рассинхронизировать
+    // окно "поднять труп только 5 ходов после смерти").
+    window.gmAdvanceTurn = function () {
+        const enemies = (lastData.enemies || []).map(e => {
+            const copy = { ...e };
+            if (Array.isArray(copy.statusEffects) && copy.statusEffects.length) {
+                copy.statusEffects = copy.statusEffects
+                    .map(s => ({ ...s, turns: s.turns != null ? s.turns - 1 : s.turns }))
+                    .filter(s => s.turns == null || s.turns > 0);
+            }
+            Object.keys(copy).forEach(k => {
+                if (k.indexOf('shoutCd_') === 0 && copy[k] > 0) copy[k] = copy[k] - 1;
+            });
+            return copy;
+        });
+        db.collection('sessions').doc(currentCode).update({
+            enemies: enemies,
+            sessionTurnCounter: firebase.firestore.FieldValue.increment(1),
+            combatLog: firebase.firestore.FieldValue.arrayUnion({
+                ts: Date.now(), author: 'Мастер',
+                text: '⏭️ Новый ход! Не забудьте прокрутить длительность своих активных эффектов на листе.'
+            })
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     // ---------- Боевой журнал ----------
+
+    // Шёпот от игроков — приватная панель, НЕ смешивается с общим боевым журналом.
+    function renderWhispers(whispers) {
+        const target = el('gm-whispers-list');
+        if (!target) return;
+        if (!whispers.length) {
+            target.innerHTML = '<p style="opacity:.6; font-size:13px;">Пока ничего не нашёптано.</p>';
+            return;
+        }
+        target.innerHTML = whispers.map(w => {
+            const time = w.ts ? new Date(w.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+            return '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-author">' + escapeHtml(w.author || '?') + ':</span> ' + escapeHtml(w.text || '') + '</div>';
+        }).join('');
+        target.scrollTop = target.scrollHeight;
+    }
+
+    window.clearWhispers = function () {
+        if (!confirm('Очистить все шёпоты от игроков?')) return;
+        db.collection('sessions').doc(currentCode).update({ whispers: [] }).catch(e => console.error(e));
+    };
 
     function renderLog(log) {
         const target = el('gm-combat-log');
@@ -630,6 +872,27 @@
     window.clearLog = function () {
         if (!confirm('Очистить весь боевой журнал?')) return;
         db.collection('sessions').doc(currentCode).update({ combatLog: [] }).catch(e => console.error(e));
+    };
+
+    // Экспорт журнала боя в текстовый файл — для протокола сессии (техдолг, пункт "экспорт
+    // боевого журнала"). Берёт lastData.combatLog — тот же массив, что уже отрендерен на экране,
+    // никакого отдельного запроса к Firestore не нужно.
+    window.exportCombatLogToFile = function () {
+        const log = (lastData && lastData.combatLog) || [];
+        if (!log.length) { alert('Журнал пуст — нечего экспортировать.'); return; }
+        const lines = log.map(entry => {
+            const time = entry.ts ? new Date(entry.ts).toLocaleString('ru-RU') : '';
+            return `[${time}] ${entry.author || '?'}: ${entry.text || ''}`;
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `boevoy_zhurnal_${currentCode || 'sessiya'}_${new Date().toISOString().slice(0, 10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     el('gm-log-input') && el('gm-log-input').addEventListener('keydown', function (ev) {
@@ -1492,7 +1755,12 @@
         });
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
-        stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold };
+        // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
+        // значение при обновлении ассортимента (это про товар, не про отношение), 0 только для
+        // нового торговца. Меняется отдельно, кнопками ниже (setMerchantDisposition), без
+        // необходимости перегенерировать весь ассортимент заново.
+        const existingDisposition = (stocks[key] && stocks[key].disposition) || 0;
+        stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold, disposition: existingDisposition };
         db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
             el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${def.gold}.</span>`;
             renderMerchantStaleness();
@@ -1509,16 +1777,29 @@
         const keys = Object.keys(stocks);
         const currentDay = lastData.gameDayCounter || 0;
         if (!keys.length) { box.innerHTML = '<p style="opacity:.6; font-size:13px;">Торговцев ещё нет.</p>'; return; }
+        const DISPOSITION_LABELS = { '-2': 'Вражда (торговля закрыта)', '-1': 'Неприязнь (+25%)', '0': 'Нейтрально', '1': 'Друг (−10%)', '2': 'Союзник (−20%)' };
         box.innerHTML = keys.map(k => {
             const s = stocks[k];
             const daysAgo = currentDay - (s.generatedOnDay || 0);
             const stale = daysAgo >= 7;
-            return `<div style="font-size:13px; display:flex; justify-content:space-between; align-items:center; gap:6px; ${stale ? 'color:#e67e22;' : ''}">
+            const disp = s.disposition || 0;
+            return `<div style="font-size:13px; display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; ${stale ? 'color:#e67e22;' : ''}">
                 <span>${stale ? '⚠️ ' : ''}${escapeHtml(s.label)} — ${escapeHtml(s.hold)}: ${daysAgo} игр. дн. назад${stale ? ' (пора обновить)' : ''}</span>
+                <select style="width:auto; font-size:11px; padding:1px;" onchange="setMerchantDisposition('${escapeHtml(k)}', this.value)">
+                    ${Object.keys(DISPOSITION_LABELS).map(v => `<option value="${v}" ${String(disp) === v ? 'selected' : ''}>${DISPOSITION_LABELS[v]}</option>`).join('')}
+                </select>
                 <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:11px; flex-shrink:0;" onclick="removeMerchant('${escapeHtml(k)}')">Убрать</button>
             </div>`;
         }).join('');
     }
+
+    // disposition конкретного торговца (-2 Вражда .. +2 Союзник) — отношение влияет на цены у
+    // игрока (computeBuyPrice/computeSellPrice, index.html) и может полностью заблокировать
+    // торговлю при -2. Меняется отдельно от ассортимента, без нужды его перегенерировать.
+    window.setMerchantDisposition = function (key, value) {
+        db.collection('sessions').doc(currentCode).update({ ['merchantStocks.' + key + '.disposition']: parseInt(value) || 0 })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
 
     // Убрать торговца совсем (не просто обновить ассортимент) — раньше такой возможности не
     // было вообще, только сброс товара у уже существующего.
@@ -2029,6 +2310,17 @@
 
         const item = { name, category: catLabels[cat] || 'Разное', weight, price, effect: desc, slot: null };
 
+        // Универсальный счётчик использований — применяется НЕЗАВИСИМО от категории (не только
+        // "разное", оружие/броня/зелье тоже могут иметь ограниченный запас зарядов, как волшебный
+        // посох). Сама механика кнопки "Использовать" уже существует (useLimitedItem, index.html),
+        // раньше просто не было способа задать maxUses при РУЧНОМ создании предмета мастером.
+        const maxUses = parseInt(el('ci-max-uses').value) || 0;
+        if (maxUses > 0) {
+            item.maxUses = maxUses;
+            item.usesLeft = maxUses;
+            item.effect = item.effect ? item.effect + `; Использований: ${maxUses}` : `Использований: ${maxUses}`;
+        }
+
         if (cat === 'weapon') {
             item.dmg = parseInt(el('ci-damage').value) || 0;
             // Значение выбора может быть "onehand:топор" (для распознавания топора/булавы по имени
@@ -2103,6 +2395,18 @@
 
     // Статус-эффекты, которые НПС может наложить на игрока атакой — пишутся прямо в
     // activeTimedEffects игрока и тикают по тем же ходам, что и его собственные баффы.
+    // Болезни Скайрима — переносятся дикими животными при укусе (см. DISEASE_DEFS ниже и теги
+    // carrierOfDisease/diseaseChance в enemies-data.js). Лечится обычным зельем лечения болезней
+    // или молитвой у алтаря — отдельной кнопки "вылечить" тут нет специально, это дело мастера
+    // отыграть по ситуации (снять статус вручную кнопкой "Снять", как и остальные статусы).
+    const DISEASE_DEFS = {
+        'Атаксия': { desc: '−2 к броскам Одноручного оружия и Взлома.' },
+        'Каменная подагра': { desc: '−2 к броскам Тяжёлой/Лёгкой брони.' },
+        'Заумь': { desc: '−2 к броскам школ магии (Разрушение/Восстановление/Колдовство/Иллюзия/Изменение).' },
+        'Кровавая лихорадка': { desc: '−10 к максимальному здоровью, пока не вылечена.' },
+        'Насморк Пелиниала': { desc: '−2 к броскам Скрытности и Карманных краж.' }
+    };
+
     const GM_STATUS_EFFECTS = {
         paralyze: { name: 'Паралич', desc: 'Не может действовать в свой ход.', turns: 1 },
         fear: { name: 'Страх', desc: 'Вынужден отступать/убегать 1 ход.', turns: 1 },
@@ -2266,6 +2570,7 @@
     if (typeof renderHolidaySelect === 'function') renderHolidaySelect();
     if (typeof renderGroupCheckSkillSelect === 'function') renderGroupCheckSkillSelect();
     if (typeof renderGuildInfoSelect === 'function') { renderGuildInfoSelect(); renderGuildInfoPanel(); }
+    if (typeof populateQgenHoldSelect === 'function') populateQgenHoldSelect();
     if (typeof renderTournBracketInfo === 'function') renderTournBracketInfo();
     if (typeof renderAllWeatherReference === 'function') renderAllWeatherReference();
     if (typeof renderAllEnchantsReference === 'function') renderAllEnchantsReference();
@@ -2285,6 +2590,56 @@
     }
 
     function genQuestId() { return 'q-' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+    // Генератор квестов (документ 4) — НЕ отдельный механизм доставки, просто заполняет уже
+    // существующую форму выдачи (quest-title-input и т.д.), дальше работает обычная
+    // window.grantQuest() как при ручном вводе. holds.js подключён отдельно в gm.html (раньше
+    // был только в holds.html).
+    function populateQgenHoldSelect() {
+        const sel = el('qgen-hold-select');
+        if (!sel || sel.options.length || !window.holdsData) return;
+        sel.innerHTML = Object.keys(window.holdsData).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+    }
+
+    const QUEST_TEMPLATES = [
+        { kind: 'bounty', giverRole: /ярл|управител/i, title: n => `Охота за головами: логово у «${n}»`,
+          desc: (giver, loc) => `${giver} объявил(а) награду за зачистку опасного места — ${loc}.`,
+          req: loc => `Зачистить ${loc} от обосновавшихся там врагов.` },
+        { kind: 'fetch', giverRole: /маг|жрец|алхимик/i, title: n => `Поручение: находка из «${n}»`,
+          desc: (giver, loc) => `${giver} просит принести редкий предмет или книгу из ${loc}.`,
+          req: loc => `Добыть нужный предмет в ${loc} и вернуть заказчику.` },
+        { kind: 'escort', giverRole: /купец|торговец|трактирщик/i, title: n => `Поручение от «${n}»`,
+          desc: (giver, loc) => `${giver} просит помощи — дело связано с ${loc}.`,
+          req: loc => `Разобраться с делом в ${loc} и вернуться с докладом.` }
+    ];
+
+    window.generateHoldQuest = function () {
+        const holdName = el('qgen-hold-select').value;
+        const difficulty = el('qgen-difficulty').value;
+        const hold = window.holdsData && window.holdsData[holdName];
+        if (!hold) { alert('Нет данных по этому владению.'); return; }
+        // "npcs" вперемешку содержит и реальных именных NPC (role непустой), и заголовки
+        // городов/разделов (role пустой) — отсеиваем вторые.
+        const realNpcs = (hold.npcs || []).filter(n => n.role);
+        const locations = (hold.locations || []).filter(l => l.name);
+        if (!realNpcs.length || !locations.length) { alert('В базе этого владения не хватает NPC или локаций для генерации.'); return; }
+        const template = QUEST_TEMPLATES[Math.floor(Math.random() * QUEST_TEMPLATES.length)];
+        const matchingGivers = realNpcs.filter(n => template.giverRole.test(n.role));
+        const giver = (matchingGivers.length ? matchingGivers : realNpcs)[Math.floor(Math.random() * (matchingGivers.length ? matchingGivers.length : realNpcs.length))];
+        const loc = locations[Math.floor(Math.random() * locations.length)];
+        const giverLabel = `${giver.name} (${giver.role})`;
+
+        // Награда по сложности — база × уровень персонажа. Уровень тут неизвестен (квест ещё не
+        // привязан к конкретному игроку), берём среднюю оценку мастера явно не нужна — просто
+        // фиксированная база по сложности, мастер поправит число в поле вручную при желании.
+        const goldByDiff = { low: 100, mid: 250, high: 500 };
+        const gold = goldByDiff[difficulty] || 250;
+
+        el('quest-title-input').value = template.title(holdName);
+        el('quest-desc-input').value = template.desc(giverLabel, loc.name);
+        el('quest-req-input').value = template.req(loc.name);
+        el('quest-reward-input').value = `${gold} септимов` + (difficulty === 'high' ? ' + ценный предмет по усмотрению мастера' : '');
+    };
 
     async function grantQuestToUid(uid, quest) {
         const ref = db.collection('characters').doc(uid);
@@ -2502,6 +2857,9 @@
 
         pendingGmAttack = {
             targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
+            // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
+            // заражение при попадании физической атакой, см. applyGmAttackDamage.
+            carrierOfDisease: hit ? enemy.carrierOfDisease : null, diseaseChance: hit ? (enemy.diseaseChance || 0) : 0,
             logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRoll}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
@@ -2550,6 +2908,27 @@
                 vitals[0] = newHp;
                 chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
                 logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}`;
+            }
+            // Автоматический бросок на заражение болезнью — раньше этого не было вообще, болезни
+            // существовали только как текст в описании монстров. Срабатывает только при физическом
+            // попадании (dmgType==='physical') от переносчика (carrierOfDisease задан).
+            if (dmg && dmgType === 'physical' && pendingGmAttack.carrierOfDisease && pendingGmAttack.diseaseChance > 0) {
+                const roll = Math.floor(Math.random() * 100) + 1;
+                const resist = (data.resistances && data.resistances.disease) || 0;
+                const effectiveChance = Math.max(0, pendingGmAttack.diseaseChance * (1 - resist / 100));
+                if (roll <= effectiveChance) {
+                    const diseaseName = pendingGmAttack.carrierOfDisease;
+                    const diseaseInfo = DISEASE_DEFS[diseaseName] || { desc: 'Эффект — на усмотрение мастера.' };
+                    const patch2 = {};
+                    patch2['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                        id: 'dis-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                        name: pendingGmAttack.enemyName, effectName: 'Болезнь: ' + diseaseName, description: diseaseInfo.desc, turnsRemaining: Infinity
+                    });
+                    chores.push(db.collection('sessions').doc(currentCode).update(patch2));
+                    logExtra += `. 🚨 Заражение! ${targetName} подхватил(а) болезнь «${diseaseName}» (бросок ${roll} ≤ ${effectiveChance.toFixed(0)}%)`;
+                } else {
+                    logExtra += `. Проверка на заражение не прошла (${roll} > ${effectiveChance.toFixed(0)}%)`;
+                }
             }
             if (statusKey) {
                 // Статус-эффект пишется В СЕССИЮ (не в документ персонажа) — у игрока нет

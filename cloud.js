@@ -136,6 +136,23 @@
 
     let unsubSelfGmFields = null;
 
+    // Живой листенер ТОЛЬКО на поля, которые правит мастер (гильдии/сверхъестественное/
+    // репутация) — не на весь документ, чтобы не перезаписывать активные локальные правки
+    // игрока (хп/инвентарь/статы и т.д.) чужим снапшотом. Игрок должен увидеть, что мастер
+    // включил ему ликантропию или поднял прогресс гильдии, СРАЗУ, без перезагрузки страницы.
+    // Вынесено отдельно от loadCharacterFromCloud — та делает ещё и ПОЛНЫЙ restore (applyCharacterData)
+    // при первой загрузке, а для переподписки после сворачивания вкладки (задача 15, см. ниже)
+    // нужна ТОЛЬКО сама подписка, без повторного restore — иначе затёрло бы несохранённые
+    // локальные правки игрока тем, что было в облаке на момент сворачивания вкладки.
+    function subscribeToOwnGmFields(uid) {
+        if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
+        unsubSelfGmFields = db.collection('characters').doc(uid).onSnapshot(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            if (window.applyGmControlledFields) window.applyGmControlledFields(data);
+        }, e => console.error('Ошибка подписки на поля мастера:', e));
+    }
+
     function loadCharacterFromCloud(uid) {
         db.collection('characters').doc(uid).get().then(doc => {
             if (doc.exists && window.applyCharacterData) {
@@ -151,17 +168,7 @@
             cloudDataReady = true;
             updateStatusBar();
         });
-
-        // Живой листенер ТОЛЬКО на поля, которые правит мастер (гильдии/сверхъестественное/
-        // репутация) — не на весь документ, чтобы не перезаписывать активные локальные правки
-        // игрока (хп/инвентарь/статы и т.д.) чужим снапшотом. Игрок должен увидеть, что мастер
-        // включил ему ликантропию или поднял прогресс гильдии, СРАЗУ, без перезагрузки страницы.
-        if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
-        unsubSelfGmFields = db.collection('characters').doc(uid).onSnapshot(doc => {
-            if (!doc.exists) return;
-            const data = doc.data();
-            if (window.applyGmControlledFields) window.applyGmControlledFields(data);
-        }, e => console.error('Ошибка подписки на поля мастера:', e));
+        subscribeToOwnGmFields(uid);
     }
 
     // ---------- Сохранение персонажа (вызывается из saveLocalStorage) ----------
@@ -445,6 +452,29 @@
             });
         },
 
+        // Шёпот мастеру — отдельное поле whispers в сессии, НЕ смешивается с общим боевым
+        // журналом (combatLog, который рендерится у ВСЕХ игроков). Важная оговорка: это
+        // интерфейсное разделение, не криптографическая приватность — весь документ сессии
+        // технически читаем любым участником (как и остальные данные сессии, см. firestore.rules
+        // "allow read: if request.auth != null" для закрытой группы друзей), просто обычный
+        // интерфейс игрока эти записи не показывает вообще, только интерфейс мастера.
+        // Состояние похода/лагеря — общее на сессию (не per-player), т.к. отряд разбивает один
+        // лагерь на всех, не каждый себе отдельно.
+        setCampState: function (state) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            return db.collection('sessions').doc(currentSessionCode).update({ campState: state });
+        },
+
+        sendWhisperToGm: function (text, authorName) {
+            if (!currentSessionCode || !db || !text) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                whispers: firebase.firestore.FieldValue.arrayUnion({
+                    id: 'wh-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                    ts: Date.now(), author: authorName || 'Игрок', text: text
+                })
+            });
+        },
+
         // Помечает труп в сессии как уже поднятый заклинанием — чтобы его нельзя было
         // поднять второй раз, и чтобы у мастера это тоже было видно.
         markCorpseRaised: function (enemyId) {
@@ -579,6 +609,21 @@
         el('session-code-input').value = '';
     };
 
+    // Когда вкладка браузера свёрнута/неактивна, живые слушатели Firestore продолжают получать
+    // snapshot-ы, обновлять DOM и жрать батарею — хотя игрок в этот момент физически не смотрит
+    // на страницу. Отписываемся на visibilitychange, переподписываемся обратно при возврате.
+    // CloudSync.saveCharacter() от этого НЕ зависит (пишет напрямую через db.collection(...).set(),
+    // не через listener) — автосохранение продолжает работать даже со свёрнутой вкладкой.
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            if (unsubSession) { unsubSession(); unsubSession = null; }
+            if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
+        } else {
+            if (currentUser && !unsubSelfGmFields) subscribeToOwnGmFields(currentUser.uid);
+            if (currentSessionCode && !unsubSession) subscribeToSession(currentSessionCode);
+        }
+    });
+
     function subscribeToSession(code) {
         if (unsubSession) unsubSession();
         unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
@@ -591,8 +636,33 @@
         });
     }
 
+    // Индикатор "мастер онлайн/отошёл" — по heartbeat, который gm.js пишет раз в 20 сек, пока
+    // открыта вкладка с активной сессией (см. enterSessionView/sendHeartbeat в gm.js).
+    function renderGmOnlineIndicator(gmLastSeen) {
+        const el2 = el('gm-online-indicator');
+        if (!el2) return;
+        if (!gmLastSeen || !gmLastSeen.toMillis) { el2.textContent = ''; return; }
+        const secAgo = (Date.now() - gmLastSeen.toMillis()) / 1000;
+        el2.textContent = secAgo < 60 ? '🟢 мастер онлайн' : '⚪ мастер отошёл';
+    }
+
+    // Отображение статуса похода/лагеря — переключает видимость "разбить"/"уже разбит" блоков.
+    function renderCampStatus(campState) {
+        const statusEl = el('camp-status-display');
+        const deployEl = el('camp-deploy-controls');
+        const activeEl = el('camp-active-controls');
+        if (!statusEl || !deployEl || !activeEl) return;
+        const active = campState && campState.active;
+        deployEl.style.display = active ? 'none' : 'block';
+        activeEl.style.display = active ? 'block' : 'none';
+        if (!active) { statusEl.textContent = ''; return; }
+        statusEl.innerHTML = `Лагерь разбит (${campState.deployedBy || '?'})${campState.isMagicallySafe ? ' · 🔮 магически безопасен' : (campState.hasTent ? ' · палатка и костёр' : '')}`;
+    }
+
     function renderSession(data) {
         lastSessionData = data;
+        renderGmOnlineIndicator(data.gmLastSeen);
+        renderCampStatus(data.campState);
         renderParty(data.participants || {});
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
@@ -621,8 +691,12 @@
         }
     }
 
+    // Кэш по имени — та же защита, что в gm.js (см. подробный комментарий там). Функция чистая,
+    // кэш безопасен без инвалидации.
+    const _avatarCache = new Map();
     function enemyAvatarData(enemy) {
         const name = String(enemy && enemy.name || '?');
+        if (_avatarCache.has(name)) return _avatarCache.get(name);
         let hash = 0; for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
         const kind = /волк|саблезуб|медвед|мамонт|краб|рыба|злокрыс|паук|корус/i.test(name) ? 'beast' :
                      /скелет|драугр|нежить|привед/i.test(name) ? 'undead' :
@@ -641,7 +715,9 @@
         else if(kind==='witch') features='<path d="M27 31 Q50 4 73 31 L67 28 Q50 18 33 28Z" fill="#332c2a"/><path d="M42 58 Q50 63 58 58" fill="none" stroke="#4d2d27" stroke-width="3"/>';
         else features='<path d="M29 38 Q31 15 50 13 Q69 15 71 38 L65 28 Q50 22 35 28Z" fill="'+hair+'"/><path d="M42 63 Q50 68 58 63" fill="none" stroke="#3a2822" stroke-width="3"/>';
         const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="bg"><stop stop-color="#6f6045"/><stop offset="1" stop-color="#17130e"/></radialGradient></defs><rect width="100" height="100" rx="50" fill="url(#bg)"/><circle cx="50" cy="52" r="32" fill="${skin}" stroke="#c5a568" stroke-width="2"/>${features}<ellipse cx="39" cy="48" rx="4" ry="5" fill="#16130f"/><ellipse cx="61" cy="48" rx="4" ry="5" fill="#16130f"/><path d="M46 55 Q50 58 54 55" fill="none" stroke="#3a2922" stroke-width="2"/><path d="M23 92 Q50 72 77 92" fill="${dark}"/></svg>`;
-        return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        const result = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        _avatarCache.set(name, result);
+        return result;
     }
 
     function barRow(name, curHp, maxHp, curMp, maxMp, avatar) {
@@ -712,6 +788,20 @@
 
     el('log-input') && el('log-input').addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') window.postLogEntry();
+    });
+
+    window.sendWhisperToGm = function () {
+        const input = el('whisper-input');
+        const text = (input.value || '').trim();
+        if (!text || !currentSessionCode || !currentUser) return;
+        const authorName = (el('char-name') || {}).value || currentUser.email;
+        window.CloudSync.sendWhisperToGm(text, authorName)
+            .then(() => { input.value = ''; })
+            .catch(e => console.error('Ошибка отправки шёпота:', e));
+    };
+
+    el('whisper-input') && el('whisper-input').addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') window.sendWhisperToGm();
     });
 
     // ---------- Инициализация ----------

@@ -167,6 +167,14 @@
                     <button onclick="addTurnOrderCustom()">+</button>
                 </div>
                 <button style="margin-top:6px; width:100%;" onclick="clearTurnOrder()">Очистить порядок ходов</button>
+                <button class="btn-success" style="margin-top:6px; width:100%;" onclick="gmAdvanceTurn()">⏭️ Объявить следующий ход (вся группа)</button>
+                <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Тикает статус-эффекты и кулдауны криков у врагов, напоминает игрокам в журнале прокрутить свои эффекты. Личные баффы/дебаффы на листах игроков эта кнопка не трогает — каждый игрок всё ещё крутит их у себя сам.</p>
+            </div>
+
+            <div class="panel">
+                <h2>🤫 Шёпот от игроков (видно только тебе)</h2>
+                <div id="gm-whispers-list" style="max-height:160px; overflow-y:auto;"></div>
+                <button style="margin-top:6px; width:100%;" onclick="clearWhispers()">Очистить шёпот</button>
             </div>
 
             <div class="panel">
@@ -176,7 +184,10 @@
                     <input type="text" id="gm-log-input" placeholder="Записать событие...">
                     <button onclick="gmPostLogEntry()">Отправить</button>
                 </div>
-                <button style="margin-top:6px; width:100%;" onclick="clearLog()">Очистить журнал</button>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button style="flex:1;" onclick="exportCombatLogToFile()">💾 Экспорт в текст</button>
+                    <button style="flex:1;" onclick="clearLog()">Очистить журнал</button>
+                </div>
             </div>
 
             <div class="panel">
@@ -349,6 +360,10 @@
                 <option value="potion">Зелье/Яд</option>
                 <option value="misc">Разное</option>
             </select>
+
+            <label>Число использований (0 — безлимитный предмет)</label>
+            <input type="number" id="ci-max-uses" value="0" min="0" placeholder="Например: 10 — как мешочек Вазьмицы">
+            <p style="font-size:11px; opacity:.6; margin:2px 0 8px;">Если больше 0 — у игрока на листе появится кнопка "✨ Использовать", расходующая один заряд. Когда заряды кончатся, вещь пропадёт из инвентаря сама.</p>
 
             <div id="ci-weapon-fields">
                 <label>Тип оружия</label>
@@ -561,6 +576,38 @@
             <div id="guild-info-body" style="margin-top:8px;"></div>
         </div>
 
+        <!-- ===== АКТИВНЫЙ БЛОК (скрытые кубы) ===== -->
+        <div class="panel">
+            <h2>🛡️ Активный блок</h2>
+            <p style="font-size:12px; opacity:.75;">Отдельный инструмент от обычной атаки — не трогает её вообще. Оба броска скрытые, результат видишь только ты (игрок узнаёт только исход).</p>
+            <label>Атакующий (враг)</label>
+            <select id="block-attacker-select"></select>
+            <label>Защищающийся (игрок)</label>
+            <select id="block-target-select"></select>
+            <label>Чем блокирует</label>
+            <select id="block-shield-type">
+                <option value="heavy">Тяжёлый щит (Телосложение)</option>
+                <option value="light">Лёгкий щит/парирование оружием (Ловкость)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="rollActiveBlock()">🎲 Бросить (скрытно)</button>
+            <div id="block-result" style="margin-top:8px; display:none;"></div>
+            <button id="block-apply-btn" class="btn-success" style="width:100%; margin-top:6px; display:none;" onclick="applyActiveBlockResult()">Применить</button>
+        </div>
+
+        <!-- ===== ПОХОДНЫЙ ЛАГЕРЬ ===== -->
+        <div class="panel">
+            <h2>⛺ Походный лагерь</h2>
+            <div id="gm-camp-status" style="font-size:13px; opacity:.8; margin-bottom:8px;"></div>
+            <label>Местность (влияет на шанс ночной засады)</label>
+            <select id="camp-terrain-select">
+                <option value="dungeon">Подземелье/Болото (40%)</option>
+                <option value="forest" selected>Лес/Горы (25%)</option>
+                <option value="plains">Равнина (15%)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="resolveCampNight()">🌙 Разыграть ночь</button>
+            <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Магически безопасный лагерь (усиленное «Создание предмета») — засады не будет вообще, местность не важна. При засаде лагерь прерывается, добавь врагов обычным способом ниже. При спокойной ночи — ХП/МП всей группы до максимума + статус "Полноценный отдых".</p>
+        </div>
+
         <!-- ===== ТУРНИРЫ БОЙЦОВСКОГО КЛУБА ===== -->
         <div class="panel">
             <h2>🥊 Турниры Бойцовского клуба</h2>
@@ -612,6 +659,21 @@
         <!-- ===== ВЫДАЧА КВЕСТОВ ===== -->
         <div class="panel">
             <h2>📜 Выдать квест</h2>
+
+            <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                <strong>🎲 Сгенерировать из владения</strong>
+                <p style="font-size:12px; opacity:.7; margin:4px 0;">Подставляет случайного NPC/локацию этого владения и текст ниже — можно поправить вручную перед выдачей.</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <select id="qgen-hold-select" style="flex:1; min-width:120px;"></select>
+                    <select id="qgen-difficulty" style="flex:1; min-width:100px;">
+                        <option value="low">Низкая</option>
+                        <option value="mid" selected>Средняя</option>
+                        <option value="high">Высокая</option>
+                    </select>
+                </div>
+                <button style="width:100%; margin-top:6px;" onclick="generateHoldQuest()">🎲 Сгенерировать</button>
+            </div>
+
             <label>Кому</label>
             <select id="quest-target-player">
                 <option value="all">Всей группе</option>
@@ -706,6 +768,7 @@
 <script src="random-events-data.js"></script>
 <script src="skill-books-data.js"></script>
 <script src="unique-weapons-data.js"></script>
+<script src="holds-data.js"></script>
 <script src="spell-tomes-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>

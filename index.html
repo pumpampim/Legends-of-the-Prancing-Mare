@@ -1161,8 +1161,21 @@
 
             <div id="session-active-block" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <div>Сессия: <span class="session-code-badge" id="session-code-display">-</span></div>
+                    <div>Сессия: <span class="session-code-badge" id="session-code-display">-</span> <span id="gm-online-indicator" style="font-size:12px; opacity:.8;"></span></div>
                     <button class="btn-danger" onclick="leaveSession()">Покинуть сессию</button>
+                </div>
+
+                <h3 style="margin-top:16px; cursor:pointer;" onclick="toggleCampPanelPlayer()">⛺ Походный лагерь <span id="camp-panel-chevron">▸</span></h3>
+                <div id="camp-panel-body" style="display:none;">
+                    <div id="camp-status-display" style="font-size:13px; opacity:.8; margin-bottom:6px;"></div>
+                    <div id="camp-deploy-controls">
+                        <button class="btn-success" style="width:100%;" onclick="deployCampSite(false)">⛺ Разбить лагерь (Палатка+Набор для костра+Полено)</button>
+                        <button style="width:100%; margin-top:4px;" onclick="deployCampSite(true)">🔮 Разбить магией («Создание предмета»)</button>
+                    </div>
+                    <div id="camp-active-controls" style="display:none;">
+                        <p style="font-size:12px; opacity:.7;">Лагерь разбит. Готовка и алхимия — на соответствующих вкладках, как обычно. Отдых разыгрывает мастер (сначала проверяет, не напали ли ночью) — просто жди.</p>
+                        <button class="btn-danger" style="width:100%; margin-top:4px;" onclick="teardownCampSite()">Свернуть лагерь</button>
+                    </div>
                 </div>
 
                 <h3 style="margin-top:16px;"><span class="skyrim-icon icon-shield" aria-hidden="true"></span> Отряд</h3>
@@ -1211,6 +1224,10 @@
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <input type="text" id="log-input" placeholder="Написать в журнал (например: Атакую волка на 12 урона)..." style="flex:1;">
                     <button onclick="postLogEntry()">Отправить</button>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <input type="text" id="whisper-input" placeholder="Шепнуть мастеру (не видно другим игрокам)..." style="flex:1;">
+                    <button onclick="sendWhisperToGm()">🤫 Шепнуть</button>
                 </div>
             </div>
         </div>
@@ -1385,6 +1402,8 @@
             <h2><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросок кубов</h2>
             <p style="font-size:14px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
 
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="dice-quick-presets"></div>
+
             <label>Навык проверки</label>
             <select id="dice-skill" onchange="onDiceSkillPicked()">
                 <option value="">— без навыка (просто характеристика или голый кубик) —</option>
@@ -1441,6 +1460,10 @@
 
             <button class="btn-success" style="width:100%;" onclick="attemptLockpick()">🔓 Взломать</button>
             <div id="lock-result" style="margin-top:10px; font-size:16px; text-align:center; font-weight:bold;"></div>
+
+            <button style="width:100%; margin-top:10px;" onclick="castKnockSpell()">🔮 Или кастануть «Стук» (если знаешь)</button>
+            <p style="font-size:12px; opacity:.6; margin:4px 0 0;">«Стук N» открывает без броска любой замок сложности N и ниже (использует ту же «Сложность замка» выше). Ранг заклинания ниже сложности — мана уходит впустую.</p>
+            <div id="knock-result" style="margin-top:6px; font-size:16px; text-align:center; font-weight:bold;"></div>
         </div>
 
         <div class="panel">
@@ -1552,6 +1575,7 @@
     let customSpells = [];
     let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
     let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
+    let _allPerkCheckboxes = []; // кэш .perk-checkbox — строится в initSkills(), см. задачу 16
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
     let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
@@ -1795,6 +1819,10 @@ let daysWithoutFood = 0;
             </div>
         `;
     });
+    // Кэш чекбоксов перков — строится один раз здесь, не на каждое сохранение/восстановление.
+    // Чекбоксы НЕ пересоздаются после инициализации (только отмечаются/снимаются), так что кэш
+    // не протухает в течение всей сессии страницы.
+    _allPerkCheckboxes = Array.from(document.querySelectorAll('.perk-checkbox'));
 }
 
 // Открывает/закрывает один навык в ветках перков
@@ -1940,14 +1968,67 @@ window.toggleSkillPanel = function (idx) {
     }
 
     // Логика навигации по вкладкам
+    // Коалесцирует повторные updateAll() через requestAnimationFrame — если пользователь быстро
+    // кликает по нескольким вкладкам подряд (или программно переключает их в цикле), несколько
+    // вызовов в пределах одного кадра схлопываются в один пересчёт вместо одного на каждый клик.
+    // НЕ убирает сам updateAll() из openTab целиком (это была моя же защита от рассинхрона между
+    // "Ветки перков" и "Проверка"/прокачкой) — просто откладывает его на 1 кадр и не дублирует.
+    // Универсальная версия той же идеи, что и _updateAllScheduled ниже — по ключу, чтобы
+    // несколько РАЗНЫХ отложенных функций (список инвентаря/продажи/замок/уровень) не мешали
+    // друг другу, но повторные вызовы с ОДНИМ И ТЕМ ЖЕ ключом в пределах кадра схлопывались.
+    const _coalescedScheduled = {};
+    function scheduleCoalesced(key, fn) {
+        if (_coalescedScheduled[key]) return;
+        _coalescedScheduled[key] = true;
+        requestAnimationFrame(() => {
+            _coalescedScheduled[key] = false;
+            fn();
+        });
+    }
+
+    let _updateAllScheduled = false;
+    function scheduleUpdateAll() {
+        if (_updateAllScheduled) return;
+        _updateAllScheduled = true;
+        requestAnimationFrame(() => {
+            _updateAllScheduled = false;
+            if (typeof updateAll === 'function') updateAll();
+        });
+    }
+
+    // Ленивая инициализация вкладки "Профессии" — 13 из ~27 render-вызовов при загрузке страницы
+    // относились именно к ней (кухня/кузница/посохи/зачарование/алхимия), а игрок может вообще
+    // не открыть эту вкладку в сессии. Остальные вкладки НЕ трогаю — риск случайно вычеркнуть
+    // что-то, от чего зависит другая часть листа, выше пользы для менее тяжёлых разделов.
+    const _tabInitDone = {};
+    function initTab7IfNeeded() {
+        if (_tabInitDone.tab7) return;
+        _tabInitDone.tab7 = true;
+        renderKitchenPot();
+        renderSmithingList();
+        renderEnchantItemSelect();
+        renderStaffEffectSelect();
+        updateStaffCalc();
+        renderStaffList();
+        renderWeaponChargeSelect();
+        renderTemperSelect();
+        renderMagicStaffSpellSelect();
+        renderMagicStaffList();
+        renderAlchEatSelect();
+        renderAlchIngredientSelects();
+        renderKnownIngredients();
+    }
+
     function openTab(ev, tabId) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         ev.currentTarget.classList.add('active');
+        if (tabId === 'tab7') initTab7IfNeeded();
         // Пересчитываем всё заново при каждом переключении вкладки — защита от любых
-        // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка).
-        if (typeof updateAll === 'function') updateAll();
+        // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка). Через
+        // scheduleUpdateAll(), не напрямую — см. пояснение выше.
+        scheduleUpdateAll();
     }
 
     // Аккордеон вкладки «Профессии» — раскрывает одну профессию за раз, остальные сворачивает.
@@ -2393,6 +2474,12 @@ window.toggleSkillPanel = function (idx) {
         if (usesLeft <= 0) {
             removeFromInventoryByName(itemId, 1);
             alert(`Использовано: «${item.name}». Заряды закончились, предмет израсходован.\n${item.effect || ''}`);
+            // Сообщение мастеру в общий журнал — последний заряд это заметное событие (предмет
+            // пропадает из инвентаря насовсем), раньше это происходило молча.
+            if (window.CloudSync && window.CloudSync.postCombatLog) {
+                const myName = document.getElementById('char-name').value || 'Игрок';
+                window.CloudSync.postCombatLog(`🎒 ${myName} истратил(а) последний заряд предмета «${item.name}» — вещь рассыпалась в прах.`, myName);
+            }
         } else {
             item.usesLeft = usesLeft;
             alert(`Использовано: «${item.name}». Осталось зарядов: ${usesLeft}/${item.maxUses}.\n${item.effect || ''}`);
@@ -2750,16 +2837,27 @@ window.toggleSkillPanel = function (idx) {
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const stock = key && session && session.merchantStocks ? session.merchantStocks[key] : null;
         if (!stock) { listEl.innerHTML = ''; infoEl.innerHTML = ''; return; }
+        // disposition торговца (-2 Вражда .. +2 Союзник) — задаётся мастером отдельно от
+        // ассортимента. При -2 торговля блокируется полностью (та же защита экономики, что и у
+        // скупщиков краденого — не хочет вести дела, не вопрос цены).
+        const disposition = stock.disposition || 0;
+        if (disposition <= -2) {
+            listEl.innerHTML = '';
+            infoEl.innerHTML = `<p style="color:#e74c3c;">😠 Торговец развернулся к вам спиной и отказывается вести дела.</p>`;
+            return;
+        }
+        const dispositionMult = { '-1': 1.25, '0': 1, '1': 0.9, '2': 0.8 }[String(disposition)] || 1;
         const repMult = getReputationPriceMult(stock.hold);
         const holidayDiscount = getActiveHolidayDiscount();
+        const dispositionNote = disposition ? `<br><span style="opacity:.8;">${disposition > 0 ? '🙂' : '😒'} Отношение торговца: ${disposition > 0 ? `скидка ${Math.round((1 - dispositionMult) * 100)}%` : `наценка ${Math.round((dispositionMult - 1) * 100)}%`} (уже учтено в ценах)</span>` : '';
         infoEl.innerHTML = `💰 У торговца: <strong>${stock.gold}</strong> золота · товаров: ${stock.items.length}` +
-            (holidayDiscount ? `<br><span style="color:var(--accent-color);">🎉 Скидка праздника: −${holidayDiscount}% (уже учтена в ценах ниже)</span>` : '');
+            (holidayDiscount ? `<br><span style="color:var(--accent-color);">🎉 Скидка праздника: −${holidayDiscount}% (уже учтена в ценах ниже)</span>` : '') + dispositionNote;
         const catFilterEl = document.getElementById('buy-category-filter');
         const catFilter = catFilterEl ? catFilterEl.value : 'all';
         const withIdx = stock.items.map((it, idx) => ({ it, idx }));
         const filtered = catFilter === 'all' ? withIdx : withIdx.filter(({ it }) => classifyItemBroad(it) === catFilter);
         listEl.innerHTML = filtered.length ? filtered.map(({ it, idx }) => {
-            const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
+            const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult * dispositionMult));
             const canAfford = price <= stock.gold && price <= (parseInt(document.getElementById('char-gold').value) || 0);
             const qty = it.qty || 1;
             return `<div class="stat-block" style="align-items:flex-start;">
@@ -2807,8 +2905,10 @@ window.toggleSkillPanel = function (idx) {
         const stock = session && session.merchantStocks ? session.merchantStocks[key] : null;
         if (!stock || !stock.items[idx]) { alert('Товар уже не в наличии — обнови список.'); return; }
         const it = stock.items[idx];
+        if ((stock.disposition || 0) <= -2) { alert('Торговец отказывается вести дела.'); return; }
+        const dispositionMult = { '-1': 1.25, '0': 1, '1': 0.9, '2': 0.8 }[String(stock.disposition || 0)] || 1;
         const repMult = getReputationPriceMult(stock.hold);
-        const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult));
+        const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult * dispositionMult));
         const goldInput = document.getElementById('char-gold');
         const myGold = parseInt(goldInput.value) || 0;
         if (price > myGold) { alert('Не хватает золота.'); return; }
@@ -2868,7 +2968,14 @@ window.toggleSkillPanel = function (idx) {
             listEl.innerHTML = '<p style="opacity:.6; font-size:14px;">В этой категории продавать нечего.</p>';
             return;
         }
-        listEl.innerHTML = filtered.map(item => {
+        // Репутация в холде влияет на цену (±5%), но молча — если мастер ещё не задал владение
+        // в погодной панели (session.currentHold пусто), getReputationPriceMult(hold) просто
+        // возвращает 1 без предупреждения. Игрок видел бы "обычную" цену, не зная, что его
+        // репутация сейчас никак не учитывается.
+        const sessionForRepNote = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const repNote = (sessionForRepNote && !sessionForRepNote.currentHold)
+            ? '<p style="opacity:.6; font-size:12px; margin-bottom:6px;">⚠ Репутация не применена к ценам — мастер ещё не задал текущее владение в погодной панели.</p>' : '';
+        listEl.innerHTML = repNote + filtered.map(item => {
             const cat = classifyItemForMerchant(item);
             const matches = (merchantType === 'pawnbroker' || merchantType === 'fence') ? true : cat === merchantType;
             const unitPrice = computeSellPrice(item, merchantType, charmActive);
@@ -3026,6 +3133,8 @@ window.toggleSkillPanel = function (idx) {
                     ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${escHtml(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
                     ${item.upgradeMaterial ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
+                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button style="width:auto; padding:2px 6px; font-size:13px;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу Кузнечного дела — Хорошее/Качественное/Отличное/Легендарное, порог навыка зависит от профильного перка материала. Текущий ранг: ${escHtml(QUALITY_TIER_NAMES[item.qualityTier || 0])}">⚔️ Заточить</button>` : ''}
+                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${item.qualityRank ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -3336,6 +3445,69 @@ window.toggleSkillPanel = function (idx) {
     // upgradeQty были только текстом в описании ("Улучшается: X ×N"), сама возможность улучшить
     // не существовала вообще. +10% к базовому значению за раз, максимум 5 улучшений (как тиры
     // перков кузнечного дела в ваниле — точило без перка тоже не даёт бесконечно улучшать).
+    // Заточка оружия по рангам Кузнечного дела — ОТДЕЛЬНАЯ механика от improveItem (та даёт
+    // +10%/использование материала, эта — фиксированный бонус по порогу навыка, с удвоенной
+    // доступностью при открытом профильном перке материала, например "Орочьи доспехи" для
+    // орихалка). Обе могут применяться к одной вещи — наточить и улучшить не взаимоисключающе,
+    // просто разные источники бонуса урона.
+    const QUALITY_TIER_NAMES = ['', 'Хорошее', 'Качественное', 'Отличное', 'Легендарное'];
+    const QUALITY_TIERS = [
+        { name: 'Хорошее', bonus: 1, threshold: 20, thresholdWithPerk: 14 },
+        { name: 'Качественное', bonus: 2, threshold: 40, thresholdWithPerk: 27 },
+        { name: 'Отличное', bonus: 3, threshold: 65, thresholdWithPerk: 42 },
+        { name: 'Легендарное', bonus: 5, threshold: 100, thresholdWithPerk: 70 }
+    ];
+
+    window.sharpenWeapon = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || !item.upgradeMaterial || typeof item.weaponDmg !== 'number') return;
+        const currentTier = item.qualityTier || 0;
+        if (currentTier >= QUALITY_TIERS.length) { alert('Эта вещь уже легендарного качества — точить дальше некуда.'); return; }
+
+        // Профильный перк материала (например "Орочьи доспехи" для орихалка) — ищем по имени
+        // предмета среди рецептов кузни, чтобы узнать perkHint; GM-созданное оружие без
+        // совпадения в базе просто считается "без перка" (ничего не ломается, порог выше).
+        const recipe = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).find(r => item.name.indexOf(r.name) !== -1 || r.name.indexOf(item.name) !== -1);
+        const hasMaterialPerk = recipe && recipe.perkHint ? isPerkChecked(recipe.perkHint) : false;
+        const smithSkill = getEffectiveSkillValue('Кузнечное дело');
+
+        // Максимальный доступный ранг при текущем навыке/перке.
+        let maxTierIdx = -1;
+        QUALITY_TIERS.forEach((t, idx) => {
+            const need = hasMaterialPerk ? t.thresholdWithPerk : t.threshold;
+            if (smithSkill >= need) maxTierIdx = idx;
+        });
+        if (maxTierIdx <= currentTier - 1) {
+            const nextNeed = QUALITY_TIERS[currentTier] ? (hasMaterialPerk ? QUALITY_TIERS[currentTier].thresholdWithPerk : QUALITY_TIERS[currentTier].threshold) : '?';
+            alert(`Навыка Кузнечного дела недостаточно, чтобы наточить эту вещь сильнее (нужно ${nextNeed}, у тебя ${smithSkill}).`);
+            return;
+        }
+        const need = item.upgradeQty || 1;
+        if (countInInventory(item.upgradeMaterial) < need) {
+            alert(`Не хватает материала: нужно «${item.upgradeMaterial}» ×${need}, есть ${countInInventory(item.upgradeMaterial)}.`);
+            return;
+        }
+        removeFromInventoryByName(item.upgradeMaterial, need);
+        const newTier = currentTier + 1;
+        item.baseWeaponDmg = item.baseWeaponDmg || item.weaponDmg; // честный пересчёт от исходного, как у improveItem
+        item.qualityTier = newTier;
+        item.weaponDmg = item.baseWeaponDmg + QUALITY_TIERS[newTier - 1].bonus;
+        // Имя вещи получает пометку ранга — заменяем предыдущую пометку, если уже была.
+        item.name = item.name.replace(/\s*\((Хорошее|Качественное|Отличное|Легендарное)\)$/, '') + ` (${QUALITY_TIERS[newTier - 1].name})`;
+        if (equippedSlots.meleeWeapon === itemId) {
+            document.getElementById('wep-melee-dmg').value = item.weaponDmg;
+            document.getElementById('wep-melee-name').value = item.name;
+        }
+        if (equippedSlots.rangedWeapon === itemId) {
+            document.getElementById('wep-ranged-dmg').value = item.weaponDmg;
+            document.getElementById('wep-ranged-name').value = item.name;
+        }
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage();
+        alert(`Заточено до «${QUALITY_TIERS[newTier - 1].name}» (+${QUALITY_TIERS[newTier - 1].bonus} к урону)! Новый урон: ${item.weaponDmg}.`);
+    };
+
     window.improveItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || !item.upgradeMaterial) return;
@@ -3378,6 +3550,47 @@ window.toggleSkillPanel = function (idx) {
         updateAll();
         saveLocalStorage();
         alert(`Улучшено (${item.upgradeCount}/5)! ${typeof item.weaponDmg === 'number' ? `Новый урон: ${item.weaponDmg}` : `Новое сопротивление: ${item.armorValue}`}.`);
+    };
+
+    // Заточка по рангам качества (документ 4) — ОТДЕЛЬНО от improveItem выше (та даёт +10%/раз
+    // без условий навыка, эта — фиксированный бонус качества, но требует порога Кузнечного дела).
+    // Бонусы складываются (qualityBonus — отдельное слагаемое, не трогает baseWeaponDmg/
+    // upgradeCount выше), можно пользоваться обоими независимо.
+    const SHARPEN_TIERS = [
+        { name: 'Хорошее', bonus: 1, threshold: 20 },
+        { name: 'Качественное', bonus: 2, threshold: 40 },
+        { name: 'Отличное', bonus: 3, threshold: 65 },
+        { name: 'Легендарное', bonus: 5, threshold: 100 }
+    ];
+    window.sharpenWeapon = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || typeof item.weaponDmg !== 'number' || !item.upgradeMaterial) return;
+        const skill = getSkillRawValue('Кузнечное дело');
+        const currentRank = item.qualityRank || 0;
+        if (currentRank >= SHARPEN_TIERS.length) { alert('Эта вещь уже легендарного качества — точить дальше некуда.'); return; }
+        const nextTier = SHARPEN_TIERS[currentRank];
+        if (skill < nextTier.threshold) {
+            alert(`Навыка Кузнечного дела не хватает: нужно ${nextTier.threshold}, у тебя ${skill}. Следующий ранг — «${nextTier.name}».`);
+            return;
+        }
+        const need = item.upgradeQty || 1;
+        if (countInInventory(item.upgradeMaterial) < need) {
+            alert(`Не хватает материала: нужно «${item.upgradeMaterial}» ×${need}, есть ${countInInventory(item.upgradeMaterial)}.`);
+            return;
+        }
+        removeFromInventoryByName(item.upgradeMaterial, need);
+        item.qualityRank = currentRank + 1;
+        item.qualityBonus = nextTier.bonus;
+        item.weaponDmg = (item.weaponDmg - (item.qualityBonusApplied || 0)) + nextTier.bonus;
+        item.qualityBonusApplied = nextTier.bonus;
+        // Имя показывает текущий ранг — заменяем предыдущую пометку ранга, если была.
+        item.name = item.name.replace(/ \((Хорошее|Качественное|Отличное|Легендарное)\)$/, '') + ` (${nextTier.name})`;
+        item.itemId = item.itemId; // itemId НЕ меняем — иначе экип-слоты/стопка потеряли бы связь с вещью
+        if (equippedSlots.meleeWeapon === itemId) document.getElementById('wep-melee-dmg').value = item.weaponDmg;
+        if (equippedSlots.rangedWeapon === itemId) document.getElementById('wep-ranged-dmg').value = item.weaponDmg;
+        renderInventoryList();
+        saveLocalStorage();
+        alert(`Наточено до ранга «${nextTier.name}» (+${nextTier.bonus} к урону)! Новый урон: ${item.weaponDmg}.`);
     };
 
     window.disenchantItem = function (itemId) {
@@ -4112,7 +4325,9 @@ window.toggleSkillPanel = function (idx) {
             dmg: (t.dmgBase !== undefined) ? (enhanced && t.dmgEnh ? t.dmgEnh : t.dmgBase) : null,
             dmgType: t.dmgType || null,
             speed: t.speed || 30,
-            turnsRemaining: t.permanent ? null : (enhanced && t.durEnh ? t.durEnh : t.durBase),
+            // Призванное оружие (category:'weapon') держится в 1.5 раза дольше обычных призывов —
+            // по прямой просьбе, раньше длительность была одинаковой для всех категорий призыва.
+            turnsRemaining: t.permanent ? null : Math.round((enhanced && t.durEnh ? t.durEnh : t.durBase) * (t.category === 'weapon' ? 1.5 : 1)),
             permanent: !!t.permanent
         };
         if (t.category === 'weapon') {
@@ -4381,7 +4596,11 @@ window.toggleSkillPanel = function (idx) {
         el.innerHTML = activeTimedEffects.map(e => {
             // Эффекты "на поддержании" (тратят ману каждый ход) имеют turnsRemaining: Infinity —
             // раньше это просто подставлялось в шаблон строки и показывало "Infinity х.".
-            const turnsLabel = e.turnsRemaining === Infinity ? '∞ (пока есть мана)' : e.turnsRemaining + ' х.';
+            // "Пока есть мана" было верно только для спеллов "на поддержании" — для болезней
+            // (тоже Infinity, но не тратят ману, просто бессрочны до лечения) текст был неверным.
+            const turnsLabel = e.turnsRemaining === Infinity
+                ? (e.effectName && e.effectName.indexOf('Болезнь:') === 0 ? '∞ (до излечения)' : '∞ (пока есть мана)')
+                : e.turnsRemaining + ' х.';
             return `
             <div class="party-row">
                 <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${turnsLabel}</span></div>
@@ -4613,10 +4832,16 @@ window.toggleSkillPanel = function (idx) {
 
     function getEquipmentEnchantBonuses() {
         const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0, resistFire: 0, resistFrost: 0, resistShock: 0, resistPoison: 0, resistDisease: 0, resistMagic: 0, resistShout: 0 };
+        // Раньше 9 отдельных playerInventory.find() — O(9×N). Локальная Map строится один раз
+        // за вызов из ТЕКУЩЕГО playerInventory, так что не может устареть/рассинхронизироваться
+        // между вызовами (в отличие от долгоживущего кэша — тот был бы рискованно трогать в
+        // формулах боевого баланса, легко пропустить место инвалидации и получить тихо неверные
+        // цифры в бою).
+        const invById = new Map(playerInventory.map(i => [i.itemId, i]));
         ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
             const itemId = equippedSlots[slotKey];
             if (!itemId) return;
-            const item = playerInventory.find(i => i.itemId === itemId);
+            const item = invById.get(itemId);
             if (!item) return;
             if (item.enchantment) {
                 const key = ENCHANT_AUTO_APPLY_ARMOR[item.enchantment.name];
@@ -5034,7 +5259,32 @@ window.toggleSkillPanel = function (idx) {
         if (!select) return;
         select.innerHTML = '<option value="">— без навыка (просто характеристика или голый кубик) —</option>' +
             skillNames.map((n, i) => `<option value="${i}">${escHtml(n)} (${STAT_LABELS[SKILL_TO_STAT[n]] || '—'})</option>`).join('');
+        renderDiceQuickPresets();
     }
+
+    // Быстрые пресеты для самых частых НЕбоевых проверок (боевые навыки проверяются через
+    // отдельный инструмент атаки, не через этот бросок) — одним кликом выбирает навык (стата
+    // подставляется сама через onDiceSkillPicked) и переводит фокус сразу на поле DC, вместо
+    // "выбери навык → дождись подстановки статы → кликни DC → введи число".
+    const DICE_QUICK_PRESETS = ['Скрытность', 'Взлом', 'Карманные кражи', 'Красноречие'];
+    function renderDiceQuickPresets() {
+        const box = document.getElementById('dice-quick-presets');
+        if (!box) return;
+        box.innerHTML = DICE_QUICK_PRESETS.map(name => {
+            const idx = skillNames.indexOf(name);
+            if (idx === -1) return '';
+            return `<button style="width:auto; padding:4px 10px; font-size:13px;" onclick="pickDiceQuickPreset(${idx})">${escHtml(name)}</button>`;
+        }).join('');
+    }
+
+    window.pickDiceQuickPreset = function (skillIdx) {
+        const select = document.getElementById('dice-skill');
+        if (!select) return;
+        select.value = String(skillIdx);
+        window.onDiceSkillPicked();
+        const dcInput = document.getElementById('dice-dc');
+        if (dcInput) dcInput.focus();
+    };
 
     window.onDiceSkillPicked = function () {
         const skillIdx = document.getElementById('dice-skill').value;
@@ -5186,6 +5436,40 @@ window.toggleSkillPanel = function (idx) {
             html += `<br><span style="opacity:.7;">🤫 «Умелые ручки»: взлом бесшумный</span>`;
         }
         infoEl.innerHTML = html;
+    };
+
+    // "Стук N" открывает без броска замки сложности N и ниже (N-1 в индексах LOCK_TIERS, см.
+    // выше): Стук 1→только Новичок(0), Стук 2→Новичок+Ученик(0-1), и т.д. Берём САМЫЙ СИЛЬНЫЙ
+    // "Стук", который знает игрок — нет смысла нарочно кастовать более слабый вариант.
+    window.castKnockSpell = function () {
+        const lockTierIdx = parseInt(document.getElementById('lock-tier').value);
+        const resultEl = document.getElementById('knock-result');
+        const knownKnocks = (customSpells || []).filter(s => /^Стук \d$/.test(s.name));
+        if (!knownKnocks.length) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Не знаешь ни одного «Стука».</span>';
+            return;
+        }
+        knownKnocks.sort((a, b) => parseInt(b.name.slice(-1)) - parseInt(a.name.slice(-1)));
+        const spell = knownKnocks[0];
+        const spellRank = parseInt(spell.name.slice(-1));
+        const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
+        const finalCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
+        const curMpEl = document.getElementById('cur-mp');
+        const curMp = parseInt(curMpEl.value) || 0;
+        if (finalCost > curMp) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Не хватает маны: нужно ${finalCost}, есть ${curMp}.</span>`;
+            return;
+        }
+        curMpEl.value = curMp - finalCost;
+        updateVitalBars();
+        saveLocalStorage();
+        const success = spellRank >= lockTierIdx + 1;
+        const lockName = LOCK_TIERS[lockTierIdx].name;
+        if (success) {
+            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ «${spell.name}» легко открывает замок уровня «${lockName}»! (−${finalCost} маны)</span>`;
+        } else {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">❌ Магия скользит по замку — «${spell.name}» слишком слаб для «${lockName}». Мана потрачена впустую. (−${finalCost} маны)</span>`;
+        }
     };
 
     window.attemptLockpick = function () {
@@ -5529,8 +5813,19 @@ window.toggleSkillPanel = function (idx) {
     // (обычно большим) числом урона, раньше урон всегда брался только из БАЗОВОГО описания —
     // инструмент атаки не мог достать усиленное число вообще, даже если игрок кастовал усиленно
     // (х2 маны) на заклинания-баффы (resolveSpellEffect), но не на прямой урон в бою.
+    // Кэш по "desc|enhanced" — чистая функция (один и тот же текст описания всегда даёт одно
+    // и то же число), безопасна без инвалидации. Раньше вызывалась дважды на каждое заклинание
+    // в renderAttackActionSelect на КАЖДЫЙ updateAll() — не бесплатно при большой книге заклинаний.
+    const _spellDmgCache = new Map();
     function parseSpellDamageFromDesc(desc, enhanced) {
         if (!desc) return null;
+        const cacheKey = desc + '|' + (enhanced ? '1' : '0');
+        if (_spellDmgCache.has(cacheKey)) return _spellDmgCache.get(cacheKey);
+        const result = _parseSpellDamageFromDescImpl(desc, enhanced);
+        _spellDmgCache.set(cacheKey, result);
+        return result;
+    }
+    function _parseSpellDamageFromDescImpl(desc, enhanced) {
         let text = desc;
         const splitIdx = desc.search(/усилен[а-яёА-ЯЁ]*\s+эффект/i);
         if (enhanced && splitIdx !== -1) {
@@ -5547,7 +5842,10 @@ window.toggleSkillPanel = function (idx) {
                   text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
         if (m) return parseInt(m[1]);
         // Ничего не нашли в усиленном тексте (напр. "Усиленный эффект" пустой) — пробуем базовый.
-        return enhanced ? parseSpellDamageFromDesc(desc, false) : null;
+        // Через _parseSpellDamageFromDescImpl напрямую (не через кэш-обёртку), чтобы не плодить
+        // двойную запись в кэш за один исходный вызов — внешняя parseSpellDamageFromDesc всё равно
+        // закэширует именно ЭТОТ (enhanced) результат по своему исходному ключу.
+        return enhanced ? _parseSpellDamageFromDescImpl(desc, false) : null;
     }
 
     // ========================================================================
@@ -5956,6 +6254,65 @@ function updateDateDisplay() {
     if (starveInput) starveInput.value = daysWithoutFood;
 }
 
+window.toggleCampPanelPlayer = function () {
+    const body = document.getElementById('camp-panel-body');
+    const chev = document.getElementById('camp-panel-chevron');
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chev) chev.textContent = isOpen ? '▸' : '▾';
+};
+
+// Разбить лагерь — физически (Палатка+Набор для костра+Полено, ничего не тратится при разбивке,
+// расходники списываются при сворачивании) или магией (знание заклинания "Создание предмета";
+// усиленный каст даёт магически безопасный лагерь — замена несуществующего в моём дереве перков
+// "Великого созидателя" из исходного ТЗ, см. заметки).
+window.deployCampSite = function (useMagic) {
+    const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+    if (!session) { alert('Нет соединения с сессией.'); return; }
+    if (session.campState && session.campState.active) { alert('Лагерь уже разбит.'); return; }
+    let isMagicallySafe = false;
+    if (useMagic) {
+        const spell = (customSpells || []).find(s => s.name === 'Создание предмета');
+        if (!spell) { alert('Не знаешь заклинание «Создание предмета».'); return; }
+        const enhancedCast = confirm('Скастовать усиленно (х2 маны)? Усиленный каст делает лагерь магически безопасным от засад (замена «Великого созидателя» — такого перка в этой системе нет). Отмена = обычный каст.');
+        const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
+        const baseCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
+        const finalCost = enhancedCast ? baseCost * 2 : baseCost;
+        const curMpEl = document.getElementById('cur-mp');
+        const curMp = parseInt(curMpEl.value) || 0;
+        if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+        curMpEl.value = curMp - finalCost;
+        updateVitalBars();
+        saveLocalStorage();
+        isMagicallySafe = enhancedCast;
+    } else {
+        if (countInInventory('Палатка (15x15 футов)') < 1 || countInInventory('Набор для костра') < 1 || countInInventory('Полено') < 1) {
+            alert('Нужны Палатка, Набор для костра и Полено (хотя бы по 1 шт.) — чего-то не хватает в инвентаре.');
+            return;
+        }
+    }
+    const myName = document.getElementById('char-name').value || 'Игрок';
+    window.CloudSync.setCampState({
+        active: true, hasTent: !useMagic, isMagicallySafe: isMagicallySafe, deployedBy: myName, ambushResolved: false
+    }).then(() => {
+        if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`⛺ ${myName} разбил(а) лагерь${useMagic ? ' силой магии' : ''}.`, myName);
+    }).catch(e => alert('Ошибка: ' + e.message));
+};
+
+window.teardownCampSite = function () {
+    const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+    if (!session || !session.campState || !session.campState.active) return;
+    // Расходники списываются только у физического лагеря — магический ничего не тратил.
+    if (session.campState.hasTent) {
+        removeFromInventoryByName('Набор для костра', 1);
+        removeFromInventoryByName('Полено', 1);
+        renderInventoryList();
+        saveLocalStorage();
+    }
+    window.CloudSync.setCampState({ active: false }).catch(e => alert('Ошибка: ' + e.message));
+};
+
 window.nextDay = function () {
     // Прокатываем дату
     gameDayNum++;
@@ -5970,12 +6327,42 @@ window.nextDay = function () {
         window.CloudSync.bumpGameDayCounter();
     }
 
-    // Тик дней заряда оружия и посохов
+    // Тик дней заряда оружия и посохов. Раньше счётчик просто тикал до 0 и застревал — магия
+    // не снималась сама, вещь навсегда оставалась "заряжена на 0 дней", но всё ещё зачарована.
+    // Теперь при достижении 0 зачарование реально стирается — убираем суффикс "[Эффект]" из
+    // имени и сам enchantment/chargeDaysLeft. Эффект описания не восстанавливаем к оригиналу
+    // (он был перезаписан при накладывании чар и нигде больше не хранится) — просто помечаем
+    // текстом, что магия иссякла; мастер/игрок могут поправить вручную при желании.
+    const decayedItems = [];
     playerInventory.forEach(i => {
-        if (Object.prototype.hasOwnProperty.call(i, 'chargeDaysLeft') && i.chargeDaysLeft > 0) {
+        if (!Object.prototype.hasOwnProperty.call(i, 'chargeDaysLeft')) return;
+        if (i.chargeDaysLeft > 0) {
             i.chargeDaysLeft--;
+            if (i.chargeDaysLeft === 0 && i.enchantment) {
+                i.name = i.name.replace(/\s*\[[^\]]+\]$/, '');
+                i.effect = 'Магия иссякла — зачарование снято временем.';
+                delete i.enchantment;
+                delete i.chargeDaysLeft;
+                decayedItems.push(i.name);
+            }
         }
     });
+    if (decayedItems.length) {
+        // Слияние с уже существующим ОБЫЧНЫМ стеком того же базового предмета — иначе разряженная
+        // вещь осталась бы отдельной строкой с тем же именем, что и уже лежащий в сумке дубликат.
+        decayedItems.forEach(name => {
+            const matches = playerInventory.filter(i => i.name === name);
+            if (matches.length > 1) {
+                const keeper = matches[0];
+                for (let m = 1; m < matches.length; m++) {
+                    keeper.count = (keeper.count || 1) + (matches[m].count || 1);
+                    const idx = playerInventory.indexOf(matches[m]);
+                    if (idx !== -1) playerInventory.splice(idx, 1);
+                }
+            }
+        });
+        alert(`⚠ Магия выветрилась: ${decayedItems.join(', ')} — зачарование снято, предмет(ы) стали обычными.`);
+    }
 
     // Тик длительности по ходам НЕ происходит — ходы и дни раздельны.
     // Но если хочешь, чтобы «раз в день» способности обнулялись, здесь это место.
@@ -6425,17 +6812,21 @@ function updateHungerPenalty() {
         if (kitchenAlchemyBlock) {
             kitchenAlchemyBlock.style.display = perks.cookingAddAlchemyIngredient ? 'block' : 'none';
         }
+        // Раньше эти 4 рендера вызывались здесь БЕЗУСЛОВНО при каждом updateAll() — а многие
+        // вызывающие места (например, обыск трупа) и так зовут renderInventoryList() явно ПЕРЕД
+        // updateAll(), получая двойную перерисовку списка за одно логическое действие. Через
+        // scheduleCoalesced() — несколько вызовов в пределах одного кадра схлопываются в один.
         if (typeof renderInventoryList === 'function' && document.getElementById('player-inventory-list')) {
-            renderInventoryList();
+            scheduleCoalesced('inv', renderInventoryList);
         }
         if (typeof renderSellList === 'function' && document.getElementById('sell-items-list')) {
-            renderSellList();
+            scheduleCoalesced('sell', renderSellList);
         }
         if (typeof updateLockInfo === 'function' && document.getElementById('lock-info')) {
-            updateLockInfo();
+            scheduleCoalesced('lock', updateLockInfo);
         }
         if (typeof renderLevelPanel === 'function' && document.getElementById('level-summary')) {
-            renderLevelPanel();
+            scheduleCoalesced('level', renderLevelPanel);
         }
 
         const equipBonuses = (typeof getEquipmentEnchantBonuses === 'function') ? getEquipmentEnchantBonuses() : { hp: 0, mp: 0, weight: 0, armor: 0 };
@@ -6920,9 +7311,29 @@ function updateHungerPenalty() {
 }
     
     // Сохранение всех параметров листа в LocalStorage
+    // Раньше saveLocalStorage делала ВСЁ синхронно на каждый вызов: чтение ~50 DOM-полей,
+    // JSON.stringify (легко 20-50 КБ), запись в localStorage — даже если immediate=false, только
+    // облачная часть внутри CloudSync.saveCharacter была дебаунсена (800мс), а сама эта тяжёлая
+    // сборка данных — нет. Теперь saveLocalStorage — тонкая обёртка: при immediate=true делает
+    // всё сразу (как и раньше — например exportCharacterToFile() читает localStorage сразу после
+    // вызова, ему нужен синхронный путь), иначе откладывает на 300мс и схлопывает повторные
+    // вызовы подряд в один. Плюс пропускает запись целиком, если с прошлого раза ничего не
+    // изменилось (хэш по итоговому JSON).
+    let _localSaveTimer = null;
+    let _lastLocalSaveHash = '';
     function saveLocalStorage(immediate) {
+        if (immediate) {
+            clearTimeout(_localSaveTimer);
+            _buildAndSaveData(true);
+            return;
+        }
+        clearTimeout(_localSaveTimer);
+        _localSaveTimer = setTimeout(() => _buildAndSaveData(false), 300);
+    }
+
+    function _buildAndSaveData(immediate) {
         let perkStates = {};
-        document.querySelectorAll('.perk-checkbox').forEach(chk => {
+        _allPerkCheckboxes.forEach(chk => {
             let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
             perkStates[key] = chk.checked;
         });
@@ -7024,7 +7435,10 @@ function updateHungerPenalty() {
             activeSummons: activeSummons,
             resistances: computeTotalResistances()
         };
-        localStorage.setItem('skyrim_ttrpg_save_v3_6', JSON.stringify(data));
+        const json = JSON.stringify(data);
+        if (json === _lastLocalSaveHash) return; // ничего не изменилось с прошлого сохранения
+        _lastLocalSaveHash = json;
+        localStorage.setItem('skyrim_ttrpg_save_v3_6', json);
         if (window.CloudSync) window.CloudSync.saveCharacter(data, immediate);
     }
 
@@ -7032,8 +7446,22 @@ function updateHungerPenalty() {
     // т.к. применяются и при первой загрузке персонажа (через applyCharacterData), и живым
     // листенером на каждое внешнее изменение (cloud.js), без риска задеть то, что редактирует
     // сам игрок (хп/инвентарь/статы и т.д. этой функцией не трогаются).
+    // Дешёвый отпечаток инвентаря вместо JSON.stringify(data.inventory) !== JSON.stringify
+    // (playerInventory) — тот вариант это O(2N) сериализация в строку на КАЖДЫЙ snapshot
+    // (а снапшоты приходят и от heartbeat раз в 30-60 сек без реальных изменений, не только от
+    // правок мастера). Длина массива + лёгкий хэш по count/itemId достаточно для обнаружения
+    // реального изменения, не претендуя на криптографическую надёжность.
+    function inventoryFingerprint(inv) {
+        if (!Array.isArray(inv)) return 0;
+        let h = inv.length;
+        for (const i of inv) h = (h * 31 + (i.count || 0) + (i.itemId || '').length) | 0;
+        return h;
+    }
+
     function applyGmControlledFields(data) {
         if (!data) return;
+        let changed = false; // true, если за этот вызов реально что-то поменялось — updateAll()
+                              // в конце запускаем только тогда, не безусловно на каждый snapshot.
         // Задача K: прогресс гильдий приходит вместе со всем остальным документом —
         // отдельный запрос (getOwnCharacterField) не нужен, экономим чтение Firestore.
         playerGuildsData = data.guildsData || {};
@@ -7042,6 +7470,7 @@ function updateHungerPenalty() {
         playerReputationByRegion = data.reputationByRegion || {};
         if (typeof renderGuildPanelPlayer === 'function') renderGuildPanelPlayer();
         // Задача L: то же самое для сверхъестественного состояния — читаем сразу из документа.
+        const prevIsTransformed = playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed;
         playerSupernaturalState = data.supernaturalState ? {
             lycanthropy: !!data.supernaturalState.lycanthropy,
             vampirism: !!data.supernaturalState.vampirism,
@@ -7049,6 +7478,10 @@ function updateHungerPenalty() {
             vampire: Object.assign({ hungerStage: 0, rank: 0, abilities: {} }, data.supernaturalState.vampire || {})
         } : null;
         if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
+        // Оборотень-трансформация меняет боевой расчёт (когти вместо оружия) — если изменилась,
+        // нужен полный пересчёт, не только собственный рендер статуса.
+        const newIsTransformed = playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed;
+        if (!!prevIsTransformed !== !!newIsTransformed) changed = true;
 
         // Штрафы/тюрьма — игрок ДОЛЖЕН это видеть (в отличие от репутации), это не тайное число.
         playerCrimeState = data.crimeState || null;
@@ -7063,33 +7496,40 @@ function updateHungerPenalty() {
             // отличаться от сохранённого снимка, перетирать их живым листенером не стоит.
             const curHpEl = document.getElementById('cur-hp');
             const curMpEl = document.getElementById('cur-mp');
-            if (curHpEl && curHpEl.value != data.vitals[0]) curHpEl.value = data.vitals[0];
-            if (curMpEl && curMpEl.value != data.vitals[1]) curMpEl.value = data.vitals[1];
+            if (curHpEl && curHpEl.value != data.vitals[0]) { curHpEl.value = data.vitals[0]; changed = true; }
+            if (curMpEl && curMpEl.value != data.vitals[1]) { curMpEl.value = data.vitals[1]; changed = true; }
         }
         if (typeof data.gold !== 'undefined') {
             const goldEl = document.getElementById('char-gold');
-            if (goldEl && goldEl.value != data.gold) goldEl.value = data.gold;
+            if (goldEl && goldEl.value != data.gold) { goldEl.value = data.gold; changed = true; }
         }
         if (typeof data.characterLevel !== 'undefined' && data.characterLevel !== characterLevel) {
             characterLevel = parseInt(data.characterLevel) || 1;
             if (typeof renderLevelPanel === 'function') renderLevelPanel();
+            changed = true;
         }
         if (typeof data.perkPointsAvailable !== 'undefined') perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
         if (Array.isArray(data.skills)) {
             data.skills.forEach((val, i) => {
                 const input = document.getElementById('skill-' + i);
-                if (input && input.getAttribute('data-raw-val') != val) input.setAttribute('data-raw-val', val || 10);
+                if (input && input.getAttribute('data-raw-val') != val) { input.setAttribute('data-raw-val', val || 10); changed = true; }
             });
         }
-        if (Array.isArray(data.inventory) && JSON.stringify(data.inventory) !== JSON.stringify(playerInventory)) {
+        if (Array.isArray(data.inventory) && inventoryFingerprint(data.inventory) !== inventoryFingerprint(playerInventory)) {
             playerInventory = data.inventory;
             if (typeof renderInventoryList === 'function') renderInventoryList();
             // Раньше не обновлялось здесь — предмет, выданный мастером ПОСЛЕ загрузки страницы,
             // появлялся в инвентаре, но не появлялся в выборе "что зачаровать" вообще (сам пункт
             // списка отсутствовал), пока игрок не перезагружал страницу.
             if (typeof renderEnchantItemSelect === 'function') renderEnchantItemSelect();
+            changed = true;
         }
-        if (typeof updateAll === 'function') updateAll();
+        // updateAll() теперь только если реально что-то поменялось за этот вызов — раньше
+        // запускался безусловно на КАЖДЫЙ snapshot, включая heartbeat раз в 30-60 сек без
+        // реальных изменений (полный пересчёт 19 навыков/перков/экипировки/резистов/каст-костов
+        // впустую). Через scheduleUpdateAll() (задача 4) — коалесцирует с другими отложенными
+        // пересчётами, если они случились в том же кадре.
+        if (changed && typeof scheduleUpdateAll === 'function') scheduleUpdateAll();
     }
     window.applyGmControlledFields = applyGmControlledFields;
 
@@ -7184,7 +7624,7 @@ function updateHungerPenalty() {
                 });
             }
             if (data.perkStates) {
-                document.querySelectorAll('.perk-checkbox').forEach(chk => {
+                _allPerkCheckboxes.forEach(chk => {
                     let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
                     if (data.perkStates.hasOwnProperty(key)) {
                         chk.checked = data.perkStates[key];
@@ -7426,29 +7866,25 @@ function updateHungerPenalty() {
 
     // Первичный запуск
     initSkills();
+    // Если страница открылась СРАЗУ на вкладке "Профессии" (например, из сохранённого
+    // состояния вкладок — сейчас такого нет, но на всякий случай) — инициализируем её тоже,
+    // иначе рендеры ниже (убраны отсюда — теперь в initTab7IfNeeded(), вызывается из openTab)
+    // не выполнились бы, пока пользователь явно не кликнет по вкладке снова.
+    if (document.getElementById('tab7') && document.getElementById('tab7').classList.contains('active')) {
+        initTab7IfNeeded();
+    }
     updateDateDisplay();
     loadLocalStorage();
     updateAll();
     renderInventoryList();
-    renderKitchenPot();
-    renderSmithingList();
-    renderEnchantItemSelect();
-    renderStaffEffectSelect();
-    updateStaffCalc();
-    renderStaffList();
-    renderWeaponChargeSelect();
-    renderTemperSelect();
-    renderMagicStaffSpellSelect();
-    renderMagicStaffList();
+    // Кухня/кузница/посохи/зачарование/алхимия — убраны отсюда, теперь лениво через
+    // initTab7IfNeeded() при первом открытии вкладки "Профессии" (задача 14).
     renderQuestList();
     renderSummonTemplateSelect();
     renderActiveSummonsList();
     initProfessionAccordion();
     renderEquipPanel();
     renderScrollSpellSelect();
-    renderAlchEatSelect();
-    renderAlchIngredientSelects();
-    renderKnownIngredients();
     renderSellList();
     renderPouchPanel();
     renderActiveEffects();

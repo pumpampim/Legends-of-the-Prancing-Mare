@@ -24,7 +24,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.gmUid == request.auth.uid;
       allow update: if request.auth != null;
-      allow delete: if false;
+      // Раньше delete был запрещён вообще для всех — теперь мастер может удалить СВОЮ ЖЕ сессию
+      // (нужно для автоматической чистки старых закрытых сессий, см. cleanupOldClosedSessions
+      // в gm.js — иначе закрытые сессии копились бы в базе вечно).
+      allow delete: if request.auth != null && resource.data.gmUid == request.auth.uid;
     }
 
     // Общая база предметов (лут/ингредиенты и т.д.) — читает кто угодно из
