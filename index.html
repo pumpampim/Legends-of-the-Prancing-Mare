@@ -798,6 +798,7 @@
                 <span id="turn-round-display-main" style="font-size:15px; font-weight:bold; color:var(--accent-color);">Ход: 0 | Круг: 0</span>
                 <button class="btn-success" style="width:auto; margin:0; padding:4px 10px;" onclick="nextTurn()">➡️ Следующий ход</button>
                 <button class="btn-success" style="width:auto; margin:0; padding:4px 10px;" onclick="nextRound()">🔄 Следующий круг</button>
+                <button class="btn-danger" style="width:auto; margin:0; padding:4px 10px;" onclick="resetTurnsRounds()" title="Обнуляет только твой личный счётчик хода/круга на листе — не трогает общий счётчик сессии у мастера">↺ Обнулить</button>
             </div>
             <div id="hunger-status" class="hunger-warning" style="display:none;"></div>
             <div id="today-holiday-widget" style="font-size:13px; margin-top:4px;"></div>
@@ -925,6 +926,7 @@
                 <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-ring-picker" class="slot-picker" onchange="equipToSlotDirect('ring', this.value, 'slot-ring-picker')"></select></div>
                 <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-neck-picker" class="slot-picker" onchange="equipToSlotDirect('amulet', this.value, 'slot-neck-picker')"></select></div>
                 <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-circlet-picker" class="slot-picker" onchange="equipToSlotDirect('circlet', this.value, 'slot-circlet-picker')"></select></div>
+                <div class="slot-row"><span>🎒 Рюкзак:</span><input type="text" id="slot-backpack-name" placeholder="Нет рюкзака" style="width:65%;" readonly><select id="slot-backpack-picker" class="slot-picker" onchange="equipToSlotDirect('backpack', this.value, 'slot-backpack-picker')"></select></div>
                 
                 <div class="checkbox-group" style="margin-top:8px;">
                     <select id="eq-armor" onchange="updateAll(); saveLocalStorage();" style="width:100px; display:inline; margin-right:10px;">
@@ -955,6 +957,7 @@
                     <div style="display:flex; gap:6px;">
                         <button class="btn-success" style="flex:1;" onclick="nextTurn()">➡️ Следующий ход</button>
                         <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
+                        <button class="btn-danger" style="flex:1;" onclick="resetTurnsRounds()">↺ Обнулить</button>
                     </div>
                     <p style="font-size:12px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
                     <div id="active-timed-effects-list" style="margin-top:8px;"></div>
@@ -1299,6 +1302,11 @@
                 <label>Навык «Зачарование» (берётся с вкладки навыков, можно поправить)</label>
                 <input type="number" id="enchant-skill-override" placeholder="Авто с вкладки навыков" onchange="updateEnchantCalc()">
 
+                <div class="checkbox-group" style="margin-top:4px;">
+                    <input type="checkbox" id="chk-portable-pentagram" onchange="updateEnchantCalc()">
+                    <label for="chk-portable-pentagram">📐 Использую переносную пентаграмму душ (чары на 50% слабее — нужна настоящая пентаграмма, эта только в дороге)</label>
+                </div>
+
                 <div id="enchant-calc-result" style="margin:10px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px;"></div>
 
                 <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
@@ -1578,7 +1586,7 @@
     let _allPerkCheckboxes = []; // кэш .perk-checkbox — строится в initSkills(), см. задачу 16
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
-    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
+    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, backpack: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let knownEnchantments = []; // ["Урон огнем", ...] — узнаётся разрушением зачарованного предмета
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
@@ -2143,8 +2151,9 @@ window.toggleSkillPanel = function (idx) {
                 </select>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#cfc5b6; background:#111; padding:2px; border-radius:3px;">
                     <span>Каст: <input type="number" class="spell-final-cost" data-base="${baseCost}" value="${baseCost}" style="width:46px; padding:1px; display:inline;" onchange="saveLocalStorage()"> MP</span>
-                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
-                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>
+                    ${name === 'Равновесие' ? `<button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a2c2c; color:white;" onclick="castEquilibrium()" title="Конвертирует ХП в ману (100 ХП → 75 МП — не 1:1), не тратит обычную ману на каст">⚖️ Конвертировать ХП→МП</button>` :
+                    `<button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
+                    <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>`}
                     <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:12px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
                 </div>
             </div>
@@ -2424,6 +2433,28 @@ window.toggleSkillPanel = function (idx) {
         if (idx === -1) return { base: text, enhanced: text };
         return { base: text.slice(0, idx), enhanced: text.slice(idx + 'Усиленный эффект'.length) };
     }
+
+    // "Равновесие" — раньше было чистым текстом ("Преобразование 25 ед. здоровья в магию"), без
+    // всякой механики. Соотношение по прямой просьбе НЕ 1:1 — 100 ХП даёт 75 маны (0.75 за
+    // единицу), не обычная формула стоимости каста. Заклинание реально "может убить заклинателя",
+    // как и написано в описании — не блокирую уход в 0 или ниже, только явно предупреждаю.
+    window.castEquilibrium = function () {
+        const curHpEl = document.getElementById('cur-hp');
+        const curHp = parseInt(curHpEl.value) || 0;
+        const input = prompt(`Сколько ХП конвертировать в ману (соотношение 100:75, т.е. ×0.75)? Сейчас ХП: ${curHp}.`, '25');
+        const hpToSpend = parseInt(input);
+        if (!hpToSpend || hpToSpend <= 0) return;
+        if (hpToSpend >= curHp) {
+            if (!confirm(`⚠ Это оставит 0 или меньше ХП — заклинание прямо предупреждает, что может убить заклинателя. Точно продолжить?`)) return;
+        }
+        const mpGain = Math.round(hpToSpend * 0.75);
+        curHpEl.value = curHp - hpToSpend;
+        const curMpEl = document.getElementById('cur-mp');
+        curMpEl.value = (parseInt(curMpEl.value) || 0) + mpGain;
+        updateVitalBars();
+        saveLocalStorage();
+        alert(`Равновесие: −${hpToSpend} ХП → +${mpGain} маны.`);
+    };
 
     function castCustomSpell(id, enhanced) {
         const card = document.getElementById(`card-${id}`);
@@ -3194,6 +3225,12 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = '<span style="color:#e74c3c;">Сначала выбери продукты и их количество слева.</span>';
             return;
         }
+        // Минимум 2 РАЗНЫЕ позиции для готовки — по прямой просьбе, раньше можно было
+        // "приготовить" из одного-единственного ингредиента.
+        if (potNames.length < 2) {
+            resultEl.innerHTML = '<span style="color:#e74c3c;">Нужно минимум 2 разных продукта — для настоящего блюда одного ингредиента мало.</span>';
+            return;
+        }
 
         const perks = window.perkBonuses || {};
         const canSubstitute = !!perks.cookingIngredientSubstitution;
@@ -3656,6 +3693,17 @@ window.toggleSkillPanel = function (idx) {
         return calc;
     }
 
+    // Переносная пентаграмма душ — чары на 50% слабее. НЕ трогаю саму calcEnchantPower (формула
+    // защищена от правок) — применяю множитель отдельным шагом поверх уже готового результата.
+    // На boolean-эффекты (вкл/выкл, без числа) ослабление не действует — там нечего делить пополам.
+    function applyPortablePentagramPenalty(calc) {
+        const checkbox = document.getElementById('chk-portable-pentagram');
+        if (!checkbox || !checkbox.checked) return calc;
+        if (countInInventory('Переносная пентаграмма душ') <= 0) return calc;
+        if (calc.boolean) return calc;
+        return Object.assign({}, calc, { value: Math.round(calc.value * 0.5 * 10) / 10 });
+    }
+
     function updateEnchantCalc() {
         const resultEl = document.getElementById('enchant-calc-result');
         if (!resultEl) return;
@@ -3664,9 +3712,10 @@ window.toggleSkillPanel = function (idx) {
         const soulGem = document.getElementById('enchant-soulgem').value;
         const skill = getEnchantSkill();
         const gemCount = countInInventory(soulGem + ' камень душ');
-        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect);
+        const calc = applyPortablePentagramPenalty(applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect));
 
         let html = `<div><strong>${escHtml(effect.name)}</strong></div><div style="opacity:.8; font-size:14px;">${escHtml(effect.description)}</div>`;
+        if (document.getElementById('chk-portable-pentagram').checked) html += `<div style="color:#e67e22; font-size:12px;">📐 Переносная пентаграмма — чары ослаблены на 50%.</div>`;
         if (calc.boolean) {
             html += `<div style="margin-top:6px;">Эффект без числовой величины (вкл/выкл).</div>`;
         } else {
@@ -3691,7 +3740,7 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         const skill = getEnchantSkill();
-        const calc = applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect);
+        const calc = applyPortablePentagramPenalty(applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect));
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
 
         removeFromInventoryByName(gemKey, 1);
@@ -3926,6 +3975,12 @@ window.toggleSkillPanel = function (idx) {
             const dualChk = document.getElementById('chk-dual-wield');
             if (dualChk) dualChk.checked = true;
         } else if (SLOT_FIELD_MAP[slot]) {
+            // Диадема/обруч несовместима с бронёй на торс (не с одеянием — то можно) — см.
+            // пояснение в ветке 'circlet' выше.
+            if (slot === 'chest' && equippedSlots.circlet) {
+                alert('Нельзя надеть броню на торс, пока надета диадема/обруч — сними его сначала (шлем/броня плотно прилегают к голове, диадема металлическая и мешает).');
+                return false;
+            }
             // Броню и одеяние нельзя носить одновременно — надевая одно, снимаем другое.
             if (slot === 'chest' && equippedSlots.robe) {
                 document.getElementById('slot-robe-name').value = '';
@@ -3948,9 +4003,20 @@ window.toggleSkillPanel = function (idx) {
             document.getElementById('slot-neck-name').value = item.name + (desc ? ' — ' + desc : '');
             equippedSlots.neck = item.itemId;
         } else if (slot === 'circlet') {
+            // Диадема/обруч — металлический и облегающий голову, несовместим с бронёй на торс
+            // (лёгкой/тяжёлой — шлем там уже плотно прилегает), можно носить только с одеянием
+            // или вовсе без брони на торс. Логика по прямой просьбе.
+            const chestItem = equippedSlots.chest ? playerInventory.find(i => i.itemId === equippedSlots.chest) : null;
+            if (chestItem) {
+                alert('Диадему/обруч нельзя носить вместе с бронёй на торс (лёгкой или тяжёлой) — шлем уже плотно прилегает к голове. Сними броню с торса или носи одеяние вместо неё.');
+                return false;
+            }
             const desc = getEffectDescriptionForItem(item);
             document.getElementById('slot-circlet-name').value = item.name + (desc ? ' — ' + desc : '');
             equippedSlots.circlet = item.itemId;
+        } else if (slot === 'backpack') {
+            document.getElementById('slot-backpack-name').value = item.name + (typeof item.carryBonus === 'number' ? ` (+${item.carryBonus} к грузоподъёмности)` : '');
+            equippedSlots.backpack = item.itemId;
         } else if (slot === 'melee') {
             document.getElementById('wep-melee-name').value = item.name;
             document.getElementById('wep-melee-dmg').value = item.weaponDmg || 2;
@@ -3989,7 +4055,7 @@ window.toggleSkillPanel = function (idx) {
         'slot-helmet-picker': 'helmet', 'slot-chest-picker': 'chest', 'slot-robe-picker': 'robe',
         'slot-gloves-picker': 'gloves', 'slot-boots-picker': 'boots', 'slot-shield-picker': 'shield',
         'slot-pouch-picker': 'pouch',
-        'slot-ring-picker': 'ring', 'slot-neck-picker': 'amulet', 'slot-circlet-picker': 'circlet',
+        'slot-ring-picker': 'ring', 'slot-neck-picker': 'amulet', 'slot-circlet-picker': 'circlet', 'slot-backpack-picker': 'backpack',
         'slot-melee-picker': 'melee', 'slot-melee-offhand-picker': 'melee_offhand', 'slot-ranged-picker': 'ranged'
     };
 
@@ -4728,6 +4794,17 @@ window.toggleSkillPanel = function (idx) {
         renderActiveEffects();
         alert(`🎭 Шеогорат бросает кости: урон ×${dmgMult}, защита ${defSwing >= 0 ? '+' : ''}${defSwing}%, бафф «${buff.name}».`);
     }
+
+    // Обнуление личного счётчика хода/круга — чтобы не копился бесконечно за долгую игру.
+    // НЕ трогает общий sessionTurnCounter в сессии (тот отдельно — окно "поднять труп 5 ходов" и
+    // т.п. завязаны на него, обнулять его отсюда было бы неправильно без согласия мастера).
+    window.resetTurnsRounds = function () {
+        if (!confirm('Обнулить твой счётчик хода/круга до 0?')) return;
+        gameTurn = 0;
+        gameRound = 0;
+        updateTurnRoundDisplay();
+        saveLocalStorage();
+    };
 
     window.nextTurn = function () {
         gameTurn++;
@@ -6929,6 +7006,12 @@ function updateHungerPenalty() {
             maxWeight = str * 5;
             maxWeight += equipBonuses.weight;
             maxWeight += (perks.extraCarryWeight || 0);
+            // Экипированный рюкзак (слот backpack) — фиксированный бонус к грузоподъёмности,
+            // не зависит от зачарования (это свойство самого предмета, не чары на нём).
+            if (equippedSlots.backpack) {
+                const backpackItem = playerInventory.find(i => i.itemId === equippedSlots.backpack);
+                if (backpackItem && typeof backpackItem.carryBonus === 'number') maxWeight += backpackItem.carryBonus;
+            }
             document.getElementById('max-weight-input').value = maxWeight;
         }
         document.getElementById('weight-max-display').innerText = maxWeight;
@@ -7089,7 +7172,11 @@ function updateHungerPenalty() {
         baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
         wepType = document.getElementById('wep-melee-type').value;
         const wepName = document.getElementById('wep-melee-name').value.toLowerCase();
-        hitModifier = strMod;
+        // Призванное оружие (имя всегда начинается с "Призван...", см. performSummon) бьёт от
+        // Мудрости, не от Силы — по прямой просьбе, логичнее для оружия, вызванного магией.
+        const isSummonedWeapon = wepName.indexOf('призван') === 0;
+        const wisMod = calcAbilityMod(parseInt(document.getElementById('stat-wis').value) || 10);
+        hitModifier = isSummonedWeapon ? wisMod : strMod;
 
         if (wepType === 'twohand_sword') hitModifier -= 2;
         if (wepType === 'twohand_axe') hitModifier -= 3;
@@ -7209,10 +7296,15 @@ function updateHungerPenalty() {
         baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
         let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
         wepType = document.getElementById('wep-ranged-type').value;
-        hitModifier = dexMod;
+        // Призванный лук — та же логика, что у призванного ближнего оружия: бьёт от Мудрости.
+        const rangedWepName = (document.getElementById('wep-ranged-name').value || '').toLowerCase();
+        const isSummonedRanged = rangedWepName.indexOf('призван') === 0;
+        const wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        const rangedWisMod = calcAbilityMod(wis);
+        hitModifier = isSummonedRanged ? rangedWisMod : dexMod;
         enchantDmgMain = getActiveWeaponEnchantDmg(false);
-        statModForFormula = dex; statLabelForFormula = 'Ловкость';
-        totalDmg = baseDmg + dex + ammoDmg;
+        statModForFormula = isSummonedRanged ? wis : dex; statLabelForFormula = isSummonedRanged ? 'Мудрость' : 'Ловкость';
+        totalDmg = baseDmg + (isSummonedRanged ? wis : dex) + ammoDmg;
         totalDmg += enchantDmgMain;
 
         // Избыточное натяжение: +20%/ранг к базовому урону лука
@@ -7737,6 +7829,10 @@ function updateHungerPenalty() {
             if (equippedSlots.pouch) {
                 const pouchItem = playerInventory.find(i => i.itemId === equippedSlots.pouch);
                 document.getElementById('slot-pouch-name').value = pouchItem ? pouchItem.name : '';
+            }
+            if (equippedSlots.backpack) {
+                const backpackItem = playerInventory.find(i => i.itemId === equippedSlots.backpack);
+                document.getElementById('slot-backpack-name').value = backpackItem ? (backpackItem.name + (typeof backpackItem.carryBonus === 'number' ? ` (+${backpackItem.carryBonus} к грузоподъёмности)` : '')) : '';
             }
             renderPouchPanel();
 

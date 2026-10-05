@@ -420,6 +420,7 @@
         populateQuestTargetSelect();
         populateGmAttackSelects();
         populateLootTargetSelect();
+        populateThemedChestTargetSelect();
         if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
         if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
@@ -800,6 +801,14 @@
     // мастер: статус-эффекты и кулдауны криков на врагах, и общий счётчик ходов сессии (тот же
     // sessionTurnCounter, что уже используют игроки — не отдельный, чтобы не рассинхронизировать
     // окно "поднять труп только 5 ходов после смерти").
+    // Обнуление общего счётчика ходов сессии — чтобы не копился бесконечно за долгую игру.
+    // Честно предупреждаю: окно "труп поднимаемый только первые 5 ходов после смерти" тоже
+    // завязано на этот счётчик — обнуление может повлиять на расчёт для уже лежащих трупов.
+    window.resetSessionTurnCounter = function () {
+        if (!confirm('Обнулить общий счётчик ходов сессии до 0? Это также повлияет на расчёт "труп поднимаемый только первые 5 ходов после смерти" для уже умерших врагов.')) return;
+        db.collection('sessions').doc(currentCode).update({ sessionTurnCounter: 0 }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     window.gmAdvanceTurn = function () {
         const enemies = (lastData.enemies || []).map(e => {
             const copy = { ...e };
@@ -1627,7 +1636,11 @@
         jeweler: { label: 'Ювелир', gold: 1500, categories: ['Ювелирное изделие (лут)', 'Ювелирные изделия', 'Драгоценные камни'] },
         foodVendor: { label: 'Торговец едой', gold: 750, categories: ['Сырые продукты'] },
         courtWizard: { label: 'Придворный колдун', gold: 1500, categories: ['Свитки (прописанные)', 'Посохи', 'Магические одеяния'] },
-        khajiitCaravan: { label: 'Каджитский караван', gold: 1500, categories: ['Сырые продукты', 'Бытовые предметы', 'Ювелирные изделия', 'Шкуры'] }
+        khajiitCaravan: { label: 'Каджитский караван', gold: 1500, categories: ['Сырые продукты', 'Бытовые предметы', 'Ювелирные изделия', 'Шкуры'] },
+        // Раньше "барахольщик" существовал ТОЛЬКО как получатель продажи (сторона продажи у
+        // игрока) — тип живого торговца с собственным ассортиментом для покупки отсутствовал
+        // вообще. Добавлен по прямой просьбе, общий профиль (всякая всячина), плюс слитки ниже.
+        pawnbrokerLive: { label: 'Барахольщик', gold: 1000, categories: ['Бытовые предметы', 'Сырые продукты', 'Ювелирные изделия'] }
     };
     window.LIVING_MERCHANT_TYPES = LIVING_MERCHANT_TYPES;
 
@@ -1753,6 +1766,19 @@
             if (typeof i.capacity === 'number') out.capacity = i.capacity;
             return out;
         });
+        // Гарантированные 2-5 слитков у кузнеца и барахольщика — по прямой просьбе "к уже их
+        // ассортименту", то есть ГАРАНТИРОВАННО, не просто доступны для случайного отбора (пул
+        // выше — рандомная выборка 15-26 из общего списка, слитки могли бы ни разу не попасть).
+        if (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive') {
+            const allIngots = (window.allItems || gmAllItems).filter(i => i.category === 'Кузнечные ингредиенты' && /слиток/i.test(i.name));
+            const usedNames2 = new Set(finalItems.map(i => i.name));
+            const freshIngots = allIngots.filter(i => !usedNames2.has(i.name)).sort(() => Math.random() - 0.5);
+            const ingotCount = Math.min(freshIngots.length, randInt(2, 5));
+            for (let k = 0; k < ingotCount; k++) {
+                const ing = freshIngots[k];
+                finalItems.push({ name: ing.name, category: ing.category, price: ing.price, weight: ing.weight || 0, effect: ing.effect || '', qty: randInt(2, 6) });
+            }
+        }
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
         // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
@@ -2957,6 +2983,76 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // ---------- Тематические сундуки (отдельно от генератора лута ниже, по прямой просьбе —
+    // быстрая настройка под конкретную фракцию без подбора по цене) ----------
+    const THEMED_CHEST_THEMES = {
+        // Ключевое слово matч по ИМЕНИ предмета (не категории) — в базе эти записи разбросаны по
+        // оружию/броне с разным написанием (например "Древний нордский"/"Древняя нордская"/
+        // "Древне нордские" — исторически неконсистентно, но ключевое слово "древн" ловит все
+        // варианты разом).
+        ancientNord: { label: 'Древнонордский', keyword: 'древн', currency: { name: 'Дракр', min: 3, max: 12 } },
+        dwemer: { label: 'Двемерский', keyword: 'двемер', currency: { name: 'Думак', min: 3, max: 12 } },
+        falmer: { label: 'Фалмерский', keyword: 'фалмер', currency: { name: 'Думак', min: 3, max: 12 } },
+        forsworn: { label: 'Изгоев', keyword: 'изгое', currency: null }
+    };
+    let lastThemedChestLoot = null;
+
+    window.generateThemedChest = function () {
+        const themeKey = el('themed-chest-select').value;
+        const theme = THEMED_CHEST_THEMES[themeKey];
+        const resultEl = el('themed-chest-result');
+        const pool = (gmAllItems || []).filter(i => i.name.toLowerCase().includes(theme.keyword));
+        if (!pool.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В базе нет предметов этой фракции.</span>'; return; }
+        const count = randInt(2, 4);
+        const items = [];
+        const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(count, shuffled.length); i++) items.push(shuffled[i]);
+
+        let currencyAmount = 0;
+        if (theme.currency) currencyAmount = randInt(theme.currency.min, theme.currency.max);
+
+        lastThemedChestLoot = { theme: theme.label, items, currencyName: theme.currency ? theme.currency.name : null, currencyAmount };
+
+        let html = `<strong>${theme.label} сундук:</strong><br>`;
+        items.forEach(it => { html += `• ${escapeHtml(it.name)}${it.resistance ? ` (сопротивление ${it.resistance})` : ''}${it.damage ? ` (урон ${it.damage})` : ''}<br>`; });
+        if (currencyAmount) html += `🪙 ${theme.currency.name} ×${currencyAmount}`;
+        resultEl.innerHTML = html;
+    };
+
+    window.grantThemedChestLoot = function () {
+        if (!lastThemedChestLoot) { alert('Сначала сгенерируй сундук.'); return; }
+        const targetUid = el('themed-chest-target-player').value;
+        if (!targetUid) { alert('Выбери игрока.'); return; }
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+            const addOne = (name, category, extra, weight, price, effect) => {
+                const itemId = name;
+                const existing = inv.find(x => x.itemId === itemId);
+                if (existing) { existing.count = (existing.count || 1) + 1; }
+                else inv.push(Object.assign({ itemId, name, count: 1, weight: weight || 0, category: category || '', effect: effect || '' }, extra || {}));
+            };
+            lastThemedChestLoot.items.forEach(it => {
+                const extra = {};
+                if (it.slot) extra.slot = it.slot;
+                if (typeof it.resistance === 'number') extra.armorValue = it.resistance;
+                if (typeof it.damage === 'number') extra.weaponDmg = it.damage;
+                if (typeof it.price === 'number') extra.price = it.price;
+                addOne(it.name, it.category || (typeof it.resistance === 'number' ? 'Броня (лут)' : 'Оружие (лут)'), extra, it.weight, it.price, it.effect);
+            });
+            if (lastThemedChestLoot.currencyAmount) {
+                for (let c = 0; c < lastThemedChestLoot.currencyAmount; c++) addOne(lastThemedChestLoot.currencyName, 'Кузнечные ингредиенты', {}, 0.1, lastThemedChestLoot.currencyName === 'Дракр' ? 4 : 5);
+            }
+            return db.collection('characters').doc(targetUid).update({ inventory: inv });
+        }).then(() => {
+            const pname = (lastData.participants[targetUid] || {}).name || targetUid;
+            alert(`Тематический сундук (${lastThemedChestLoot.theme}) выдан игроку ${pname}.`);
+            gmPostLogEntryText(`🗝️ ${pname} нашёл(а) ${lastThemedChestLoot.theme.toLowerCase()} сундук: ${lastThemedChestLoot.items.map(i => i.name).join(', ')}${lastThemedChestLoot.currencyAmount ? ` + ${lastThemedChestLoot.currencyName} ×${lastThemedChestLoot.currencyAmount}` : ''}.`);
+            lastThemedChestLoot = null;
+            el('themed-chest-result').innerHTML = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     // ---------- Генератор лута сундуков ----------
 
     const LOOT_TIERS = {
@@ -3039,6 +3135,17 @@
             el('loot-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+
+    function populateThemedChestTargetSelect() {
+        const select = el('themed-chest-target-player');
+        if (!select) return;
+        const uids = Object.keys(lastData.participants || {});
+        const prev = select.value;
+        select.innerHTML = uids.length
+            ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
+            : '<option value="">Нет игроков</option>';
+        if (uids.includes(prev)) select.value = prev;
+    }
 
     function populateLootTargetSelect() {
         const select = el('loot-gen-target-player');

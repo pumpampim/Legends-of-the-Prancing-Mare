@@ -243,6 +243,7 @@ const armorRecipes = [
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Железный слиток", qty: 2 }, { name: "Кожа", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
+
     {
         name: "Костяной шлем", armorType: "Тяжелая броня", slot: "Шлема",
         resistance: 19, weight: 3, price: 135, upgradeMaterial: "2 костные муки",
@@ -1017,61 +1018,61 @@ const weaponRecipes = [
     {
         name: "Железная стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 8, weight: 0.04, price: 1, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Стальная стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 10, weight: 0.04, price: 2, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Стальной слиток", qty: 1 }]
     },
     {
         name: "Орочья стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 12, weight: 0.08, price: 3, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Орочьи доспехи",
+        yieldCount: 20, perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Орихалковый слиток", qty: 1 }]
     },
     {
         name: "Двемерская стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 14, weight: 0.08, price: 4, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Двемерские доспехи",
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Двемерский слиток", qty: 1 }]
     },
     {
         name: "Нордская стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 14, weight: 0.08, price: 4, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Железный слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
         name: "Эльфийская стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 16, weight: 0.04, price: 5, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эльфийские доспехи",
+        yieldCount: 20, perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Лунный камень", qty: 1 }]
     },
     {
         name: "Стеклянная стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 18, weight: 0.04, price: 6, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Стеклянные доспехи",
+        yieldCount: 20, perkHint: "Стеклянные доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Малахитовый слиток", qty: 1 }]
     },
     {
         name: "Эбонитовая стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 20, weight: 0.08, price: 7, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи",
+        yieldCount: 20, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
     {
         name: "Древненордская стрела героя", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 23, weight: 0.08, price: 8, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи",
+        yieldCount: 20, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
     {
         name: "Сталгримовая стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 20, weight: 0.04, price: 7, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи",
+        yieldCount: 20, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 1 }, { name: "Полено", qty: 1 }]
     },
     {

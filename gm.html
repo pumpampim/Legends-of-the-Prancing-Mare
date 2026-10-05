@@ -168,6 +168,7 @@
                 </div>
                 <button style="margin-top:6px; width:100%;" onclick="clearTurnOrder()">Очистить порядок ходов</button>
                 <button class="btn-success" style="margin-top:6px; width:100%;" onclick="gmAdvanceTurn()">⏭️ Объявить следующий ход (вся группа)</button>
+                <button class="btn-danger" style="margin-top:4px; width:100%;" onclick="resetSessionTurnCounter()" title="Обнуляет общий счётчик ходов сессии — окно 'поднять труп' и т.п. тоже сбросится">↺ Обнулить общий счётчик ходов</button>
                 <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Тикает статус-эффекты и кулдауны криков у врагов, напоминает игрокам в журнале прокрутить свои эффекты. Личные баффы/дебаффы на листах игроков эта кнопка не трогает — каждый игрок всё ещё крутит их у себя сам.</p>
             </div>
 
@@ -719,6 +720,24 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
+        <div class="panel">
+            <h2>🗝️ Тематические сундуки</h2>
+            <p style="font-size:12px; opacity:.75;">Отдельный от обычного генератора лута ниже — всегда даёт броню/оружие конкретной фракции (своя скорая настройка, не нужно гадать по цене).</p>
+            <label>Фракция</label>
+            <select id="themed-chest-select">
+                <option value="ancientNord">Древнонордский (Дракры)</option>
+                <option value="dwemer">Двемерский (Думаки)</option>
+                <option value="falmer">Фалмерский (Думаки)</option>
+                <option value="forsworn">Изгоев (без валюты)</option>
+            </select>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateThemedChest()">🗝️ Сгенерировать</button>
+            <div id="themed-chest-result" style="margin-top:8px; font-size:13px;"></div>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <select id="themed-chest-target-player" style="flex:1;"></select>
+                <button class="btn-success" style="flex:1;" onclick="grantThemedChestLoot()">Выдать</button>
+            </div>
+        </div>
+
         <div class="panel">
             <h2>📦 Генератор лута (сундук)</h2>
             <label>Уровень сундука (примерно под уровень группы)</label>
