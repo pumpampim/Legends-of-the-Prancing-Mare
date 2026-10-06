@@ -3008,6 +3008,14 @@
             const data = doc.exists ? doc.data() : {};
             const resist = (data.resistances && data.resistances[dmgType]) || 0;
             let finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
+            // Способность «Берсерк» (орк): пока действует — получаемый ФИЗИЧЕСКИЙ урон ×½ (на магию не действует).
+            // Эффект читаем из сохранённых активных эффектов игрока (activeTimedEffects → powerFlag).
+            let berserkNote = '';
+            if (finalDmg && dmgType === 'physical' && Array.isArray(data.activeTimedEffects) &&
+                data.activeTimedEffects.some(e => e && e.powerFlag === 'berserk' && (e.turnsRemaining > 0 || e.turnsRemaining === null))) {
+                finalDmg = Math.round(finalDmg / 2);
+                berserkNote = ' (🪓 Берсерк: урон ×½)';
+            }
             // Задача L: вампир получает удвоенный урон, если сейчас "День" в сессии — раньше
             // это было только текстовым предупреждением в интерфейсе, урон не менялся.
             let sunNote = '';
@@ -3022,7 +3030,7 @@
                 newHp = Math.max(0, (parseInt(vitals[0]) || 0) - finalDmg);
                 vitals[0] = newHp;
                 chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
-                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}`;
+                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}`;
             }
             // Автоматический бросок на заражение болезнью — раньше этого не было вообще, болезни
             // существовали только как текст в описании монстров. Срабатывает только при физическом

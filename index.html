@@ -537,6 +537,7 @@
     <script src="skill-books-data.js"></script>
     <script src="unique-weapons-data.js"></script>
     <script src="spell-tomes-data.js"></script>
+<script src="powers-data.js"></script>
 </head>
 <body>
 
@@ -645,6 +646,7 @@
                     <option value="shadow">Тень (раз в день невидимость на 60 сек. — решает мастер)</option>
                     <option value="tower">Башня (раз в день открыть любой замок без взлома — решает мастер)</option>
                 </select>
+                <div id="mage-sign-status" style="font-size:13px; margin-top:2px;"></div>
 
                 <div class="grid-2" style="margin-top:10px;">
                     <div>
@@ -980,6 +982,14 @@
             </p>
 
             <div class="panel">
+                <div class="profession-header" onclick="toggleAccordion('magic','powers')">
+                    <span style="color:#d4af37;">✨ Особые способности (раса, знак, оборотень, вампир)</span><span id="magic-chevron-powers">▸</span>
+                </div>
+                <div class="profession-body" id="magic-body-powers">
+                    <p style="font-size:12px; opacity:.7;">Способности твоей расы и знака рождения, а также оборотня и вампира, если мастер включил их. «Раз в день» — сбрасывается кнопкой «Следующий день». Описания и числа — в powers-data.js.</p>
+                    <div id="powers-panel"></div>
+                </div>
+
                 <div class="profession-header" onclick="toggleAccordion('magic','destr')">
                     <span style="color:#e74c3c;">🔥 Школа Разрушения</span><span id="magic-chevron-destr">▸</span>
                 </div>
@@ -1258,6 +1268,8 @@
                 </div>
                 <button class="btn-success" style="width:100%;" onclick="cookFood()">Готовить</button>
                 <div id="kitchen-result" style="margin-top:10px; font-size:15px; line-height:1.5;"></div>
+                <h4 style="margin:12px 0 4px;">📖 Мои рецепты (удачные)</h4>
+                <div id="kitchen-known-recipes"></div>
             </div>
 
             <div class="profession-header" onclick="toggleProfession('smithing')">
@@ -1421,6 +1433,8 @@
 
                 <button class="btn-success" style="width:100%;" onclick="brewPotion()">Сварить</button>
                 <div id="alch-brew-result" style="margin-top:10px; font-size:15px;"></div>
+                <h4 style="margin:12px 0 4px;">📖 Мои рецепты (удачные)</h4>
+                <div id="alch-known-recipes"></div>
 
                 <h3 style="margin-top:16px;"><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Известные свойства ингредиентов</h3>
                 <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
@@ -1609,6 +1623,74 @@
     let scrollWisdomSpent = 0; // Счётчик потраченной Мудрости на свитки
     let playerInventory = []; // Общий инвентарь: [{itemId, name, count, weight, category, effect}]
     let _allPerkCheckboxes = []; // кэш .perk-checkbox — строится в initSkills(), см. задачу 16
+    // Книга удачных рецептов — раньше успешная готовка/варка нигде не запоминалась (сохранялись только
+    // открытые свойства ингредиентов, в кулинарии — вообще ничего). Теперь каждый удачный результат
+    // записывается и сохраняется вместе с персонажем; из списка можно одним нажатием подставить рецепт.
+    let knownCookRecipes = {}; // { 'Название блюда': { ingredients: [{name, qty}], effect } }
+    let knownBrewRecipes = {}; // { 'Ингр1|Ингр2|Ингр3' (по алфавиту): { ingredients: [имена], effects: [названия эффектов], itemName } }
+
+    function renderKnownRecipes() {
+        const kEl = document.getElementById('kitchen-known-recipes');
+        if (kEl) {
+            const names = Object.keys(knownCookRecipes).sort();
+            kEl.innerHTML = names.length ? names.map(n => {
+                const r = knownCookRecipes[n];
+                const ing = r.ingredients.map(i => `${escHtml(i.name)} ×${i.qty}`).join(', ');
+                return `<div class="party-row" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:4px 8px;">
+                    <span style="flex:0 1 220px; min-width:0;"><strong>${escHtml(n)}</strong></span>
+                    <span style="flex:1 1 200px; min-width:0; font-size:13px; opacity:.85;">${ing}</span>
+                    <button style="width:auto; padding:3px 12px; margin:0;" onclick="loadCookRecipe('${escHtml(n).replace(/'/g, "\\'")}')">В котёл</button>
+                </div>`;
+            }).join('') : '<p style="opacity:.6; font-size:13px;">Пока пусто — удачные блюда запишутся сюда сами.</p>';
+        }
+        const aEl = document.getElementById('alch-known-recipes');
+        if (aEl) {
+            const keys = Object.keys(knownBrewRecipes).sort();
+            aEl.innerHTML = keys.length ? keys.map(k => {
+                const r = knownBrewRecipes[k];
+                return `<div class="party-row" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:4px 8px;">
+                    <span style="flex:0 1 240px; min-width:0;"><strong>${escHtml(r.itemName)}</strong></span>
+                    <span style="flex:1 1 200px; min-width:0; font-size:13px; opacity:.85;">${r.ingredients.map(escHtml).join(' + ')}</span>
+                    <button style="width:auto; padding:3px 12px; margin:0;" onclick="loadBrewRecipe('${escHtml(k).replace(/'/g, "\\'")}')">Загрузить</button>
+                </div>`;
+            }).join('') : '<p style="opacity:.6; font-size:13px;">Пока пусто — удачные зелья и яды запишутся сюда сами.</p>';
+        }
+    }
+
+    // Подставляет рецепт в котёл (в пределах того, что есть в инвентаре).
+    window.loadCookRecipe = function (name) {
+        const r = knownCookRecipes[name];
+        if (!r) return;
+        potSelections = {};
+        const lacking = [];
+        r.ingredients.forEach(i => {
+            const have = countInInventory(i.name);
+            if (have >= i.qty) potSelections[i.name] = i.qty;
+            else { if (have > 0) potSelections[i.name] = have; lacking.push(`${i.name} (нужно ${i.qty}, есть ${have})`); }
+        });
+        renderKitchenPot();
+        const res = document.getElementById('kitchen-result');
+        if (res) res.innerHTML = lacking.length ? `<span style="color:#e67e22;">Рецепт «${escHtml(name)}» загружен не полностью — не хватает: ${lacking.map(escHtml).join(', ')}.</span>` : `<span style="color:#2ecc71;">Рецепт «${escHtml(name)}» загружен в котёл.</span>`;
+    };
+
+    // Выбирает три ингредиента рецепта в списках варки (если они есть в инвентаре).
+    window.loadBrewRecipe = function (key) {
+        const r = knownBrewRecipes[key];
+        if (!r) return;
+        renderAlchIngredientSelects();
+        const lacking = [];
+        ['alch-ing-0', 'alch-ing-1', 'alch-ing-2'].forEach((id, idx) => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const name = r.ingredients[idx] || '';
+            if (name && countInInventory(name) > 0) sel.value = name;
+            else { sel.value = ''; if (name) lacking.push(name); }
+        });
+        if (typeof updateBrewPreview === 'function') updateBrewPreview();
+        const res = document.getElementById('alch-brew-result');
+        if (res) res.innerHTML = lacking.length ? `<span style="color:#e67e22;">Нет в инвентаре: ${lacking.map(escHtml).join(', ')}.</span>` : `<span style="color:#2ecc71;">Рецепт загружен — осталось нажать «Сварить».</span>`;
+    };
+
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
     // Единый полный список слотов — используется и для начальной инициализации, и при загрузке
@@ -1666,7 +1748,11 @@
         // танка"); после исправления в базе у игроков с уже сохранённой старой версией точное
         // сравнение потеряло бы связь с шаблоном призыва.
         const lname = String(name || '').toLowerCase();
-        return summonTemplates.find(t => t.spellName.toLowerCase() === lname);
+        if (!lname) return undefined;
+        // У части шаблонов (например "Скелет-компаньон", создаётся предметом) поля spellName НЕТ —
+        // без проверки t.spellName это роняло TypeError в renderAttackActionSelect → updateAll, и ломались
+        // призыв, баффы одеяния, экипировка и применение данных персонажа.
+        return summonTemplates.find(t => t.spellName && t.spellName.toLowerCase() === lname);
     }
 
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
@@ -1686,6 +1772,106 @@
         return entry;
     }
     let gameTurn = 0, gameRound = 0;
+
+    // Знак «Маг»: ОДИН бесплатный каст заклинания 1-го уровня в день. Раньше стоимость всех заклинаний
+    // 1-го уровня была 0 постоянно. Флаг сохраняется в сейве и сбрасывается в nextDay().
+    let mageSignFreeUsed = false;
+    function consumeMageSignFreeCast(costInput) {
+        if (!costInput || mageSignFreeUsed) return;
+        const signEl = document.getElementById('char-sign');
+        if (!signEl || signEl.value !== 'mage') return;
+        // Бесплатно именно из-за знака: показанная стоимость 0 при ненулевой базе.
+        if ((parseInt(costInput.value) || 0) === 0 && (parseInt(costInput.getAttribute('data-base')) || 0) > 0) {
+            mageSignFreeUsed = true;
+            scheduleUpdateAll(); // пересчитать стоимости остальных заклинаний 1 ур. — теперь они платные
+        }
+    }
+
+    // ==================== ОСОБЫЕ СПОСОБНОСТИ (раса / знак / оборотень / вампир) ====================
+    // Данные — window.powersData (powers-data.js). Здесь: что доступно сейчас, лимит "раз в день", применение.
+    let powersUsedToday = {}; // { группа: true } — сбрасывается в nextDay()
+
+    function getAvailablePowers() {
+        const list = window.powersData || [];
+        const race = (document.getElementById('char-race') || {}).value;
+        const sign = (document.getElementById('char-sign') || {}).value;
+        const s = playerSupernaturalState;
+        return list.filter(p => {
+            if (p.source === 'race') return p.race === race;
+            if (p.source === 'sign') return p.sign === sign;
+            if (p.source === 'werewolf') return !!(s && s.lycanthropy);
+            if (p.source === 'vampire') return !!(s && s.vampirism);
+            return false;
+        });
+    }
+
+    function isPowerFlagActive(flag) {
+        return activeTimedEffects.some(e => e.powerFlag === flag && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity));
+    }
+
+    function renderPowersPanel() {
+        const box = document.getElementById('powers-panel');
+        if (!box) return;
+        const powers = getAvailablePowers();
+        const sign = (document.getElementById('char-sign') || {}).value;
+        let html = '';
+        // Знак «Маг» — не кнопка, а автоматика: статус бесплатного каста
+        if (sign === 'mage') {
+            html += `<div class="party-row" style="padding:5px 8px;"><strong>Маг: Концентрация</strong> <span style="font-size:13px; opacity:.85;">— ${mageSignFreeUsed ? 'бесплатный каст заклинания 1 ур. сегодня уже использован' : 'доступен 1 бесплатный каст заклинания 1 ур. сегодня (спишется автоматически)'}</span></div>`;
+        }
+        if (!powers.length && !html) {
+            box.innerHTML = '<p style="opacity:.6; font-size:13px;">У выбранной расы и знака нет активных способностей. Они появятся, если мастер даст ликантропию или вампиризм.</p>';
+            return;
+        }
+        const titles = { race: '🧬 Расовая', sign: '⭐ Знак рождения', werewolf: '🐺 Оборотень', vampire: '🧛 Вампир' };
+        html += powers.map(p => {
+            const group = p.group || p.id;
+            const used = p.perDay && powersUsedToday[group];
+            const needForm = p.requiresTransformed && !(playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed);
+            const active = activeTimedEffects.find(e => e.effectName === p.name && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity));
+            let status = '<span style="color:#2ecc71;">доступна</span>';
+            if (used) status = '<span style="opacity:.7;">использована сегодня</span>';
+            else if (needForm) status = '<span style="color:#e67e22;">нужен облик зверя</span>';
+            if (active) status = `<span style="color:var(--accent-color);">действует: ещё ${active.turnsRemaining === Infinity ? '∞' : active.turnsRemaining} ход.</span>`;
+            return `<div class="party-row" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:5px 8px;">
+                <span style="flex:1 1 260px; min-width:0;"><strong>${escHtml(p.name)}</strong> <span style="font-size:12px; opacity:.6;">${titles[p.source] || ''}${p.perDay ? ' · раз в день' : ''}</span><br><span style="font-size:13px; opacity:.85;">${escHtml(p.desc)}</span></span>
+                <span style="font-size:13px; min-width:110px;">${status}</span>
+                <button class="btn-success" style="width:auto; padding:3px 14px; margin:0;" ${(used || needForm) ? 'disabled' : ''} onclick="usePower('${escHtml(p.id)}')">Применить</button>
+            </div>`;
+        }).join('');
+        box.innerHTML = html;
+    }
+
+    window.usePower = function (id) {
+        const p = (window.powersData || []).find(x => x.id === id);
+        if (!p) return;
+        const group = p.group || p.id;
+        if (p.perDay && powersUsedToday[group]) { alert('Эта способность уже использована сегодня.'); return; }
+        if (p.requiresTransformed && !(playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed)) { alert('Только в облике зверя.'); return; }
+        const eff = p.effect || {};
+        if (p.perDay) powersUsedToday[group] = true;
+
+        if (eff.healFlat) {
+            const curEl = document.getElementById('cur-hp'), maxEl = document.getElementById('max-hp');
+            curEl.value = Math.min(parseInt(maxEl.value) || 0, (parseInt(curEl.value) || 0) + eff.healFlat);
+            updateVitalBars();
+        }
+        if (p.turns > 0) {
+            pushOrRefreshTimedEffect({
+                id: 'pow-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                name: p.name, effectName: p.name, description: p.desc, turnsRemaining: p.turns,
+                hp: 0, mp: 0, value: 0, healPctPerTurn: eff.healPctPerTurn || 0, powerFlag: eff.flag || ''
+            });
+        }
+        const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+        if (window.CloudSync && window.CloudSync.postCombatLog) {
+            window.CloudSync.postCombatLog(`✨ ${myName} применяет «${p.name}»${p.turns ? ` (${p.turns} ход.)` : ''}: ${p.desc}`, myName);
+        }
+        renderPowersPanel();
+        if (typeof renderActiveEffects === 'function') renderActiveEffects();
+        updateAll();
+        saveLocalStorage();
+    };
 
     // ==================== ВРЕМЯ СУТОК / ПОГОДА / СБОР ИНГРЕДИЕНТОВ ====================
     const TIME_PERIODS = ['Утро', 'День', 'Вечер', 'Ночь'];
@@ -1719,7 +1905,14 @@
         'Медвежьи когти', 'Паучье яйцо', 'Перья ворожеи', 'Прах вампира', 'Сердце даэдра',
         'Ухо фалмера', 'Хвост злокрыса', 'Человеческое сердце', 'Человечье мясо',
         'Эльфийское ухо', 'Язык дракона', 'Чешуя рыбы-убийцы', 'Толчёный бивень мамонта',
-        'Эктоплазма', 'Прах Берита', 'Жареная злокрысья кожа'
+        'Эктоплазма', 'Прах Берита', 'Жареная злокрысья кожа',
+        // Дополнено: эти ингредиенты падают с существ (в луте врагов они уже прописаны: Великан, атронахи,
+        // Корус, двемерские механизмы, Горелый сприган, Изгои-«вересковые сердца», скелеты/драугры) и
+        // продаются алхимиками, но раньше ещё и «находились» кнопкой сбора — в том числе, например,
+        // древесина горелого сприггана в Вайтране.
+        'Палец великана', 'Огненная соль', 'Морозная соль', 'Соль пустоты', 'Яйцо коруса', 'Двемерское масло',
+        'Древесина горелого сприггана', 'Живица сприггана', 'Костная мука', 'Вересковое сердце',
+        'Клюв ястреба', 'Перья ястреба', 'Большие рога', 'Маленькие рога'
     ]);
     // Ингредиенты, которые логично находить чаще в определённом регионе (доп. вес при сборе).
     const INGREDIENT_REGION_TAGS = {
@@ -2057,6 +2250,7 @@ window.toggleSkillPanel = function (idx) {
         renderAlchEatSelect();
         renderAlchIngredientSelects();
         renderKnownIngredients();
+        renderKnownRecipes();
     }
 
     function openTab(ev, tabId) {
@@ -2502,6 +2696,7 @@ window.toggleSkillPanel = function (idx) {
         const finalCost = enhanced ? baseFinalCost * 2 : baseFinalCost;
         let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
         if (curMp >= finalCost) {
+            consumeMageSignFreeCast(card.querySelector('.spell-final-cost'));
             document.getElementById('cur-mp').value = curMp - finalCost;
             const targetSelect = card.querySelector('.spell-target-select');
             const targetVal = targetSelect ? targetSelect.value : 'self';
@@ -3311,6 +3506,11 @@ window.toggleSkillPanel = function (idx) {
         const finalEffect = scaleEffectText(dish.effect, powerBonus, durBonus) + alchemyNote;
         addToInventory(dish.name, dish.name, 1, dish.weight || 1, matchedRecipe ? 'Блюдо' : 'Провал готовки', finalEffect, { price: dish.price || 0 });
         if (matchedRecipe && typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария');
+        if (matchedRecipe) {
+            // Запоминаем именно то сочетание, что сработало (с учётом замены ингредиента перком).
+            knownCookRecipes[matchedRecipe.name] = { ingredients: potNames.map(n => ({ name: n, qty: potMap[n] })), effect: dish.effect };
+            renderKnownRecipes();
+        }
 
         let extraNote = '';
         // Полевой опыт: шанс получить ещё одно такое же блюдо
@@ -3990,11 +4190,21 @@ window.toggleSkillPanel = function (idx) {
 
     // Задача "стрелы расходуются при выстреле" — раньше слота боеприпасов не было вообще,
     // выстрелы ничего не тратили. Список — всё, что похоже на стрелы/болты в инвентаре.
+    // Боеприпас — категория "Боеприпасы" либо стрела/болт по названию. Раньше проверялось ТОЛЬКО название
+    // (/стрел|болт/), и «Свиток: Огненная стрела» (свиток заклинания) попадал в выбор боеприпасов для
+    // лука. Свитки и заклинания/книги/посохи исключаются явно.
+    function isAmmoItem(i) {
+        if (!i) return false;
+        if (i.category === 'Боеприпасы') return true;
+        const notAmmo = /^Свиток/i.test(i.name || '') || /Свитк|Книг|Посох|заклинан/i.test(i.category || '') || i.scrollSpellName || i.isMagicStaff;
+        return !notAmmo && /стрел|болт/i.test(i.name || '');
+    }
+
     function renderAmmoSelect() {
         const select = document.getElementById('ammo-select');
         const countEl = document.getElementById('ammo-count-display');
         if (!select) return;
-        const ammoItems = playerInventory.filter(i => i.count > 0 && (i.category === 'Боеприпасы' || /стрел|болт/i.test(i.name)));
+        const ammoItems = playerInventory.filter(i => i.count > 0 && isAmmoItem(i));
         const prev = select.value;
         select.innerHTML = '<option value="">— не заряжено —</option>' +
             ammoItems.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('');
@@ -4813,9 +5023,18 @@ window.toggleSkillPanel = function (idx) {
         if (mpEl && hasMaintained) mpEl.value = curMp;
         if (manaRanOut.length) alert(`Мана кончилась — спадает: ${manaRanOut.join(', ')}.`);
 
+        // Лечение за ход в процентах от максимума ХП (способность «Кора Хиста» и подобные).
+        const regenPct = activeTimedEffects.reduce((s, e) => s + ((e.healPctPerTurn && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity)) ? e.healPctPerTurn : 0), 0);
+        if (regenPct) {
+            const curHpEl = document.getElementById('cur-hp'), maxHpEl = document.getElementById('max-hp');
+            const maxHp = parseInt(maxHpEl.value) || 0;
+            curHpEl.value = Math.min(maxHp, (parseInt(curHpEl.value) || 0) + Math.max(1, Math.round(maxHp * regenPct / 100)));
+            updateVitalBars();
+        }
         activeTimedEffects.forEach(e => { if (e.turnsRemaining !== Infinity) e.turnsRemaining -= 1; });
         activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0 || e.turnsRemaining === Infinity);
         renderActiveEffects();
+        renderPowersPanel();
         if (typeof tickActiveSummons === 'function') tickActiveSummons();
         updateAll();
         // Общий счётчик ходов в сессии — нужен, чтобы знать, сколько ходов прошло с момента
@@ -5208,9 +5427,11 @@ window.toggleSkillPanel = function (idx) {
         const effInfo = window.alchemyBaseEffects[firstEffectName];
         let effectNote = '';
         if (effInfo) {
-            const skill = getSkillRawValue('Алхимия');
-            const magnitude = window.calcAlchemyValue(effInfo.base, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, 0, effInfo.polarity, firstEffectName);
-            const duration = effInfo.hasDuration ? window.calcAlchemyValue(1, skill, perkState.alchemistRank, perkState.hasProvisor, perkState.hasHealer, perkState.hasPoisoner, 0, effInfo.polarity, firstEffectName) : 1;
+            // Базовая сила БЕЗ масштабирования: раньше значение прогонялось через calcAlchemyValue с навыком
+            // Алхимии, рангами и перками — сырой ингредиент «вырастал» вместе с игроком, хотя по смыслу
+            // (и по комментарию выше) это одиночный ингредиент без бонусов. Масштабируются только зелья.
+            const magnitude = effInfo.base;
+            const duration = 1;
             activateTimedEffectFromItem({
                 name: `${name} (сырой)`,
                 effect: `${firstEffectName}: ${magnitude}${effInfo.unit || ''} на ${duration} ход(ов)`,
@@ -5348,6 +5569,9 @@ window.toggleSkillPanel = function (idx) {
             alchemyEffects: effects, price: totalPrice
         });
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Алхимия');
+        // Запоминаем удачное сочетание (ключ — ингредиенты по алфавиту, чтобы порядок выбора не плодил дубли).
+        knownBrewRecipes[picked.slice().sort().join('|')] = { ingredients: picked.slice(), effects: effects.map(e => e.name), itemName };
+        renderKnownRecipes();
 
         let html = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: «${escHtml(itemName)}» (${totalPrice} септ.)</div>`;
         html += `<div style="opacity:.85; margin-top:4px;">${escHtml(desc)}</div>`;
@@ -5605,6 +5829,7 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = `<span style="color:#e74c3c;">Не хватает маны: нужно ${finalCost}, есть ${curMp}.</span>`;
             return;
         }
+        consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
         updateVitalBars();
         saveLocalStorage();
@@ -6461,6 +6686,7 @@ window.deployCampSite = function (useMagic) {
         const curMpEl = document.getElementById('cur-mp');
         const curMp = parseInt(curMpEl.value) || 0;
         if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+        consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
         updateVitalBars();
         saveLocalStorage();
@@ -6494,6 +6720,8 @@ window.teardownCampSite = function () {
 
 window.nextDay = function () {
     // Прокатываем дату
+    mageSignFreeUsed = false; // новый день — снова доступен бесплатный каст знака «Маг»
+    powersUsedToday = {};     // новый день — «раз в день» способности снова доступны
     gameDayNum++;
     if (gameDayNum > 30) {
         gameDayNum = 1;
@@ -6672,6 +6900,7 @@ function updateHungerPenalty() {
             lifestealPct += gb('weaponVamp');
             penetrationPct = gb('armorPenetration');
             actionLabel = actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием';
+            if (isPowerFlagActive('berserk')) { dmg *= 2; actionLabel += ' (🪓 Берсерк: урон ×2)'; } // на заклинания не действует
             skillNameForProgress = actionVal === 'melee'
                 ? (calc.wepType === 'twohand_sword' || calc.wepType === 'twohand_axe' || calc.wepType === 'twohand_hammer' ? 'Двуручное оружие' : 'Одноручное оружие')
                 : 'Стрельба';
@@ -6699,6 +6928,7 @@ function updateHungerPenalty() {
             const curMpEl = document.getElementById('cur-mp');
             const curMp = parseInt(curMpEl.value) || 0;
             if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+            consumeMageSignFreeCast(costInput);
             curMpEl.value = curMp - finalCost;
             updateVitalBars();
             saveLocalStorage();
@@ -6750,6 +6980,7 @@ function updateHungerPenalty() {
             const curMpEl = document.getElementById('cur-mp');
             const curMp = parseInt(curMpEl.value) || 0;
             if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
+            consumeMageSignFreeCast(costInput);
             curMpEl.value = curMp - finalCost;
             updateVitalBars();
             saveLocalStorage();
@@ -7149,6 +7380,15 @@ function updateHungerPenalty() {
         document.getElementById('val-scrolls-max').innerText = wisForScrolls;
         document.getElementById('val-scrolls').innerText = Math.max(0, wisForScrolls - scrollWisdomSpent);
 
+        // Индикатор знака «Маг»: один бесплатный каст заклинания 1-го уровня в день.
+        scheduleCoalesced('powers', renderPowersPanel);
+        const mageStatusEl = document.getElementById('mage-sign-status');
+        if (mageStatusEl) {
+            mageStatusEl.innerHTML = sign === 'mage'
+                ? (mageSignFreeUsed ? '<span style="opacity:.7;">🌟 Бесплатный каст 1 ур. на сегодня уже использован — вернётся в новый день.</span>' : '<span style="color:var(--accent-color);">🌟 Доступен 1 бесплатный каст заклинания 1 ур. сегодня.</span>')
+                : '';
+        }
+
         document.querySelectorAll('.spell-card').forEach(card => {
             const finalCostInput = card.querySelector('.spell-final-cost');
             if (!finalCostInput) return;
@@ -7199,7 +7439,7 @@ function updateHungerPenalty() {
 
             // Знак «Маг» — бесплатный каст заклинаний 1 уровня (было только текстом в описании,
             // нигде не применялось).
-            const signFreeTier1 = (sign === 'mage' && tier === 1);
+            const signFreeTier1 = (sign === 'mage' && tier === 1 && !mageSignFreeUsed);
 
             finalCostInput.value = signFreeTier1 ? 0 : Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult * godCostMult);
 
@@ -7612,6 +7852,10 @@ function updateHungerPenalty() {
             inventory: playerInventory,
             equippedSlots: equippedSlots,
             knownIngredientProps: knownIngredientProps,
+            mageSignFreeUsed: mageSignFreeUsed,
+            powersUsedToday: powersUsedToday,
+            knownCookRecipes: knownCookRecipes,
+            knownBrewRecipes: knownBrewRecipes,
             knownEnchantments: knownEnchantments,
             pouchContents: pouchContents,
             activeTimedEffects: activeTimedEffects,
@@ -7969,6 +8213,11 @@ function updateHungerPenalty() {
             renderPouchPanel();
 
             knownIngredientProps = (data.knownIngredientProps && typeof data.knownIngredientProps === 'object') ? data.knownIngredientProps : {};
+            mageSignFreeUsed = !!data.mageSignFreeUsed;
+            powersUsedToday = (data.powersUsedToday && typeof data.powersUsedToday === 'object') ? data.powersUsedToday : {};
+            knownCookRecipes = (data.knownCookRecipes && typeof data.knownCookRecipes === 'object') ? data.knownCookRecipes : {};
+            knownBrewRecipes = (data.knownBrewRecipes && typeof data.knownBrewRecipes === 'object') ? data.knownBrewRecipes : {};
+            if (typeof renderKnownRecipes === 'function') renderKnownRecipes();
             knownEnchantments = Array.isArray(data.knownEnchantments) ? data.knownEnchantments : [];
             renderAlchEatSelect();
             renderAlchIngredientSelects();

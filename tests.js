@@ -139,6 +139,19 @@
     const fireball = ((W.spellsData.destr || {})[3] || []).find(s => s.name === 'Огненный шар');
     ok(fireball && fireball.desc.indexOf('50') !== -1, 'Заклинания: у Огненного шара в описании 50 урона');
 
+    // ---------- ОСОБЫЕ СПОСОБНОСТИ (powers-data.js) ----------
+    const PW = W.powersData || [];
+    const RACE_KEYS = ['nord', 'altmer', 'breton', 'orc', 'khajiit', 'redguard', 'argonian', 'bosmer', 'dunmer', 'imperial'];
+    const SIGN_KEYS = ['warrior', 'mage', 'thief', 'atronach', 'apprentice', 'steed', 'lady', 'lord', 'zmey', 'ritual', 'lover', 'shadow', 'tower'];
+    ok(PW.length > 0, 'Способности: данные загружены');
+    ok(new Set(PW.map(p => p.id)).size === PW.length, 'Способности: id уникальны');
+    ok(PW.every(p => ['race', 'sign', 'werewolf', 'vampire'].indexOf(p.source) !== -1), 'Способности: у каждой допустимый source');
+    ok(PW.filter(p => p.source === 'race').every(p => RACE_KEYS.indexOf(p.race) !== -1), 'Способности: расовые привязаны к существующим расам');
+    ok(PW.filter(p => p.source === 'sign').every(p => SIGN_KEYS.indexOf(p.sign) !== -1), 'Способности: знаковые привязаны к существующим знакам');
+    // Четыре расовые силы из списка рас (Берсерк, Адреналин, Кора Хиста, Голос императора) обязаны быть описаны
+    ['Берсерк', 'Адреналин', 'Кора Хиста', 'Голос императора'].forEach(n => ok(PW.some(p => p.name === n), `Способности: есть «${n}»`));
+    ok(PW.filter(p => p.perDay).every(p => p.desc && p.desc.length > 10), 'Способности: у каждой "раз в день" есть описание');
+
     // ---------- ВРАГИ ----------
     const en = (W.enemiesData || []).map(e => e.name);
     ok(en.length === new Set(en).size, 'Враги: нет дублей по имени', en.filter((n, i) => en.indexOf(n) !== i).join(', '));
