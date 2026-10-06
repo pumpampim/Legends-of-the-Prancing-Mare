@@ -520,7 +520,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -1102,6 +1102,8 @@
                 <input type="number" id="char-gold" value="150" onchange="saveLocalStorage()">
             </div>
 
+            <!-- Правая колонка: передача золота + заметки под ней (раньше заметки падали в следующий ряд, а справа оставалось пустое место) -->
+            <div class="grid-col">
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
             <div class="panel">
                 <h2>🤝 Передать союзнику</h2>
@@ -1124,6 +1126,7 @@
                     <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
                 </div>
             </div>
+            </div><!-- /grid-col -->
         </div>
 
         <!-- КВЕСТЫ -->
@@ -1232,6 +1235,7 @@
                     <input type="text" id="whisper-input" placeholder="Шепнуть мастеру (не видно другим игрокам)..." style="flex:1;">
                     <button onclick="sendWhisperToGm()">🤫 Шепнуть</button>
                 </div>
+                <div id="gm-whispers-inbox" style="margin-top:6px;"></div>
             </div>
         </div>
     </div>
@@ -1262,10 +1266,30 @@
             <div class="profession-body" id="prof-body-smithing">
                 <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
                 <p style="font-size:14px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
-                <label>Показать</label>
-                <select id="smithing-subcat-filter" onchange="renderSmithingList()">
-                    <option value="all">Все категории</option>
-                </select>
+                <input type="text" id="smithing-search" placeholder="Поиск: название, материал, подкатегория..." oninput="renderSmithingList()" style="margin-bottom:6px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <select id="smithing-type-filter" onchange="renderSmithingList()" style="flex:1; min-width:140px;">
+                        <option value="all">Любой тип</option>
+                        <option value="melee">Оружие ближнего боя</option>
+                        <option value="ranged">Оружие дальнего боя</option>
+                        <option value="ammo">Боеприпасы</option>
+                        <option value="light">Лёгкая броня</option>
+                        <option value="heavy">Тяжёлая броня</option>
+                        <option value="shield">Щиты</option>
+                        <option value="jewelry">Украшения</option>
+                    </select>
+                    <select id="smithing-material-filter" onchange="renderSmithingList()" style="flex:1; min-width:140px;">
+                        <option value="all">Любой материал</option>
+                    </select>
+                    <select id="smithing-subcat-filter" onchange="renderSmithingList()" style="flex:1; min-width:140px;">
+                        <option value="all">Все подкатегории</option>
+                    </select>
+                </div>
+                <label style="display:flex; gap:6px; align-items:center; margin:6px 0; cursor:pointer;">
+                    <input type="checkbox" id="smithing-craftable-only" onchange="renderSmithingList()" style="width:auto; margin:0;">
+                    Только то, что можно сковать прямо сейчас (есть все материалы и нужный перк)
+                </label>
+                <div id="smithing-count" style="font-size:12px; opacity:.65; margin-bottom:4px;"></div>
                 <div id="smithing-list"></div>
 
                 <h3 style="margin-top:16px;">🔧 Заточка / Улучшение</h3>
@@ -1337,7 +1361,8 @@
                 <h3 style="margin-top:16px;">🪄 Магические посохи (посох-заклинатель)</h3>
                 <p style="font-size:14px; opacity:.8;">Не зачарованное оружие, а посох, хранящий одно из твоих выученных заклинаний, с ограниченным числом применений. Подзарядка: 1 заполненный камень душ (Обычный/Большой/Великий) ИЛИ 2 заполненных Маленьких ИЛИ 4 заполненных Крохотных.</p>
                 <label>Заклинание (из выученных)</label>
-                <select id="magic-staff-spell-select"></select>
+                <select id="magic-staff-spell-select" onchange="renderMagicStaffRecipeInfo()"></select>
+                <div id="magic-staff-recipe-info" style="margin-top:6px; font-size:13px;"></div>
                 <button class="btn-success" style="width:100%; margin-top:6px;" onclick="createMagicStaff()">Создать посох-заклинатель</button>
                 <div id="magic-staff-create-result" style="margin-top:8px; font-size:14px;"></div>
 
@@ -1586,7 +1611,10 @@
     let _allPerkCheckboxes = []; // кэш .perk-checkbox — строится в initSkills(), см. задачу 16
     let potSelections = {}; // Текущий "котёл": { itemId: qty }
     let knownSmithingRecipes = []; // Список названий рецептов, которые открыл мастер (см. gm.html)
-    let equippedSlots = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, backpack: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
+    // Единый полный список слотов — используется и для начальной инициализации, и при загрузке
+    // сейва (applyCharacterData), чтобы новый слот не забывался в одном из двух мест.
+    const FULL_EQUIPPED_SLOTS = { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, backpack: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null, ammo: null };
+    let equippedSlots = Object.assign({}, FULL_EQUIPPED_SLOTS);
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let knownEnchantments = []; // ["Урон огнем", ...] — узнаётся разрушением зачарованного предмета
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
@@ -1619,7 +1647,7 @@
         { category: 'skeleton', name: 'Скелет солдата', hpBase: 50, dmgBase: 15, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета солдата' },
         { category: 'skeleton', name: 'Скелет мага', hpBase: 50, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Вызов Скелета мага', note: 'Атакует обморожением (мана 120)' },
         { category: 'skeleton', name: 'Скелет лучника', hpBase: 100, dmgBase: 35, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета лучника' },
-        { category: 'skeleton', name: 'Скелет-танк', hpBase: 190, dmgBase: 20, dmgType: 'физический', speed: 35, permanent: true, spellName: 'вызов скелета танка' },
+        { category: 'skeleton', name: 'Скелет-танк', hpBase: 190, dmgBase: 20, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета танка' },
         { category: 'skeleton', name: 'Сильный скелет воин', hpBase: 130, dmgBase: 30, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв сильного скелета воина' },
         { category: 'skeleton', name: 'Сильный скелет маг', hpBase: 100, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Призыв сильного скелета мага', note: 'Обморожение(15мп)/Ледяной шип(25мп, 25 урона)/Ледяная буря(70мп, 70 урона)' },
         { category: 'skeleton', name: 'Сильный скелет лучник', hpBase: 130, dmgBase: 40, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв сильного скелета лучника' },
@@ -1634,7 +1662,11 @@
     ];
 
     function findSummonTemplateBySpellName(name) {
-        return summonTemplates.find(t => t.spellName === name);
+        // Без учёта регистра — раньше у части заклинаний название было строчным ("вызов скелета
+        // танка"); после исправления в базе у игроков с уже сохранённой старой версией точное
+        // сравнение потеряло бы связь с шаблоном призыва.
+        const lname = String(name || '').toLowerCase();
+        return summonTemplates.find(t => t.spellName.toLowerCase() === lname);
     }
 
     let activeTimedEffects = []; // [{ id, name, effectName, description, turnsRemaining, hp, mp }]
@@ -1685,8 +1717,8 @@
         'Глаз саблезуба', 'Жир тролля', 'Зубы ледяного привидения', 'Икра рыбы-убийцы',
         'Клешня грязевого краба', 'Клык саблезуба', 'Коготь ворожеи', 'Кровавый венец',
         'Медвежьи когти', 'Паучье яйцо', 'Перья ворожеи', 'Прах вампира', 'Сердце даэдра',
-        'Ухо фалмера', 'Хвост злокрыся', 'Человеческое сердце', 'Человечье мясо',
-        'Эльфийское ухо', 'Язык дракона', 'Чешуя рыбы-убийцы', 'Толченый бивень мамонта',
+        'Ухо фалмера', 'Хвост злокрыса', 'Человеческое сердце', 'Человечье мясо',
+        'Эльфийское ухо', 'Язык дракона', 'Чешуя рыбы-убийцы', 'Толчёный бивень мамонта',
         'Эктоплазма', 'Прах Берита', 'Жареная злокрысья кожа'
     ]);
     // Ингредиенты, которые логично находить чаще в определённом регионе (доп. вес при сборе).
@@ -1695,9 +1727,9 @@
                  'Голубой горноцвет', 'Красный горноцвет', 'Лиловый горноцвет', 'Большие рога', 'Маленькие рога',
                  'Клюв ястреба', 'Перья ястреба', 'Древесина горелого сприггана', 'Живица сприггана'],
         'Болото': ['Болотный стручок', 'Бесовский гриб', 'Мора тапинелла', 'Гниль Намиры', 'Ядовитый колокольчик',
-                    'Паслен', 'Бородатый мох', 'Стержневой корень', 'Собачий корень', 'Ползучая лоза', 'Травяной стручок'],
+                    'Паслён', 'Бородатый мох', 'Стержневой корень', 'Собачий корень', 'Ползучая лоза', 'Травяной стручок'],
         'Горы': ['Морозная мириам', 'Морозная соль', 'Снежные ягоды', 'Огненная соль', 'Соль пустоты'],
-        'Побережье': ['Морской желудь', 'Сиродильский лопатохвост', 'Хисткарп', 'Абесинский окунь',
+        'Побережье': ['Морской жёлудь', 'Сиродильский лопатохвост', 'Хисткарп', 'Абесинский окунь',
                        'Серебристый окунь', 'Бойцовая рыбка', 'Жемчужина', 'Маленькая жемчужина'],
         'Равнина': ['Пшеница', 'Соль', 'Куриное яйцо', 'Вересковое сердце']
     };
@@ -1714,7 +1746,7 @@
                   'Хисткарп', 'Сиродильский лопатохвост', 'Серебристый окунь', 'Абесинский окунь', 'Бойцовая рыбка',
                   'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет', 'Чешуйчатка', 'Пшеница'],
         'Фолкрит': ['Яйцо соснового дрозда', 'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет',
-                     'Паслен', 'Ветка чертополоха', 'Торакс светлячка', 'Крыло синей бабочки'],
+                     'Паслён', 'Ветка чертополоха', 'Торакс светлячка', 'Крыло синей бабочки'],
         'Истмарк (Виндхельм)': ['Виноград джазби', 'Голубой горноцвет', 'Лиловый горноцвет', 'Красный горноцвет',
                                   'Снежные ягоды', 'Ветка чертополоха', 'Пшеница'],
         'Солитьюд (Хаафингар)': ['Клюв ястреба', 'Перья ястреба', 'Собачий корень', 'Ядовитый колокольчик',
@@ -1726,7 +1758,7 @@
     };
     // Собираются только ночью.
     const NIGHT_ONLY_INGREDIENTS = new Set([
-        'Мухомор', 'Светящийся гриб', 'Лунный сахар', 'Крыло лунного мотылька', 'Паслен', 'Светящаяся пыль'
+        'Мухомор', 'Светящийся гриб', 'Лунный сахар', 'Крыло лунного мотылька', 'Паслён', 'Светящаяся пыль'
     ]);
 
     let characterLevel = 1;
@@ -1760,7 +1792,7 @@ let daysWithoutFood = 0;
         'Голубой горноцвет', 'Красный горноцвет', 'Лиловый горноцвет', 'Ягоды можжевельника',
         'Лаванда', 'Пчела', 'Медовые соты', 'Пчелиное гнездо', 'Крыло синей бабочки',
         'Крыло монарха', 'Оранжевая стрекоза', 'Синяя стрекоза', 'Виноград джазби',
-        'Ветка чертополоха', 'Паслен', 'Ядовитый колокольчик'
+        'Ветка чертополоха', 'Паслён', 'Ядовитый колокольчик'
     ]);
 
     // Динамический рендеринг 19 навыков и генерация многоступенчатых чекбоксов перков
@@ -2070,6 +2102,9 @@ window.toggleSkillPanel = function (idx) {
 
     window.toggleProfession = function (id) {
         window.toggleAccordion('prof', id);
+        // Инвентарь мог измениться с прошлого открытия — перерисовываем, чтобы фильтр
+        // "можно сковать сейчас" и счётчики материалов 0/N были актуальны.
+        if (id === 'smithing' && typeof renderSmithingList === 'function') renderSmithingList();
     };
 
     // Проверка перка "Боевой маг" в ветке Тяжелой брони (индекс 7)
@@ -2193,6 +2228,10 @@ window.toggleSkillPanel = function (idx) {
     };
 
     function saveSpellsAndRefresh() {
+        // Кэш урона заклинаний (ключ — текст описания) корректен и без этого, т.к. функция чистая,
+        // но при долгой правке описаний старые ключи копились бы бесконечно — чистим при каждом
+        // сохранении книги (пересчёт дешёвый, ~2 вызова на заклинание).
+        try { _spellDmgCache.clear(); } catch (e) { /* кэш ещё не объявлен (TDZ) на раннем этапе загрузки — ничего страшного */ }
         customSpells = [];
         const schools = ['destr', 'restor', 'alter', 'illus', 'conj'];
         schools.forEach(school => {
@@ -2891,8 +2930,9 @@ window.toggleSkillPanel = function (idx) {
             const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category) * repMult * dispositionMult));
             const canAfford = price <= stock.gold && price <= (parseInt(document.getElementById('char-gold').value) || 0);
             const qty = it.qty || 1;
-            return `<div class="stat-block" style="align-items:flex-start;">
-                <span><strong>${escHtml(it.name)}</strong>${qty > 1 ? ` <span style="opacity:.6; font-size:12px;">(есть: ${qty})</span>` : ''}${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
+            // Цена и кнопка "Купить" рядом с названием (как в списке продажи), а не на дальнем краю строки.
+            return `<div class="stat-block" style="align-items:flex-start; justify-content:flex-start; gap:12px;">
+                <span style="flex:0 1 300px; min-width:0;"><strong>${escHtml(it.name)}</strong>${qty > 1 ? ` <span style="opacity:.6; font-size:12px;">(есть: ${qty})</span>` : ''}${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
                 <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                     <span style="color:var(--accent-color);">${price} септ.</span>
                     <button class="btn-success" style="width:auto; padding:2px 8px;" ${canAfford ? '' : 'disabled'} onclick="buyFromMerchant('${escHtml(key)}', ${idx})">Купить</button>
@@ -3024,16 +3064,17 @@ window.toggleSkillPanel = function (idx) {
                 <div style="font-size:12px; color:#e74c3c; margin-top:2px;">Краденое — этот торговец его не купит, нужен скупщик.</div>
             </div>`;
             }
+            // Одна компактная строка: название · цена · количество · кнопка. Раньше название и цена
+            // разъезжались по краям (row-name = space-between), а количество и кнопка шли отдельной
+            // строкой на всю ширину. Колонки фиксированной ширины — число и кнопка стоят ровным столбцом.
             return `
-            <div class="party-row">
-                <div class="row-name">
-                    <span>${escHtml(item.name)}${stolenTag} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
-                    <span>${unitPrice} септ./шт.${noteHtml}</span>
-                </div>
-                <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
-                    <input type="number" id="sell-qty-${escHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:65px;">
-                    <button class="btn-success" style="flex:1;" onclick="sellItem('${escHtml(item.itemId)}')">Продать</button>
-                </div>
+            <div class="party-row" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:4px 8px;">
+                <span style="flex:0 1 250px; min-width:0;">${escHtml(item.name)}${stolenTag} <span style="opacity:.6; font-size:13px;">(есть: ${item.count})</span></span>
+                <span style="flex:0 1 210px; min-width:0; font-size:14px;">${unitPrice} септ./шт.${noteHtml}</span>
+                <span style="display:flex; gap:6px; align-items:center; margin-left:0;">
+                    <input type="number" id="sell-qty-${escHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:56px; min-width:0; padding:3px 4px;">
+                    <button class="btn-success" style="width:auto; padding:3px 14px; margin:0;" onclick="sellItem('${escHtml(item.itemId)}')">Продать</button>
+                </span>
             </div>`;
         }).join('');
     }
@@ -3164,8 +3205,7 @@ window.toggleSkillPanel = function (idx) {
                     ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${escHtml(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
                     ${item.upgradeMaterial ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
-                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button style="width:auto; padding:2px 6px; font-size:13px;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу Кузнечного дела — Хорошее/Качественное/Отличное/Легендарное, порог навыка зависит от профильного перка материала. Текущий ранг: ${escHtml(QUALITY_TIER_NAMES[item.qualityTier || 0])}">⚔️ Заточить</button>` : ''}
-                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${item.qualityRank ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
+                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${(item.qualityRank && SHARPEN_TIERS[item.qualityRank-1]) ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -3304,6 +3344,45 @@ window.toggleSkillPanel = function (idx) {
         return item ? item.count : 0;
     }
 
+    // Тип рецепта для фильтра: ближний/дальний бой, боеприпасы, лёгкая/тяжёлая броня, щиты, украшения.
+    function smithingTypeOf(r) {
+        if (r.slot === 'jewelry') return 'jewelry';
+        if (r.hasOwnProperty('damage')) {
+            if (r.isAmmo) return 'ammo';
+            return r.slot === 'ranged' ? 'ranged' : 'melee';
+        }
+        if (r.slot === 'Щиты') return 'shield';
+        return r.armorType === 'Легкая броня' ? 'light' : 'heavy';
+    }
+
+    // Основной материал рецепта — первый ингредиент, не являющийся "расходной мелочью" (кожа,
+    // ремешки, дерево). Для железного меча это «Железный слиток», для хитиновой брони — «Хитиновая
+    // пластина». Нужен для быстрого фильтра по материалу.
+    const SMITHING_HELPER_INGREDIENTS = ['Кожа', 'Полоски кожи', 'Полено'];
+    function smithingMaterialOf(r) {
+        const list = r.ingredients || [];
+        const ing = list.find(g => SMITHING_HELPER_INGREDIENTS.indexOf(g.name) === -1) || list[0]; // кожаная броня — только кожа/ремешки: материал "Кожа"
+        return ing ? ing.name : 'Материалы не указаны';
+    }
+
+    // Единое правило "можно сковать сейчас" — им пользуются и кнопка "Сковать", и фильтр.
+    function canCraftSmithingRecipe(r) {
+        const hasMatPerk = !r.perkHint || isPerkChecked(r.perkHint);
+        // У части рецептов в данных пустой список ингредиентов (12 кастетов) — every() по пустому
+        // списку даёт true, и вещь ковалась бы бесплатно. Такой рецепт считаем недоступным.
+        if (!r.ingredients || !r.ingredients.length) return false;
+        return hasMatPerk && r.ingredients.every(i => countInInventory(i.name) >= i.qty);
+    }
+
+    // Пересобирает выпадающий список, сохраняя выбранное значение, если оно ещё есть среди опций.
+    // (Раньше список подкатегорий строился ОДИН раз и не обновлялся, когда мастер открывал новые рецепты.)
+    function refillSelect(sel, firstLabel, values) {
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = `<option value="all">${firstLabel}</option>` + values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+        sel.value = (prev !== 'all' && values.indexOf(prev) !== -1) ? prev : 'all';
+    }
+
     function renderSmithingList() {
         const el = document.getElementById('smithing-list');
         if (!el) return;
@@ -3312,26 +3391,39 @@ window.toggleSkillPanel = function (idx) {
             el.innerHTML = '<p style="opacity:.7; font-size:15px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
             return;
         }
-        // Подкатегория (Кинжалы/Мечи/Секиры/Булавы/Луки и т.д.) уже была в данных рецептов
-        // (subcat), но интерфейс её вообще не читал — один плоский список из всего сразу, без
-        // возможности отфильтровать "покажи только кинжалы, которые я умею ковать".
-        const filterEl = document.getElementById('smithing-subcat-filter');
-        const subcats = [...new Set(known.map(r => r.subcat).filter(Boolean))].sort();
-        if (filterEl && filterEl.options.length <= 1) {
-            filterEl.innerHTML = '<option value="all">Все категории</option>' +
-                subcats.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
-        }
-        const activeFilter = filterEl ? filterEl.value : 'all';
-        const filtered = activeFilter === 'all' ? known : known.filter(r => r.subcat === activeFilter);
+        refillSelect(document.getElementById('smithing-subcat-filter'), 'Все подкатегории', [...new Set(known.map(r => r.subcat).filter(Boolean))].sort());
+        refillSelect(document.getElementById('smithing-material-filter'), 'Любой материал', [...new Set(known.map(smithingMaterialOf))].sort());
+
+        const q = ((document.getElementById('smithing-search') || {}).value || '').trim().toLowerCase();
+        const typeF = (document.getElementById('smithing-type-filter') || {}).value || 'all';
+        const matF = (document.getElementById('smithing-material-filter') || {}).value || 'all';
+        const subF = (document.getElementById('smithing-subcat-filter') || {}).value || 'all';
+        const onlyCraftable = !!(document.getElementById('smithing-craftable-only') || {}).checked;
+
+        const canMap = new Map(known.map(r => [r, canCraftSmithingRecipe(r)]));
+        const filtered = known.filter(r => {
+            if (typeF !== 'all' && smithingTypeOf(r) !== typeF) return false;
+            if (matF !== 'all' && smithingMaterialOf(r) !== matF) return false;
+            if (subF !== 'all' && r.subcat !== subF) return false;
+            if (onlyCraftable && !canMap.get(r)) return false;
+            if (q) {
+                // поиск по названию, подкатегории и ЛЮБОМУ ингредиенту (т.е. и по материалу)
+                const hay = (r.name + ' ' + (r.subcat || '') + ' ' + r.ingredients.map(g => g.name).join(' ')).toLowerCase();
+                if (hay.indexOf(q) === -1) return false;
+            }
+            return true;
+        });
+        const countEl = document.getElementById('smithing-count');
+        if (countEl) countEl.textContent = `Показано рецептов: ${filtered.length} из ${known.length}`;
         if (!filtered.length) {
-            el.innerHTML = '<p style="opacity:.6; font-size:14px;">В этой категории у тебя нет известных рецептов.</p>';
+            el.innerHTML = '<p style="opacity:.6; font-size:14px;">Ничего не найдено — измени поиск или фильтры.</p>';
             el.dataset.knownList = JSON.stringify(known.map(r => r.name));
             return;
         }
         el.innerHTML = filtered.map((r) => {
-            const idx = known.indexOf(r); // индекс относительно ПОЛНОГО known-списка — так craftSmithingItem(idx) находит рецепт верно и при активном фильтре
+            const idx = known.indexOf(r); // индекс относительно ПОЛНОГО known-списка — так craftSmithingItem(idx) находит рецепт верно и при активных фильтрах
             const hasMatPerk = !r.perkHint || isPerkChecked(r.perkHint);
-            const canMake = hasMatPerk && r.ingredients.every(i => countInInventory(i.name) >= i.qty);
+            const canMake = canMap.get(r);
             const ingList = r.ingredients.map(i => {
                 const have = countInInventory(i.name);
                 const ok = have >= i.qty;
@@ -3345,7 +3437,7 @@ window.toggleSkillPanel = function (idx) {
             } else {
                 statLine = `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${r.price}`;
             }
-            const perkNote = !hasMatPerk ? `<div style="font-size:13px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : '';
+            const perkNote = !hasMatPerk ? `<div style="font-size:13px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : (!r.ingredients.length ? '<div style="font-size:13px; color:#e67e22;">⚠ Материалы этого рецепта не указаны в данных — ковка недоступна</div>' : '');
             return `<div class="party-row">
                 <div class="row-name"><strong>${escHtml(r.name)}</strong><span style="font-size:13px; opacity:.7;">${r.subcat ? escHtml(r.subcat) + ' · ' : ''}${escHtml(statLine)}</span></div>
                 <div style="font-size:14px; margin:4px 0;">${ingList}</div>
@@ -3369,6 +3461,7 @@ window.toggleSkillPanel = function (idx) {
             alert(`Нужен перк «${recipe.perkHint}», чтобы ковать этот материал.`);
             return;
         }
+        if (!recipe.ingredients || !recipe.ingredients.length) { alert('У этого рецепта не указаны материалы — ковка недоступна, пока данные не дозаполнены.'); return; }
         const canMake = recipe.ingredients.every(i => countInInventory(i.name) >= i.qty);
         if (!canMake) { alert('Не хватает материалов.'); return; }
         recipe.ingredients.forEach(i => removeFromInventoryByName(i.name, i.qty));
@@ -3405,6 +3498,15 @@ window.toggleSkillPanel = function (idx) {
             // экип-слот для лука должен быть "ranged", иначе он попадал бы не в тот выпадающий
             // список при экипировке.
             extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: wepType.startsWith('ranged') ? 'ranged' : 'melee', weaponDmg: dmgVal, weaponType: wepType, price: recipe.price };
+            // У оружейных рецептов поля upgradeMaterial в данных нет вообще (только у брони) — из-за
+            // этого кнопки "Улучшить"/"Наточить" у выкованного оружия не появлялись. Берём материал
+            // из самого рецепта: первый слиток (или Сталгрим) среди ингредиентов — как в ваниле точило
+            // использует слиток материала оружия. Явное recipe.upgradeMaterial имеет приоритет.
+            if (!recipe.isAmmo) {
+                const ingotIng = (recipe.ingredients || []).find(g => /слиток/i.test(g.name) || g.name === 'Сталгрим');
+                const mat = recipe.upgradeMaterial || (ingotIng && ingotIng.name);
+                if (mat) { extra.upgradeMaterial = mat; extra.upgradeQty = recipe.upgradeQty || 1; }
+            }
         } else if (recipe.slot === 'jewelry') {
             desc = 'Ювелирное изделие';
             extra = { slot: recipe.name.includes('кольцо') ? 'ring' : 'amulet', price: recipe.price || 0 };
@@ -3416,6 +3518,7 @@ window.toggleSkillPanel = function (idx) {
             const upgradeNote = recipe.upgradeMaterial ? ` · Улучшается «${recipe.upgradeMaterial}»` : '';
             desc = `Сопротивление ${resVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''} · ${recipe.armorType || '?'}${upgradeNote}`;
             extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: resVal, price: recipe.price, armorType: recipe.armorType, upgradeMaterial: recipe.upgradeMaterial };
+            if (recipe.upgradeQty) extra.upgradeQty = recipe.upgradeQty;
         }
         addToInventory(recipe.name, recipe.name, yieldCount, recipe.weight || 0.25, extra.category || 'Скованное', desc, extra);
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кузнечное дело');
@@ -3482,72 +3585,10 @@ window.toggleSkillPanel = function (idx) {
     // upgradeQty были только текстом в описании ("Улучшается: X ×N"), сама возможность улучшить
     // не существовала вообще. +10% к базовому значению за раз, максимум 5 улучшений (как тиры
     // перков кузнечного дела в ваниле — точило без перка тоже не даёт бесконечно улучшать).
-    // Заточка оружия по рангам Кузнечного дела — ОТДЕЛЬНАЯ механика от improveItem (та даёт
-    // +10%/использование материала, эта — фиксированный бонус по порогу навыка, с удвоенной
-    // доступностью при открытом профильном перке материала, например "Орочьи доспехи" для
-    // орихалка). Обе могут применяться к одной вещи — наточить и улучшить не взаимоисключающе,
-    // просто разные источники бонуса урона.
-    const QUALITY_TIER_NAMES = ['', 'Хорошее', 'Качественное', 'Отличное', 'Легендарное'];
-    const QUALITY_TIERS = [
-        { name: 'Хорошее', bonus: 1, threshold: 20, thresholdWithPerk: 14 },
-        { name: 'Качественное', bonus: 2, threshold: 40, thresholdWithPerk: 27 },
-        { name: 'Отличное', bonus: 3, threshold: 65, thresholdWithPerk: 42 },
-        { name: 'Легендарное', bonus: 5, threshold: 100, thresholdWithPerk: 70 }
-    ];
-
-    window.sharpenWeapon = function (itemId) {
-        const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item || !item.upgradeMaterial || typeof item.weaponDmg !== 'number') return;
-        const currentTier = item.qualityTier || 0;
-        if (currentTier >= QUALITY_TIERS.length) { alert('Эта вещь уже легендарного качества — точить дальше некуда.'); return; }
-
-        // Профильный перк материала (например "Орочьи доспехи" для орихалка) — ищем по имени
-        // предмета среди рецептов кузни, чтобы узнать perkHint; GM-созданное оружие без
-        // совпадения в базе просто считается "без перка" (ничего не ломается, порог выше).
-        const recipe = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).find(r => item.name.indexOf(r.name) !== -1 || r.name.indexOf(item.name) !== -1);
-        const hasMaterialPerk = recipe && recipe.perkHint ? isPerkChecked(recipe.perkHint) : false;
-        const smithSkill = getEffectiveSkillValue('Кузнечное дело');
-
-        // Максимальный доступный ранг при текущем навыке/перке.
-        let maxTierIdx = -1;
-        QUALITY_TIERS.forEach((t, idx) => {
-            const need = hasMaterialPerk ? t.thresholdWithPerk : t.threshold;
-            if (smithSkill >= need) maxTierIdx = idx;
-        });
-        if (maxTierIdx <= currentTier - 1) {
-            const nextNeed = QUALITY_TIERS[currentTier] ? (hasMaterialPerk ? QUALITY_TIERS[currentTier].thresholdWithPerk : QUALITY_TIERS[currentTier].threshold) : '?';
-            alert(`Навыка Кузнечного дела недостаточно, чтобы наточить эту вещь сильнее (нужно ${nextNeed}, у тебя ${smithSkill}).`);
-            return;
-        }
-        const need = item.upgradeQty || 1;
-        if (countInInventory(item.upgradeMaterial) < need) {
-            alert(`Не хватает материала: нужно «${item.upgradeMaterial}» ×${need}, есть ${countInInventory(item.upgradeMaterial)}.`);
-            return;
-        }
-        removeFromInventoryByName(item.upgradeMaterial, need);
-        const newTier = currentTier + 1;
-        item.baseWeaponDmg = item.baseWeaponDmg || item.weaponDmg; // честный пересчёт от исходного, как у improveItem
-        item.qualityTier = newTier;
-        item.weaponDmg = item.baseWeaponDmg + QUALITY_TIERS[newTier - 1].bonus;
-        // Имя вещи получает пометку ранга — заменяем предыдущую пометку, если уже была.
-        item.name = item.name.replace(/\s*\((Хорошее|Качественное|Отличное|Легендарное)\)$/, '') + ` (${QUALITY_TIERS[newTier - 1].name})`;
-        if (equippedSlots.meleeWeapon === itemId) {
-            document.getElementById('wep-melee-dmg').value = item.weaponDmg;
-            document.getElementById('wep-melee-name').value = item.name;
-        }
-        if (equippedSlots.rangedWeapon === itemId) {
-            document.getElementById('wep-ranged-dmg').value = item.weaponDmg;
-            document.getElementById('wep-ranged-name').value = item.name;
-        }
-        renderInventoryList();
-        updateAll();
-        saveLocalStorage();
-        alert(`Заточено до «${QUALITY_TIERS[newTier - 1].name}» (+${QUALITY_TIERS[newTier - 1].bonus} к урону)! Новый урон: ${item.weaponDmg}.`);
-    };
-
     window.improveItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || !item.upgradeMaterial) return;
+        normalizeUpgradeMaterial(item);
         const upgradeCount = item.upgradeCount || 0;
         if (upgradeCount >= 5) { alert('Эта вещь уже улучшена по максимуму (5/5).'); return; }
         const need = item.upgradeQty || 1;
@@ -3559,7 +3600,7 @@ window.toggleSkillPanel = function (idx) {
         item.upgradeCount = upgradeCount + 1;
         if (typeof item.weaponDmg === 'number') {
             item.baseWeaponDmg = item.baseWeaponDmg || item.weaponDmg; // запоминаем изначальное значение для честного пересчёта
-            item.weaponDmg = Math.round(item.baseWeaponDmg * (1 + item.upgradeCount * 0.1));
+            item.weaponDmg = Math.round(item.baseWeaponDmg * (1 + item.upgradeCount * 0.1)) + (item.qualityBonusApplied || 0);
             // Если эта вещь сейчас экипирована — обновляем сразу видимое поле урона в бою, иначе
             // игрок продолжал бы видеть старое число, пока не переэкипирует вещь вручную.
             if (equippedSlots.meleeWeapon === itemId) document.getElementById('wep-melee-dmg').value = item.weaponDmg;
@@ -3589,25 +3630,49 @@ window.toggleSkillPanel = function (idx) {
         alert(`Улучшено (${item.upgradeCount}/5)! ${typeof item.weaponDmg === 'number' ? `Новый урон: ${item.weaponDmg}` : `Новое сопротивление: ${item.armorValue}`}.`);
     };
 
+    // Самовосстановление уже сохранённых вещей: countInInventory ищет материал по ТОЧНОМУ имени,
+    // а в старых данных он мог быть записан иначе ("лунный камень", "Орихалковый  слиток" с двойным
+    // пробелом, "Корундовый" без слова "слиток", "2 костные муки" с количеством в названии).
+    // Приводим к точному имени предмета и вытаскиваем количество, если оно было в строке.
+    function normalizeUpgradeMaterial(item) {
+        if (!item || !item.upgradeMaterial) return;
+        let raw = String(item.upgradeMaterial).trim().replace(/\s+/g, ' ');
+        const m = raw.match(/^(\d+)\s+(.*)$/);
+        if (m) { if (!item.upgradeQty) item.upgradeQty = parseInt(m[1]); raw = m[2]; }
+        const lower = raw.toLowerCase();
+        const names = (window.allItems || []).map(i => i.name);
+        let found = names.find(n => n.toLowerCase() === lower) || names.find(n => n.toLowerCase() === lower + ' слиток');
+        if (!found && /^костн[а-яё]+ мук[аи]$/.test(lower)) found = 'Костная мука';
+        item.upgradeMaterial = found || raw;
+    }
+
     // Заточка по рангам качества (документ 4) — ОТДЕЛЬНО от improveItem выше (та даёт +10%/раз
     // без условий навыка, эта — фиксированный бонус качества, но требует порога Кузнечного дела).
     // Бонусы складываются (qualityBonus — отдельное слагаемое, не трогает baseWeaponDmg/
     // upgradeCount выше), можно пользоваться обоими независимо.
+    // thresholdWithPerk — сниженный порог навыка, если открыт профильный перк материала вещи
+    // (perkHint из рецепта, например "Орочьи доспехи" для орихалка) — часть исходного ТЗ.
     const SHARPEN_TIERS = [
-        { name: 'Хорошее', bonus: 1, threshold: 20 },
-        { name: 'Качественное', bonus: 2, threshold: 40 },
-        { name: 'Отличное', bonus: 3, threshold: 65 },
-        { name: 'Легендарное', bonus: 5, threshold: 100 }
+        { name: 'Хорошее', bonus: 1, threshold: 20, thresholdWithPerk: 14 },
+        { name: 'Качественное', bonus: 2, threshold: 40, thresholdWithPerk: 27 },
+        { name: 'Отличное', bonus: 3, threshold: 65, thresholdWithPerk: 42 },
+        { name: 'Легендарное', bonus: 5, threshold: 100, thresholdWithPerk: 70 }
     ];
     window.sharpenWeapon = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || typeof item.weaponDmg !== 'number' || !item.upgradeMaterial) return;
-        const skill = getSkillRawValue('Кузнечное дело');
+        normalizeUpgradeMaterial(item);
+        const skill = getEffectiveSkillValue('Кузнечное дело');
         const currentRank = item.qualityRank || 0;
-        if (currentRank >= SHARPEN_TIERS.length) { alert('Эта вещь уже легендарного качества — точить дальше некуда.'); return; }
         const nextTier = SHARPEN_TIERS[currentRank];
-        if (skill < nextTier.threshold) {
-            alert(`Навыка Кузнечного дела не хватает: нужно ${nextTier.threshold}, у тебя ${skill}. Следующий ранг — «${nextTier.name}».`);
+        if (!nextTier) { alert('Эта вещь уже легендарного качества — точить дальше некуда.'); return; }
+        // Профильный перк материала (perkHint рецепта) снижает порог. GM-созданное оружие без
+        // совпадения в базе рецептов — просто без сниженного порога, ничего не ломается.
+        const recipe = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).find(r => item.name.indexOf(r.name) !== -1);
+        const hasMaterialPerk = !!(recipe && recipe.perkHint && isPerkChecked(recipe.perkHint));
+        const needSkill = hasMaterialPerk ? nextTier.thresholdWithPerk : nextTier.threshold;
+        if (skill < needSkill) {
+            alert(`Навыка Кузнечного дела не хватает: нужно ${needSkill}${hasMaterialPerk ? ' (с перком материала)' : ''}, у тебя ${skill}. Следующий ранг — «${nextTier.name}».`);
             return;
         }
         const need = item.upgradeQty || 1;
@@ -3616,10 +3681,13 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         removeFromInventoryByName(item.upgradeMaterial, need);
+        // Урон = база × (1 + 10%×улучшения) + бонус качества. Считаем от baseWeaponDmg (как и
+        // improveItem), иначе улучшение и заточка затирали бы бонус друг друга.
+        item.baseWeaponDmg = item.baseWeaponDmg || (item.weaponDmg - (item.qualityBonusApplied || 0));
         item.qualityRank = currentRank + 1;
         item.qualityBonus = nextTier.bonus;
-        item.weaponDmg = (item.weaponDmg - (item.qualityBonusApplied || 0)) + nextTier.bonus;
         item.qualityBonusApplied = nextTier.bonus;
+        item.weaponDmg = Math.round(item.baseWeaponDmg * (1 + (item.upgradeCount || 0) * 0.1)) + nextTier.bonus;
         // Имя показывает текущий ранг — заменяем предыдущую пометку ранга, если была.
         item.name = item.name.replace(/ \((Хорошее|Качественное|Отличное|Легендарное)\)$/, '') + ` (${nextTier.name})`;
         item.itemId = item.itemId; // itemId НЕ меняем — иначе экип-слоты/стопка потеряли бы связь с вещью
@@ -5625,8 +5693,10 @@ window.toggleSkillPanel = function (idx) {
             const effVal = skillInput ? (parseInt(skillInput.value) || getEffectiveSkillValue(name)) : getEffectiveSkillValue(name);
             const needed = getSuccessesNeededForSkill(effVal);
             const progress = skillProgress[idx] || 0;
-            return `<div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:4px; padding:4px 6px;">
-                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
+            // Название и кнопка "+1" рядом: раньше justify-content:space-between уносил кнопку на дальний
+            // край строки. Колонка текста фиксированной ширины (с многоточием) — кнопки выстраиваются в ровный столбик.
+            return `<div class="party-row" style="display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:3px 6px;">
+                <span style="flex:0 1 230px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
                 <button style="width:auto; flex-shrink:0; padding:2px 8px; margin:0;" onclick="logSkillSuccess(${idx})">+1</button>
             </div>`;
         }).join('') + '</div>';
@@ -5798,21 +5868,52 @@ window.toggleSkillPanel = function (idx) {
         select.innerHTML = customSpells.length
             ? customSpells.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)} (${escHtml(s.school)})</option>`).join('')
             : '<option value="">Сначала выучи заклинание на вкладке «Книга заклинаний»</option>';
+        if (typeof renderMagicStaffRecipeInfo === 'function') renderMagicStaffRecipeInfo();
     }
+
+    // Рецепт по рангу выбранного заклинания (window.magicStaffRecipes в smithing-data.js).
+    function getMagicStaffRecipe(spell) {
+        const tier = getSpellTier(spell.school, spell.name) || 1;
+        return { tier, ingredients: (window.magicStaffRecipes || {})[tier] || [] };
+    }
+
+    // Показывает, что нужно для посоха выбранного заклинания и сколько из этого уже есть.
+    window.renderMagicStaffRecipeInfo = function () {
+        const box = document.getElementById('magic-staff-recipe-info');
+        const select = document.getElementById('magic-staff-spell-select');
+        if (!box || !select) return;
+        const spell = customSpells.find(s => s.id === select.value);
+        if (!spell) { box.innerHTML = ''; return; }
+        const { tier, ingredients } = getMagicStaffRecipe(spell);
+        const tierName = ['', 'Новичок', 'Ученик', 'Адепт', 'Эксперт'][tier];
+        box.innerHTML = `<div style="opacity:.85;">Ранг заклинания: <strong>${tierName}</strong>. Нужно:</div>` + ingredients.map(g => {
+            const have = countInInventory(g.name);
+            return `<div style="color:${have >= g.qty ? '#2ecc71' : '#e74c3c'};">${have >= g.qty ? '✓' : '✗'} ${escHtml(g.name)} ×${g.qty} (есть ${have})</div>`;
+        }).join('');
+    };
 
     window.createMagicStaff = function () {
         const select = document.getElementById('magic-staff-spell-select');
         const spell = customSpells.find(s => s.id === select.value);
         const resultEl = document.getElementById('magic-staff-create-result');
         if (!spell) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери заклинание.</span>'; return; }
-        const tier = getSpellTier(spell.school, spell.name) || 1;
+        const { tier, ingredients } = getMagicStaffRecipe(spell);
+        const missing = ingredients.filter(g => countInInventory(g.name) < g.qty);
+        if (missing.length) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">Не хватает: ${missing.map(g => `${escHtml(g.name)} ×${g.qty - countInInventory(g.name)}`).join(', ')}.</span>`;
+            renderMagicStaffRecipeInfo();
+            return;
+        }
+        ingredients.forEach(g => removeFromInventoryByName(g.name, g.qty));
         const maxUses = MAGIC_STAFF_MAX_USES[tier] || 5;
         const name = `Посох-заклинатель: ${spell.name}`;
         addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', spell.desc, {
             isMagicStaff: true, spellName: spell.name, usesLeft: maxUses, maxUses: maxUses, slot: 'ranged', price: 60 + tier * 40
         });
-        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Создан «${escHtml(name)}» (${maxUses} применений).</span>`;
+        resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Создан «${escHtml(name)}» (${maxUses} применений). Потрачено: ${ingredients.map(g => `${escHtml(g.name)} ×${g.qty}`).join(', ')}.</span>`;
         renderMagicStaffList();
+        renderMagicStaffRecipeInfo();
+        renderInventoryList();
         saveLocalStorage();
     };
 
@@ -6210,6 +6311,7 @@ window.toggleSkillPanel = function (idx) {
         const panels = new Set();
         tab.querySelectorAll(':scope > .panel').forEach(p => panels.add(p));
         tab.querySelectorAll(':scope > .grid-2 > .panel').forEach(p => panels.add(p));
+        tab.querySelectorAll(':scope > .grid-2 > .grid-col > .panel').forEach(p => panels.add(p));
         tab.querySelectorAll(':scope > .grid-3 > .panel').forEach(p => panels.add(p));
 
         let counter = 0;
@@ -7634,8 +7736,38 @@ function updateHungerPenalty() {
     // ...меняет data и возвращает его...; return data; } и поднимаем CURRENT_SAVE_VERSION.
     const CURRENT_SAVE_VERSION = '3.6';
     const SAVE_MIGRATIONS = {};
+    // Переименованные предметы (исправление ё/е и опечаток в названиях ингредиентов). У игроков в
+    // сохранённом инвентаре/известных свойствах могли остаться старые написания — приводим к новым,
+    // при совпадении стопок складываем количество. Не зависит от версии сейва — идемпотентно.
+    const ITEM_RENAMES = {
+        'Паслен': 'Паслён', 'Морской желудь': 'Морской жёлудь', 'Толченый бивень мамонта': 'Толчёный бивень мамонта',
+        'Хвост злокрыся': 'Хвост злокрыса', 'Череп троля': 'Череп тролля'
+    };
+    function applyItemRenames(data) {
+        if (!data) return data;
+        if (Array.isArray(data.inventory)) {
+            const merged = [];
+            data.inventory.forEach(it => {
+                const newName = ITEM_RENAMES[it.itemId] || ITEM_RENAMES[it.name];
+                if (newName) { it.name = newName; if (ITEM_RENAMES[it.itemId]) it.itemId = newName; }
+                const twin = merged.find(m => m.itemId === it.itemId);
+                if (twin && typeof twin.count === 'number' && typeof it.count === 'number') twin.count += it.count;
+                else merged.push(it);
+            });
+            data.inventory = merged;
+        }
+        if (data.knownIngredientProps && typeof data.knownIngredientProps === 'object') {
+            Object.keys(ITEM_RENAMES).forEach(old => {
+                if (data.knownIngredientProps[old] && !data.knownIngredientProps[ITEM_RENAMES[old]]) data.knownIngredientProps[ITEM_RENAMES[old]] = data.knownIngredientProps[old];
+                delete data.knownIngredientProps[old];
+            });
+        }
+        return data;
+    }
+
     function migrateSaveData(data) {
         if (!data) return data;
+        data = applyItemRenames(data);
         let version = data.version || '3.6'; // сейвы совсем без поля version — считаем самыми старыми из известных
         let guard = 0;
         while (version !== CURRENT_SAVE_VERSION && SAVE_MIGRATIONS[version] && guard < 20) {
@@ -7814,9 +7946,9 @@ function updateHungerPenalty() {
                 });
                 window._legacyInvToMigrate = null;
             }
-            equippedSlots = data.equippedSlots && typeof data.equippedSlots === 'object'
-                ? Object.assign({ helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null }, data.equippedSlots)
-                : { helmet: null, chest: null, robe: null, gloves: null, boots: null, shield: null, pouch: null, ring: null, neck: null, circlet: null, meleeWeapon: null, meleeWeaponOffhand: null, rangedWeapon: null };
+            // Полный список слотов — раньше тут не было backpack и ammo: сейв, созданный до их
+            // появления, терял эти ключи при загрузке, и следующее сохранение их уже не писало.
+            equippedSlots = Object.assign({}, FULL_EQUIPPED_SLOTS, (data.equippedSlots && typeof data.equippedSlots === 'object') ? data.equippedSlots : {});
             renderInventoryList();
             renderKitchenPot();
             renderEquipPanel();

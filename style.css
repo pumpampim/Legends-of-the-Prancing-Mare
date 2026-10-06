@@ -1667,3 +1667,26 @@ input[type="number"] {
     border-radius: 4px;
     margin-top: 8px;
 }
+
+/* ---------- Правки дизайна (компактность) ---------- */
+
+/* Поля числового значения характеристики. Общее правило input[type="number"] { min-width:64px;
+   max-width:110px } (выше по файлу) перебивало ширину 54px из .stat-block input — поля растягивались
+   до 110px и правая колонка выходила за границу панели. Селектор с большей специфичностью. */
+.stat-block input[type="number"] {
+    width: 56px;
+    min-width: 0;
+    max-width: 56px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+/* Колонка внутри .grid-2: несколько панелей друг под другом в одной ячейке сетки (например, «Передать
+   союзнику» + «Заметки» под ней — раньше заметки падали в следующий ряд, оставляя правую колонку пустой). */
+.grid-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+.grid-col > .panel { margin-bottom: 0; }

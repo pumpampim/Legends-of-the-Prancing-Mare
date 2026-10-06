@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -173,9 +173,14 @@
             </div>
 
             <div class="panel">
-                <h2>🤫 Шёпот от игроков (видно только тебе)</h2>
+                <h2>🤫 Шёпот с игроками (видно только тебе и адресату)</h2>
                 <div id="gm-whispers-list" style="max-height:160px; overflow-y:auto;"></div>
-                <button style="margin-top:6px; width:100%;" onclick="clearWhispers()">Очистить шёпот</button>
+                <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                    <select id="gm-whisper-target" style="flex:1; min-width:110px;"></select>
+                    <input type="text" id="gm-whisper-input" placeholder="Ответить шёпотом..." style="flex:2; min-width:140px;">
+                    <button class="btn-success" style="width:auto;" onclick="sendGmWhisper()">🤫 Шепнуть</button>
+                </div>
+                <button style="margin-top:6px; width:100%;" onclick="clearWhispers()">Очистить шёпот (и твои ответы)</button>
             </div>
 
             <div class="panel">
@@ -720,33 +725,30 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
-        <div class="panel">
-            <h2>🗝️ Тематические сундуки</h2>
-            <p style="font-size:12px; opacity:.75;">Отдельный от обычного генератора лута ниже — всегда даёт броню/оружие конкретной фракции (своя скорая настройка, не нужно гадать по цене).</p>
-            <label>Фракция</label>
-            <select id="themed-chest-select">
-                <option value="ancientNord">Древнонордский (Дракры)</option>
-                <option value="dwemer">Двемерский (Думаки)</option>
-                <option value="falmer">Фалмерский (Думаки)</option>
-                <option value="forsworn">Изгоев (без валюты)</option>
-            </select>
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateThemedChest()">🗝️ Сгенерировать</button>
-            <div id="themed-chest-result" style="margin-top:8px; font-size:13px;"></div>
-            <div style="display:flex; gap:6px; margin-top:6px;">
-                <select id="themed-chest-target-player" style="flex:1;"></select>
-                <button class="btn-success" style="flex:1;" onclick="grantThemedChestLoot()">Выдать</button>
-            </div>
-        </div>
-
+        <!-- ===== ГЕНЕРАТОР ЛУТА: уровень + тип сундука в одном блоке (обычный или тематический фракции) ===== -->
         <div class="panel">
             <h2>📦 Генератор лута (сундук)</h2>
-            <label>Уровень сундука (примерно под уровень группы)</label>
-            <select id="loot-tier-select">
-                <option value="poor">Бедный (ур. 1-3)</option>
-                <option value="common" selected>Обычный (ур. 4-7)</option>
-                <option value="rich">Богатый (ур. 8-12)</option>
-                <option value="legendary">Легендарный (ур. 13+)</option>
-            </select>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:150px;">
+                    <label>Уровень сундука</label>
+                    <select id="loot-tier-select">
+                        <option value="poor">Бедный (ур. 1-3)</option>
+                        <option value="common" selected>Обычный (ур. 4-7)</option>
+                        <option value="rich">Богатый (ур. 8-12)</option>
+                        <option value="legendary">Легендарный (ур. 13+)</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:150px;">
+                    <label>Тип сундука</label>
+                    <select id="loot-type-select">
+                        <option value="common" selected>Обычный (случайный лут)</option>
+                        <option value="ancientNord">Древнонордский (+ Дракры)</option>
+                        <option value="dwemer">Двемерский (+ Думаки)</option>
+                        <option value="falmer">Фалмерский (+ Думаки)</option>
+                        <option value="forsworn">Изгоев (+ золото)</option>
+                    </select>
+                </div>
+            </div>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="generateChestLoot()">🎲 Сгенерировать</button>
             <div id="loot-gen-result" style="margin-top:8px; font-size:14px;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">

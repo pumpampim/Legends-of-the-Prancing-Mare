@@ -89,6 +89,18 @@
 
     // Та же формула модификатора характеристики, что у игрока (index.html) — gm.js отдельный
     // файл, общих переменных с ним нет, поэтому копия.
+    // Урон врага оружием = база оружия + ЗНАЧЕНИЕ характеристики (Сила — ближний бой, Ловкость —
+    // лук), как у игрока (updateCombat в index.html: baseDmg + str, а не модификатор). Раньше
+    // характеристики у бандитов были, но влияли только на бросок попадания (atkMod), а сам урон
+    // брался плоским weaponDmg — и генератор запекал в него лишь маленький модификатор (+1…+7).
+    // Враги без характеристик (вся база enemies-data.js) считаются как прежде — stat=0.
+    function enemyWeaponDamage(enemy) {
+        const base = enemy.weaponDmg || 0;
+        if (!base) return { base: 0, stat: 0, total: 0, label: '' };
+        const stat = enemy.isRanged ? (enemy.dex || 0) : (enemy.str || 0);
+        return { base, stat, total: base + stat, label: enemy.isRanged ? 'ЛОВ' : 'СИЛ' };
+    }
+
     function calcAbilityMod(val) {
         return Math.floor((val - 10) / 2);
     }
@@ -338,7 +350,7 @@
     window.applyActiveBlockResult = function () {
         if (!pendingBlockResult) return;
         const { enemy, targetUid, outcome, blockReductionPct } = pendingBlockResult;
-        const baseDmg = enemy.weaponDmg || 0;
+        const baseDmg = enemyWeaponDamage(enemy).total;
         let finalDmgNote = '';
         const patch = {};
         if (outcome === 'success') {
@@ -411,7 +423,8 @@
         renderTurnOrder(lastData.turnOrder || []);
         renderTurnOrderPickSelect();
         renderLog(lastData.combatLog || []);
-        renderWhispers(lastData.whispers || []);
+        renderWhispers(lastData.whispers || [], lastData.gmWhispers || []);
+        populateGmWhisperTarget();
         renderCampStatusGm(lastData.campState);
         populateBlockSelects();
         populateRecipePlayerSelect();
@@ -420,7 +433,6 @@
         populateQuestTargetSelect();
         populateGmAttackSelects();
         populateLootTargetSelect();
-        populateThemedChestTargetSelect();
         if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
         if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
@@ -630,7 +642,7 @@
         const totalMana = e.spells && e.spells.length ? Math.max(...e.spells.map(s => s.cost)) * 3 : 0;
         el('enemy-mp-input').value = totalMana;
         let info = '';
-        if (e.weaponDmg) info += `Урон: ${e.weaponDmg}${e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : ''}<br>`;
+        if (e.weaponDmg) { const wd = enemyWeaponDamage(e); info += `Урон: ${wd.total}${wd.stat ? ' (оружие ' + wd.base + ' + ' + wd.label + ' ' + wd.stat + ')' : ''}${e.weaponNote ? ' — ' + escapeHtml(e.weaponNote) : ''}<br>`; }
         if (e.weaponOptions && e.weaponOptions.length > 1) info += `🎲 Варианты оружия (при добавлении выберется случайно): ${e.weaponOptions.map(escapeHtml).join(', ')}<br>`;
         if (Object.keys(e.resist).length) info += `Резист: ${Object.entries(e.resist).map(([k, v]) => k + ' ' + v + '%').join(', ')}<br>`;
         if (e.spells.length) info += `Заклинания: ${e.spells.map(s => s.name + ' (' + s.dmg + '/' + s.cost + ')').join(', ')}<br>`;
@@ -835,23 +847,75 @@
     // ---------- Боевой журнал ----------
 
     // Шёпот от игроков — приватная панель, НЕ смешивается с общим боевым журналом.
-    function renderWhispers(whispers) {
+    // Переписка: входящие (whispers, от игроков) и исходящие (gmWhispers, твои ответы) вперемешку по времени.
+    function renderWhispers(whispers, gmWhispers) {
         const target = el('gm-whispers-list');
         if (!target) return;
-        if (!whispers.length) {
+        const items = (whispers || []).map(w => ({ ...w, dir: 'in' }))
+            .concat((gmWhispers || []).map(w => ({ ...w, dir: 'out' })))
+            .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        if (!items.length) {
             target.innerHTML = '<p style="opacity:.6; font-size:13px;">Пока ничего не нашёптано.</p>';
             return;
         }
-        target.innerHTML = whispers.map(w => {
+        target.innerHTML = items.map(w => {
             const time = w.ts ? new Date(w.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
-            return '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-author">' + escapeHtml(w.author || '?') + ':</span> ' + escapeHtml(w.text || '') + '</div>';
+            if (w.dir === 'out') {
+                return '<div class="log-entry" style="opacity:.85;"><span class="log-time">' + time + '</span><span class="log-author">Ты → ' + escapeHtml(w.toName || '?') + ':</span> ' + escapeHtml(w.text || '') + '</div>';
+            }
+            // Ответить можно по fromUid; у старых шёпотов (до этой правки) uid нет — ищем игрока по имени.
+            let uid = w.fromUid;
+            if (!uid) {
+                const parts = lastData.participants || {};
+                uid = Object.keys(parts).find(u => (parts[u] || {}).name === w.author) || '';
+            }
+            const reply = uid ? ' <button style="width:auto; padding:0 6px; font-size:11px;" onclick="replyToWhisper(\'' + escapeHtml(uid) + '\')">↩ ответить</button>' : '';
+            return '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-author">' + escapeHtml(w.author || '?') + ':</span> ' + escapeHtml(w.text || '') + reply + '</div>';
         }).join('');
         target.scrollTop = target.scrollHeight;
     }
 
+    function populateGmWhisperTarget() {
+        const sel = el('gm-whisper-target');
+        if (!sel) return;
+        const parts = lastData.participants || {};
+        const uids = Object.keys(parts);
+        const prev = sel.value;
+        sel.innerHTML = uids.length
+            ? uids.map(u => `<option value="${escapeHtml(u)}">${escapeHtml((parts[u] || {}).name || u)}</option>`).join('')
+            : '<option value="">Нет игроков</option>';
+        if (uids.includes(prev)) sel.value = prev;
+    }
+
+    window.replyToWhisper = function (uid) {
+        const sel = el('gm-whisper-target');
+        if (sel) sel.value = uid;
+        const inp = el('gm-whisper-input');
+        if (inp) inp.focus();
+    };
+
+    window.sendGmWhisper = function () {
+        const uid = el('gm-whisper-target').value;
+        const text = (el('gm-whisper-input').value || '').trim();
+        if (!uid) { alert('Выбери игрока.'); return; }
+        if (!text) return;
+        const toName = ((lastData.participants || {})[uid] || {}).name || uid;
+        db.collection('sessions').doc(currentCode).update({
+            gmWhispers: firebase.firestore.FieldValue.arrayUnion({
+                id: 'gw-' + Date.now() + Math.random().toString(36).slice(2, 8), // уникальный id — arrayUnion иначе схлопнул бы два одинаковых ответа подряд
+                ts: Date.now(), toUid: uid, toName: toName, text: text
+            })
+        }).then(() => { el('gm-whisper-input').value = ''; }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Enter в поле ответа — отправить.
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' && ev.target && ev.target.id === 'gm-whisper-input') window.sendGmWhisper();
+    });
+
     window.clearWhispers = function () {
         if (!confirm('Очистить все шёпоты от игроков?')) return;
-        db.collection('sessions').doc(currentCode).update({ whispers: [] }).catch(e => console.error(e));
+        db.collection('sessions').doc(currentCode).update({ whispers: [], gmWhispers: [] }).catch(e => console.error(e));
     };
 
     function renderLog(log) {
@@ -1309,7 +1373,7 @@
 
     // ---------- Гильдии и Сверхъестественное ----------
     const GUILD_NAMES = ['Гильдия воров', 'Соратники', 'Коллегия магов', 'Тёмное братство', 'Стража Рассвета', 'Бойцовский клуб', 'Коллегия бардов'];
-    const REPUTATION_HOLDS = ['Вайтран', 'Рифт', 'Хаафингар', 'Хьялмарк', 'Истмарк', 'Фолкрит', 'Предел', 'Белый Берег', 'Винтерхолд'];
+    const REPUTATION_HOLDS = ['Вайтран', 'Рифт', 'Хаафингар', 'Хьялмарк', 'Истмарк', 'Фолкрит', 'Предел', 'Белый Берег', 'Винтерхолд', 'Схолстейм'];
     const HIRCINE_TOTEMS = ['— нет —', 'Тотем Охоты', 'Тотем Братства', 'Тотем Страха'];
     // Из Фракции.xlsx, лист "Соратники" — настоящие пороги по количеству съеденных сердец,
     // раньше был примитивный ручной счётчик "ранг" без всякой связи со способностями.
@@ -1770,7 +1834,10 @@
         // ассортименту", то есть ГАРАНТИРОВАННО, не просто доступны для случайного отбора (пул
         // выше — рандомная выборка 15-26 из общего списка, слитки могли бы ни разу не попасть).
         if (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive') {
-            const allIngots = (window.allItems || gmAllItems).filter(i => i.category === 'Кузнечные ингредиенты' && /слиток/i.test(i.name));
+            // Золотой слиток по вики купить нельзя вообще, серебряный слиток почти не продаётся — их исключаем.
+            // Зато серебряную РУДУ кузнецы и торговцы общими товарами продают (по вики) — добавляем в тот же пул.
+            const NOT_FOR_SALE = ['Золотой слиток', 'Серебряный слиток'];
+            const allIngots = (window.allItems || gmAllItems).filter(i => i.category === 'Кузнечные ингредиенты' && (/слиток/i.test(i.name) || i.name === 'Серебряная руда') && NOT_FOR_SALE.indexOf(i.name) === -1);
             const usedNames2 = new Set(finalItems.map(i => i.name));
             const freshIngots = allIngots.filter(i => !usedNames2.has(i.name)).sort(() => Math.random() - 0.5);
             const ingotCount = Math.min(freshIngots.length, randInt(2, 5));
@@ -1778,6 +1845,26 @@
                 const ing = freshIngots[k];
                 finalItems.push({ name: ing.name, category: ing.category, price: ing.price, weight: ing.weight || 0, effect: ing.effect || '', qty: randInt(2, 6) });
             }
+        }
+        // Ювелиры торгуют слитками (UESP: "traded by jewelry merchants as well as blacksmiths") —
+        // гарантированно серебряный и золотой слиток у ювелира.
+        if (typeKey === 'jeweler') {
+            ['Серебряный слиток', 'Золотой слиток'].forEach(nm => {
+                const it = (window.allItems || gmAllItems).find(i => i.name === nm);
+                if (it && !finalItems.some(f => f.name === nm)) {
+                    finalItems.push({ name: it.name, category: it.category, price: it.price, weight: it.weight || 0, effect: it.effect || '', qty: randInt(2, 5) });
+                }
+            });
+        }
+        // Солстейм: по вики (UESP) хитиновую пластину и шкуру нетча продают кузнецы и торговцы общими
+        // товарами ТОЛЬКО на Солстейме — гарантированно добавляем их туда (как и слитки выше).
+        if (hold === 'Схолстейм' && (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive')) {
+            [['Хитиновая пластина', 3, 8], ['Шкура нетча', 2, 5]].forEach(([nm, lo, hi]) => {
+                const it = (window.allItems || gmAllItems).find(i => i.name === nm);
+                if (it && !finalItems.some(f => f.name === nm)) {
+                    finalItems.push({ name: it.name, category: it.category, price: it.price, weight: it.weight || 0, effect: it.effect || '', qty: randInt(lo, hi) });
+                }
+            });
         }
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
@@ -2803,7 +2890,7 @@
         const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
         if (!enemy) { actionSelect.innerHTML = '<option value="">—</option>'; return; }
         let opts = '';
-        if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemy.weaponDmg} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
+        if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemyWeaponDamage(enemy).total} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
         (enemy.spells || []).forEach((s, i) => {
             opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${s.dmg} урона / ${s.cost} МП)</option>`;
         });
@@ -2844,9 +2931,11 @@
         const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
 
-        let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0;
+        let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
         if (actionVal === 'weapon') {
-            dmg = enemy.weaponDmg || 0;
+            const wd = enemyWeaponDamage(enemy);
+            dmg = wd.total;
+            dmgBreakdown = wd.stat ? ` (оружие ${wd.base} + ${wd.label} ${wd.stat})` : '';
             actionLabel = 'оружием';
             // Модификатор атаки — СИЛ для ближнего, ЛОВ для дальнего (если у противника вообще
             // есть характеристики — генератор бандитов их теперь даёт, база enemies-data.js нет,
@@ -2891,7 +2980,7 @@
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
             `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
             (!hit ? `<strong style="color:#7a7a7a;">❌ Промах — урона нет.</strong>` :
-                dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед. (резист цели вычтется автоматически при применении)` :
+                dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед.${dmgBreakdown} (резист цели вычтется автоматически при применении)` :
                     '<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
         resultBox.style.display = 'block';
     };
@@ -2983,75 +3072,74 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
-    // ---------- Тематические сундуки (отдельно от генератора лута ниже, по прямой просьбе —
-    // быстрая настройка под конкретную фракцию без подбора по цене) ----------
+    // ---------- Тематические сундуки — теперь тип сундука в ОДНОМ блоке с обычным генератором лута ----------
+    // (раньше отдельная панель — окно мастера и так длинное). Уровень сундука влияет и здесь: число
+    // предметов (как у обычного), КАЧЕСТВО (окно по цене внутри предметов фракции), размер валюты.
     const THEMED_CHEST_THEMES = {
-        // Ключевое слово matч по ИМЕНИ предмета (не категории) — в базе эти записи разбросаны по
-        // оружию/броне с разным написанием (например "Древний нордский"/"Древняя нордская"/
-        // "Древне нордские" — исторически неконсистентно, но ключевое слово "древн" ловит все
-        // варианты разом).
-        ancientNord: { label: 'Древнонордский', keyword: 'древн', currency: { name: 'Дракр', min: 3, max: 12 } },
-        dwemer: { label: 'Двемерский', keyword: 'двемер', currency: { name: 'Думак', min: 3, max: 12 } },
-        falmer: { label: 'Фалмерский', keyword: 'фалмер', currency: { name: 'Думак', min: 3, max: 12 } },
-        forsworn: { label: 'Изгоев', keyword: 'изгое', currency: null }
+        // Ключевое слово ищется по ИМЕНИ предмета (не категории) — в базе названия фракций написаны
+        // непоследовательно ("Древний нордский"/"Древняя нордская"/"Древне нордские"), "древн" ловит все.
+        ancientNord: { label: 'Древнонордский', keyword: 'древн', currency: { name: 'Дракр', price: 4, base: [3, 12] } },
+        dwemer: { label: 'Двемерский', keyword: 'двемер', currency: { name: 'Думак', price: 5, base: [3, 12] } },
+        falmer: { label: 'Фалмерский', keyword: 'фалмер', currency: { name: 'Думак', price: 5, base: [3, 12] } },
+        forsworn: { label: 'Изгоев', keyword: 'изгое', currency: null } // валюты нет — вместо неё золото по уровню
     };
-    let lastThemedChestLoot = null;
+    // Какой кусок пула фракции (отсортированного по цене) доступен на данном уровне: бедный — дешёвые
+    // вещи, легендарный — самые дорогие. Не привязано к абсолютным ценам — у разных фракций они разные.
+    const THEMED_PRICE_WINDOW = { poor: [0, 0.4], common: [0.15, 0.7], rich: [0.4, 0.9], legendary: [0.6, 1] };
+    const THEMED_CURRENCY_MULT = { poor: 0.5, common: 1, rich: 2, legendary: 3.5 };
 
-    window.generateThemedChest = function () {
-        const themeKey = el('themed-chest-select').value;
-        const theme = THEMED_CHEST_THEMES[themeKey];
-        const resultEl = el('themed-chest-result');
-        const pool = (gmAllItems || []).filter(i => i.name.toLowerCase().includes(theme.keyword));
+    // Выбор count разных предметов из окна по цене (без повторов).
+    function pickThemedGear(pool, tierKey, count) {
+        const sorted = pool.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
+        const win = THEMED_PRICE_WINDOW[tierKey] || [0, 1];
+        let windowed = sorted.slice(Math.floor(sorted.length * win[0]), Math.ceil(sorted.length * win[1]));
+        if (!windowed.length) windowed = sorted;
+        const shuffled = windowed.slice().sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(count, shuffled.length));
+    }
+
+    function generateThemedLoot(typeKey, tierKey, tier, resultEl) {
+        const theme = THEMED_CHEST_THEMES[typeKey];
+        // Только экипировка (броня/оружие со слотом) и никакого уникального: "древн" иначе цепляло
+        // «…древнего вампира» (Уникальная броня) и «Древнюю нордскую кирку», "двемер" — слитки и детали.
+        const rawPool = (gmAllItems || []).filter(i =>
+            i.name.toLowerCase().includes(theme.keyword) &&
+            (typeof i.armor === 'number' || typeof i.dmg === 'number') && i.slot &&
+            !isUniqueLootItem(i)
+        );
+        // В базе есть предметы под ОДНИМ именем в двух записях (кастеты: «Двемерские боевые перчатки»
+        // и т.п. — и в кованых, и в лутовых). Без дедупликации сундук мог выдать «два разных» предмета
+        // с одним названием. Оставляем одну запись на имя, лутовую версию предпочитаем кованой.
+        const byName = new Map();
+        rawPool.forEach(i => {
+            const prev = byName.get(i.name);
+            if (!prev || (/\(лут\)/.test(i.category || '') && !/\(лут\)/.test(prev.category || ''))) byName.set(i.name, i);
+        });
+        const pool = [...byName.values()];
         if (!pool.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В базе нет предметов этой фракции.</span>'; return; }
-        const count = randInt(2, 4);
-        const items = [];
-        const shuffled = pool.slice().sort(() => Math.random() - 0.5);
-        for (let i = 0; i < Math.min(count, shuffled.length); i++) items.push(shuffled[i]);
+        const count = randInt(tier.itemCount[0], tier.itemCount[1]);
+        const items = pickThemedGear(pool, tierKey, count);
+        let gold = 0;
+        if (theme.currency) {
+            const amount = Math.max(1, Math.round(randInt(theme.currency.base[0], theme.currency.base[1]) * (THEMED_CURRENCY_MULT[tierKey] || 1)));
+            items.push({ name: theme.currency.name, category: 'Кузнечные ингредиенты', price: theme.currency.price, weight: 0.1, qty: amount });
+        } else {
+            gold = randInt(tier.gold[0], tier.gold[1]);
+        }
+        lastGeneratedLoot = { tier: tier.label, title: `${theme.label}, ${tier.label.toLowerCase()}`, gold, items };
+        resultEl.innerHTML = renderLootHtml(lastGeneratedLoot);
+    }
 
-        let currencyAmount = 0;
-        if (theme.currency) currencyAmount = randInt(theme.currency.min, theme.currency.max);
-
-        lastThemedChestLoot = { theme: theme.label, items, currencyName: theme.currency ? theme.currency.name : null, currencyAmount };
-
-        let html = `<strong>${theme.label} сундук:</strong><br>`;
-        items.forEach(it => { html += `• ${escapeHtml(it.name)}${it.resistance ? ` (сопротивление ${it.resistance})` : ''}${it.damage ? ` (урон ${it.damage})` : ''}<br>`; });
-        if (currencyAmount) html += `🪙 ${theme.currency.name} ×${currencyAmount}`;
-        resultEl.innerHTML = html;
-    };
-
-    window.grantThemedChestLoot = function () {
-        if (!lastThemedChestLoot) { alert('Сначала сгенерируй сундук.'); return; }
-        const targetUid = el('themed-chest-target-player').value;
-        if (!targetUid) { alert('Выбери игрока.'); return; }
-        db.collection('characters').doc(targetUid).get().then(doc => {
-            const data = doc.exists ? doc.data() : {};
-            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-            const addOne = (name, category, extra, weight, price, effect) => {
-                const itemId = name;
-                const existing = inv.find(x => x.itemId === itemId);
-                if (existing) { existing.count = (existing.count || 1) + 1; }
-                else inv.push(Object.assign({ itemId, name, count: 1, weight: weight || 0, category: category || '', effect: effect || '' }, extra || {}));
-            };
-            lastThemedChestLoot.items.forEach(it => {
-                const extra = {};
-                if (it.slot) extra.slot = it.slot;
-                if (typeof it.resistance === 'number') extra.armorValue = it.resistance;
-                if (typeof it.damage === 'number') extra.weaponDmg = it.damage;
-                if (typeof it.price === 'number') extra.price = it.price;
-                addOne(it.name, it.category || (typeof it.resistance === 'number' ? 'Броня (лут)' : 'Оружие (лут)'), extra, it.weight, it.price, it.effect);
-            });
-            if (lastThemedChestLoot.currencyAmount) {
-                for (let c = 0; c < lastThemedChestLoot.currencyAmount; c++) addOne(lastThemedChestLoot.currencyName, 'Кузнечные ингредиенты', {}, 0.1, lastThemedChestLoot.currencyName === 'Дракр' ? 4 : 5);
-            }
-            return db.collection('characters').doc(targetUid).update({ inventory: inv });
-        }).then(() => {
-            const pname = (lastData.participants[targetUid] || {}).name || targetUid;
-            alert(`Тематический сундук (${lastThemedChestLoot.theme}) выдан игроку ${pname}.`);
-            gmPostLogEntryText(`🗝️ ${pname} нашёл(а) ${lastThemedChestLoot.theme.toLowerCase()} сундук: ${lastThemedChestLoot.items.map(i => i.name).join(', ')}${lastThemedChestLoot.currencyAmount ? ` + ${lastThemedChestLoot.currencyName} ×${lastThemedChestLoot.currencyAmount}` : ''}.`);
-            lastThemedChestLoot = null;
-            el('themed-chest-result').innerHTML = '';
-        }).catch(e => alert('Ошибка: ' + e.message));
-    };
+    // Общий вывод результата для обоих типов сундуков.
+    function renderLootHtml(loot) {
+        let html = `<strong>${escapeHtml(loot.title || loot.tier)} сундук:</strong><br>`;
+        if (loot.gold) html += `💰 ${loot.gold} септимов<br>`;
+        loot.items.forEach(it => {
+            const stats = (it.armor ? ` · броня ${it.armor}` : '') + (it.dmg ? ` · урон ${it.dmg}` : '');
+            html += `• ${escapeHtml(it.name)}${it.qty > 1 ? ` ×${it.qty}` : ''} <span style="opacity:.65;">(${escapeHtml(it.category || '')}${stats}, ${it.price} септимов)</span><br>`;
+        });
+        return html;
+    }
 
     // ---------- Генератор лута сундуков ----------
 
@@ -3068,6 +3156,14 @@
         'Маски жрецов', 'Магические одеяния'
     ];
 
+    // Уникальное/именное не должно падать из случайного сундука. Раньше проверялся только список
+    // категорий выше — а "Уникальное оружие" (файл unique-weapons-data.js, добавленный позже) в него
+    // не попало, и уникальные клинки/луки изредка выпадали из обычных сундуков 13+ уровня.
+    // Теперь отсекаем и по флагу unique, и по любой категории, начинающейся с "Уникальн".
+    function isUniqueLootItem(i) {
+        return !!i.unique || /^Уникальн/.test(i.category || '') || LOOT_EXCLUDE_CATEGORIES.includes(i.category);
+    }
+
     let lastGeneratedLoot = null;
 
     function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -3076,9 +3172,12 @@
         const tierKey = el('loot-tier-select').value;
         const tier = LOOT_TIERS[tierKey];
         const resultEl = el('loot-gen-result');
+        // Тип сундука: обычный (случайный лут по цене) или тематический (броня/оружие фракции).
+        const typeKey = el('loot-type-select') ? el('loot-type-select').value : 'common';
+        if (typeKey !== 'common' && THEMED_CHEST_THEMES[typeKey]) { generateThemedLoot(typeKey, tierKey, tier, resultEl); return; }
         const pool = (gmAllItems || []).filter(i =>
             typeof i.price === 'number' && i.price >= tier.priceMin && i.price <= tier.priceMax &&
-            !LOOT_EXCLUDE_CATEGORIES.includes(i.category)
+            !isUniqueLootItem(i)
         );
         if (!pool.length) {
             resultEl.innerHTML = '<span style="color:#e74c3c;">В базе нет предметов в этом ценовом диапазоне.</span>';
@@ -3100,11 +3199,8 @@
         if (soulGemPool.length && Math.random() < 0.3) items.push(soulGemPool[Math.floor(Math.random() * soulGemPool.length)]);
         if (gemPool.length && Math.random() < 0.25) items.push(gemPool[Math.floor(Math.random() * gemPool.length)]);
 
-        lastGeneratedLoot = { tier: tier.label, gold, items };
-
-        let html = `<strong>${tier.label} сундук:</strong><br>💰 ${gold} септимов<br>`;
-        items.forEach(it => { html += `• ${escapeHtml(it.name)} (${escapeHtml(it.category || '')}, ${it.price} септимов)<br>`; });
-        resultEl.innerHTML = html;
+        lastGeneratedLoot = { tier: tier.label, title: tier.label, gold, items };
+        resultEl.innerHTML = renderLootHtml(lastGeneratedLoot);
     };
 
     window.grantGeneratedLoot = function () {
@@ -3122,30 +3218,20 @@
                 if (typeof it.armor === 'number') extra.armorValue = it.armor;
                 if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
                 if (typeof it.price === 'number') extra.price = it.price;
-                if (existing) { existing.count += 1; Object.assign(existing, extra); }
-                else inv.push(Object.assign({ itemId, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, extra));
+                const q = it.qty || 1; // валюта сундука (Дракры/Думаки) приходит стопкой, не по одной штуке
+                if (existing) { existing.count += q; Object.assign(existing, extra); }
+                else inv.push(Object.assign({ itemId, name: it.name, count: q, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, extra));
             });
             const newGold = (parseInt(data.gold) || 0) + lastGeneratedLoot.gold;
             return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
         }).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
-            alert(`Лут (${lastGeneratedLoot.tier} сундук) выдан игроку ${pname}.`);
-            gmPostLogEntryText(`📦 ${pname} нашёл(а) ${lastGeneratedLoot.tier.toLowerCase()} сундук: ${lastGeneratedLoot.gold} золота + ${lastGeneratedLoot.items.map(i => i.name).join(', ')}.`);
+            alert(`Лут (${lastGeneratedLoot.title || lastGeneratedLoot.tier} сундук) выдан игроку ${pname}.`);
+            gmPostLogEntryText(`📦 ${pname} нашёл(а) ${(lastGeneratedLoot.title || lastGeneratedLoot.tier).toLowerCase()} сундук: ${lastGeneratedLoot.gold ? lastGeneratedLoot.gold + ' золота + ' : ''}${lastGeneratedLoot.items.map(i => i.name + (i.qty > 1 ? ' ×' + i.qty : '')).join(', ')}.`);
             lastGeneratedLoot = null;
             el('loot-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
-
-    function populateThemedChestTargetSelect() {
-        const select = el('themed-chest-target-player');
-        if (!select) return;
-        const uids = Object.keys(lastData.participants || {});
-        const prev = select.value;
-        select.innerHTML = uids.length
-            ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
-            : '<option value="">Нет игроков</option>';
-        if (uids.includes(prev)) select.value = prev;
-    }
 
     function populateLootTargetSelect() {
         const select = el('loot-gen-target-player');
@@ -3267,9 +3353,12 @@
         // характеристики сверху, как у игрока (Сила — ближний бой, Ловкость — дальний).
         const levelDmgMult = 1 + (level - 1) * 0.06;
         const levelHpMult = 1 + (level - 1) * 0.08;
+        // Только база оружия с масштабом по уровню. Характеристика (СИЛ/ЛОВ) добавляется к урону
+        // при самой атаке — enemyWeaponDamage(); раньше сюда запекался лишь модификатор (+1…+7),
+        // и он же не учитывался бы повторно.
         const weaponDmg = isRanged
-            ? Math.round(bow.damage * levelDmgMult) + dexMod
-            : Math.round(weapon.damage * levelDmgMult) + strMod;
+            ? Math.round(bow.damage * levelDmgMult)
+            : Math.round(weapon.damage * levelDmgMult);
         const hp = con * 10 + Math.round(randInt(0, 20) * levelHpMult);
         // Мана — теперь у ЛЮБОГО бандита (не только мага), для зелий/свитков за столом мастера.
         const mp = Math.round(randInt(20, 40) * (1 + (level - 1) * 0.05));
@@ -3307,7 +3396,7 @@
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
         html += `СИЛ ${str}(${strMod >= 0 ? '+' : ''}${strMod}) · ЛОВ ${dex}(${dexMod >= 0 ? '+' : ''}${dexMod}) · ТЕЛ ${con}(${conMod >= 0 ? '+' : ''}${conMod})<br>`;
-        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' урона, вкл. ЛОВ)' : weapon.name + ' (' + weaponDmg + ' урона, вкл. СИЛ)'} · Броня: ${totalArmor}<br>`;
+        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' + ЛОВ ' + dex + ' = ' + (weaponDmg + dex) + ' урона за попадание)' : weapon.name + ' (' + weaponDmg + ' + СИЛ ' + str + ' = ' + (weaponDmg + str) + ' урона за попадание)'} · Броня: ${totalArmor}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
@@ -3412,7 +3501,7 @@
         enemies.push({
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
-            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, resist: { physical: physResist }, spells: b.spells || [],
+            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [],
             isRaisable: true, corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {

@@ -26,7 +26,7 @@ const smithingMaterials = {
     "Серебряный слиток": { price: 25, weight: 1 },
     "Полено": { price: 5, weight: 5 },
     "Корень Нирна": { price: 10, weight: 0.2 },
-    "Паслен": { price: 10, weight: 0.2 },
+    "Паслён": { price: 10, weight: 0.2 },
     "Соль пустоты": { price: 125, weight: 0.2 },
     "Огненная соль": { price: 50, weight: 0.333 },
     "Морозная соль": { price: 100, weight: 0.333 },
@@ -59,19 +59,19 @@ const armorRecipes = [
     },
     {
         name: "Эльфийский шлем", armorType: "Легкая броня", slot: "Шлема",
-        resistance: 14, weight: 1, price: 110, upgradeMaterial: "лунный камень",
+        resistance: 14, weight: 1, price: 110, upgradeMaterial: "Лунный камень",
         perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Лунный камень", qty: 2 }, { name: "Полоски кожи", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Ламеллярный шлем", armorType: "Легкая броня", slot: "Шлема",
-        resistance: 15, weight: 2, price: 175, upgradeMaterial: "Корундовый",
+        resistance: 15, weight: 2, price: 175, upgradeMaterial: "Корундовый слиток",
         perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Корундовый слиток", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Стеклянный шлем", armorType: "Легкая броня", slot: "Шлема",
-        resistance: 17, weight: 2, price: 450, upgradeMaterial: "Малахитовый",
+        resistance: 17, weight: 2, price: 450, upgradeMaterial: "Малахитовый слиток",
         perkHint: "Стеклянные доспехи",
         ingredients: [{ name: "Малахитовый слиток", qty: 2 }, { name: "Лунный камень", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
@@ -107,13 +107,13 @@ const armorRecipes = [
     },
     {
         name: "Ламеллярная броня", armorType: "Легкая броня", slot: "Доспехи",
-        resistance: 34, weight: 2, price: 350, upgradeMaterial: "корундовый",
+        resistance: 34, weight: 2, price: 350, upgradeMaterial: "Корундовый слиток",
         perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Корундовый слиток", qty: 2 }, { name: "Кожа", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Ламеллярная броня с рогами", armorType: "Легкая броня", slot: "Доспехи",
-        resistance: 34, weight: 2, price: 350, upgradeMaterial: "корундовый",
+        resistance: 34, weight: 2, price: 350, upgradeMaterial: "Корундовый слиток",
         perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Корундовый слиток", qty: 2 }, { name: "Кожа", qty: 2 }, { name: "Полоски кожи", qty: 3 }, { name: "Козьи рога", qty: 1 }]
     },
@@ -125,25 +125,25 @@ const armorRecipes = [
     },
     {
         name: "Сыромятные наручи", armorType: "Легкая броня", slot: "Наручи и перчатки",
-        resistance: 6, weight: 1, price: 10, upgradeMaterial: "кожа",
+        resistance: 6, weight: 1, price: 10, upgradeMaterial: "Кожа",
         perkHint: null,
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Кожа", qty: 1 }]
     },
     {
         name: "Сталгримовые легкие наручи", armorType: "Легкая броня", slot: "Наручи и перчатки",
-        resistance: 13, weight: 1, price: 215, upgradeMaterial: "сталгрим",
+        resistance: 13, weight: 1, price: 215, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 2 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Кожаные наручи", armorType: "Легкая броня", slot: "Наручи и перчатки",
-        resistance: 8, weight: 1, price: 25, upgradeMaterial: "кожа",
+        resistance: 8, weight: 1, price: 25, upgradeMaterial: "Кожа",
         perkHint: null,
         ingredients: [{ name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Эльфийские перчатки", armorType: "Легкая броня", slot: "Наручи и перчатки",
-        resistance: 9, weight: 1, price: 45, upgradeMaterial: "лунный камень",
+        resistance: 9, weight: 1, price: 45, upgradeMaterial: "Лунный камень",
         perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Лунный камень", qty: 1 }, { name: "Полоски кожи", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
@@ -173,25 +173,25 @@ const armorRecipes = [
     },
     {
         name: "Эльфийские сапоги", armorType: "Легкая броня", slot: "Сапоги и ботинки",
-        resistance: 9, weight: 1, price: 45, upgradeMaterial: "",
+        resistance: 9, weight: 1, price: 45, upgradeMaterial: "Лунный камень",
         perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Лунный камень", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 2 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Ламеллярные сапоги", armorType: "Легкая броня", slot: "Сапоги и ботинки",
-        resistance: 10, weight: 2, price: 70, upgradeMaterial: "Корундовый",
+        resistance: 10, weight: 2, price: 70, upgradeMaterial: "Корундовый слиток",
         perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Корундовый слиток", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Сталгримовые легкие сапоги", armorType: "Легкая броня", slot: "Сапоги и ботинки",
-        resistance: 17, weight: 2, price: 450, upgradeMaterial: "сталгрим",
+        resistance: 17, weight: 2, price: 450, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 3 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Стеклянные сапоги", armorType: "Легкая броня", slot: "Сапоги и ботинки",
-        resistance: 12, weight: 2, price: 190, upgradeMaterial: "малахитовый слиток",
+        resistance: 12, weight: 2, price: 190, upgradeMaterial: "Малахитовый слиток",
         perkHint: "Стеклянные доспехи",
         ingredients: [{ name: "Малахитовый слиток", qty: 2 }, { name: "Лунный камень", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
@@ -203,19 +203,19 @@ const armorRecipes = [
     },
     {
         name: "Эльфийский щит", armorType: "Легкая броня", slot: "Щиты",
-        resistance: 23, weight: 3, price: 115, upgradeMaterial: "лунный камень",
+        resistance: 23, weight: 3, price: 115, upgradeMaterial: "Лунный камень",
         perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Лунный камень", qty: 4 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Стеклянный щит", armorType: "Легкая броня", slot: "Щиты",
-        resistance: 29, weight: 3, price: 450, upgradeMaterial: "малахитовый слиток",
+        resistance: 29, weight: 3, price: 450, upgradeMaterial: "Малахитовый слиток",
         perkHint: "Стеклянные доспехи",
         ingredients: [{ name: "Малахитовый слиток", qty: 4 }, { name: "Лунный камень", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Сталгримовый щит", armorType: "Легкая броня", slot: "Щиты",
-        resistance: 32, weight: 3, price: 600, upgradeMaterial: "сталгрим",
+        resistance: 32, weight: 3, price: 600, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 4 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
@@ -227,13 +227,13 @@ const armorRecipes = [
     },
     {
         name: "Стальной шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 19, weight: 2, price: 125, upgradeMaterial: "Стальной",
+        resistance: 19, weight: 2, price: 125, upgradeMaterial: "Стальной слиток",
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Стальной рогатый шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 19, weight: 2, price: 125, upgradeMaterial: "Стальной",
+        resistance: 19, weight: 2, price: 125, upgradeMaterial: "Стальной слиток",
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
@@ -246,7 +246,7 @@ const armorRecipes = [
 
     {
         name: "Костяной шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 19, weight: 3, price: 135, upgradeMaterial: "2 костные муки",
+        resistance: 19, weight: 3, price: 135, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 6 }, { name: "Шкура нетча", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
@@ -270,19 +270,19 @@ const armorRecipes = [
     },
     {
         name: "Орочий шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 22, weight: 3, price: 500, upgradeMaterial: "Орихалковый  слиток",
+        resistance: 22, weight: 3, price: 500, upgradeMaterial: "Орихалковый слиток",
         perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Орихалковый слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Сталгримовый шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 22, weight: 3, price: 1165, upgradeMaterial: "сталгрим",
+        resistance: 22, weight: 3, price: 1165, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 4 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Нордский резной шлем", armorType: "Тяжелая броня", slot: "Шлема",
-        resistance: 22, weight: 4, price: 550, upgradeMaterial: "Ртутный  слиток",
+        resistance: 22, weight: 4, price: 550, upgradeMaterial: "Ртутный слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 4 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
@@ -324,7 +324,7 @@ const armorRecipes = [
     },
     {
         name: "Костяные перчатки", armorType: "Тяжелая броня", slot: "Наручи и перчатки",
-        resistance: 13, weight: 2, price: 60, upgradeMaterial: "2 костные муки",
+        resistance: 13, weight: 2, price: 60, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 4 }, { name: "Шкура нетча", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
@@ -342,7 +342,7 @@ const armorRecipes = [
     },
     {
         name: "Сталгримовые перчатки", armorType: "Тяжелая броня", slot: "Наручи и перчатки",
-        resistance: 20, weight: 3, price: 450, upgradeMaterial: "сталгрим",
+        resistance: 20, weight: 3, price: 450, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 3 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
@@ -390,7 +390,7 @@ const armorRecipes = [
     },
     {
         name: "Сталгримовая броня", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 49, weight: 8, price: 2200, upgradeMaterial: "сталгрим",
+        resistance: 49, weight: 8, price: 2200, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 6 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 3 }]
     },
@@ -402,13 +402,13 @@ const armorRecipes = [
     },
     {
         name: "Костяная броня", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 34, weight: 12, price: 90, upgradeMaterial: "2 костные муки",
+        resistance: 34, weight: 12, price: 90, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 10 }, { name: "Шкура нетча", qty: 2 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Костяная броня с наплечниками", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 34, weight: 13, price: 90, upgradeMaterial: "2 костные муки",
+        resistance: 34, weight: 13, price: 90, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 10 }, { name: "Шкура нетча", qty: 2 }, { name: "Железный слиток", qty: 1 }]
     },
@@ -426,13 +426,13 @@ const armorRecipes = [
     },
     {
         name: "Орочья броня", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 43, weight: 14, price: 1000, upgradeMaterial: "Орихалковый  слиток",
+        resistance: 43, weight: 14, price: 1000, upgradeMaterial: "Орихалковый слиток",
         perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Орихалковый слиток", qty: 4 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Нордская резная броня", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 43, weight: 13, price: 1600, upgradeMaterial: "Ртутный  слиток",
+        resistance: 43, weight: 13, price: 1600, upgradeMaterial: "Ртутный слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Стальной слиток", qty: 6 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
@@ -474,13 +474,13 @@ const armorRecipes = [
     },
     {
         name: "Орочьи сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
-        resistance: 16, weight: 3, price: 270, upgradeMaterial: "Орихалковый  слиток",
+        resistance: 16, weight: 3, price: 270, upgradeMaterial: "Орихалковый слиток",
         perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Орихалковый слиток", qty: 3 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Нордские резные сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
-        resistance: 16, weight: 4, price: 220, upgradeMaterial: "Ртутный  слиток",
+        resistance: 16, weight: 4, price: 220, upgradeMaterial: "Ртутный слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 3 }, { name: "Ртутный слиток", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
@@ -492,7 +492,7 @@ const armorRecipes = [
     },
     {
         name: "Костяные сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
-        resistance: 13, weight: 3, price: 60, upgradeMaterial: "2 костные муки",
+        resistance: 13, weight: 3, price: 60, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 6 }, { name: "Шкура нетча", qty: 1 }, { name: "Железный слиток", qty: 1 }]
     },
@@ -504,13 +504,13 @@ const armorRecipes = [
     },
     {
         name: "Сталгримовые сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
-        resistance: 17, weight: 3, price: 450, upgradeMaterial: "сталгрим",
+        resistance: 17, weight: 3, price: 450, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 4 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
         name: "Эбонитовые сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
-        resistance: 17, weight: 5, price: 275, upgradeMaterial: "",
+        resistance: 17, weight: 5, price: 275, upgradeMaterial: "Эбонитовый слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Эбонитовый слиток", qty: 3 }, { name: "Полоски кожи", qty: 2 }]
     },
@@ -540,25 +540,25 @@ const armorRecipes = [
     },
     {
         name: "Нордский щит", armorType: "Тяжелая броня", slot: "Щиты",
-        resistance: 29, weight: 4, price: 335, upgradeMaterial: "Ртутный  слиток",
+        resistance: 29, weight: 4, price: 335, upgradeMaterial: "Ртутный слиток",
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 4 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
         name: "Орочий щит", armorType: "Тяжелая броня", slot: "Щиты",
-        resistance: 32, weight: 5, price: 500, upgradeMaterial: "Орихалковый  слиток",
+        resistance: 32, weight: 5, price: 500, upgradeMaterial: "Орихалковый слиток",
         perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Орихалковый слиток", qty: 3 }, { name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
         name: "Эбонитовый щит", armorType: "Тяжелая броня", slot: "Щиты",
-        resistance: 34, weight: 6, price: 750, upgradeMaterial: "",
+        resistance: 34, weight: 6, price: 750, upgradeMaterial: "Эбонитовый слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Эбонитовый слиток", qty: 4 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
         name: "Костяной щит", armorType: "Тяжелая броня", slot: "Щиты",
-        resistance: 23, weight: 5, price: 95, upgradeMaterial: "2 костные муки",
+        resistance: 23, weight: 5, price: 95, upgradeMaterial: "Костная мука", upgradeQty: 2,
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Костная мука", qty: 8 }, { name: "Шкура нетча", qty: 2 }, { name: "Железный слиток", qty: 1 }]
     }
@@ -1000,19 +1000,19 @@ const weaponRecipes = [
     {
         name: "Серебрянная стрела", category: "Стрелы", subcat: "Стрелы (эффект)",
         damage: 9, weight: 0.04, price: 4, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Серебряный слиток", qty: 1 }]
     },
     {
         name: "Стрела из трольей кости", category: "Стрелы", subcat: "Стрелы (эффект)",
         damage: 11, weight: 0.04, price: 3, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Череп тролля", qty: 1 }]
     },
     {
         name: "Стрела из мамонтовой кости", category: "Стрелы", subcat: "Стрелы (эффект)",
         damage: 15, weight: 0.04, price: 5, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Бивень мамонта", qty: 1 }]
     },
     {
@@ -1078,13 +1078,13 @@ const weaponRecipes = [
     {
         name: "Стальной болт", category: "Болты", subcat: "Болты",
         damage: 10, weight: 0.1, price: 3, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Стальной слиток", qty: 1 }]
     },
     {
         name: "Двемерский болт", category: "Болты", subcat: "Болты",
         damage: 14, weight: 0.1, price: 5, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Двемерские доспехи",
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Двемерский слиток", qty: 1 }]
     },
     {
@@ -1100,69 +1100,69 @@ const weaponRecipes = [
         ingredients: [{ name: "Морозная соль", qty: 2 }, { name: "Стальной болт", qty: 20 }]
     },
     {
-        name: "стальной болт электричества", category: "Болты", subcat: "Болты",
+        name: "Стальной болт электричества", category: "Болты", subcat: "Болты",
         damage: 10, weight: 0.1, price: 100, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Соль пустоты", qty: 2 }, { name: "Стальной болт", qty: 20 }]
     },
     {
-        name: "стальной болт яда", category: "Болты", subcat: "Болты",
+        name: "Стальной болт яда", category: "Болты", subcat: "Болты",
         damage: 20, weight: 0.1, price: 100, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
-        ingredients: [{ name: "Паслен", qty: 20 }, { name: "Стальной болт", qty: 20 }]
+        ingredients: [{ name: "Паслён", qty: 20 }, { name: "Стальной болт", qty: 20 }]
     },
     {
-        name: "двемерский болт огня", category: "Болты", subcat: "Болты",
+        name: "Двемерский болт огня", category: "Болты", subcat: "Болты",
         damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Огненная соль", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
-        name: "двемерский болт льда", category: "Болты", subcat: "Болты",
+        name: "Двемерский болт льда", category: "Болты", subcat: "Болты",
         damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Морозная соль", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
-        name: "двемерскийболт электричества", category: "Болты", subcat: "Болты",
+        name: "Двемерский болт электричества", category: "Болты", subcat: "Болты",
         damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Соль пустоты", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
-        name: "двемерский болт яда", category: "Болты", subcat: "Болты",
+        name: "Двемерский болт яда", category: "Болты", subcat: "Болты",
         damage: 24, weight: 0.1, price: 140, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
-        ingredients: [{ name: "Паслен", qty: 20 }, { name: "Двемерский болт", qty: 20 }]
+        ingredients: [{ name: "Паслён", qty: 20 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
         name: "Серебрянный болт", category: "Болты", subcat: "Болты",
         damage: 12, weight: 0.1, price: 5, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: null,
+        yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Серебряный слиток", qty: 1 }]
     },
     {
         name: "Эльфийский болт", category: "Болты", subcat: "Болты",
         damage: 14, weight: 0.1, price: 6, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эльфийские доспехи",
+        yieldCount: 20, perkHint: "Эльфийские доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Лунный камень", qty: 1 }]
     },
     {
         name: "Орочий болт", category: "Болты", subcat: "Болты",
         damage: 15, weight: 0.1, price: 5, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Орочьи доспехи",
+        yieldCount: 20, perkHint: "Орочьи доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Орихалковый слиток", qty: 1 }]
     },
     {
-        name: "сталгримовый", category: "Болты", subcat: "Болты",
+        name: "Сталгримовый болт", category: "Болты", subcat: "Болты",
         damage: 18, weight: 0.1, price: 8, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи",
+        yieldCount: 20, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 1 }, { name: "Полено", qty: 1 }]
     },
     {
-        name: "эбонитовый", category: "Болты", subcat: "Болты",
+        name: "Эбонитовый болт", category: "Болты", subcat: "Болты",
         damage: 20, weight: 0.1, price: 8, slot: null, isAmmo: true,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи",
+        yieldCount: 20, perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
     {
@@ -1375,14 +1375,14 @@ const weaponsNonCraftable = [
     { name: "Фалмерская стрела", category: "Стрелы", subcat: "Стрелы (особые)", damage: 7, weight: 0.04, price: 1, slot: null, isAmmo: true },
     { name: "Стрела Изгоев", category: "Стрелы", subcat: "Стрелы (особые)", damage: 7, weight: 0.04, price: 1, slot: null, isAmmo: true },
     { name: "Древняя нордская стрела", category: "Стрелы", subcat: "Стрелы (особые)", damage: 8, weight: 0.04, price: 1, slot: null, isAmmo: true },
-    { name: "Стеклянный", category: "Болты", subcat: "Болты", damage: 17, weight: 0.1, price: 7, slot: null, isAmmo: true },
+    { name: "Стеклянный болт", category: "Болты", subcat: "Болты", damage: 17, weight: 0.1, price: 7, slot: null, isAmmo: true },
     { name: "Стальной арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 20, weight: 6.0, price: 120, slot: "ranged", isAmmo: false },
     { name: "Двемерский арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 24, weight: 9.0, price: 350, slot: "ranged", isAmmo: false },
     { name: "Серебрянный арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 22, weight: 7.0, price: 320, slot: "ranged", isAmmo: false },
     { name: "Эльфийский арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 26, weight: 5.0, price: 415, slot: "ranged", isAmmo: false },
     { name: "Орочий арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 25, weight: 8.0, price: 545, slot: "ranged", isAmmo: false },
-    { name: "Стеклянный", category: "Арбалеты", subcat: "Арбалеты", damage: 28, weight: 7.0, price: 750, slot: "ranged", isAmmo: false },
-    { name: "Эбонитовый", category: "Арбалеты", subcat: "Арбалеты", damage: 30, weight: 9.0, price: 892, slot: "ranged", isAmmo: false },
+    { name: "Стеклянный арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 28, weight: 7.0, price: 750, slot: "ranged", isAmmo: false },
+    { name: "Эбонитовый арбалет", category: "Арбалеты", subcat: "Арбалеты", damage: 30, weight: 9.0, price: 892, slot: "ranged", isAmmo: false },
     { name: "Длинный лук", category: "Луки", subcat: "Луки (особые)", damage: 6, weight: 3.0, price: 30, slot: "ranged", isAmmo: false },
     { name: "Охотничий лук", category: "Луки", subcat: "Луки (особые)", damage: 8, weight: 4.0, price: 50, slot: "ranged", isAmmo: false },
     { name: "Древний нордский лук", category: "Луки", subcat: "Луки (особые)", damage: 9, weight: 5.0, price: 45, slot: "ranged", isAmmo: false },
@@ -1395,3 +1395,15 @@ const weaponsNonCraftable = [
 ];
 window.armorNonCraftable = armorNonCraftable;
 window.weaponsNonCraftable = weaponsNonCraftable;
+
+// Рецепты посохов-заклинателей по рангу заклинания (1=Новичок … 4=Эксперт). Раньше посох создавался
+// "из воздуха" — достаточно было знать заклинание. Чем сильнее заклинание, тем дороже посох:
+// больше сердечных камней и слитков, более ценный наполненный камень душ; у Эксперта ещё и
+// Сердце даэдра. Все названия обязаны точно совпадать с именами предметов в items-data.js
+// (это проверяет tests.js). Править рецепт можно прямо здесь.
+window.magicStaffRecipes = {
+    1: [{ name: "Полено", qty: 1 }, { name: "Железный слиток", qty: 1 }, { name: "Сердечный камень", qty: 1 }, { name: "Заполненный крохотный камень душ", qty: 1 }],
+    2: [{ name: "Полено", qty: 1 }, { name: "Стальной слиток", qty: 2 }, { name: "Сердечный камень", qty: 2 }, { name: "Заполненный маленький камень душ", qty: 1 }],
+    3: [{ name: "Полено", qty: 2 }, { name: "Орихалковый слиток", qty: 2 }, { name: "Сердечный камень", qty: 3 }, { name: "Заполненный большой камень душ", qty: 1 }],
+    4: [{ name: "Полено", qty: 2 }, { name: "Эбонитовый слиток", qty: 3 }, { name: "Сердечный камень", qty: 4 }, { name: "Заполненный великий камень душ", qty: 1 }, { name: "Сердце даэдра", qty: 1 }]
+};

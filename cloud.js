@@ -470,7 +470,8 @@
             return db.collection('sessions').doc(currentSessionCode).update({
                 whispers: firebase.firestore.FieldValue.arrayUnion({
                     id: 'wh-' + Date.now() + Math.random().toString(36).slice(2, 8),
-                    ts: Date.now(), author: authorName || 'Игрок', text: text
+                    ts: Date.now(), author: authorName || 'Игрок', text: text,
+                    fromUid: currentUser ? currentUser.uid : null // для ответа мастера; null, а не undefined — Firestore отвергает undefined
                 })
             });
         },
@@ -659,10 +660,65 @@
         statusEl.innerHTML = `Лагерь разбит (${campState.deployedBy || '?'})${campState.isMagicallySafe ? ' · 🔮 магически безопасен' : (campState.hasTent ? ' · палатка и костёр' : '')}`;
     }
 
+    // ---------- Шёпот от мастера (ответ на шёпот игрока) ----------
+    // Мастер пишет в sessions/{code}.gmWhispers записи {id, ts, toUid, toName, text}. Игрок видит
+    // только адресованные ему (toUid === его uid). Как и шёпот игрока мастеру, это интерфейсное
+    // разделение, а не криптографическая приватность — документ сессии читаем любым участником.
+    let _lastGmWhisperToastTs = 0;
+    function gmWhisperSeenKey() { return 'skyrim_gm_whisper_seen_' + (currentSessionCode || ''); }
+
+    window.markGmWhispersSeen = function () {
+        const mine = ((lastSessionData && lastSessionData.gmWhispers) || []).filter(w => currentUser && w.toUid === currentUser.uid);
+        const maxTs = mine.reduce((m, w) => Math.max(m, w.ts || 0), 0);
+        try { localStorage.setItem(gmWhisperSeenKey(), String(maxTs)); } catch (e) {}
+        const toast = document.getElementById('gm-whisper-toast');
+        if (toast) toast.style.display = 'none';
+        renderGmWhispersInbox((lastSessionData && lastSessionData.gmWhispers) || []);
+    };
+
+    function renderGmWhispersInbox(all) {
+        if (!currentUser) return;
+        const mine = all.filter(w => w.toUid === currentUser.uid).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        let seen = 0;
+        try { seen = parseInt(localStorage.getItem(gmWhisperSeenKey())) || 0; } catch (e) {}
+        const unread = mine.filter(w => (w.ts || 0) > seen);
+
+        const box = el('gm-whispers-inbox');
+        if (box) {
+            if (!mine.length) { box.innerHTML = ''; }
+            else {
+                box.innerHTML = '<div style="font-size:13px; opacity:.8; margin-bottom:2px;">🤫 Шёпот от мастера' +
+                    (unread.length ? ` — <strong style="color:var(--accent-color);">новых: ${unread.length}</strong> <button style="width:auto; padding:1px 8px; font-size:12px;" onclick="markGmWhispersSeen()">Прочитано</button>` : '') + '</div>' +
+                    mine.slice(-8).map(w => {
+                        const isNew = (w.ts || 0) > seen;
+                        const time = w.ts ? new Date(w.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                        return `<div class="log-entry" style="${isNew ? 'border-left:3px solid var(--accent-color); padding-left:6px;' : ''}"><span class="log-time">${time}</span><span class="log-author">Мастер:</span> ${escapeHtml(w.text || '')}</div>`;
+                    }).join('');
+            }
+        }
+
+        // Неблокирующее уведомление — игрок может сидеть на другой вкладке и не видеть панель сессии.
+        const newest = unread.length ? unread[unread.length - 1] : null;
+        if (newest && (newest.ts || 0) > _lastGmWhisperToastTs) {
+            _lastGmWhisperToastTs = newest.ts || 0;
+            let toast = document.getElementById('gm-whisper-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'gm-whisper-toast';
+                toast.style.cssText = 'position:fixed; top:12px; right:12px; max-width:320px; z-index:9500; background:#241c10; border:1px solid #765d35; border-radius:6px; padding:10px 12px; color:#f0e6d2; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.5); cursor:pointer;';
+                toast.onclick = window.markGmWhispersSeen;
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = '🤫 <strong>Шёпот от мастера</strong>' + (unread.length > 1 ? ` (новых: ${unread.length})` : '') + '<br>' + escapeHtml(newest.text || '') + '<div style="opacity:.6; font-size:11px; margin-top:4px;">нажми, чтобы отметить прочитанным</div>';
+            toast.style.display = 'block';
+        }
+    }
+
     function renderSession(data) {
         lastSessionData = data;
         renderGmOnlineIndicator(data.gmLastSeen);
         renderCampStatus(data.campState);
+        renderGmWhispersInbox(data.gmWhispers || []);
         renderParty(data.participants || {});
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
