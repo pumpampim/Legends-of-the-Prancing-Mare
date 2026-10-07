@@ -533,6 +533,7 @@
     <script src="enchant-data.js"></script>
     <script src="spell-data.js"></script>
     <script src="alchemy-data.js"></script>
+    <script src="fish-data.js"></script>
     <script src="holidays-data.js"></script>
     <script src="skill-books-data.js"></script>
     <script src="unique-weapons-data.js"></script>
@@ -1411,6 +1412,11 @@
                 <p style="font-size:14px; opacity:.8;">Находит 1-3 ингредиента в зависимости от региона, погоды и времени суток, которые задал мастер (вкладка «Сессия»). Некоторые ингредиенты (части монстров, трофеи) при сборе не попадаются — их можно получить только с трупов врагов.</p>
                 <button class="btn-success" style="width:100%;" onclick="gatherIngredients()">🌿 Собрать</button>
                 <div id="gather-result" style="margin-top:8px; font-size:15px;"></div>
+
+                <h2 style="margin-top:16px;">🎣 Рыбалка</h2>
+                <p style="font-size:14px; opacity:.8;">Одна заброска: что клюнет, зависит от <strong>воды</strong> (по региону и владению, которые задал мастер: север и горы — ледяные воды, «Подземелье» — подземные водоёмы, остальное — тёплые озёра и реки) и от <strong>погоды</strong> (дождь/ясно). У каждой рыбы своё положение и редкость — подробности в её описании.</p>
+                <button class="btn-success" style="width:100%;" onclick="goFishing()">🎣 Закинуть удочку</button>
+                <div id="fishing-result" style="margin-top:8px; font-size:15px;"></div>
 
                 <h2 style="margin-top:16px;">🍽️ Съесть ингредиент</h2>
                 <p style="font-size:14px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
@@ -5365,6 +5371,60 @@ window.toggleSkillPanel = function (idx) {
 
     // Собирает 1-3 ингредиента с учётом региона/погоды/времени суток, заданных мастером.
     // Ингредиенты-трофеи (части монстров) в дикой природе не попадаются — только с трупов.
+    // ---------- Рыбалка (fish-data.js: положение каждой рыбы AE) ----------
+    // Вода по региону/владению сессии: 'Подземелье' — подземные водоёмы; 'Горы' и север — ледяные воды;
+    // остальное — тёплые озёра/реки (регион задаёт, что вероятнее). Погода: дождь/гроза = rain, иначе clear.
+    // Удочки (аликрская/аргонианская) в системе пока нет — рыбалка идёт «голыми руками» без бонусов к размеру рыбы.
+    const FISHING_COLD_HOLDS = ['Винтерхолд', 'Белый берег (Данстар)', 'Истмарк (Виндхельм)', 'Хьялмарк (Морфал)'];
+    function resolveFishingWater(region, hold) {
+        if (region === 'Подземелье') return 'underground';
+        if (region === 'Горы') return 'freezing';
+        if (region === 'Побережье' && FISHING_COLD_HOLDS.indexOf(hold) !== -1) return 'freezing';
+        if (hold === 'Винтерхолд' || hold === 'Белый берег (Данстар)') return 'freezing';
+        if (region === 'Болото') return 'lake';
+        if (region === 'Равнина') return Math.random() < 0.6 ? 'stream' : 'lake';
+        return Math.random() < 0.5 ? 'lake' : 'stream';
+    }
+
+    // Список (рыба, вес) для данной воды и погоды: редкость 6/3/1.
+    function getFishingPool(water, weatherBucket) {
+        const RW = { common: 6, uncommon: 3, rare: 1 };
+        const pool = [];
+        (window.fishData || []).forEach(f => {
+            let w = 0;
+            f.habitats.forEach(([hw, hweather, rarity]) => {
+                if (hw === water && (hweather === 'any' || hweather === weatherBucket)) w = Math.max(w, RW[rarity] || 1);
+            });
+            if (w) pool.push({ fish: f, weight: w });
+        });
+        return pool;
+    }
+
+    window.goFishing = function () {
+        const resultEl = document.getElementById('fishing-result');
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const region = (session && session.currentRegion) || null;
+        const hold = (session && session.currentHold) || null;
+        const weatherKey = (session && session.currentWeather) || 'clear';
+        const rain = weatherKey === 'rain' || weatherKey === 'storm';
+        const water = region ? resolveFishingWater(region, hold) : 'lake';
+        const waterLabel = (window.FISH_WATER_LABELS || {})[water] || water;
+        const where = `${waterLabel}, ${rain ? 'дождь' : 'без дождя'}${region ? '' : ' (регион мастер ещё не задал — считаем тёплым озером)'}`;
+        const pool = getFishingPool(water, rain ? 'rain' : 'clear');
+        if (!pool.length || Math.random() < 0.2) {
+            resultEl.innerHTML = `<span style="opacity:.8;">🎣 Ничего не клюнуло. (${escHtml(where)})</span>`;
+            return;
+        }
+        const total = pool.reduce((s, p) => s + p.weight, 0);
+        let r = Math.random() * total, pick = pool[0];
+        for (const p of pool) { r -= p.weight; if (r <= 0) { pick = p; break; } }
+        const info = (window.allItems || []).find(i => i.name === pick.fish.name) || {};
+        addToInventory(pick.fish.name, pick.fish.name, 1, info.weight || pick.fish.weight || 0.25, info.category || 'Сырые продукты', '', { price: info.price || pick.fish.price || 1 });
+        resultEl.innerHTML = `<strong>🎣 Поймано: ${escHtml(pick.fish.name)}</strong> <span style="opacity:.75;">(${escHtml(where)})</span>`;
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
     window.gatherIngredients = function () {
         const resultEl = document.getElementById('gather-result');
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
@@ -5374,7 +5434,8 @@ window.toggleSkillPanel = function (idx) {
         const regionTags = region ? (INGREDIENT_REGION_TAGS[region] || []) : [];
         const holdTags = hold ? (INGREDIENT_HOLD_TAGS[hold] || []) : [];
 
-        const allNames = Object.keys(window.alchemyIngredients || {}).filter(n => !INGREDIENT_CORPSE_ONLY.has(n));
+        // Рыба — отдельным занятием (🎣 Рыбалка, с учётом воды/погоды); в сборе трав и грибов её быть не должно.
+        const allNames = Object.keys(window.alchemyIngredients || {}).filter(n => !INGREDIENT_CORPSE_ONLY.has(n) && !(window.fishNames && window.fishNames.has(n)));
         const isWinter = getCurrentSeason().name === 'Зима';
         const weighted = [];
         allNames.forEach(n => {

@@ -248,6 +248,191 @@ const recipes = [
         needsWater: false,
         ingredients: [{ name: "Мора тапинелла", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Кувшин молока", qty: 1 }],
         effect: "5 к скорости на 75 ходов"
+    },
+    // ---- Новые рецепты (23): рыба Anniversary Edition + выпечка и мясные блюда. Названия рыб — официальные русские. ----
+    {
+        name: "Рыбный пирог с хисткарпом",
+        weight: 1,
+        price: 40,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Хисткарп", qty: 3 }, { name: "Куриное яйцо", qty: 2 }],
+        effect: "Запас магии увеличен на 20 на 75 ходов"
+    },
+    {
+        name: "Слойка с бойцовой рыбкой",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Бойцовая рыбка", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Соль", qty: 1 }],
+        effect: "+20 переносимого веса на 75 ходов"
+    },
+    {
+        name: "Уха из сиродильского лопатохвоста",
+        weight: 0.5,
+        price: 25,
+        needsWater: true,
+        ingredients: [{ name: "Соль", qty: 2 }, { name: "Сиродильский лопатохвост", qty: 2 }, { name: "Картофель", qty: 3 }, { name: "Чеснок", qty: 1 }],
+        effect: "+15% к сопротивлению ядам на 75 ходов"
+    },
+    {
+        name: "Запечённый серебристый окунь",
+        weight: 0.5,
+        price: 30,
+        needsWater: false,
+        ingredients: [{ name: "Серебристый окунь", qty: 2 }, { name: "Масло", qty: 1 }, { name: "Соль", qty: 1 }, { name: "Помидор", qty: 2 }],
+        effect: "+10% сопротивления к холоду на 75 ходов"
+    },
+    {
+        name: "Пряный суп с абесинским окунем",
+        weight: 0.5,
+        price: 28,
+        needsWater: true,
+        ingredients: [{ name: "Соль", qty: 1 }, { name: "Абесинский окунь", qty: 2 }, { name: "Кувшин молока", qty: 1 }, { name: "Лунный сахар", qty: 1 }],
+        effect: "+10 урона заклинаний на 75 ходов"
+    },
+    {
+        name: "Лавандовый кекс",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 2 }, { name: "Масло", qty: 1 }, { name: "Лаванда", qty: 3 }, { name: "Кувшин молока", qty: 1 }],
+        effect: "+15% к сопротивлению магии на 75 ходов"
+    },
+    {
+        name: "Морковный пирог с глазурью",
+        weight: 1,
+        price: 40,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Морковь", qty: 4 }, { name: "Кувшин молока", qty: 1 }],
+        effect: "Запас магии увеличен на 20 на 75 ходов"
+    },
+    {
+        name: "Чесночное пюре",
+        weight: 0.5,
+        price: 25,
+        needsWater: false,
+        ingredients: [{ name: "Картофель", qty: 4 }, { name: "Чеснок", qty: 2 }, { name: "Масло", qty: 1 }, { name: "Соль", qty: 1 }],
+        effect: "+20 к броне на 75 ходов"
+    },
+    {
+        name: "Праздничный ягодный пудинг",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Снежные ягоды", qty: 3 }, { name: "Ягоды можжевельника", qty: 3 }, { name: "Кувшин молока", qty: 1 }, { name: "Масло", qty: 1 }],
+        effect: "+10% к сопротивлению огню и холоду на 75 ходов"
+    },
+    {
+        name: "Запечённая тыква с травами",
+        weight: 0.5,
+        price: 25,
+        needsWater: false,
+        ingredients: [{ name: "Тыква", qty: 1 }, { name: "Лаванда", qty: 2 }, { name: "Соль", qty: 1 }, { name: "Чеснок", qty: 1 }],
+        effect: "+25% к сопротивлению болезням на 75 ходов"
+    },
+    {
+        name: "Заливное из золотой рыбки",
+        weight: 0.5,
+        price: 35,
+        needsWater: true,
+        ingredients: [{ name: "Золотая рыбка", qty: 2 }, { name: "Соль", qty: 1 }, { name: "Морковь", qty: 2 }, { name: "Чеснок", qty: 1 }],
+        effect: "+1 к броскам Красноречия на 75 ходов"
+    },
+    {
+        name: "Пирог с карпом",
+        weight: 1,
+        price: 40,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Карп", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Соль", qty: 1 }],
+        effect: "+30 переносимого веса на 75 ходов"
+    },
+    {
+        name: "Похлёбка из сома",
+        weight: 0.5,
+        price: 28,
+        needsWater: true,
+        ingredients: [{ name: "Сом", qty: 1 }, { name: "Картофель", qty: 3 }, { name: "Лук-порей", qty: 2 }, { name: "Соль", qty: 2 }],
+        effect: "+20 хп на 75 ходов"
+    },
+    {
+        name: "Прозрачное суфле из стеклянного окуня",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Стеклянный окунь", qty: 2 }, { name: "Кувшин молока", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Чеснок", qty: 1 }],
+        effect: "+2 к кубам на Скрытность на 75 ходов"
+    },
+    {
+        name: "Слойка с полярным гольцом",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Полярный голец", qty: 2 }, { name: "Снежные ягоды", qty: 3 }, { name: "Соль", qty: 1 }],
+        effect: "+15% к сопротивлению холоду на 75 ходов"
+    },
+    {
+        name: "Имперский мясной рулет",
+        weight: 1,
+        price: 45,
+        needsWater: false,
+        ingredients: [{ name: "Сырая говядина", qty: 2 }, { name: "Мешок муки", qty: 1 }, { name: "Чеснок", qty: 1 }, { name: "Куриное яйцо", qty: 2 }],
+        effect: "+20 к урону для атак ближнего боя на 75 ходов"
+    },
+    {
+        name: "Запеканка трех сыров",
+        weight: 1,
+        price: 40,
+        needsWater: false,
+        ingredients: [{ name: "Круг козьего сыра", qty: 1 }, { name: "Круг эйдарского сыра", qty: 1 }, { name: "Кувшин молока", qty: 1 }, { name: "Картофель", qty: 2 }],
+        effect: "Запас здоровья увеличен на 25 на 75 ходов"
+    },
+    {
+        name: "Охотничье рагу с можжевельником",
+        weight: 0.5,
+        price: 30,
+        needsWater: true,
+        ingredients: [{ name: "Оленина", qty: 1 }, { name: "Ягоды можжевельника", qty: 3 }, { name: "Морковь", qty: 2 }, { name: "Соль", qty: 1 }],
+        effect: "+5% к физическому урону на 75 ходов"
+    },
+    {
+        name: "Яблочно-лавандовый тарт",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Зелёное яблоко", qty: 2 }, { name: "Красное яблоко", qty: 2 }, { name: "Мешок муки", qty: 1 }, { name: "Лаванда", qty: 2 }],
+        effect: "Запас магии увеличен на 25 на 75 ходов"
+    },
+    {
+        name: "Суп из стража-рыбы",
+        weight: 0.5,
+        price: 28,
+        needsWater: true,
+        ingredients: [{ name: "Страж-рыба", qty: 2 }, { name: "Капуста", qty: 2 }, { name: "Лук-порей", qty: 2 }, { name: "Соль", qty: 1 }],
+        effect: "+25% к сопротивлению ядам на 75 ходов"
+    },
+    {
+        name: "Слойка с нежным лирохвостым окунем",
+        weight: 0.5,
+        price: 35,
+        needsWater: false,
+        ingredients: [{ name: "Мешок муки", qty: 1 }, { name: "Масло", qty: 1 }, { name: "Лирохвостый окунь", qty: 2 }, { name: "Снежные ягоды", qty: 3 }],
+        effect: "+15% к сопротивлению магии на 75 ходов"
+    },
+    {
+        name: "Жаркое из мелководного окуня",
+        weight: 0.5,
+        price: 30,
+        needsWater: false,
+        ingredients: [{ name: "Мелководный окунь", qty: 2 }, { name: "Картофель", qty: 3 }, { name: "Масло", qty: 1 }, { name: "Чеснок", qty: 1 }],
+        effect: "+25 к броне на 75 ходов"
+    },
+    {
+        name: "Пряное филе рыбы-ангела",
+        weight: 0.5,
+        price: 40,
+        needsWater: false,
+        ingredients: [{ name: "Рыба-ангел", qty: 2 }, { name: "Лунный сахар", qty: 1 }, { name: "Кувшин молока", qty: 1 }, { name: "Соль", qty: 1 }],
+        effect: "+1 к броскам Иллюзии и Восстановления на 75 ходов"
     }
 ];
 

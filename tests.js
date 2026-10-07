@@ -97,7 +97,9 @@
     const spellingPairs = alchItems.filter(n => !alch[n] && alchNormMap.has(normName(n))).map(n => `«${n}» ≠ «${alchNormMap.get(normName(n))}»`);
     ok(spellingPairs.length === 0, 'Алхимия: нет ингредиентов с разным написанием в предметах и алхимической базе', spellingPairs.join('; '));
     // Известные пробелы (не опечатки, а отсутствие данных): Dragonborn-ингредиенты без записанных эффектов.
-    const KNOWN_NO_EFFECTS = ['Желе пепельного прыгуна', 'Желе нетча', 'Перья фельсадской крачки', 'Пепельная ползучая лоза', 'Императорский зонтичный мох', 'Стручок пепельной травы', 'Пепел порождения', 'Корень трамы', 'Кабаний клык', 'Вредозобник'];
+    const KNOWN_NO_EFFECTS = ['Желе пепельного прыгуна', 'Желе нетча', 'Перья фельсадской крачки', 'Пепельная ползучая лоза', 'Императорский зонтичный мох', 'Стручок пепельной травы', 'Пепел порождения', 'Корень трамы', 'Кабаний клык', 'Вредозобник',
+        // Рыбы AE — ингредиенты без записанных эффектов (на вики-выдержках неполный список свойств / нет соответствия в вашей системе эффектов):
+        'Карликовый солнечник', 'Рыба-лопата', 'Малек удильщика', 'Молодой грязевой краб'];
     const KNOWN_NO_ITEM = ['Корень жарницы', 'Прах Берита'];
     const noEffects = alchItems.filter(n => !alch[n]);
     const noItem = Object.keys(alch).filter(k => alchItems.indexOf(k) === -1);
@@ -151,6 +153,31 @@
     // Четыре расовые силы из списка рас (Берсерк, Адреналин, Кора Хиста, Голос императора) обязаны быть описаны
     ['Берсерк', 'Адреналин', 'Кора Хиста', 'Голос императора'].forEach(n => ok(PW.some(p => p.name === n), `Способности: есть «${n}»`));
     ok(PW.filter(p => p.perDay).every(p => p.desc && p.desc.length > 10), 'Способности: у каждой "раз в день" есть описание');
+
+    // ---------- РЫБЫ AE (fish-data.js) и рецепты кухни ----------
+    const FD = W.fishData || [];
+    ok(FD.length === 28, `Рыбы: все 28 видов AE на месте (сейчас ${FD.length})`);
+    ok(new Set(FD.map(f => f.name)).size === FD.length, 'Рыбы: названия уникальны');
+    const WATERS = ['freezing', 'lake', 'stream', 'underground'], WEATHERS = ['any', 'clear', 'rain'], RARITIES = ['common', 'uncommon', 'rare'];
+    ok(FD.every(f => f.habitats.length && f.habitats.every(h => WATERS.indexOf(h[0]) !== -1 && WEATHERS.indexOf(h[1]) !== -1 && RARITIES.indexOf(h[2]) !== -1)), 'Рыбы: у каждой есть положение (вода/погода/редкость) из допустимых значений');
+    ok(FD.every(f => itemNames.has(f.name)), 'Рыбы: у каждой есть предмет в базе', FD.filter(f => !itemNames.has(f.name)).map(f => f.name).join(', '));
+    // Каждую рыбу реально можно поймать хотя бы в одной воде при какой-то погоде
+    const catchable = f => f.habitats.some(h => WATERS.indexOf(h[0]) !== -1);
+    ok(FD.every(catchable), 'Рыбы: каждая ловится хотя бы где-то');
+    ['freezing', 'lake', 'stream', 'underground'].forEach(w => ok(FD.some(f => f.habitats.some(h => h[0] === w)), `Рыбы: в воде «${w}» есть что ловить`));
+    ok(FD.filter(f => f.estimated).length <= 3, 'Рыбы: оценочных (без точных цифр с вики) не больше трёх', FD.filter(f => f.estimated).map(f => f.name).join(', '));
+    // Кухня: все ингредиенты ВСЕХ рецептов известны кухне (иначе блюдо невозможно приготовить)
+    const CK = W.cookingIngredients || {};
+    const badKitchen = [];
+    (W.recipes || []).forEach(r => r.ingredients.forEach(i => { if (!CK[i.name]) badKitchen.push(`${r.name}: ${i.name}`); }));
+    ok(badKitchen.length === 0, 'Кухня: все ингредиенты рецептов есть в списке продуктов кухни', badKitchen.join('; '));
+    const rkeys = (W.recipes || []).map(r => r.ingredients.map(i => i.name + 'x' + i.qty).sort().join('|'));
+    ok(new Set(rkeys).size === rkeys.length, 'Кухня: нет двух рецептов с одинаковым составом (второй никогда бы не сработал)');
+    ok(new Set((W.recipes || []).map(r => r.name)).size === (W.recipes || []).length, 'Кухня: названия блюд уникальны');
+    ok((W.recipes || []).length === 44, `Кухня: 44 рецепта (21 прежний + 23 новых), сейчас ${(W.recipes || []).length}`);
+    // Эффекты блюд на «+N хп»/«Запас магии/здоровья увеличен на N» срабатывают автоматически — таких среди новых рецептов должно быть не меньше 4
+    const autoRe = /^(\+\s*\d+\s*(хп|мп)|Запас (магии|здоровья) увеличен на \d+)/i;
+    ok((W.recipes || []).slice(21).filter(r => autoRe.test(r.effect)).length >= 4, 'Кухня: среди новых рецептов не меньше 4 с автоприменяемым эффектом (хп/мана)');
 
     // ---------- ВРАГИ ----------
     const en = (W.enemiesData || []).map(e => e.name);
