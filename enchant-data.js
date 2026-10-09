@@ -20,8 +20,9 @@ const enchantArmorEffects = [
     { name: "Повышение навыка:«Разрушение»", slots: ["helmet", "armor", "amulet", "ring"], maxValue: 25.0, unit: "%", description: "Заклинания школы на х% сильнее" },
     { name: "Повышение навыка:«Стрельба»", slots: ["helmet", "gauntlets", "amulet", "ring"], maxValue: 40.0, unit: "%", description: "эффективнее от базового значения атаки оружия" },
     { name: "Повышение навыка:«Скрытность»", slots: ["gauntlets", "boots", "amulet", "ring"], maxValue: 40.0, unit: "%", description: "Каждые 10% зачарования +1 к кубам" },
-    { name: "Повышение навыка:«Тяжёлая броня»", slots: ["armor", "gauntlets", "amulet", "ring"], maxValue: 35, unit: "брони", description: "увеличение класса брони" },
-    { name: "Повышение навыка: «Легкая броня»", slots: ["armor", "gauntlets", "amulet", "ring"], maxValue: 25, unit: "брони", description: "увеличение класса брони" },
+    { name: "Повышение навыка:«Тяжёлая броня»", slots: ["armor", "gauntlets", "amulet", "ring"], maxValue: 35, unit: "%", description: "" },
+    { name: "Повышение навыка: «Легкая броня»", slots: ["armor", "gauntlets", "amulet", "ring"], maxValue: 25, unit: "%", description: "" },
+    { name: "Повышение навыка: «Кузнечное дело»", slots: ["gauntlets", "boots", "amulet", "ring"], maxValue: 40.0, unit: "%", description: "" },
     { name: "Повышение искусства торговли", slots: ["amulet"], maxValue: 25.0, unit: "%", description: "цены выгоднее" },
     { name: "Водное дыхание", slots: ["helmet", "amulet"], maxValue: null, unit: "", description: "Возможность дышать под водой" },
     { name: "Приглушение шагов", slots: ["boots"], maxValue: null, unit: "", description: "Ваши шаги не издают звука" },
@@ -35,7 +36,7 @@ const enchantArmorEffects = [
     { name: "Сопротивление электричеству", slots: ["boots", "shield", "amulet", "ring"], maxValue: 37, unit: "%", description: "Сопротивление к урону электричеством" },
     { name: "Сопротивление яду", slots: ["armor", "shield", "amulet", "ring"], maxValue: 37, unit: "%", description: "Сопротивление к урону ядом" },
     { name: "Усиление рукопашного боя", slots: ["armor", "ring"], maxValue: 20, unit: "", description: "При атаках перчатками добавляется ввиде доп урона к классу брони перчаток" },
-    { name: "Повышение навыка: «Алхимия»", slots: ["helmet", "gauntlets", "amulet", "ring"], maxValue: 24, unit: "", description: "Повышает навык Алхимии " }
+    { name: "Повышение навыка: «Алхимия»", slots: ["helmet", "gauntlets", "amulet", "ring"], maxValue: 24, unit: "%", description: "Сила и длительность зелий и ядов, которые вы варите, на N% больше (множитель «усиление алхимии от экипировки» в формуле алхимии)." }
 ];
 
 const enchantWeaponEffects = [
@@ -71,3 +72,5 @@ window.soulGemPower = soulGemPower;
 window.enchantArmorEffects = enchantArmorEffects;
 window.enchantWeaponEffects = enchantWeaponEffects;
 window.calcEnchantPower = calcEnchantPower;
+// Описания «Повышения навыка» берутся из таблицы алхимии (alchemy-data.js) — если тот файл уже загружен, подтягиваем сразу.
+if (typeof window.syncEnchantDescriptions === 'function') window.syncEnchantDescriptions();

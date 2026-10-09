@@ -365,7 +365,7 @@
             finalDmgNote = `Игрок получает ПОЛНЫЙ урон ${baseDmg} (срез только бронёй по обычным правилам) + статус «Ошеломление».`;
             patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
                 id: 'stag-' + Date.now() + Math.random().toString(36).slice(2, 6),
-                name: enemy.name, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1
+                name: enemy.name, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1, rollPenalty: -3, fromGm: true
             });
         }
         patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🛡️ Активный блок: ${enemy.name} vs блокирующий — ${outcome === 'success' ? 'успех' : outcome === 'partial' ? 'частично' : 'пробит'}. ${finalDmgNote}` });
@@ -455,6 +455,9 @@
             return `<div style="border:1px solid var(--border-color); border-radius:4px; padding:5px 8px; margin-bottom:4px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:bold;">
                     <span>${escapeHtml(p.name || '?')}</span>
+                    <label style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:normal; margin:0;" title="Вне города игрок не может закупаться у торговцев">
+                        <input type="checkbox" ${p.inTown === false ? '' : 'checked'} onchange="setParticipantTown('${uid}', this.checked)"> 🏙 В городе
+                    </label>
                 </div>
                 <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
                     <span style="font-size:11px; color:#e74c3c; width:24px;">HP</span>
@@ -479,6 +482,12 @@
             </div>`;
         }).join('');
     }
+
+    window.setParticipantTown = function (uid, flag) {
+        const patch = {};
+        patch['participants.' + uid + '.inTown'] = !!flag;
+        db.collection('sessions').doc(currentCode).update(patch).catch(e => console.error(e));
+    };
 
     window.setParticipantField = function (uid, field, value) {
         const patch = {};
@@ -567,6 +576,11 @@
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
                     '<input type="number" value="' + (s.cost || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'cost\',this.value)"> МП</div>').join('')
                 : '';
+            const KIND_OPTS = [['', '— тип? —'], ['animal', 'зверь'], ['monster', 'монстр'], ['people', 'человек/меры'], ['undead', 'нежить'], ['daedra', 'даэдра'], ['automaton', 'механизм']];
+            const levelLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Уровень: ' +
+                '<input type="number" min="0" value="' + (e.level || '') + '" placeholder="?" style="width:50px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'level\',this.value)"> ' +
+                '<select style="width:auto; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'kind\',this.value)">' +
+                KIND_OPTS.map(o => '<option value="' + o[0] + '"' + ((e.kind || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>';
             const lootLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">🎒 ' +
                 '<input type="text" value="' + escapeHtml(e.loot || '') + '" placeholder="лут текстом" style="flex:1; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'loot\',this.value)"></div>';
             const shoutsHtml = (e.shouts && e.shouts.length)
@@ -584,7 +598,7 @@
             return '<div class="enemy-row">' +
                 '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                statsLine + statusLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
+                statsLine + statusLine + levelLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -594,7 +608,7 @@
                 (e.isRaisable && (e.curHp || 0) <= 0
                     ? '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:12px;">' +
                       '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
-                      (e.corpseLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>' : '<div style="opacity:.6;">Уже обыскан.</div>') +
+                      (e.ashes ? '<div style="opacity:.75;">🔥 Обращён в пепел (Трансмутация смерти) — обыскать и поднять нельзя.</div>' : e.corpseLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>' : '<div style="opacity:.6;">Уже обыскан.</div>') +
                       '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' +
                       '</div>'
                     : '') +
@@ -680,6 +694,9 @@
             if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
             if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
             if (currentEnemyDbPick.loot) extra.loot = currentEnemyDbPick.loot;
+            if (currentEnemyDbPick.soul) extra.soul = currentEnemyDbPick.soul; // размер души для захвата душ
+            if (currentEnemyDbPick.level) extra.level = currentEnemyDbPick.level; // уровень и тип — для заклинаний «до N уровня»
+            if (currentEnemyDbPick.kind) extra.kind = currentEnemyDbPick.kind;
             // Только гуманоидов можно поднять заклинанием (Воины/Шаманы/Боевые маги — фалмеры
             // и подобные; звери/монстры/ловушки — нет).
             if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
@@ -700,7 +717,7 @@
 
     // TEXT_ENEMY_FIELDS — поля, которые НЕ надо принудительно приводить к числу (раньше
     // Number(value)||0 стояло безусловно для любого поля — для текста типа "лут" это дало бы 0).
-    const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name'];
+    const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name', 'kind'];
     window.setEnemyField = function (id, field, value) {
         const finalVal = TEXT_ENEMY_FIELDS.includes(field) ? value : (Number(value) || 0);
         const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: finalVal } : e);
@@ -822,8 +839,31 @@
     };
 
     window.gmAdvanceTurn = function () {
+        const tickLog = [];
         const enemies = (lastData.enemies || []).map(e => {
             const copy = { ...e };
+            // Яды и зелья на враге: затяжной урон/снятие маны и регенерация тикают КАЖДЫЙ ход (до уменьшения длительности).
+            if (Array.isArray(copy.statusEffects) && copy.statusEffects.length && (copy.curHp || 0) > 0) {
+                let dHp = 0, dMp = 0;
+                let poisonRes = (copy.resist && copy.resist.poison) || 0;
+                copy.statusEffects.forEach(s => { if (s.res && s.res.poison) poisonRes += s.res.poison; });
+                copy.statusEffects.forEach(s => {
+                    if (s.dotHp) dHp -= Math.max(0, Math.round(s.dotHp * (s.dotNoResist ? 1 : (1 - poisonRes / 100))));
+                    if (s.dotMp) dMp -= s.dotMp;
+                    if (s.regenHp) dHp += s.regenHp;
+                    if (s.regenMp) dMp += s.regenMp;
+                });
+                if (dHp || dMp) {
+                    const oldHp = copy.curHp || 0, oldMp = copy.curMp || 0;
+                    copy.curHp = Math.max(0, Math.min(copy.maxHp || oldHp, oldHp + dHp));
+                    copy.curMp = Math.max(0, Math.min(copy.maxMp || oldMp, oldMp + dMp));
+                    if (oldHp > 0 && copy.curHp <= 0) copy.diedAtTurn = lastData.sessionTurnCounter || 0;
+                    const parts = [];
+                    if (copy.curHp !== oldHp) parts.push(`${copy.curHp - oldHp > 0 ? '+' : ''}${copy.curHp - oldHp} хп`);
+                    if (copy.curMp !== oldMp) parts.push(`${copy.curMp - oldMp > 0 ? '+' : ''}${copy.curMp - oldMp} маны`);
+                    if (parts.length) tickLog.push(`☠ «${copy.name}»: ${parts.join(', ')} от эффектов${copy.curHp <= 0 ? ' — погибает' : ''}.`);
+                }
+            }
             if (Array.isArray(copy.statusEffects) && copy.statusEffects.length) {
                 copy.statusEffects = copy.statusEffects
                     .map(s => ({ ...s, turns: s.turns != null ? s.turns - 1 : s.turns }))
@@ -834,13 +874,14 @@
             });
             return copy;
         });
+        const logEntries = [{
+            ts: Date.now(), author: 'Мастер',
+            text: '⏭️ Новый ход! Не забудьте прокрутить длительность своих активных эффектов на листе.'
+        }].concat(tickLog.map((t, i) => ({ ts: Date.now() + i + 1, author: 'Мастер', text: t })));
         db.collection('sessions').doc(currentCode).update({
-            enemies: enemies,
+            enemies: stripUndefinedDeep(enemies),
             sessionTurnCounter: firebase.firestore.FieldValue.increment(1),
-            combatLog: firebase.firestore.FieldValue.arrayUnion({
-                ts: Date.now(), author: 'Мастер',
-                text: '⏭️ Новый ход! Не забудьте прокрутить длительность своих активных эффектов на листе.'
-            })
+            combatLog: firebase.firestore.FieldValue.arrayUnion(...logEntries)
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -1045,7 +1086,7 @@
         (window.alchemyPremadePotions || []).forEach(p => {
             out.push({
                 name: p.name, category: p.category, weight: p.weight, price: p.price,
-                armor: null, dmg: null, effect: p.effect, slot: null
+                armor: null, dmg: null, effect: p.effect, slot: null, alchemyEffects: p.alchemyEffects
             });
         });
         // Крафтящиеся свитки — все заклинания, которые игрок может выучить и записать сам.
@@ -1187,6 +1228,10 @@
         if (typeof sourceItem.maxUses === 'number') { extra.maxUses = sourceItem.maxUses; extra.usesLeft = sourceItem.maxUses; }
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
         if (isStolen) extra.stolen = true;
+        // Зелья/яды: игрок получает реальные эффекты (применяются автоматически при использовании) и единую категорию.
+        if (Array.isArray(sourceItem.alchemyEffects)) extra.alchemyEffects = sourceItem.alchemyEffects;
+        if (/^Яд/i.test(sourceItem.category || '')) extra.category = 'Яд';
+        else if (/^Зель/i.test(sourceItem.category || '')) extra.category = 'Зелье';
 
         // Мастер видит и может применить ЛЮБОЕ зачарование (не только то, что игрок уже узнал
         // разрушив вещь — у мастера, в отличие от игрока, ограничения "только узнанное" нет).
@@ -1716,7 +1761,7 @@
     // повара (рабочая форма, не то, что носят обычные покупатели).
     const MERCHANT_EXCLUDED_ITEMS = new Set([
         'Человечье мясо',
-        'Перчатки магистра (школы)', 'Роба разрушения', 'Великий созидатель', 'Создатель обмана',
+        'Перчатки магистра (Разрушение)', 'Перчатки магистра (Изменение)', 'Перчатки магистра (Иллюзия)', 'Перчатки магистра (Колдовство)', 'Перчатки магистра (Восстановление)', 'Роба разрушения', 'Великий созидатель', 'Создатель обмана',
         'Мастер даэдра', 'Великий свет', 'Выпускник Коллегии Магов Винтерхолда',
         'Одение повара', 'Колпак повара',
         // Скума и лунный сахар — эксклюзив каджитского каравана, у остальных торговцев их быть
@@ -2389,7 +2434,9 @@
             effSelect.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
             if (names.includes(prevVal)) effSelect.value = prevVal;
             const info = window.alchemyBaseEffects[effSelect.value];
-            el('ci-potion-duration-wrap').style.display = (info && info.hasDuration) ? 'block' : 'none';
+            el('ci-potion-duration-wrap').style.display = (info && info.dur !== null && info.dur !== undefined) ? 'block' : 'none';
+            const magEl = el('ci-potion-magnitude');
+            if (magEl && magEl.parentElement) magEl.parentElement.style.display = (info && info.base !== null && info.base !== undefined) ? 'block' : 'none';
         }
 
         const enchanted = el('ci-enchanted').checked;
@@ -2460,14 +2507,15 @@
             // конкретной величины/длительности, теперь та же база эффектов, что у реальной алхимии.
             const kind = el('ci-potion-kind').value;
             const effName = el('ci-potion-effect').value;
-            const magnitude = parseFloat(el('ci-potion-magnitude').value) || 0;
             const info = window.alchemyBaseEffects ? window.alchemyBaseEffects[effName] : null;
+            const hasMag = !info || (info.base !== null && info.base !== undefined);
+            const magnitude = hasMag ? (parseFloat(el('ci-potion-magnitude').value) || 0) : null;
             const unit = info ? info.unit : '';
-            const hasDur = info ? info.hasDuration : false;
-            const duration = hasDur ? (parseInt(el('ci-potion-duration').value) || 0) : null;
-            item.category = kind === 'poison' ? 'Яды' : 'Зелья';
-            item.alchemyEffects = [{ name: effName, magnitude, duration, unit }];
-            const potDesc = `${effName}: ${magnitude}${unit}${duration ? ` на ${duration} ход.` : ''}`;
+            const hasDur = info ? (info.dur !== null && info.dur !== undefined) : false;
+            const duration = hasDur ? (parseInt(el('ci-potion-duration').value) || 1) : null;
+            item.category = kind === 'poison' ? 'Яд' : 'Зелье';
+            item.alchemyEffects = [{ name: effName, magnitude, duration, unit, kind: info ? info.kind : null }];
+            const potDesc = window.describeAlchemyEffect ? window.describeAlchemyEffect({ name: effName, magnitude, duration, unit }) : effName;
             item.effect = item.effect ? item.effect + '; ' + potDesc : potDesc;
         }
 
@@ -2525,7 +2573,7 @@
         fear: { name: 'Страх', desc: 'Вынужден отступать/убегать 1 ход.', turns: 1 },
         frenzy: { name: 'Бешенство', desc: 'Атакует ближайшую цель без разбора 1 ход.', turns: 1 },
         slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3 },
-        weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2 }
+        weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2, rollPenalty: -2 }
     };
 
     const RACE_SKILL_BONUSES = {
@@ -2620,25 +2668,25 @@
             const perks = computeAlchemyPerksFor(data);
             el('calc-alch-skill-info').textContent = `Алхимия: ${skill} (с расой) · Алхимик: ранг ${perks.alchemistRank} · Провизор: ${perks.hasProvisor ? 'да' : 'нет'} · Целитель: ${perks.hasHealer ? 'да' : 'нет'} · Отравитель: ${perks.hasPoisoner ? 'да' : 'нет'}`;
 
-            const p1 = window.alchemyIngredients[ing1].effects, p2 = window.alchemyIngredients[ing2].effects;
-            const sharedSet = new Set(p1.filter(e => p2.includes(e)));
-            if (ing3 && ing3 !== ing1 && ing3 !== ing2 && window.alchemyIngredients[ing3]) {
-                const p3 = window.alchemyIngredients[ing3].effects;
-                const firstTwo = new Set([...p1, ...p2]);
-                p3.forEach(e => { if (firstTwo.has(e)) sharedSet.add(e); });
-            }
-            const shared = Array.from(sharedSet);
+            // Правило автора: у первых двух должно быть общее свойство; третий добавляет только совпавшие.
+            const shared = window.getSharedAlchemyEffectsFor(ing1, ing2, (ing3 && ing3 !== ing1 && ing3 !== ing2) ? ing3 : null);
             if (!shared.length) {
-                resultEl.innerHTML = '<span style="color:#e74c3c;">⚠ Нет общих свойств — варево не получится.</span>';
+                resultEl.innerHTML = '<span style="color:#e74c3c;">⚠ У первых двух ингредиентов нет общих свойств — варево не получится.</span>';
                 return;
             }
+            const gear = (data.skillBoosts && data.skillBoosts['алхимия']) || 0;
+            const ctxBase = { skill, alchemistRank: perks.alchemistRank, hasProvisor: perks.hasProvisor, hasHealer: perks.hasHealer, hasPoisoner: perks.hasPoisoner, gear };
+            const pols = shared.map(n => (window.alchemyBaseEffects[n] || {}).polarity);
+            const mixed = pols.includes('positive') && pols.includes('negative');
+            const modes = mixed ? ['potion', 'poison'] : [pols.every(p => p === 'positive') ? 'potion' : 'poison'];
             let html = '';
-            shared.forEach(effName => {
-                const info = window.alchemyBaseEffects[effName];
-                if (!info) return;
-                const magnitude = window.calcAlchemyValue(info.base, skill, perks.alchemistRank, perks.hasProvisor, perks.hasHealer, perks.hasPoisoner, 0, info.polarity, effName);
-                const duration = info.hasDuration ? window.calcAlchemyValue(1, skill, perks.alchemistRank, perks.hasProvisor, perks.hasHealer, perks.hasPoisoner, 0, info.polarity, effName) : null;
-                html += `<div>🧪 <strong>${escapeHtml(effName)}</strong>: ${magnitude === null ? '' : magnitude}${escapeHtml(info.unit || '')}${duration ? ' на ' + duration + ' ход(ов)' : ''}</div>`;
+            modes.forEach(mode => {
+                html += `<div style="margin-top:6px; opacity:.85;">${mode === 'poison' ? '☠ Если варить ЯД' : '🧪 Если варить ЗЕЛЬЕ'}:</div>`;
+                shared.forEach(effName => {
+                    const e = window.calcAlchemyEffect(effName, Object.assign({ mode }, ctxBase));
+                    if (!e) return;
+                    html += `<div>${e.polarity === 'negative' ? '☠' : '🧪'} <strong>${escapeHtml(effName)}</strong>: ${escapeHtml(window.describeAlchemyEffect(e).slice(effName.length + 2) || '—')}</div>`;
+                });
             });
             resultEl.innerHTML = html;
         }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
@@ -2869,6 +2917,8 @@
     // ---------- Разрешить атаку (НПС → игрок) ----------
 
     let pendingGmAttack = null; // { targetUid, dmg, logText }
+    // Знак «Атронах»: успешное поглощение магии (спасбросок) полностью отменяет заклинание (решение мастера).
+    const ATRONACH_ABSORB_NEGATES_SPELL = true;
 
     function parseSpellDamageForGm(desc) {
         if (!desc) return null;
@@ -2932,10 +2982,17 @@
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
 
         let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
+        let isSpellAttack = false, spellCost = 0, statusNote = '';
         if (actionVal === 'weapon') {
             const wd = enemyWeaponDamage(enemy);
             dmg = wd.total;
-            dmgBreakdown = wd.stat ? ` (оружие ${wd.base} + ${wd.label} ${wd.stat})` : '';
+            // Статусы от зелий/ядов на самом враге: «Увеличение физ.урона» (+%) и «Повреждение наносимого физ.урона» (−N).
+            let stPct = 0, stFlat = 0;
+            (enemy.statusEffects || []).forEach(s => { stPct += s.dmgPct || 0; stFlat += s.dmgFlat || 0; });
+            if (stPct) dmg = Math.round(dmg * (1 + stPct / 100));
+            if (stFlat) dmg = Math.max(0, dmg + stFlat);
+            if (stPct || stFlat) statusNote = ` (эффекты на враге: ${stPct ? '+' + stPct + '%' : ''}${stPct && stFlat ? ', ' : ''}${stFlat ? stFlat : ''})`;
+            dmgBreakdown = (wd.stat ? ` (оружие ${wd.base} + ${wd.label} ${wd.stat})` : '') + statusNote;
             actionLabel = 'оружием';
             // Модификатор атаки — СИЛ для ближнего, ЛОВ для дальнего (если у противника вообще
             // есть характеристики — генератор бандитов их теперь даёт, база enemies-data.js нет,
@@ -2945,6 +3002,7 @@
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             dmg = s ? s.dmg : 0;
+            isSpellAttack = true; spellCost = s ? (parseInt(s.cost) || 0) : 0;
             dmgType = mapEnemyDmgType(s ? s.name : '');
             actionLabel = `заклинанием «${s ? s.name : '?'}»`;
             atkMod = calcAbilityMod(enemy.int || 10);
@@ -2972,6 +3030,8 @@
 
         pendingGmAttack = {
             targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
+            isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
+            isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
             carrierOfDisease: hit ? enemy.carrierOfDisease : null, diseaseChance: hit ? (enemy.diseaseChance || 0) : 0,
@@ -3008,13 +3068,45 @@
             const data = doc.exists ? doc.data() : {};
             const resist = (data.resistances && data.resistances[dmgType]) || 0;
             let finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
-            // Способность «Берсерк» (орк): пока действует — получаемый ФИЗИЧЕСКИЙ урон ×½ (на магию не действует).
-            // Эффект читаем из сохранённых активных эффектов игрока (activeTimedEffects → powerFlag).
+            const defNotes = [];
+            { // «Вихревой плащ»: часть урона стрел и болтов игнорируется
+                const cloakEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.rangedResist && x.turnsRemaining !== 0);
+                if (finalDmg && dmgType === 'physical' && pendingGmAttack.isRangedAtk && cloakEff) {
+                    const cut = Math.round(finalDmg * cloakEff.rangedResist / 100);
+                    finalDmg = Math.max(0, finalDmg - cut);
+                    defNotes.push('🌪 «Вихревой плащ» игнорирует ' + cloakEff.rangedResist + '% урона стрелы/болта (−' + cut + ')');
+                }
+            }
+            let spellNegated = false, absorbedMp = 0;
+            // Знак «Атронах» (Sistema 2.2): когда игрок — цель заклинания, спасбросок д20 против сложности 15 − мод. Мудрости;
+            // успех — игрок поглощает магию заклинания (очки магии = четверть стоимости заклинания).
+            if (pendingGmAttack.isSpell && data.sign === 'atronach') {
+                const wisE = (data.effectiveStats && data.effectiveStats.wis) || 10;
+                const dc = 15 - calcAbilityMod(wisE);
+                const saveRoll = 1 + Math.floor(Math.random() * 20);
+                if (saveRoll >= dc) {
+                    absorbedMp = Math.max(1, Math.floor((pendingGmAttack.spellCost || 0) / 4));
+                    if (ATRONACH_ABSORB_NEGATES_SPELL) { spellNegated = true; finalDmg = 0; }
+                    defNotes.push(`🌀 Атронах поглощает магию: спасбросок ${saveRoll} ≥ ${dc} → +${absorbedMp} маны${ATRONACH_ABSORB_NEGATES_SPELL ? ', заклинание не действует' : ''}`);
+                } else {
+                    defNotes.push(`🌀 Атронах: спасбросок ${saveRoll} < ${dc} — магия не поглощена`);
+                }
+            }
+            // «Повышение навыка» (зачарования/зелья): Блокирование — N% шанс поглотить физ. урон; Лёгкая броня — (N/2)% уклониться.
+            if (finalDmg && dmgType === 'physical') {
+                const boosts = data.skillBoosts || {};
+                const blockPct = boosts['блокирование'] || 0;
+                const dodgePct = (boosts['легкая броня'] || 0) / 2;
+                if (blockPct > 0 && Math.random() * 100 < blockPct) { defNotes.push(`🛡️ Блок (${blockPct}%) — урон поглощён`); finalDmg = 0; }
+                else if (dodgePct > 0 && Math.random() * 100 < dodgePct) { defNotes.push(`💨 Уклонение (${dodgePct}%) — атака мимо`); finalDmg = 0; }
+            }
+            // Знак «Лорд» — «Родство с троллями» (Sistema 2.2): весь получаемый урон огнём увеличивается на 2d6.
+            // (Прежнее «Берсерк: урон ×½» убрано — в документе у Берсерка временные ХП и преимущество, а не защита.)
             let berserkNote = '';
-            if (finalDmg && dmgType === 'physical' && Array.isArray(data.activeTimedEffects) &&
-                data.activeTimedEffects.some(e => e && e.powerFlag === 'berserk' && (e.turnsRemaining > 0 || e.turnsRemaining === null))) {
-                finalDmg = Math.round(finalDmg / 2);
-                berserkNote = ' (🪓 Берсерк: урон ×½)';
+            if (finalDmg && dmgType === 'fire' && data.sign === 'lord') {
+                const t1 = 1 + Math.floor(Math.random() * 6), t2 = 1 + Math.floor(Math.random() * 6);
+                finalDmg += t1 + t2;
+                berserkNote = ` (🔥 Родство с троллями: +2d6 = ${t1 + t2})`;
             }
             // Задача L: вампир получает удвоенный урон, если сейчас "День" в сессии — раньше
             // это было только текстовым предупреждением в интерфейсе, урон не менялся.
@@ -3023,15 +3115,59 @@
                 finalDmg *= 2;
                 sunNote = ' (☀️ уязвимость вампира к солнцу — урон ×2)';
             }
-            let logExtra = '', newHp;
+            let logExtra = '', newHp, newMp;
             const chores = [];
-            if (dmg) {
+            // Заклинание «Барьер» (Изменение): pct% ВСЕГО входящего урона уходит в ману (rate маны за 1 урона).
+            // Мана кончилась — барьер падает: ошеломление (−2 к кубам на 2 хода) и снятие всех положительных эффектов.
+            let barrierBroke = false;
+            let barrierMpSpent = 0;
+            if (finalDmg > 0) {
+                const bEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.barrier && x.turnsRemaining !== 0);
+                if (bEff) {
+                    const vit = Array.isArray(data.vitals) ? data.vitals : [0, 0, 0, 0];
+                    const mpNow = parseInt(vit[1]) || 0;
+                    const pct = bEff.barrier.pct || 20, rate = bEff.barrier.rate || 5;
+                    const redirected = Math.round(finalDmg * pct / 100);
+                    const needMp = Math.ceil(redirected * rate);
+                    if (needMp <= mpNow) {
+                        barrierMpSpent = needMp; finalDmg -= redirected;
+                        if (mpNow - needMp <= 0) barrierBroke = true;
+                        defNotes.push(`🛡 Барьер: ${redirected} урона ушло в ману (−${needMp} маны, курс 1:${rate})`);
+                    } else {
+                        const absorbable = Math.floor(mpNow / rate);
+                        barrierMpSpent = mpNow; finalDmg -= Math.min(redirected, absorbable); barrierBroke = true;
+                        defNotes.push(`🛡 Барьер: поглощено ${Math.min(redirected, absorbable)} урона, мана кончилась`);
+                    }
+                }
+            }
+            // «Нечестивый барьер» (Колдовство): большая часть ФИЗИЧЕСКОГО урона принимается на себя — вместо N урона
+            // с игрока снимается 1 ХП за каждые `per` единиц (5 у барьеров 1-2, 10 у барьера 3). Мана на поддержание уходит в свой ход.
+            if (finalDmg > 0 && dmgType === 'physical') {
+                const uEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.unholy && x.turnsRemaining !== 0);
+                if (uEff) {
+                    const per = uEff.unholy.per || 5, hpc = uEff.unholy.hp || 1;
+                    const taken = Math.ceil(finalDmg / per) * hpc;
+                    if (taken < finalDmg) {
+                        defNotes.push(`🦴 Нечестивый барьер: ${finalDmg} физ. урона → ${taken} ХП (${hpc} ХП за каждые ${per} урона)`);
+                        finalDmg = taken;
+                    }
+                }
+            }
+            if (dmg || absorbedMp || barrierMpSpent) {
                 const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
                 newHp = Math.max(0, (parseInt(vitals[0]) || 0) - finalDmg);
                 vitals[0] = newHp;
+                if (absorbedMp) {
+                    const maxMpV = parseInt(vitals[3]) || 0;
+                    const curMpV = parseInt(vitals[1]) || 0;
+                    vitals[1] = Math.max(curMpV, Math.min(maxMpV, curMpV + absorbedMp));
+                    newMp = vitals[1];
+                }
+                if (barrierMpSpent) { vitals[1] = Math.max(0, (parseInt(vitals[1]) || 0) - barrierMpSpent); newMp = vitals[1]; }
                 chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
-                logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}`;
+                if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}`;
             }
+            if (defNotes.length) logExtra += '. ' + defNotes.join('. ');
             // Автоматический бросок на заражение болезнью — раньше этого не было вообще, болезни
             // существовали только как текст в описании монстров. Срабатывает только при физическом
             // попадании (dmgType==='physical') от переносчика (carrierOfDisease задан).
@@ -3053,7 +3189,19 @@
                     logExtra += `. Проверка на заражение не прошла (${roll} > ${effectiveChance.toFixed(0)}%)`;
                 }
             }
-            if (statusKey) {
+            if (barrierBroke) {
+                const bp = {};
+                bp['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                    id: 'brk-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                    name: 'Барьер', effectName: 'Барьер разрушен — ошеломление', description: '−2 к кубам на 2 хода; все положительные эффекты сняты.',
+                    turnsRemaining: 2, rollPenalty: -2, clearPositive: true, fromGm: true
+                });
+                chores.push(db.collection('sessions').doc(currentCode).update(bp));
+                logExtra += `, 💥 Барьер разрушен: ошеломление (−2 к кубам, 2 хода), положительные эффекты сняты`;
+            }
+            const fearBlocked = statusKey === 'fear' && (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).some(x => x && x.fearImmune && x.turnsRemaining !== 0);
+            if (fearBlocked) logExtra += ', 🦁 цель под «Мужеством/Ободрением» — страх не действует';
+            if (statusKey && !spellNegated && !fearBlocked) {
                 // Статус-эффект пишется В СЕССИЮ (не в документ персонажа) — у игрока нет
                 // живого листенера на свой собственный документ, а на сессию есть, так что
                 // так эффект долетит до него сразу, без перезагрузки страницы.
@@ -3061,15 +3209,19 @@
                 const patch = {};
                 patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
                     id: 'st-' + Date.now() + Math.random().toString(36).slice(2, 8),
-                    name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns
+                    name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns,
+                    rollPenalty: statusDef.rollPenalty || 0, fromGm: true
                 });
                 chores.push(db.collection('sessions').doc(currentCode).update(patch));
                 logExtra += `, наложен статус «${statusDef.name}» (${statusDef.turns} х.)`;
             }
-            return Promise.all(chores).then(() => ({ newHp, logExtra }));
-        }).then(({ newHp, logExtra }) => {
-            const chain = newHp !== undefined
-                ? db.collection('sessions').doc(currentCode).update({ ['participants.' + targetUid + '.curHp']: newHp })
+            return Promise.all(chores).then(() => ({ newHp, newMp, logExtra }));
+        }).then(({ newHp, newMp, logExtra }) => {
+            const mirror = {};
+            if (newHp !== undefined) mirror['participants.' + targetUid + '.curHp'] = newHp;
+            if (newMp !== undefined) mirror['participants.' + targetUid + '.curMp'] = newMp;
+            const chain = Object.keys(mirror).length
+                ? db.collection('sessions').doc(currentCode).update(mirror)
                 : Promise.resolve();
             return chain.then(() => logExtra);
         }).then(logExtra => {
@@ -3398,7 +3550,7 @@
             name: 'Бандит', race, sign, god: god.name, level, hp, mp,
             str, dex, con,
             weaponDmg, weaponNote: isRanged ? bow.name : weapon.name, isRanged, isMage: false, spells: [],
-            armor: totalArmor, gold, lootItems, isRaisable: true
+            armor: totalArmor, gold, lootItems, isRaisable: true, soul: 'black'
         };
 
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
@@ -3488,7 +3640,7 @@
             name: 'Бандит-маг', race, sign, god: god.name, level, hp, mp,
             con, int: int_, wis,
             weaponDmg: 0, weaponNote: robe ? robe.name : 'Без одеяния', isRanged: false, isMage: true, spells,
-            armor: 0, gold, lootItems, isRaisable: true
+            armor: 0, gold, lootItems, isRaisable: true, soul: 'black'
         };
 
         let html = `<strong>Маг ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
@@ -3510,7 +3662,7 @@
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
             weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [],
-            isRaisable: true, corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             lastGeneratedBandit = null;
@@ -3526,7 +3678,7 @@
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             con: b.con, int: b.int, wis: b.wis,
             weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
-            isRaisable: true, corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         });
         db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
             lastGeneratedMageBandit = null;

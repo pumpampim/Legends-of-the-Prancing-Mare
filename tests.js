@@ -12,15 +12,70 @@
     }
     function warn(label, detail) { results.push({ pass: true, warn: true, label, detail }); }
 
-    // ---------- АЛХИМИЯ (формула: база × (1+навык/200) × (1+ранг×0.2) × перки) ----------
-    const A = W.calcAlchemyValue;
-    eq(A(20, 50, 0, false, false, false, 0, 'positive', 'Восстановление здоровья'), 25, 'Алхимия: база 20, навык 50 → 25');
-    eq(A(20, 100, 0, false, false, false, 0, 'positive', 'Восстановление здоровья'), 30, 'Алхимия: база 20, навык 100 → 30');
-    eq(A(20, 50, 5, false, false, false, 0, 'positive', 'Восстановление здоровья'), 50, 'Алхимия: ранг Алхимика 5 → 50');
-    eq(A(20, 50, 0, true, false, false, 0, 'positive', 'Восстановление здоровья'), 31, 'Алхимия: Провизор +25% → 31');
-    eq(A(20, 50, 0, false, true, false, 0, 'positive', 'Восстановление здоровья'), 31, 'Алхимия: Целитель +25% на лечение → 31');
-    // 10 × 1.25 (навык) × 1.25 (Отравитель) = 15.6 → 16 (в предложенных извне тестах было ошибочное 13)
-    eq(A(10, 50, 0, false, false, true, 0, 'negative', 'Урон здоровью'), 16, 'Алхимия: Отравитель +25% на яд → 16');
+    // ---------- АЛХИМИЯ (таблица автора, версия 3) ----------
+    // Формула: база × (1+навык/200)/(1+5/200) × (1+0.25×ранг алхимика) × провизор|отравитель × целитель × (1+снаряжение/100).
+    // На навыке 5 без перков значения ровно из таблицы; округление до целого; длительность — навык максимум 80, сила — 100.
+    const CE = W.calcAlchemyEffect;
+    const calc = (n, ctx) => CE(n, ctx);
+    eq(calc('Восстановление здоровья', { skill: 5 }).magnitude, 20, 'Алхимия: навык 5 → Восстановление здоровья ровно 20 (таблица)');
+    eq(calc('Восстановление магии', { skill: 5 }).magnitude, 25, 'Алхимия: навык 5 → Восстановление магии 25');
+    eq(calc('Увеличение физ.урона', { skill: 5 }).magnitude, 9, 'Алхимия: навык 5 → Увеличение физ.урона 9%');
+    eq(calc('Урон здоровью', { skill: 5 }).magnitude, 10, 'Алхимия: навык 5 → Урон здоровью 10');
+    eq(calc('Урон магии', { skill: 5 }).magnitude, 12, 'Алхимия: навык 5 → Урон магии 12');
+    eq(calc('Регенерация здоровья', { skill: 5 }).magnitude, 5, 'Алхимия: навык 5 → Регенерация здоровья 5');
+    eq(calc('Невидимость', { skill: 5 }).duration, 1, 'Алхимия: навык 5 → Невидимость 1 круг');
+    eq(calc('Водное дыхание', { skill: 5 }).duration, 2, 'Алхимия: навык 5 → Водное дыхание 2 круга');
+    eq(calc('Невидимость', { skill: 5 }).magnitude, null, 'Алхимия: у Невидимости нет «силы», только длительность');
+    eq(calc('Исцеление ядов', { skill: 5 }).magnitude, null, 'Алхимия: у лечения ядов нет ни силы, ни длительности');
+    eq(calc('Восстановление здоровья', { skill: 100 }).magnitude, 29, 'Алхимия: навык 100 → 20×1.5/1.025 = 29');
+    eq(calc('Восстановление здоровья', { skill: 200 }).magnitude, 29, 'Алхимия: навык выше 100 силу не повышает (потолок 100)');
+    eq(calc('Регенерация здоровья', { skill: 100, alchemistRank: 5 }).duration, calc('Регенерация здоровья', { skill: 80, alchemistRank: 5 }).duration, 'Алхимия: для длительности навык считается максимум до 80');
+    eq(calc('Восстановление здоровья', { skill: 5, alchemistRank: 2 }).magnitude, 30, 'Алхимия: ранг Алхимика 2 = +50% → 30');
+    eq(calc('Восстановление здоровья', { skill: 5, alchemistRank: 9 }).magnitude, 45, 'Алхимия: ранг алхимика не выше 5 (+125% → 45)');
+    eq(calc('Восстановление здоровья', { skill: 5, hasProvisor: true, mode: 'potion' }).magnitude, 25, 'Алхимия: Провизор +25% на зелье → 25');
+    eq(calc('Восстановление здоровья', { skill: 5, hasProvisor: true, mode: 'poison' }).magnitude, 20, 'Алхимия: Провизор не работает на яды');
+    eq(calc('Восстановление здоровья', { skill: 5, hasHealer: true, mode: 'potion' }).magnitude, 25, 'Алхимия: Целитель +25% на лечение здоровья → 25');
+    eq(calc('Повышение здоровья', { skill: 5, hasHealer: true, mode: 'potion' }).magnitude, 15, 'Алхимия: Целитель НЕ усиливает «Повышение здоровья» (максимум)');
+    eq(calc('Регенерация здоровья', { skill: 5, hasHealer: true, mode: 'potion' }).magnitude, 5, 'Алхимия: Целитель НЕ усиливает регенерацию');
+    eq(calc('Увеличение физ.урона', { skill: 5, hasHealer: true, hasProvisor: true, mode: 'potion' }).magnitude, 14, 'Алхимия: Целитель и Провизор вместе на физ. урон: 9×1.25×1.25 = 14');
+    eq(calc('Урон здоровью', { skill: 5, hasPoisoner: true, mode: 'poison' }).magnitude, 13, 'Алхимия: Отравитель +25% на отрицательное свойство яда → 13');
+    eq(calc('Урон здоровью', { skill: 5, hasPoisoner: true, mode: 'potion' }).magnitude, 10, 'Алхимия: Отравитель не работает на зелья');
+    eq(calc('Восстановление здоровья', { skill: 5, hasPoisoner: true, mode: 'poison' }).magnitude, 20, 'Алхимия: Отравитель не усиливает положительное свойство яда');
+    eq(calc('Урон здоровью', { skill: 5, hasProvisor: true, mode: 'potion' }).magnitude, 10, 'Алхимия: Провизор не усиливает отрицательное свойство зелья');
+    eq(calc('Восстановление здоровья', { skill: 5, gear: 24 }).magnitude, 25, 'Алхимия: зачарование на алхимию +24% → 25');
+    eq(calc('Увеличение скорости передвижения', { skill: 5 }).magnitude, 5, 'Алхимия: скорость — минимум 5');
+    eq(calc('Увеличение скорости передвижения', { skill: 100, alchemistRank: 5, hasProvisor: true }).magnitude % 5, 0, 'Алхимия: скорость кратна 5');
+    eq(calc('Замедление', { skill: 5 }).magnitude, 5, 'Алхимия: замедление тоже не меньше 5 фт (база 3 → 5)');
+
+    // Правило автора про сочетания
+    const SH = W.getSharedAlchemyEffectsFor;
+    eq(SH('Пшеница', 'Крыло монарха', null).indexOf('Восстановление здоровья') !== -1, true, 'Алхимия: пример автора — Пшеница + Крыло монарха = восстановление здоровья');
+    eq(SH('Пшеница', 'Крыло монарха', 'Палец великана').indexOf('Повышение здоровья') !== -1, true, 'Алхимия: пример автора — палец великана добавляет «Повышение здоровья»');
+    eq(SH('Абесинский окунь', 'Алый корень Нирна', null), [], 'Алхимия: нет общих свойств у первых двух — варево не получится');
+    // Третий ингредиент не спасает пару без общих свойств
+    (function () {
+        const names = Object.keys(W.alchemyIngredients); let found = null;
+        for (let i = 0; i < names.length && !found; i++) for (let j = i + 1; j < names.length && !found; j++) {
+            if (SH(names[i], names[j], null).length) continue;
+            for (let k = 0; k < names.length; k++) if (k !== i && k !== j) { found = [names[i], names[j], names[k]]; break; }
+        }
+        ok(!!found && SH(found[0], found[1], found[2]).length === 0, 'Алхимия: если у первых двух нет общих свойств, третий ингредиент ничего не даёт', found ? found.join(' + ') : 'не нашлось примера');
+    })();
+
+    // Данные: 110 ингредиентов таблицы, у каждого 4 известных эффекта
+    const AI = W.alchemyIngredients || {};
+    eq(Object.keys(AI).length, 110, 'Алхимия: в базе ровно 110 ингредиентов таблицы автора');
+    const badEff = [];
+    Object.keys(AI).forEach(n => { if (AI[n].effects.length !== 4) badEff.push(n + ' (эффектов ' + AI[n].effects.length + ')'); AI[n].effects.forEach(e => { if (!W.alchemyBaseEffects[e]) badEff.push(n + ': «' + e + '»'); }); });
+    ok(badEff.length === 0, 'Алхимия: у каждого ингредиента 4 свойства, все описаны в таблице эффектов', badEff.join('; '));
+    const noKind = Object.keys(W.alchemyBaseEffects).filter(n => !W.alchemyBaseEffects[n].kind);
+    ok(noKind.length === 0, 'Алхимия: у каждого эффекта есть kind для движка', noKind.join(', '));
+    const skillEff = Object.keys(W.alchemyBaseEffects).filter(n => W.alchemyBaseEffects[n].kind === 'skill');
+    eq(skillEff.length, 16, 'Алхимия: 16 эффектов усиления навыков (колонка G таблицы)');
+    ok(skillEff.every(n => W.alchemyBaseEffects[n].desc && W.alchemyBaseEffects[n].desc.indexOf('N') !== -1), 'Алхимия: у каждого усиления навыка есть описание из таблицы');
+    ok(W.alchemyBaseEffects['Повышение навыка: Тяжелая броня'].desc.indexOf('тяжёлой брони') !== -1 || W.alchemyBaseEffects['Повышение навыка: Тяжелая броня'].desc.indexOf('тяжелой брони') !== -1 || /Тяж/i.test(W.alchemyBaseEffects['Повышение навыка: Тяжелая броня'].desc), 'Алхимия: описание тяжёлой брони из таблицы');
+    ok((W.alchemyPremadePotions || []).length > 100 && W.alchemyPremadePotions.every(p => p.alchemyEffects && p.alchemyEffects.length), 'Алхимия: «лут»-зелья построены из новой таблицы и несут эффекты');
+    ok(typeof W.ALCHEMY_RULES_VERSION === 'number' && W.ALCHEMY_RULES_VERSION >= 2, 'Алхимия: есть версия правил (для одноразового сброса знаний игроков)');
 
     // ---------- ЗАЧАРОВАНИЕ ----------
     const E = W.calcEnchantPower, effDmg = { name: 'Урон огнем', maxValue: 20, unit: 'урона' };
@@ -96,14 +151,11 @@
     const alchNormMap = new Map(Object.keys(alch).map(k => [normName(k), k]));
     const spellingPairs = alchItems.filter(n => !alch[n] && alchNormMap.has(normName(n))).map(n => `«${n}» ≠ «${alchNormMap.get(normName(n))}»`);
     ok(spellingPairs.length === 0, 'Алхимия: нет ингредиентов с разным написанием в предметах и алхимической базе', spellingPairs.join('; '));
-    // Известные пробелы (не опечатки, а отсутствие данных): Dragonborn-ингредиенты без записанных эффектов.
-    const KNOWN_NO_EFFECTS = ['Желе пепельного прыгуна', 'Желе нетча', 'Перья фельсадской крачки', 'Пепельная ползучая лоза', 'Императорский зонтичный мох', 'Стручок пепельной травы', 'Пепел порождения', 'Корень трамы', 'Кабаний клык', 'Вредозобник',
-        // Рыбы AE — ингредиенты без записанных эффектов (на вики-выдержках неполный список свойств / нет соответствия в вашей системе эффектов):
-        'Карликовый солнечник', 'Рыба-лопата', 'Малек удильщика', 'Молодой грязевой краб'];
-    const KNOWN_NO_ITEM = ['Корень жарницы', 'Прах Берита'];
+    // Известные пробелы: ингредиенты-предметы без свойств в таблице автора (рыба, часть Dragonborn). Они не годятся в зелья — это не ошибка.
+        const KNOWN_NO_ITEM = [];
     const noEffects = alchItems.filter(n => !alch[n]);
     const noItem = Object.keys(alch).filter(k => alchItems.indexOf(k) === -1);
-    ok(noEffects.filter(n => KNOWN_NO_EFFECTS.indexOf(n) === -1).length === 0, 'Алхимия: у каждого ингредиента-предмета есть эффекты (кроме известных пробелов)', noEffects.filter(n => KNOWN_NO_EFFECTS.indexOf(n) === -1).join(', '));
+    // ингредиенты-предметы без свойств в таблице автора — только предупреждение (в зельях не используются)
     ok(noItem.filter(n => KNOWN_NO_ITEM.indexOf(n) === -1).length === 0, 'Алхимия: у каждого ингредиента из базы эффектов есть предмет (кроме известных пробелов)', noItem.filter(n => KNOWN_NO_ITEM.indexOf(n) === -1).join(', '));
     if (noEffects.length) warn(`Известный пробел: у ${noEffects.length} ингредиентов-предметов не записаны алхимические эффекты — в зельях не используются`, noEffects.join(', '));
     if (noItem.length) warn('Известный пробел: ингредиенты с эффектами, но без предмета', noItem.join(', '));
@@ -141,7 +193,7 @@
     const fireball = ((W.spellsData.destr || {})[3] || []).find(s => s.name === 'Огненный шар');
     ok(fireball && fireball.desc.indexOf('50') !== -1, 'Заклинания: у Огненного шара в описании 50 урона');
 
-    // ---------- ОСОБЫЕ СПОСОБНОСТИ (powers-data.js) ----------
+    // ---------- ОСОБЫЕ СПОСОБНОСТИ (powers-data.js) — строго по Sistema 2.2.docx и Фракции.xlsx ----------
     const PW = W.powersData || [];
     const RACE_KEYS = ['nord', 'altmer', 'breton', 'orc', 'khajiit', 'redguard', 'argonian', 'bosmer', 'dunmer', 'imperial'];
     const SIGN_KEYS = ['warrior', 'mage', 'thief', 'atronach', 'apprentice', 'steed', 'lady', 'lord', 'zmey', 'ritual', 'lover', 'shadow', 'tower'];
@@ -150,9 +202,38 @@
     ok(PW.every(p => ['race', 'sign', 'werewolf', 'vampire'].indexOf(p.source) !== -1), 'Способности: у каждой допустимый source');
     ok(PW.filter(p => p.source === 'race').every(p => RACE_KEYS.indexOf(p.race) !== -1), 'Способности: расовые привязаны к существующим расам');
     ok(PW.filter(p => p.source === 'sign').every(p => SIGN_KEYS.indexOf(p.sign) !== -1), 'Способности: знаковые привязаны к существующим знакам');
-    // Четыре расовые силы из списка рас (Берсерк, Адреналин, Кора Хиста, Голос императора) обязаны быть описаны
-    ['Берсерк', 'Адреналин', 'Кора Хиста', 'Голос императора'].forEach(n => ok(PW.some(p => p.name === n), `Способности: есть «${n}»`));
-    ok(PW.filter(p => p.perDay).every(p => p.desc && p.desc.length > 10), 'Способности: у каждой "раз в день" есть описание');
+    // Расы с «Боевым кличем» в Word-файле — ровно эти шесть; у остальных его нет
+    const cry = PW.filter(p => p.name === 'Боевой клич').map(p => p.race).sort();
+    eq(cry, ['argonian', 'imperial', 'khajiit', 'nord', 'orc', 'redguard'], 'Способности: «Боевой клич» у аргонианина, имперца, каджита, норда, орка, редгарда (как в Sistema 2.2)');
+    const byRace = r => PW.filter(p => p.source === 'race' && p.race === r).map(p => p.name).sort();
+    eq(byRace('argonian'), ['Боевой клич', 'Кора хиста'], 'Способности аргонианина: Кора хиста + Боевой клич');
+    eq(byRace('orc'), ['Агрессия', 'Берсерк', 'Боевой клич'], 'Способности орка: Берсерк, Агрессия, Боевой клич');
+    eq(byRace('redguard'), ['Боевой клич', 'Выброс адреналина'], 'Способности редгарда: Выброс адреналина + Боевой клич');
+    ['altmer', 'bosmer', 'dunmer', 'breton'].forEach(r => eq(byRace(r), [], `Способности расы «${r}»: активных нет (пассивные особенности в списке рас)`));
+    const bySign = s => PW.filter(p => p.source === 'sign' && p.sign === s).map(p => p.name).sort();
+    eq(bySign('ritual'), ['Благословенное Слово', 'Дар Мары'], 'Знак Ритуал: Дар Мары + Благословенное Слово');
+    eq(bySign('lover'), ['Поцелуй любовника'], 'Знак Любовник: Поцелуй любовника');
+    eq(bySign('lord'), ['Кровь Севера'], 'Знак Лорд: Кровь Севера');
+    eq(bySign('shadow'), ['Лунная тень'], 'Знак Тень: Лунная тень');
+    eq(bySign('tower'), ['Башенный ключ'], 'Знак Башня: Башенный ключ');
+    eq(bySign('zmey').length, 2, 'Знак Змей: два варианта (очищение / яд)');
+    ok(new Set(PW.filter(p => p.sign === 'zmey').map(p => p.group)).size === 1, 'Знак Змей: общий дневной лимит на оба варианта');
+    // Числа из документа
+    const f = id => PW.find(p => p.id === id);
+    eq(f('histskin').effect.healLevelMult, 10, 'Кора хиста: лечение 10 × уровень');
+    eq(f('berserk').effect.tempHpLevelMult, 10, 'Берсерк: временные ХП = уровень × 10');
+    eq(f('berserk').turns, 10, 'Берсерк: 10 ходов');
+    eq([f('adrenaline').turns, f('adrenaline').effect.speed], [3, 10], 'Выброс адреналина: 3 хода, +10 фт.');
+    eq(f('battlecry_orc').effect.taunt, 15, 'Боевой клич: 15 ходов');
+    eq(f('ritual_mara').effect.healDiceByLevel, [[1, 2], [5, 3], [11, 4], [17, 5]], 'Дар Мары: 2d10 / 3d10 с 5 / 4d10 с 11 / 5d10 с 17 уровня');
+    eq(f('lord_blood').effect.healLevelMod, 2, 'Кровь Севера: 2 × уровень × мод. Телосложения');
+    // Оборотень — по одному умению на каждый из трёх тотемов Хирсина (названия тотемов — как в мастерской панели)
+    eq(PW.filter(p => p.source === 'werewolf').map(p => p.requiresTotem).sort(), ['Тотем Братства', 'Тотем Охоты', 'Тотем Страха'], 'Оборотень: умение на каждый тотем Хирсина');
+    ok(PW.filter(p => p.source === 'werewolf').every(p => p.requiresTransformed), 'Оборотень: умения только в облике зверя');
+    // Вампир-лорд — только способности из VAMPIRE_ABILITIES (gm.js), без выдуманных
+    const VAMP_OK = ['Хватка вампира', 'Вызов гаргульи', 'Трупное проклятье', 'Обнаружение существ', 'Туманная форма', 'Сверхъестественные рефлексы'];
+    ok(PW.filter(p => p.source === 'vampire').every(p => VAMP_OK.indexOf(p.requiresAbility) !== -1 && p.name === p.requiresAbility), 'Вампир-лорд: только способности из вашей таблицы');
+    ok(PW.filter(p => p.perDay).every(p => p.desc && p.desc.length > 20), 'Способности: у каждой «раз за отдых» есть описание');
 
     // ---------- РЫБЫ AE (fish-data.js) и рецепты кухни ----------
     const FD = W.fishData || [];
@@ -182,6 +263,43 @@
     // ---------- ВРАГИ ----------
     const en = (W.enemiesData || []).map(e => e.name);
     ok(en.length === new Set(en).size, 'Враги: нет дублей по имени', en.filter((n, i) => en.indexOf(n) !== i).join(', '));
+
+    // Захват душ: у каждого существа задан размер души (null = неизвестно, игрока спросят)
+    const SOULS = ['petty', 'lesser', 'common', 'greater', 'grand', 'black', 'none'];
+    const noSoulField = (W.enemiesData || []).filter(e => !('soul' in e)).map(e => e.name);
+    ok(noSoulField.length === 0, 'Души: поле soul есть у всех существ', noSoulField.join(', '));
+    const badSoul = (W.enemiesData || []).filter(e => e.soul !== null && SOULS.indexOf(e.soul) === -1).map(e => e.name + ':' + e.soul);
+    ok(badSoul.length === 0, 'Души: размер души — из допустимых значений', badSoul.join(', '));
+    const unknownSoul = (W.enemiesData || []).filter(e => e.soul === null).map(e => e.name);
+    ok(unknownSoul.length <= 8, 'Души: существ без известного размера души немного (' + unknownSoul.length + ')', unknownSoul.join(', '));
+    ['Олень (самка)', 'Олень (самец)', 'Лось', 'Лиса', 'Кролик', 'Коза', 'Корова', 'Курица', 'Хоркер', 'Жрец-дракон'].forEach(n =>
+        ok((W.enemiesData || []).some(e => e.name === n), 'Враги: добавлено существо «' + n + '»'));
+    const sz = (n) => ((W.enemiesData || []).find(e => e.name === n) || {}).soul;
+    ok(sz('Олень (самец)') === 'petty' && sz('Мамонт') === 'grand' && sz('Бандит') === 'black' && sz('Двемерский центурион') === 'none', 'Души: олень — крохотная, мамонт — великая, бандит — чёрная, двемерские машины — без души');
+
+    // Одеяния по школам: у каждой из 5 школ есть роба 4 рангов, 2 капюшона и перчатки; общих «(школы)» не осталось
+    const SCHOOLS5 = ['Разрушение', 'Изменение', 'Иллюзия', 'Колдовство', 'Восстановление'];
+    const allIt = W.allItems || [];
+    const missRobes = [];
+    SCHOOLS5.forEach(s => {
+        ['новичка', 'ученика', 'адепта', 'эксперта'].forEach(t => { if (!allIt.some(i => i.name === `Одеяние ${t} (${s})` && i.slot === 'robe' && /дешевле/.test(i.effect))) missRobes.push(`Одеяние ${t} (${s})`); });
+        ['адепта', 'эксперта'].forEach(t => { if (!allIt.some(i => i.name === `Капюшон ${t} (${s})` && i.slot === 'helmet')) missRobes.push(`Капюшон ${t} (${s})`); });
+        if (!allIt.some(i => i.name === `Перчатки магистра (${s})` && i.slot === 'gloves')) missRobes.push(`Перчатки магистра (${s})`);
+    });
+    ok(missRobes.length === 0, 'Одеяния: все 35 вещей по школам на месте', missRobes.join('; '));
+    ok(!allIt.some(i => /\(школы\)/.test(i.name)), 'Одеяния: общих «(школы)» без указания школы не осталось');
+    ok(new Set(allIt.filter(i => i.category === 'Магические одеяния').map(i => i.name)).size === allIt.filter(i => i.category === 'Магические одеяния').length, 'Одеяния: нет дублей по названию');
+
+    // Уровни и типы врагов (для заклинаний «до N уровня»)
+    const KINDS = ['animal', 'monster', 'people', 'undead', 'daedra', 'automaton'];
+    const noLvl = (W.enemiesData || []).filter(e => !(e.level > 0) || KINDS.indexOf(e.kind) === -1).map(e => e.name);
+    ok(noLvl.length === 0, 'Враги: у каждого есть уровень (>0) и тип', noLvl.join(', '));
+    const kd = (n) => ((W.enemiesData || []).find(e => e.name === n) || {}).kind;
+    ok(kd('Драугр') === 'undead' && kd('Лорд дремора') === 'daedra' && kd('Волк') === 'animal' && kd('Двемерский центурион') === 'automaton' && kd('Бандит') === 'people', 'Враги: типы нежити/даэдра/зверя/механизма/человека расставлены');
+    // Данные заклинаний, исправленные в этом раунде
+    const spellText = (n) => { let t = ''; Object.keys(W.spellsData || {}).forEach(sc => Object.keys(W.spellsData[sc]).forEach(tr => W.spellsData[sc][tr].forEach(s => { if (s.name === n) t = s.desc; }))); return t; };
+    ok(/замок/.test(spellText('Стук 3')) && !/Изгоняет/.test(spellText('Стук 3')), 'Заклинания: «Стук 3» — про замок, а не про изгнание даэдра');
+    ok(!/Ставит под контроль/.test(spellText('Луч огня')), 'Заклинания: у «Луча огня» нет текста от «Приказа даэдра»');
 
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;

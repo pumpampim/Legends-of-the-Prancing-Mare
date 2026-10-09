@@ -7,8 +7,7 @@
 //   погода:  any — любая · clear — ясно/пасмурно/туман · rain — дождь/гроза
 //   редкость: common / uncommon / rare  (при рыбалке вес выбора 6 / 3 / 1)
 // Рыбалка (index.html → goFishing) выбирает воду по региону/владению сессии, погоду — по currentWeather.
-// Файл ДОПОЛНЯЕТ базы: добавляет недостающие предметы в window.allItems, ингредиенты в window.alchemyIngredients
-// и продукты кухни в window.cookingIngredients (поэтому подключается после items/alchemy/cooking-data.js).
+// Файл ДОПОЛНЯЕТ базы: добавляет недостающие предметы в window.allItems и продукты кухни в window.cookingIngredients (поэтому подключается после items/alchemy/cooking-data.js).
 (function () {
     const F = [
         // ---- уже были в базе как алхимические ингредиенты (предмет не создаём, добавляем только положение) ----
@@ -94,11 +93,8 @@
     F.forEach(f => {
         if (f.existing) return;
         if (!have.has(f.name)) {
-            items.push({ name: f.name, category: f.kind === 'ingredient' ? 'Ингредиенты для алхимии' : 'Сырые продукты', type: 'misc', weight: f.weight, price: f.price, effect: describe(f) });
+            items.push({ name: f.name, category: 'Сырые продукты', type: 'misc', weight: f.weight, price: f.price, effect: describe(f) });
             have.add(f.name);
-        }
-        if (f.alch && window.alchemyIngredients && !window.alchemyIngredients[f.name]) {
-            window.alchemyIngredients[f.name] = { effects: f.alch, weight: f.weight, price: f.price };
         }
     });
 
