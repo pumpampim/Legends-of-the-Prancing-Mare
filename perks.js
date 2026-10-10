@@ -210,8 +210,8 @@
             lockpickSilent: false, lockpickWaxKey: false, lockpickGoldBonus: false, lockpickTreasureBonus: false
         };
 
-        // Логируем, что мы нашли в чекбоксах (для отладки)
-        console.log('maxSteps:', maxSteps);
+        // Отладочный вывод включается командой window.DEBUG_PERKS = true в консоли
+        if (window.DEBUG_PERKS) console.log('maxSteps:', maxSteps);
 
         for (let [key, step] of Object.entries(maxSteps)) {
             const effectFn = perkEffects[key];
@@ -228,7 +228,7 @@
         }
 
         window.perkBonuses = bonuses;
-        console.log('Perk bonuses (max steps only):', bonuses);
+        if (window.DEBUG_PERKS) console.log('Perk bonuses (max steps only):', bonuses);
     };
 
     window.getPerkBonuses = function() {

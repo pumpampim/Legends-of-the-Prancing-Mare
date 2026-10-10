@@ -1407,3 +1407,38 @@ window.magicStaffRecipes = {
     3: [{ name: "Полено", qty: 2 }, { name: "Орихалковый слиток", qty: 2 }, { name: "Сердечный камень", qty: 3 }, { name: "Заполненный большой камень душ", qty: 1 }],
     4: [{ name: "Полено", qty: 2 }, { name: "Эбонитовый слиток", qty: 3 }, { name: "Сердечный камень", qty: 4 }, { name: "Заполненный великий камень душ", qty: 1 }, { name: "Сердце даэдра", qty: 1 }]
 };
+
+// ============================================================================
+// ПЛАВИЛЬНЯ И ДУБИЛЬНАЯ РАМА (общедоступные операции — рецепты открывать не нужно).
+// Sistema 2.2: «идеальное рабочее место — кузница, в которой присутствуют плавильня, наковальня,
+// верстак, точильный камень и дубильный станок». Единственная цифра из таблицы автора — «Стальной
+// слиток = 1 железная и 1 корундовая руды»; остальные пропорции — по ванильному Skyrim, их можно
+// править здесь (все названия обязаны совпадать с предметами из items-data.js — это проверяет tests.js).
+// ============================================================================
+window.smeltingRecipes = [
+    { name: "Железный слиток",    place: "smelter", ingredients: [{ name: "Железная руда", qty: 1 }], yieldCount: 1 },
+    { name: "Стальной слиток",    place: "smelter", ingredients: [{ name: "Железная руда", qty: 1 }, { name: "Корундовая руда", qty: 1 }], yieldCount: 1 },
+    { name: "Корундовый слиток",  place: "smelter", ingredients: [{ name: "Корундовая руда", qty: 1 }], yieldCount: 1 },
+    { name: "Золотой слиток",     place: "smelter", ingredients: [{ name: "Золотая руда", qty: 1 }], yieldCount: 1 },
+    { name: "Ртутный слиток",     place: "smelter", ingredients: [{ name: "Ртутная руда", qty: 1 }], yieldCount: 1 },
+    { name: "Орихалковый слиток", place: "smelter", ingredients: [{ name: "Орихалковая руда", qty: 2 }], yieldCount: 1 },
+    { name: "Малахитовый слиток", place: "smelter", ingredients: [{ name: "Малахитовая руда", qty: 2 }], yieldCount: 1 },
+    { name: "Эбонитовый слиток",  place: "smelter", ingredients: [{ name: "Эбонитовая руда", qty: 2 }], yieldCount: 1 },
+    { name: "Двемерский слиток",  place: "smelter", ingredients: [{ name: "Двемерский металлолом", qty: 2 }], yieldCount: 1 },
+    { name: "Серебряный слиток",  place: "smelter", ingredients: [{ name: "Серебряная руда", qty: 1 }], yieldCount: 1 },
+    // Дубильная рама: шкуры → кожа (мелкая шкура даёт 1 кожу, крупная — 2), кожа → полоски.
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Козья шкура", qty: 1 }], yieldCount: 1 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Волчья шкура", qty: 1 }], yieldCount: 1 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура снежного волка", qty: 1 }], yieldCount: 1 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура лисицы", qty: 1 }], yieldCount: 1 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура снежной лисицы", qty: 1 }], yieldCount: 1 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Коровья шкура", qty: 1 }], yieldCount: 2 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Оленья шкура", qty: 1 }], yieldCount: 2 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Лошадиная шкура", qty: 1 }], yieldCount: 2 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура саблезуба", qty: 1 }], yieldCount: 2 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура снежного саблезуба", qty: 1 }], yieldCount: 2 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура медведя", qty: 1 }], yieldCount: 3 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура пещерного медведя", qty: 1 }], yieldCount: 3 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура белого медведя", qty: 1 }], yieldCount: 3 },
+    { name: "Полоски кожи", place: "tanning", ingredients: [{ name: "Кожа", qty: 1 }], yieldCount: 2 }
+];

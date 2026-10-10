@@ -1278,7 +1278,7 @@
             </div>
             <div class="profession-body" id="prof-body-cooking">
                 <h2><span class="skyrim-icon icon-pot" aria-hidden="true"></span> Кухня</h2>
-                <p style="font-size:14px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка. Ингредиенты списываются в любом случае.</p>
+                <p style="font-size:14px; opacity:.8;">Отметь продукты из инвентаря и их количество для готовки. Совпало с рецептом — получишь настоящее блюдо, нет — выйдет похлёбка (она тоже качает Кулинарию, но в 4 раза слабее). Ингредиенты списываются в любом случае.</p>
                 <div id="kitchen-pot-list" style="max-height:240px; overflow-y:auto; margin-bottom:8px;">
                     <p style="opacity:.6; font-size:14px;">В инвентаре пока нет продуктов для готовки.</p>
                 </div>
@@ -1298,6 +1298,11 @@
             <div class="profession-body" id="prof-body-smithing">
                 <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
                 <p style="font-size:14px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+                <details id="smelting-box" style="margin:8px 0 12px; border:1px solid var(--border-color, #555); border-radius:6px; padding:6px 10px;">
+                    <summary style="cursor:pointer; font-weight:bold;">🔥 Плавильня и дубильная рама <span style="font-weight:normal; font-size:12px; opacity:.7;">— руды → слитки, шкуры → кожа, кожа → полоски</span></summary>
+                    <p style="font-size:13px; opacity:.75; margin:6px 0;">Доступно всем кузнецам без рецептов — нужны только материалы в инвентаре. Пропорции: сталь — 1 железная + 1 корундовая руда, тугоплавкие руды (орихалк, малахит, эбонит) — по 2 на слиток; крупные шкуры дают больше кожи, из 1 кожи выходит 2 полоски.</p>
+                    <div id="smelting-list"></div>
+                </details>
                 <input type="text" id="smithing-search" placeholder="Поиск: название, материал, подкатегория..." oninput="renderSmithingList()" style="margin-bottom:6px;">
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     <select id="smithing-type-filter" onchange="renderSmithingList()" style="flex:1; min-width:140px;">
@@ -3997,6 +4002,47 @@ window.toggleSkillPanel = function (idx) {
         return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0);
     }
 
+    // Вещи из базы предметов приходят к игроку разными путями (выдача мастером, покупка у торговца,
+    // обмен) — и не везде вместе с «структурными» свойствами: зачарованием (оно считается в
+    // макс. ХП/МП и сопротивления) и бонусом рюкзака к переносимому весу. Раньше ожерелье
+    // «Повышение здоровья» приходило с текстом в описании, но без зачарования — и ХП не росло.
+    // Достраиваем недостающее по базе (имя + категория) — и для новых, и для уже лежащих вещей.
+    function enrichItemFromDb(it) {
+        if (!it || !it.name) return it;
+        if (it.alchemyEffects && typeof it.effect === 'string' && window.alchemyFixRoundsText) it.effect = window.alchemyFixRoundsText(it.effect);
+        if (!window.allItems) return it;
+        if (it.enchantment !== undefined && it.carryBonus !== undefined) return it;
+        const proto = window.allItems.find(p => p.name === it.name && p.category === it.category);
+        if (!proto) return it;
+        if (it.enchantment === undefined && proto.enchantment) it.enchantment = JSON.parse(JSON.stringify(proto.enchantment));
+        if (it.carryBonus === undefined && typeof proto.carryBonus === 'number') it.carryBonus = proto.carryBonus;
+        return it;
+    }
+
+    // Лечит инвентарь: предметы, выданные мастером раньше с id документа базы вместо названия
+    // («Железный слиток» двоился: одна строка работала в кузнечном деле, другая нет, потому что
+    // материалы ищутся по itemId = названию). Такие строки получают itemId = названию и сливаются.
+    // Трогаем только id, не начинающиеся с названия (чтобы не задеть «имя#метка» у зачарованных вещей).
+    const healedIdMap = {}; // старый itemId → название (нужно при загрузке: слоты экипировки восстанавливаются позже)
+    function healInventoryIds(inv) {
+        if (!Array.isArray(inv)) return false;
+        let changed = false;
+        for (let k = inv.length - 1; k >= 0; k--) {
+            const it = inv[k];
+            if (!it || !it.name || !it.itemId || it.itemId === it.name || String(it.itemId).indexOf(it.name) === 0) continue;
+            if (!window.allItems || !window.allItems.some(p => p.name === it.name && p.category === it.category)) continue;
+            const twin = inv.find((o, j) => j !== k && o.itemId === it.name);
+            const oldId = it.itemId;
+            if (twin) { twin.count = (twin.count || 0) + (it.count || 0); inv.splice(k, 1); }
+            else it.itemId = it.name;
+            healedIdMap[oldId] = it.name;
+            Object.keys(equippedSlots || {}).forEach(s => { if (equippedSlots[s] === oldId) equippedSlots[s] = it.name; });
+            changed = true;
+        }
+        return changed;
+    }
+    window.healInventoryIds = healInventoryIds;
+
     function addToInventory(itemId, name, qty, weight, category, effect, extra) {
         // Firestore отвергает ЛЮБОЕ поле undefined — а вызовы вида { armorValue: it.armor, weaponDmg: it.dmg, capacity: it.capacity }
         // кладут в предмет undefined-свойства у вещей без брони/урона. Выбрасываем их здесь.
@@ -4007,7 +4053,7 @@ window.toggleSkillPanel = function (idx) {
             if (effect) existing.effect = effect;
             if (extra) Object.assign(existing, extra);
         } else {
-            playerInventory.push(Object.assign({ itemId, name, count: qty, weight: weight || 0, category: category || '', effect: effect || '' }, extra || {}));
+            playerInventory.push(enrichItemFromDb(Object.assign({ itemId, name, count: qty, weight: weight || 0, category: category || '', effect: effect || '' }, extra || {})));
         }
         renderInventoryList();
         renderKitchenPot();
@@ -4027,8 +4073,49 @@ window.toggleSkillPanel = function (idx) {
         const idx = playerInventory.findIndex(i => i.itemId === itemId);
         if (idx === -1) return;
         playerInventory[idx].count -= qty;
-        if (playerInventory[idx].count <= 0) playerInventory.splice(idx, 1);
+        if (playerInventory[idx].count <= 0) { playerInventory.splice(idx, 1); unequipVanishedItems(); }
     }
+
+    // Снимает с персонажа вещи, которых больше нет в инвентаре (проданы, переданы, выданы мастером в обмен, удалены).
+    // Раньше слот оставался заполненным: проданный железный шлем продолжал давать броню.
+    let _unequipBusy = false;
+    function unequipVanishedItems() {
+        if (_unequipBusy || typeof equippedSlots !== 'object' || !equippedSlots) return [];
+        const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        const gone = [];
+        _unequipBusy = true;
+        try {
+            Object.keys(equippedSlots).forEach(k => {
+                const id = equippedSlots[k];
+                if (!id || k === 'ammo') return; // боеприпасы чистит renderAmmoSelect
+                if (playerInventory.some(i => i.itemId === id && i.count > 0)) return;
+                equippedSlots[k] = null;
+                gone.push(String(id).split('#')[0]);
+                if (SLOT_FIELD_MAP[k]) { setV(SLOT_FIELD_MAP[k][0], ''); setV(SLOT_FIELD_MAP[k][1], 0); }
+                else if (k === 'ring') setV('slot-ring-name', '');
+                else if (k === 'neck') setV('slot-neck-name', '');
+                else if (k === 'circlet') setV('slot-circlet-name', '');
+                else if (k === 'backpack') setV('slot-backpack-name', '');
+                else if (k === 'pouch') {
+                    setV('slot-pouch-name', '');
+                    const back = pouchContents; pouchContents = [];
+                    back.forEach(entry => addToInventory(entry.itemId, entry.name, 1, 0.25, 'Зелье', entry.effect, { alchemyEffects: entry.alchemyEffects }));
+                    if (typeof renderPouchPanel === 'function') renderPouchPanel();
+                }
+                else if (k === 'meleeWeapon') { setV('wep-melee-name', 'Бой голыми руками'); setV('wep-melee-dmg', 2); }
+                else if (k === 'meleeWeaponOffhand') { setV('wep-melee-offhand-name', ''); setV('wep-melee-offhand-dmg', 0); const d = document.getElementById('chk-dual-wield'); if (d) d.checked = false; }
+                else if (k === 'rangedWeapon') { setV('wep-ranged-name', ''); setV('wep-ranged-dmg', 0); }
+            });
+        } finally { _unequipBusy = false; }
+        if (gone.length) {
+            if (typeof renderEquippedSummary === 'function') renderEquippedSummary();
+            if (typeof renderAllSlotPickers === 'function') renderAllSlotPickers();
+            if (typeof updateAll === 'function') { try { updateAll(); } catch (e) { /* не критично */ } }
+            if (typeof alchToast === 'function') { try { alchToast('🎽 Снято (вещи больше нет в инвентаре): ' + gone.join(', ')); } catch (e) { /* подсказка */ } }
+        }
+        return gone;
+    }
+    window.unequipVanishedItems = unequipVanishedItems;
 
     function adjustInventoryQty(itemId, delta) {
         const item = playerInventory.find(i => i.itemId === itemId);
@@ -4037,6 +4124,7 @@ window.toggleSkillPanel = function (idx) {
         if (item.count <= 0) {
             playerInventory = playerInventory.filter(i => i.itemId !== itemId);
             delete potSelections[itemId];
+            unequipVanishedItems();
         }
         renderInventoryList();
         renderKitchenPot();
@@ -4749,7 +4837,8 @@ window.toggleSkillPanel = function (idx) {
         const dish = matchedRecipe || window.failedDish;
         const finalEffect = scaleEffectText(dish.effect, powerBonus, durBonus) + alchemyNote;
         addToInventory(dish.name, dish.name, 1, dish.weight || 1, matchedRecipe ? 'Блюдо' : 'Провал готовки', finalEffect, { price: dish.price || 0 });
-        if (matchedRecipe && typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария');
+        // Удачное блюдо — полный успех кулинарии; провал (похлёбка) тоже чему-то учит, но слабее: четверть успеха.
+        if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария', matchedRecipe ? 1 : COOKING_FAIL_PROGRESS);
         if (matchedRecipe) {
             // Запоминаем именно то сочетание, что сработало (с учётом замены ингредиента перком).
             knownCookRecipes[matchedRecipe.name] = { ingredients: potNames.map(n => ({ name: n, qty: potMap[n] })), effect: dish.effect };
@@ -4767,7 +4856,7 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: ${escHtml(matchedRecipe.name)}${usedSubstitution ? ' <span style="font-weight:normal;">(с заменой ингредиента — «Сочетание вкуса»)</span>' : ''}</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>` + extraNote;
         } else {
-            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышла Похлёбка</div>` +
+            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышла Похлёбка</div><div style="font-size:13px; opacity:.75;">Провал тоже чему-то учит: +¼ успеха к Кулинарии (удачное блюдо даёт целый).</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>`;
         }
 
@@ -4830,6 +4919,7 @@ window.toggleSkillPanel = function (idx) {
     function renderSmithingList() {
         const el = document.getElementById('smithing-list');
         if (!el) return;
+        if (typeof renderSmeltingList === 'function') renderSmeltingList();
         const known = getAllSmithingRecipes().filter(r => knownSmithingRecipes.includes(r.name));
         if (!known.length) {
             el.innerHTML = '<p style="opacity:.7; font-size:15px;">Мастер пока не открыл тебе ни одного рецепта.</p>';
@@ -4891,6 +4981,42 @@ window.toggleSkillPanel = function (idx) {
         }).join('');
         el.dataset.knownList = JSON.stringify(known.map(r => r.name));
     }
+
+    // ---- Плавильня и дубильная рама (smeltingRecipes в smithing-data.js) ----
+    function renderSmeltingList() {
+        const el = document.getElementById('smelting-list');
+        if (!el) return;
+        const rec = window.smeltingRecipes || [];
+        const groups = [['smelter', '🔥 Плавильня'], ['tanning', '🦌 Дубильная рама']];
+        el.innerHTML = groups.map(([place, title]) => {
+            // показываем только те рецепты, для которых в инвентаре есть хотя бы один компонент; остальные — свёрнуты в счётчик
+            const rows = rec.map((r, idx) => ({ r, idx })).filter(o => o.r.place === place);
+            const avail = rows.filter(o => o.r.ingredients.some(g => countInInventory(g.name) > 0));
+            const body = avail.length ? avail.map(({ r, idx }) => {
+                const can = r.ingredients.every(g => countInInventory(g.name) >= g.qty);
+                const ing = r.ingredients.map(g => {
+                    const have = countInInventory(g.name);
+                    return `<span style="color:${have >= g.qty ? '#2ecc71' : '#e74c3c'};">${escHtml(g.name)} ${have}/${g.qty}</span>`;
+                }).join(' + ');
+                return `<div class="party-row" style="padding:4px 0;"><div class="row-name"><span>${ing} → <strong>${escHtml(r.name)}</strong>${r.yieldCount > 1 ? ' ×' + r.yieldCount : ''}</span></div>
+                    <button class="btn-success" style="width:100%; padding:4px;" ${can ? '' : 'disabled'} onclick="smeltItem(${idx})">${place === 'smelter' ? 'Переплавить' : 'Выделать'}</button></div>`;
+            }).join('') : '<p style="font-size:13px; opacity:.6; margin:2px 0;">В инвентаре нет подходящего сырья.</p>';
+            return `<h4 style="margin:8px 0 2px;">${title}</h4>${body}`;
+        }).join('');
+    }
+    window.renderSmeltingList = renderSmeltingList;
+
+    window.smeltItem = function(idx) {
+        const r = (window.smeltingRecipes || [])[idx];
+        if (!r) return;
+        if (!r.ingredients.every(g => countInInventory(g.name) >= g.qty)) { alert('Не хватает сырья.'); return; }
+        const proto = (window.allItems || []).find(p => p.name === r.name) || {};
+        r.ingredients.forEach(g => removeFromInventoryByName(g.name, g.qty));
+        addToInventory(r.name, r.name, r.yieldCount || 1, proto.weight || 1, proto.category || 'Кузнечные ингредиенты', proto.effect || '', proto.price !== undefined ? { price: proto.price } : undefined);
+        renderSmeltingList();
+        renderSmithingList();
+        saveLocalStorage();
+    };
 
     const SMITHING_SLOT_MAP = {
         'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves',
@@ -6443,7 +6569,7 @@ window.toggleSkillPanel = function (idx) {
             // (тоже Infinity, но не тратят ману, просто бессрочны до лечения) текст был неверным.
             const turnsLabel = e.turnsRemaining === Infinity
                 ? (e.untilDayEnd ? '∞ (до конца дня)' : (e.effectName && e.effectName.indexOf('Болезнь:') === 0 ? '∞ (до излечения)' : '∞ (пока есть мана)'))
-                : e.turnsRemaining + ' х.';
+                : e.turnsRemaining + (e.fromAlchemy ? ' кр.' : ' х.');
             return `
             <div class="party-row">
                 <div class="row-name"><span><strong>${escHtml(e.name)}</strong>: ${escHtml(e.description)}</span><span>${turnsLabel}</span></div>
@@ -6582,7 +6708,7 @@ window.toggleSkillPanel = function (idx) {
             const parts = [];
             if (newHp !== curHp) parts.push(`${newHp - curHp > 0 ? '+' : ''}${newHp - curHp} хп`);
             if (newMp !== curMp2) parts.push(`${newMp - curMp2 > 0 ? '+' : ''}${newMp - curMp2} маны`);
-            if (parts.length) alchToast('⏳ Эффекты зелий за ход: ' + parts.join(', '));
+            if (parts.length) alchToast('⏳ Эффекты зелий за круг: ' + parts.join(', '));
             if (typeof updateVitalBars === 'function') updateVitalBars();
         }
 
@@ -7660,22 +7786,24 @@ window.toggleSkillPanel = function (idx) {
 
     // Обёртка для автоматической фиксации успеха по имени навыка (крафт/каст) —
     // не боевые навыки качаются «за каждое успешное действие», это и есть та фиксация.
-    function logSkillSuccessByName(skillName) {
+    const COOKING_FAIL_PROGRESS = 0.25; // доля успеха за провальную готовку (похлёбку)
+    function logSkillSuccessByName(skillName, amount) {
         const idx = skillNames.indexOf(skillName);
         if (idx === -1) return;
-        window.logSkillSuccess(idx);
+        window.logSkillSuccess(idx, amount);
     }
 
-    window.logSkillSuccess = function (skillIdx) {
+    window.logSkillSuccess = function (skillIdx, amount) {
+        amount = (typeof amount === 'number' && amount > 0) ? amount : 1;
         const skillInput = document.getElementById('skill-' + skillIdx);
         if (!skillInput) return;
         const skillName = skillNames[skillIdx];
         const effVal = getEffectiveSkillValue(skillName);
         const needed = getSuccessesNeededForSkill(effVal);
-        skillProgress[skillIdx] = (skillProgress[skillIdx] || 0) + 1;
+        skillProgress[skillIdx] = Math.round(((skillProgress[skillIdx] || 0) + amount) * 100) / 100;
 
         if (skillProgress[skillIdx] >= needed) {
-            skillProgress[skillIdx] = 0;
+            skillProgress[skillIdx] = Math.round((skillProgress[skillIdx] - needed) * 100) / 100; // остаток дробного прогресса не теряется
             let raw = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
             if (raw < 100) { // лимит навыка — 100, дальше успехи не растрачиваются впустую
                 raw = Math.min(100, raw + 1);
@@ -9682,7 +9810,7 @@ function updateHungerPenalty() {
                 const hearts = playerSupernaturalState.werewolf.heartsEaten || 0;
                 baseHp += hearts >= 27 ? 100 : 50;
             }
-            document.getElementById('max-hp').value = baseHp;
+            document.getElementById('max-hp').value = Math.round(baseHp);
         }
 
         if (!document.getElementById('manual-mp-lock').checked) {
@@ -9694,7 +9822,7 @@ function updateHungerPenalty() {
             baseMp += equipBonuses.mp;
             baseMp += activeEffectBonuses.mp;
             if (perks.restorationManaBonus) baseMp = Math.round(baseMp * (1 + perks.restorationManaBonus));
-            document.getElementById('max-mp').value = baseMp;
+            document.getElementById('max-mp').value = Math.round(baseMp);
         }
 
         const helmArmorVal = parseInt(document.getElementById('slot-helm-armor').value) || 0;
@@ -10656,6 +10784,10 @@ function updateHungerPenalty() {
         }
         if (Array.isArray(data.inventory) && inventoryFingerprint(data.inventory) !== inventoryFingerprint(playerInventory)) {
             playerInventory = data.inventory;
+            playerInventory.forEach(enrichItemFromDb);
+            const _healed = healInventoryIds(playerInventory);
+            const _gone = unequipVanishedItems(); // мастер мог забрать/удалить надетую вещь
+            if (_healed || _gone.length) setTimeout(() => { try { saveLocalStorage(); } catch (e) { /* не критично */ } }, 0);
             if (typeof renderInventoryList === 'function') renderInventoryList();
             // Раньше не обновлялось здесь — предмет, выданный мастером ПОСЛЕ загрузки страницы,
             // появлялся в инвентаре, но не появлялся в выборе "что зачаровать" вообще (сам пункт
@@ -10871,6 +11003,8 @@ function updateHungerPenalty() {
             renderQuestList();
 
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
+            playerInventory.forEach(enrichItemFromDb);
+            healInventoryIds(playerInventory);
 
             // Миграция старого инвентаря ресурсов (фиксированные счётчики) в новый общий —
             // чтобы у тех, кто сохранялся раньше, ресурсы не потерялись.
@@ -10909,6 +11043,8 @@ function updateHungerPenalty() {
             // Полный список слотов — раньше тут не было backpack и ammo: сейв, созданный до их
             // появления, терял эти ключи при загрузке, и следующее сохранение их уже не писало.
             equippedSlots = Object.assign({}, FULL_EQUIPPED_SLOTS, (data.equippedSlots && typeof data.equippedSlots === 'object') ? data.equippedSlots : {});
+            Object.keys(equippedSlots).forEach(k => { if (equippedSlots[k] && healedIdMap[equippedSlots[k]]) equippedSlots[k] = healedIdMap[equippedSlots[k]]; });
+            setTimeout(() => { unequipVanishedItems(); }, 0); // после того, как поля слотов заполнены из сейва
             renderInventoryList();
             renderKitchenPot();
             renderEquipPanel();

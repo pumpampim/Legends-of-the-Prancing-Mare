@@ -248,7 +248,7 @@
 
     function enterSessionView(code) {
         currentCode = code;
-        rumFirst = true;
+        rumFirst = true; _stocksSanitized = false;
     el('no-session-block').style.display = 'none';
     el('session-block').style.display = 'block';
     el('gm-session-code').textContent = code;
@@ -470,7 +470,7 @@
     // Боевой журнал, шёпоты, слухи и записи партии только растут (arrayUnion). На долгой кампании
     // документ упёрся бы в лимит, и ЛЮБАЯ запись (ХП, ходы, инвентарь) перестала бы проходить.
     // Раз в минуту мастер обрезает самые старые записи и предупреждает, если документ всё ещё тяжёлый.
-    let _maintLast = 0;
+    let _maintLast = 0, _stocksSanitized = false;
     const SESSION_TRIM = { combatLog: [400, 250], whispers: [300, 200], gmWhispers: [300, 200], rumors: [80, 60], entries: [300, 200] };
     function gmMaintainSession(d) {
         if (!currentCode || Date.now() - _maintLast < 60000) return;
@@ -479,6 +479,23 @@
         const cut = (arr, key, field) => { const [hi, lo] = SESSION_TRIM[key]; if (Array.isArray(arr) && arr.length > hi) upd[field] = arr.slice(-lo); };
         cut(d.combatLog, 'combatLog', 'combatLog'); cut(d.whispers, 'whispers', 'whispers'); cut(d.gmWhispers, 'gmWhispers', 'gmWhispers');
         cut(j.rumors, 'rumors', 'journal.rumors'); cut(j.entries, 'entries', 'journal.entries');
+        // Один раз за вход в сессию: убираем из уже созданных ассортиментов то, что торговцы продавать
+        // не должны (одеяния Коллегии, зелье крови), и заменяем безымянную «Стрелу» на железную.
+        if (!_stocksSanitized && d.merchantStocks && typeof isMerchantExcluded === 'function') {
+            _stocksSanitized = true;
+            const out = {}; let changed = false;
+            Object.keys(d.merchantStocks).forEach(k => {
+                const s = d.merchantStocks[k];
+                if (!s || !Array.isArray(s.items)) { out[k] = s; return; }
+                let ch = false;
+                const items = s.items.filter(it => { const bad = !it.playerItem && isMerchantExcluded(it); if (bad) ch = true; return !bad; }).map(it => {
+                    if (it.name === 'Стрела' && !it.playerItem) { ch = true; return Object.assign({}, it, { name: 'Железная стрела', price: 1, dmg: 8, weight: 0.04, qty: Math.max(it.qty || 1, 10) }); }
+                    return it;
+                });
+                if (ch) { changed = true; out[k] = Object.assign({}, s, { items: items }); } else out[k] = s;
+            });
+            if (changed) upd.merchantStocks = out;
+        }
         if (Object.keys(upd).length) db.collection('sessions').doc(currentCode).update(stripUndefinedDeep(upd)).catch(e => console.error('Чистка сессии:', e));
         let size = 0; try { size = JSON.stringify(d).length; } catch (e) { }
         let w = el('gm-size-warn');
@@ -1804,6 +1821,10 @@
         if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
         if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
         if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
+        if (typeof sourceItem.carryBonus === 'number') extra.carryBonus = sourceItem.carryBonus;
+        // уже зачарованная вещь из базы (ожерелье «Повышение здоровья» и т.п.) должна нести зачарование,
+        // иначе игрок получает только текст в описании, а бонус не работает
+        if (sourceItem.enchantment) extra.enchantment = JSON.parse(JSON.stringify(sourceItem.enchantment));
         if (typeof sourceItem.maxUses === 'number') { extra.maxUses = sourceItem.maxUses; extra.usesLeft = sourceItem.maxUses; }
         if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
         if (isStolen) extra.stolen = true;
@@ -1841,13 +1862,17 @@
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.data();
             let inv = data.inventory || [];
-            const existing = inv.find(item => item.itemId === itemId);
+            // itemId в инвентаре игрока = название предмета (по нему считаются ингредиенты, продажа, ковка).
+            // Раньше брался id документа из базы предметов — тот же «Железный слиток» ложился отдельной строкой
+            // и «не работал» в кузнечном деле.
+            const invId = sourceItem.name;
+            const existing = inv.find(item => item.itemId === invId);
             if (existing) {
                 existing.count += numCount;
                 Object.assign(existing, extra);
             } else {
                 inv.push(Object.assign({
-                    itemId: itemId,
+                    itemId: invId,
                     name: sourceItem.name,
                     count: numCount,
                     weight: sourceItem.weight || 0,
@@ -2347,21 +2372,40 @@
         'Одение повара', 'Колпак повара',
         // Скума и лунный сахар — эксклюзив каджитского каравана, у остальных торговцев их быть
         // не должно (по прямой просьбе).
-        'Красноводная скума', 'Лунный сахар'
+        'Красноводная скума', 'Лунный сахар',
+        // Вампирский напиток — в таверне его не наливают
+        'Зелье крови'
     ]);
+    // Одеяния и перчатки мастеров школ «выдаются в Коллегии при полном изучении школы» — купить их
+    // нельзя ни у кого. Раньше в списке исключений были не все (не хватало Робы разрушения,
+    // Великого созидателя, Создателя обмана и Перчаток магистра (Восстановление)), поэтому
+    // исключаем и по самому описанию предмета: «Выдаётся/Выдаются/Выдаёт в Коллегии…».
+    function isMerchantExcluded(i) {
+        if (MERCHANT_EXCLUDED_ITEMS.has(i.name)) return true;
+        return /выд[а-яё]*\s+в\s+коллеги/i.test(i.effect || '');
+    }
+
+    // Стрелы для продажи: обычные материальные стрелы из таблицы кузнеца (по цене за штуку).
+    // Раньше торговец луками продавал безымянную «Стрелу» за 1 септим — заглушку.
+    const MERCHANT_ARROW_NAMES = ['Железная стрела', 'Стальная стрела', 'Орочья стрела', 'Нордская стрела', 'Двемерская стрела', 'Эльфийская стрела', 'Стеклянная стрела', 'Эбонитовая стрела'];
+    function merchantArrowPool() {
+        return (window.weaponRecipes || []).filter(w => w.isAmmo && MERCHANT_ARROW_NAMES.includes(w.name))
+            .map(w => ({ name: w.name, category: 'Боеприпасы', price: w.price, weight: w.weight, dmg: w.damage }));
+    }
 
     function getMerchantItemPool(typeKey) {
         const def = LIVING_MERCHANT_TYPES[typeKey];
         if (!def) return [];
-        let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0 && !MERCHANT_EXCLUDED_ITEMS.has(i.name));
+        let pool = (gmAllItems || []).filter(i => def.categories.includes(i.category) && typeof i.price === 'number' && i.price > 0 && !isMerchantExcluded(i));
         if (typeKey === 'blacksmith2') {
-            pool = pool.concat((window.weaponRecipes || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat((window.weaponRecipes || []).filter(w => !/лук/i.test(w.name) && !w.isAmmo).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorRecipes || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: GM_SMITHING_SLOT_MAP[a.slot] || null })));
-            pool = pool.concat((window.weaponsNonCraftable || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
+            pool = pool.concat(merchantArrowPool());
+            pool = pool.concat((window.weaponsNonCraftable || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: /стрел|болт/i.test(w.name) ? 'Боеприпасы' : 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorNonCraftable || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot) })));
         }
         if (typeKey === 'fletcher') {
-            pool.push({ name: 'Стрела', category: 'Боеприпасы', price: 1, weight: 0.1 });
+            pool = pool.concat(merchantArrowPool());
             // "Луки (лут)" в allItems — только зачарованные варианты; базовые луки лежат в
             // weaponRecipes/weaponsNonCraftable, раньше торговец луками их вообще не продавал.
             pool = pool.concat((window.weaponRecipes || []).filter(w => /лук/i.test(w.name)).map(w => ({ name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
@@ -2444,7 +2488,7 @@
         // (оружие/броня/книги/украшения) остаются по 1.
         const STACKABLE_CATEGORIES = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
         const finalItems = items.map(i => {
-            const qty = STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1;
+            const qty = i.category === 'Боеприпасы' ? randInt(10, 30) : (STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1);
             // Firestore ЦЕЛИКОМ отвергает .update(), если хоть ОДНО поле где-то внутри — undefined
             // (было тут: dmg/armor/slot/capacity у предмета без этих свойств, например у еды) —
             // отсюда "торговец не появляется" после нажатия "Обновить ассортимент": запись просто
@@ -3475,12 +3519,13 @@
             return db.collection('characters').doc(uid).get().then(doc => {
                 const data = doc.exists ? doc.data() : {};
                 const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-                const existing = inv.find(i => i.itemId === itemId);
+                const invId = sourceItem.name; // см. gmGiveItemFromTable: itemId = название
+                const existing = inv.find(i => i.itemId === invId);
                 if (existing) {
                     existing.count += itemQty;
                     Object.assign(existing, itemExtra);
                 } else {
-                    inv.push(Object.assign({ itemId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
+                    inv.push(Object.assign({ itemId: invId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
                 }
                 update.inventory = inv;
                 return db.collection('characters').doc(uid).update(update);
@@ -3953,7 +3998,7 @@
             const data = doc.exists ? doc.data() : {};
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
             lastGeneratedLoot.items.forEach(it => {
-                const itemId = it.id || it.name;
+                const itemId = it.name; // а не id документа базы — иначе стек не сливается с одноимённым предметом игрока
                 const existing = inv.find(x => x.itemId === itemId);
                 const extra = {};
                 if (it.slot) extra.slot = it.slot;

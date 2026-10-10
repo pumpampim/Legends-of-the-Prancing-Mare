@@ -166,8 +166,8 @@ const alchemyBaseEffects = {
     "Повышение здоровья": { kind: 'max_hp', base: 15, dur: 1, unit: "хп", polarity: "positive", priceBase: 10, desc: "Максимум здоровья +N." },
     "Повышение магии": { kind: 'max_mp', base: 20, dur: 1, unit: "маны", polarity: "positive", priceBase: 10, desc: "Максимум маны +N." },
     "Сопротивление физ. урону": { kind: 'res_phys', base: 6, dur: 1, unit: "%", polarity: "positive", priceBase: 5, desc: "Получаемый физ. урон −N%." },
-    "Регенерация здоровья": { kind: 'regen_hp', base: 5, dur: 1, unit: "хп/ход", polarity: "positive", priceBase: 4, desc: "Восстанавливает N здоровья каждый ход." },
-    "Регенерация магии": { kind: 'regen_mp', base: 6, dur: 1, unit: "маны/ход", polarity: "positive", priceBase: 4, desc: "Восстанавливает N маны каждый ход." },
+    "Регенерация здоровья": { kind: 'regen_hp', base: 5, dur: 1, unit: "хп/круг", polarity: "positive", priceBase: 4, desc: "Восстанавливает N здоровья каждый круг." },
+    "Регенерация магии": { kind: 'regen_mp', base: 6, dur: 1, unit: "маны/круг", polarity: "positive", priceBase: 4, desc: "Восстанавливает N маны каждый круг." },
     "Сопротивление крикам": { kind: 'res_shout', base: 6, dur: 1, unit: "%", polarity: "positive", priceBase: 5, desc: "Влияние туума на вас −N%." },
     "Сопротивление магии": { kind: 'res_magic', base: 6, dur: 1, unit: "%", polarity: "positive", priceBase: 6, desc: "Получаемый магический урон −N%; вражеские эффекты магии слабее на N%." },
     "Сопротивление огню": { kind: 'res_fire', base: 6, dur: 1, unit: "%", polarity: "positive", priceBase: 5, desc: "Влияние огня −N%." },
@@ -178,8 +178,8 @@ const alchemyBaseEffects = {
     "Увеличение скорости передвижения": { kind: 'speed', base: 3, dur: 1, unit: "фт", polarity: "positive", priceBase: 3, desc: "Скорость +N фт (кратно 5 вниз, минимум 5)." },
     "Повреждение наносимого физ.урона": { kind: 'dmg_dealt_down', base: 6, dur: 1, unit: "", polarity: "negative", priceBase: 10, desc: "Жертва наносит физ. оружием на N меньше урона." },
     "Увеличение получаемого физ.урона": { kind: 'dmg_taken_up', base: 6, dur: 1, unit: "%", polarity: "negative", priceBase: 8, desc: "Жертва получает физ. урона на N% больше." },
-    "Затяжной урон здоровью": { kind: 'dot_hp', base: 5, dur: 1, unit: "хп/ход", polarity: "negative", priceBase: 8, desc: "Наносит N урона ядом каждый круг." },
-    "Затяжной урон магии": { kind: 'dot_mp', base: 8, dur: 1, unit: "маны/ход", polarity: "negative", priceBase: 8, desc: "Снимает N маны каждый круг." },
+    "Затяжной урон здоровью": { kind: 'dot_hp', base: 5, dur: 1, unit: "хп/круг", polarity: "negative", priceBase: 8, desc: "Наносит N урона ядом каждый круг." },
+    "Затяжной урон магии": { kind: 'dot_mp', base: 8, dur: 1, unit: "маны/круг", polarity: "negative", priceBase: 8, desc: "Снимает N маны каждый круг." },
     "Уязвимость к огню": { kind: 'vuln_fire', base: 6, dur: 1, unit: "%", polarity: "negative", priceBase: 5, desc: "Влияние огня +N%." },
     "Уязвимость к холоду": { kind: 'vuln_frost', base: 6, dur: 1, unit: "%", polarity: "negative", priceBase: 5, desc: "Влияние холода +N%." },
     "Уязвимость к электричеству": { kind: 'vuln_shock', base: 6, dur: 1, unit: "%", polarity: "negative", priceBase: 5, desc: "Влияние электричества +N%." },
@@ -273,11 +273,28 @@ function calcAlchemyEffectPrice(effectName, magnitude, duration) {
     return Math.max(1, Math.round(price));
 }
 
-// Текст эффекта для описания зелья: «Восстановление здоровья: 20 хп», «Паралич: 2 хода», «Регенерация здоровья: 5 хп/ход на 2 х.»
+// Длительность в алхимии считается в КРУГАХ (новая редакция): 1 круг, 2–4 круга, 5+ кругов.
+function alchemyRoundsWord(n) {
+    n = Math.abs(parseInt(n) || 0);
+    const m10 = n % 10, m100 = n % 100;
+    if (m100 >= 11 && m100 <= 14) return 'кругов';
+    if (m10 === 1) return 'круг';
+    if (m10 >= 2 && m10 <= 4) return 'круга';
+    return 'кругов';
+}
+// Старые зелья хранят текст «на N ход(ов)» — переводим в круги.
+function alchemyFixRoundsText(s) {
+    return String(s || '').replace(/на\s+(\d+)\s+ход\(ов\)/g, (m, n) => 'на ' + n + ' ' + alchemyRoundsWord(n)).replace(/(хп|маны)\/ход/g, '$1/круг');
+}
+window.alchemyFixRoundsText = alchemyFixRoundsText;
+window.alchemyRoundsWord = alchemyRoundsWord;
+
+// Текст эффекта для описания зелья: «Восстановление здоровья: 20 хп», «Паралич: на 2 круга», «Регенерация здоровья: 5 хп/круг на 3 круга»
 function describeAlchemyEffect(e) {
     const parts = [];
-    if (e.magnitude !== null && e.magnitude !== undefined) parts.push(`${e.magnitude}${e.unit && e.unit !== '%' ? ' ' : ''}${e.unit || ''}`);
-    if (e.duration) parts.push(`на ${e.duration} ход(ов)`);
+    const unit = String(e.unit || '').replace(/\/ход$/, '/круг'); // в старых зельях единица хранилась как «хп/ход»
+    if (e.magnitude !== null && e.magnitude !== undefined) parts.push(`${e.magnitude}${unit && unit !== '%' ? ' ' : ''}${unit}`);
+    if (e.duration) parts.push(`на ${e.duration} ${alchemyRoundsWord(e.duration)}`);
     return e.name + (parts.length ? ': ' + parts.join(' ') : '');
 }
 
