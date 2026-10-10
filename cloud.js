@@ -208,6 +208,9 @@
                     patch['participants.' + currentUser.uid + '.curMp'] = Number(vitals[1]) || 0;
                     patch['participants.' + currentUser.uid + '.maxHp'] = Number(vitals[2]) || 0;
                     patch['participants.' + currentUser.uid + '.maxMp'] = Number(vitals[3]) || 0;
+                    // Свободные жизни и состояние «пал» — для панели «Отряд» у мастера
+                    patch['participants.' + currentUser.uid + '.lives'] = Number(data.lives) || 0;
+                    patch['participants.' + currentUser.uid + '.fallen'] = !!(data.deathState && data.deathState.fallen);
                     // Задача "порядок ходов": лёгкий список имён призванных/поднятых существ игрока,
                     // чтобы мастер видел их и мог включить в порядок ходов, не зная деталей.
                     const summons = Array.isArray(data.activeSummons) ? data.activeSummons.filter(s => s.category !== 'weapon') : [];
@@ -763,32 +766,34 @@
             return db.collection('sessions').doc(currentSessionCode).update(patch);
         },
 
-        // Передаёт предмет (itemData: {itemId,name,count,weight,category,effect,...доп.поля}) ИЛИ
-        // золото (goldAmount) от текущего игрока другому игроку в той же сессии.
-        transferItemToPlayer: function (targetUid, itemData) {
-            if (!db) return Promise.reject(new Error('Нет соединения.'));
-            const ref = db.collection('characters').doc(targetUid);
-            return ref.get().then(doc => {
-                const data = doc.exists ? doc.data() : {};
-                const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-                const existing = inv.find(x => x.itemId === itemData.itemId);
-                if (existing) {
-                    existing.count += itemData.count;
-                } else {
-                    inv.push(Object.assign({}, itemData));
-                }
-                return ref.update({ inventory: inv });
-            });
+        // ===== Обмен между игроками (через сессию, с подтверждением получателя) =====
+        // Раньше передача писала прямо в документ персонажа получателя, но его лист не слушает собственный
+        // документ и при ближайшем автосохранении перезаписывал инвентарь — переданное исчезало. Теперь предложение
+        // хранится в sessions/{код}.trades.{id}; предметы отправителя лежат в нём (залог), пока получатель не ответит.
+        isDataReady: function () { return !!cloudDataReady; },
+        createTrade: function (id, trade) {
+            if (!db || !currentSessionCode) return Promise.reject(new Error('Нет активной сессии.'));
+            return db.collection('sessions').doc(currentSessionCode).update({ ['trades.' + id]: stripUndefinedForCloud(trade) });
         },
-
-        transferGoldToPlayer: function (targetUid, amount) {
-            if (!db) return Promise.reject(new Error('Нет соединения.'));
-            const ref = db.collection('characters').doc(targetUid);
-            return ref.get().then(doc => {
-                const data = doc.exists ? doc.data() : {};
-                const newGold = (parseInt(data.gold) || 0) + amount;
-                return ref.update({ gold: newGold });
-            });
+        // Меняет статус, только если он сейчас один из fromStatuses (транзакция — чтобы «принято» и «отменено» не столкнулись).
+        respondTrade: function (id, fromStatuses, newStatus) {
+            if (!db || !currentSessionCode) return Promise.reject(new Error('Нет активной сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                const t = ((doc.data() || {}).trades || {})[id];
+                if (!t) throw new Error('Это предложение уже недоступно.');
+                if (fromStatuses.indexOf(t.status) < 0) throw new Error('Предложение уже закрыто (' + t.status + ').');
+                tx.update(ref, { ['trades.' + id + '.status']: newStatus });
+                return t;
+            }));
+        },
+        flagTrade: function (id, field) {
+            if (!db || !currentSessionCode) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({ ['trades.' + id + '.' + field]: true });
+        },
+        deleteTrade: function (id) {
+            if (!db || !currentSessionCode) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({ ['trades.' + id]: firebase.firestore.FieldValue.delete() });
         }
     };
 
@@ -980,6 +985,8 @@
         renderCampStatus(data.campState);
         renderGmWhispersInbox(data.gmWhispers || []);
         renderParty(data.participants || {});
+        renderJournal(data.journal || {}, { hold: (data.partyPos && data.partyPos.hold) || data.currentHold || '' });
+        if (typeof window.processTrades === 'function') window.processTrades(data.trades || {});
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
         renderLog(data.combatLog || []);
@@ -1046,6 +1053,88 @@
             '<div class="bar-track"><div class="bar-fill-mp" style="width:' + mpPct + '%"></div></div>' +
             '</div>';
     }
+
+    // ===== Журнал сессии: сводка и слухи публикует мастер, «записи партии» пишут все =====
+    function journalSignature(j) {
+        const s = (j.summary && j.summary.ts) || 0;
+        const r = (j.rumors || []).map(x => x.id + (x.verdict || '')).join(',');
+        const e = (j.entries || []).length;
+        return s + '|' + r + '|' + e;
+    }
+    function rumorHere(r, hold) {
+        if (!r.hold || !hold) return false;
+        const a = String(r.hold).toLowerCase(), b = String(hold).toLowerCase();
+        return a === b || a.indexOf(b) >= 0 || b.indexOf(a) >= 0;
+    }
+    function rumorMarks() {
+        try { return JSON.parse(localStorage.getItem('rumorMarks:' + currentSessionCode) || '{}') || {}; } catch (e) { return {}; }
+    }
+    window.cycleRumorMark = function (id) {
+        const m = rumorMarks(); const cur = m[id] || '';
+        const next = cur === '' ? 't' : cur === 't' ? 'f' : '';
+        if (next) m[id] = next; else delete m[id];
+        try { localStorage.setItem('rumorMarks:' + currentSessionCode, JSON.stringify(m)); } catch (e) { }
+        if (window._lastJournal) renderJournal(window._lastJournal, window._lastJournalCtx);
+    };
+    window.rumorToDiary = function (id) {
+        const r = (window._journalRumors || []).find(x => x.id === id);
+        if (!r || !window.addRumorDiaryEntry) return;
+        window.addRumorDiaryEntry(r);
+    };
+    function rumorHtml(r, marks) {
+        const VERD = { true: ['✔ подтвердилось', '#2ecc71'], twist: ['≈ правда, но приукрашена', '#e0a030'], false: ['✘ оказалось ложью', '#e74c3c'] };
+        const v = r.verdict && VERD[r.verdict];
+        const mk = marks[r.id];
+        return '<div style="border-left:3px solid var(--accent-color); padding:3px 8px; margin-bottom:5px;">' +
+            (r.hold ? '<span style="opacity:.65; font-size:11px;">' + escapeHtml(r.hold) + (r.day ? ' · день ' + r.day : '') + '</span><br>' : '') +
+            escapeHtml(r.text || '') +
+            (v ? ' <span style="font-size:12px; color:' + v[1] + ';">' + v[0] + '</span>' : '') +
+            '<div style="margin-top:3px; display:flex; gap:6px; flex-wrap:wrap;">' +
+            '<button type="button" style="width:auto; padding:1px 8px; font-size:12px; min-height:0;" onclick="cycleRumorMark(\'' + r.id + '\')">' + (mk === 't' ? '✔ верю' : mk === 'f' ? '✘ не верю' : '❔ сомневаюсь') + '</button>' +
+            '<button type="button" style="width:auto; padding:1px 8px; font-size:12px; min-height:0;" onclick="rumorToDiary(\'' + r.id + '\')">📌 в дневник</button></div></div>';
+    }
+    function renderJournal(j, ctx) {
+        window._lastJournal = j; window._lastJournalCtx = ctx || {};
+        const sumEl = el('journal-summary'), rumEl = el('journal-rumors'), entEl = el('journal-entries');
+        if (!sumEl || !rumEl || !entEl) return;
+        const sum = j.summary && j.summary.text;
+        sumEl.innerHTML = sum ? escapeHtml(sum) : '<span style="opacity:.6;">Мастер пока ничего не опубликовал.</span>';
+        const rumors = (j.rumors || []).slice().reverse();
+        window._journalRumors = rumors;
+        const here = (ctx && ctx.hold) || '';
+        const marks = rumorMarks();
+        const near = rumors.filter(r => rumorHere(r, here)), far = rumors.filter(r => !rumorHere(r, here));
+        rumEl.innerHTML = rumors.length
+            ? (near.length ? '<div style="font-weight:bold; margin:2px 0 4px;">🗣 Сейчас здесь говорят (' + escapeHtml(here) + ')</div>' + near.map(r => rumorHtml(r, marks)).join('') : '')
+              + (far.length ? (near.length ? '<div style="font-weight:bold; margin:8px 0 4px; opacity:.85;">Слышали раньше и в других местах</div>' : '') + far.map(r => rumorHtml(r, marks)).join('') : '')
+            : '<span style="opacity:.6;">Слухов пока нет.</span>';
+        const entries = (j.entries || []);
+        entEl.innerHTML = entries.length ? entries.map(e => {
+            const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            return '<div class="log-entry"><span class="log-time">' + t + '</span><span class="log-author">' + escapeHtml(e.author || '?') + ':</span> ' + escapeHtml(e.text || '') + '</div>';
+        }).join('') : '<span style="opacity:.6;">Записей пока нет.</span>';
+        // Метка «есть новое» на вкладке
+        window._journalSig = journalSignature(j);
+        let seen = ''; try { seen = localStorage.getItem('journalSeen:' + currentSessionCode) || ''; } catch (e) { }
+        const btn = el('tab14-btn');
+        const empty = window._journalSig === '0||0';
+        if (btn && btn.classList.contains('active')) { window.markJournalSeen(); return; }
+        if (btn) btn.textContent = (!empty && seen !== window._journalSig) ? '📖 Дневник ●' : '📖 Дневник';
+    }
+    window.markJournalSeen = function () {
+        try { localStorage.setItem('journalSeen:' + currentSessionCode, window._journalSig || ''); } catch (e) { }
+        const btn = el('tab14-btn'); if (btn) btn.textContent = '📖 Дневник';
+    };
+    window.postJournalEntry = function () {
+        const input = el('journal-new');
+        const text = (input.value || '').trim();
+        if (!text) return;
+        if (!currentSessionCode || !currentUser) { alert('Запись партии доступна только внутри сессии.'); return; }
+        const author = (el('char-name') || {}).value || currentUser.email || 'Игрок';
+        db.collection('sessions').doc(currentSessionCode).update({
+            'journal.entries': firebase.firestore.FieldValue.arrayUnion({ id: 'j' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), author: author, text: text })
+        }).then(() => { input.value = ''; }).catch(e => alert('Не удалось записать: ' + e.message));
+    };
 
     function renderParty(participants) {
         const target = el('party-list');

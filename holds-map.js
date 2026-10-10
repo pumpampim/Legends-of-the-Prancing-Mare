@@ -121,15 +121,17 @@ ${showName ? `<text class="lbl" x="${x}" y="${y + 17 * u}" text-anchor="middle" 
             });
         });
         // метки подземелий (только при приближении)
-        if (zoom && o.pins && o.pins[zoom]) {
-            const pins = o.pins[zoom];
+        // pinsAll — показывать метки всех владений и при общем виде (карта игрока: открытые места)
+        const pinHolds = zoom ? (o.pins && o.pins[zoom] ? [zoom] : []) : (o.pinsAll && o.pins ? Object.keys(o.pins) : []);
+        pinHolds.forEach(ph => {
+            const pins = o.pins[ph];
             Object.keys(pins).forEach(n => {
                 const p = pins[n];
-                s += `<g class="pin" data-pin="${esc(n)}" data-ph="${esc(zoom)}" data-x="${p.x}" data-y="${p.y}" transform="translate(${p.x} ${p.y})"><title>${esc(n)}${p.cat ? ' · ' + esc(p.cat) : ''}</title>
+                s += `<g class="pin" data-pin="${esc(n)}" data-ph="${esc(ph)}" data-x="${p.x}" data-y="${p.y}" transform="translate(${p.x} ${p.y})"><title>${esc(n)}${p.cat ? ' · ' + esc(p.cat) : ''}</title>
 <circle r="${6 * u}" fill="${catColor(p.cat)}" stroke="#14100a" stroke-width="${1.5 * u}"/>
 <text class="lbl" y="${-10 * u}" text-anchor="middle" font-size="${11 * u}" stroke-width="${3 * u}">${esc(n)}</text></g>`;
             });
-        }
+        });
         if (o.sel && typeof o.sel.x === 'number') {
             s += `<g pointer-events="none"><circle cx="${o.sel.x}" cy="${o.sel.y}" r="${10 * u}" fill="none" stroke="#2ecc71" stroke-width="${2.5 * u}"/><circle cx="${o.sel.x}" cy="${o.sel.y}" r="${2.5 * u}" fill="#2ecc71"/></g>`;
         }

@@ -248,6 +248,7 @@
 
     function enterSessionView(code) {
         currentCode = code;
+        rumFirst = true;
     el('no-session-block').style.display = 'none';
     el('session-block').style.display = 'block';
     el('gm-session-code').textContent = code;
@@ -256,6 +257,7 @@
     unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
         if (!doc.exists) return;
         lastData = doc.data();
+        try { rumOnSnapshot(lastData); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
@@ -417,7 +419,527 @@
         });
     };
 
+    // ---------- Журнал сессии (вкладка «Дневник» у игроков) ----------
+    function renderJournalGm() {
+        const j = lastData.journal || {};
+        const sumEl = el('gm-journal-summary');
+        // не перетираем текст, который мастер сейчас печатает
+        if (sumEl && document.activeElement !== sumEl && (j.summary && j.summary.text) !== undefined && sumEl.dataset.pub !== String((j.summary && j.summary.ts) || 0)) {
+            sumEl.value = (j.summary && j.summary.text) || '';
+            sumEl.dataset.pub = String((j.summary && j.summary.ts) || 0);
+        }
+        const rumEl = el('gm-journal-rumors');
+        if (rumEl) {
+            const rumors = j.rumors || [];
+            rumEl.innerHTML = rumors.length ? rumors.map(r => `<div style="display:flex; gap:6px; align-items:center; border-left:3px solid var(--accent-color); padding:2px 8px; margin-bottom:3px;">
+                <span style="flex:1; font-size:14px;">${r.hold ? '<span style="opacity:.65; font-size:11px;">[' + escapeHtml(r.hold) + ']</span> ' : ''}${escapeHtml(r.text || '')}
+                  ${r.truth ? '<span style="font-size:11px; opacity:.75;" title="Видишь только ты">' + ({ true: '✔ верный', twist: '≈ искажённый', false: '✘ ложный' }[r.truth] || '') + (r.verdict ? ' · раскрыто' : '') + '</span>' : ''}</span>
+                ${r.truth && !r.verdict ? `<button style="padding:1px 6px; width:auto;" title="Показать игрокам, правда это или нет" onclick="gmRevealRumor('${r.id}')">🔎</button>` : ''}
+                <button style="padding:1px 6px;" onclick="gmDeleteRumor('${r.id}')">🗑</button></div>`).join('') : '<span style="opacity:.6; font-size:13px;">Слухов нет.</span>';
+        }
+        const entEl = el('gm-journal-entries');
+        if (entEl) {
+            const entries = j.entries || [];
+            entEl.innerHTML = entries.length ? entries.map(e => `<div style="display:flex; gap:6px; align-items:flex-start; margin-bottom:3px; font-size:13px;">
+                <span style="flex:1;"><b>${escapeHtml(e.author || '?')}:</b> ${escapeHtml(e.text || '')}</span>
+                <button style="padding:1px 6px;" onclick="gmDeleteJournalEntry('${e.id}')">🗑</button></div>`).join('') : '<span style="opacity:.6; font-size:13px;">Записей пока нет.</span>';
+        }
+    }
+
+    window.gmPublishSummary = function () {
+        const text = (el('gm-journal-summary').value || '').trim();
+        const ts = Date.now();
+        db.collection('sessions').doc(currentCode).update({
+            'journal.summary': { text: text, ts: ts },
+            combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: ts, author: 'Мастер', text: '📖 Опубликована сводка прошлой сессии (вкладка «Дневник»).' })
+        }).then(() => { el('gm-journal-summary').dataset.pub = String(ts); el('gm-journal-summary-state').textContent = 'опубликовано'; setTimeout(() => { const s = el('gm-journal-summary-state'); if (s) s.textContent = ''; }, 3000); })
+          .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.gmAddRumor = function () {
+        const inp = el('gm-journal-rumor');
+        const text = (inp.value || '').trim();
+        if (!text) return;
+        db.collection('sessions').doc(currentCode).update({
+            'journal.rumors': firebase.firestore.FieldValue.arrayUnion({ id: 'r' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), text: text })
+        }).then(() => { inp.value = ''; }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Молва: деяния партии → слухи ----------
+    const RUM_MAX_DEEDS = 60;
+    let rumDraft = null;          // { deedId, text, hold, truth }
+    let rumFirst = true;          // первый снимок сессии — только запоминаем, что уже было
+    let rumSeenDead = new Set(), rumSeenFallen = new Set(), rumDayDone = 0;
+
+    function rumSettings() { return Object.assign({ auto: true, tone: 'normal' }, lastData.rumorSettings || {}); }
+    function rumDay() { return lastData.gameDayCounter || 0; }
+    function rumPartyHold() { return (lastData.partyPos && lastData.partyPos.hold) || lastData.currentHold || ''; }
+    function rumPartyNames() { return Object.values(lastData.participants || {}).map(p => p && p.name).filter(Boolean); }
+    function rumAllHolds() {
+        const s = el('weather-hold-select');
+        return s ? Array.from(s.options).map(o => o.value).filter(Boolean) : [];
+    }
+    function rumEnemyCat(name) {
+        const base = window.RumorEngine.clean(name).toLowerCase();
+        const e = (window.enemiesData || []).find(x => base.indexOf(String(x.name).toLowerCase()) === 0);
+        return e ? e.category : '';
+    }
+    function rumDeedText(d) {
+        const hold = d.hold ? ' · ' + d.hold : '';
+        const who = (d.who && d.who.length) ? ' (' + d.who.join(', ') + ')' : '';
+        switch (d.kind) {
+            case 'kill': return 'Победа: ' + window.RumorEngine.clean(d.enemy || 'враги').toLowerCase() + (d.count > 1 ? ' ×' + d.count : '') + hold;
+            case 'fall': return 'Пал: ' + (d.who || []).join(', ') + hold;
+            case 'crime': return 'Штраф' + (d.amount ? ' ' + d.amount : '') + (d.reason ? ': ' + d.reason : '') + hold + who;
+            case 'jail': return 'Тюрьма' + (d.days ? ' на ' + d.days + ' дн.' : '') + hold + who;
+            case 'quest': return 'Взяли задание «' + (d.what || '') + '»' + hold;
+            default: return (d.what || '—') + (d.place ? ' · ' + d.place : '') + hold;
+        }
+    }
+    function rumSaveDeeds(list, extra) {
+        list = list.slice(-RUM_MAX_DEEDS);
+        lastData.deeds = list;
+        if (!currentCode) return Promise.resolve();
+        return db.collection('sessions').doc(currentCode).update(Object.assign({ deeds: stripUndefinedDeep(list) }, extra || {}));
+    }
+    // Записать деяние. Однотипные победы за один день в одном месте склеиваются в одно.
+    window.rumAddDeed = function (d) {
+        if (!window.RumorEngine || !currentCode) return Promise.resolve();
+        const deed = Object.assign({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), day: rumDay(), hold: rumPartyHold(), spread: [] }, d);
+        if (!deed.hold) deed.hold = rumPartyHold();
+        const list = (lastData.deeds || []).slice();
+        if (deed.kind === 'kill') {
+            const k = window.RumorEngine.mergeKey(deed);
+            const ex = list.find(x => x.kind === 'kill' && window.RumorEngine.mergeKey(x) === k && !(x.spread || []).length);
+            if (ex) { ex.count = (ex.count || 1) + (deed.count || 1); return rumSaveDeeds(list).catch(e => console.error(e)); }
+        }
+        list.push(deed);
+        return rumSaveDeeds(list).catch(e => console.error(e));
+    };
+
+    // Вызывается на каждый снимок сессии: что нового случилось?
+    function rumOnSnapshot(d) {
+        if (!window.RumorEngine) return;
+        const enemies = d.enemies || [], parts = d.participants || {};
+        if (rumFirst) {
+            rumFirst = false;
+            rumSeenDead = new Set(enemies.filter(e => (e.curHp || 0) <= 0).map(e => e.id));
+            rumSeenFallen = new Set(Object.keys(parts).filter(u => parts[u] && parts[u].fallen));
+            rumDayDone = (d.rumorSettings && d.rumorSettings.lastDay != null) ? d.rumorSettings.lastDay : (d.gameDayCounter || 0);
+            return;
+        }
+        // победы
+        const fresh = enemies.filter(e => (e.curHp || 0) <= 0 && !rumSeenDead.has(e.id));
+        fresh.forEach(e => rumSeenDead.add(e.id));
+        if (fresh.length) {
+            const groups = {};
+            fresh.forEach(e => { const n = window.RumorEngine.clean(e.name); (groups[n] = groups[n] || []).push(e); });
+            Object.keys(groups).forEach(n => window.rumAddDeed({ kind: 'kill', enemy: n, ecat: rumEnemyCat(n), count: groups[n].length, who: rumPartyNames() }));
+        }
+        // павшие игроки
+        Object.keys(parts).forEach(u => {
+            const p = parts[u] || {};
+            if (p.fallen && !rumSeenFallen.has(u)) { rumSeenFallen.add(u); window.rumAddDeed({ kind: 'fall', who: [p.name || '?'] }); }
+            if (!p.fallen) rumSeenFallen.delete(u);
+        });
+        // новый день → слухи расходятся сами
+        const day = d.gameDayCounter || 0;
+        if (day > rumDayDone) { rumDayDone = day; rumAutoSpread(day); }
+    }
+
+    function rumBuildRumor(deed, mode, holdOverride) {
+        const RE = window.RumorEngine, set = rumSettings();
+        const c = RE.compose(deed, mode, { tone: set.tone });
+        const hold = holdOverride || RE.chooseHold(deed, { allHolds: rumAllHolds(), partyHold: rumPartyHold() });
+        return { text: c.text, truth: c.truth, kind: c.kind, hold: hold };
+    }
+
+    function rumAutoSpread(day) {
+        const set = rumSettings();
+        const extra = { 'rumorSettings.lastDay': day };
+        if (!set.auto) { db.collection('sessions').doc(currentCode).update(extra).catch(() => { }); return; }
+        const RE = window.RumorEngine;
+        const deeds = (lastData.deeds || []).map(x => Object.assign({}, x, { spread: (x.spread || []).slice() }));
+        const el_ = RE.eligibleDeeds(deeds, day);
+        if (!el_.length) { db.collection('sessions').doc(currentCode).update(extra).catch(() => { }); return; }
+        const n = el_.length >= 4 ? 2 : 1;
+        const newRumors = [];
+        el_.slice(0, n).forEach(deed => {
+            const r = rumBuildRumor(deed, 'auto');
+            const rum = { id: 'r' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), text: r.text, hold: r.hold, truth: r.truth, kind: r.kind, deedId: deed.id, day: day, auto: true };
+            deed.spread.push({ hold: r.hold, truth: r.truth, rumorId: rum.id, day: day });
+            newRumors.push(rum);
+        });
+        lastData.deeds = deeds;
+        db.collection('sessions').doc(currentCode).update(Object.assign({
+            deeds: stripUndefinedDeep(deeds),
+            'journal.rumors': firebase.firestore.FieldValue.arrayUnion(...newRumors)
+        }, extra)).then(() => {
+            const r = el('rum-result'); if (r) r.textContent = '🗣 Новый день: пущено слухов — ' + newRumors.length + '.';
+        }).catch(e => console.error(e));
+    }
+
+    window.rumSetSetting = function (key, val) {
+        if (!currentCode) return;
+        db.collection('sessions').doc(currentCode).update({ ['rumorSettings.' + key]: val }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function rumFillSelects() {
+        const holds = rumAllHolds();
+        const hs = el('rum-hold');
+        if (hs && !hs.options.length) hs.innerHTML = '<option value="">Куда дойдёт — по случаю</option>' + holds.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        const nh = el('rum-new-hold');
+        if (nh && !nh.options.length) nh.innerHTML = '<option value="">Где — где сейчас партия</option>' + holds.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        const nk = el('rum-new-kind');
+        if (nk && !nk.options.length && window.RumorEngine) nk.innerHTML = Object.keys(window.RumorEngine.KIND_INFO).filter(k => ['feat', 'deed', 'trade', 'magic', 'crime', 'kill', 'misc'].indexOf(k) >= 0)
+            .map(k => `<option value="${k}">${window.RumorEngine.KIND_INFO[k].icon} ${window.RumorEngine.KIND_INFO[k].label}</option>`).join('');
+    }
+
+    function rumRender() {
+        if (!window.RumorEngine || !el('rum-deeds')) return;
+        rumFillSelects();
+        const set = rumSettings();
+        const ca = el('rum-auto'); if (ca && document.activeElement !== ca) ca.checked = !!set.auto;
+        const ct = el('rum-tone'); if (ct && document.activeElement !== ct) ct.value = set.tone;
+        const deeds = (lastData.deeds || []).slice().reverse();
+        const KI = window.RumorEngine.KIND_INFO;
+        el('rum-deeds').innerHTML = deeds.length ? deeds.map(d => `<div class="party-row" style="display:flex; gap:6px; align-items:center; justify-content:space-between;">
+            <span style="flex:1; font-size:13px;">${(KI[d.kind] || KI.misc).icon} ${escapeHtml(rumDeedText(d))}
+              <span style="opacity:.6; font-size:11px;"> · день ${d.day || 0} · слухов: ${(d.spread || []).length}</span></span>
+            <span style="display:flex; gap:4px; flex:0 0 auto;">
+              <button style="width:auto; padding:2px 8px;" onclick="rumStartDraft('${d.id}')">🗣 Слух</button>
+              <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="rumDeleteDeed('${d.id}')">🗑</button></span></div>`).join('')
+            : '<p style="opacity:.6; font-size:13px;">Деяний пока нет — они появятся, когда партия победит врагов, кто-то падёт, выдадут штраф или квест.</p>';
+    }
+
+    function rumShowDraft() {
+        const box = el('rum-draft');
+        if (!rumDraft) { box.style.display = 'none'; return; }
+        box.style.display = 'block';
+        const TL = { true: '✔ верный', twist: '≈ искажённый', false: '✘ ложный' };
+        el('rum-draft-info').textContent = 'Вид: ' + (TL[rumDraft.truth] || '?') + ' · дойдёт до: ' + (rumDraft.hold || '—') + ' (текст можно править)';
+        el('rum-draft-text').value = rumDraft.text;
+    }
+    window.rumStartDraft = function (deedId) {
+        const deed = (lastData.deeds || []).find(d => d.id === deedId);
+        if (!deed) return;
+        const r = rumBuildRumor(deed, el('rum-mode').value, el('rum-hold').value);
+        rumDraft = { deedId: deedId, text: r.text, hold: r.hold, truth: r.truth, kind: r.kind };
+        rumShowDraft();
+        el('rum-draft').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    window.rumReroll = function () { if (rumDraft) window.rumStartDraft(rumDraft.deedId); };
+    window.rumCancelDraft = function () { rumDraft = null; rumShowDraft(); };
+    window.rumPublishDraft = function () {
+        if (!rumDraft || !currentCode) return;
+        const text = (el('rum-draft-text').value || '').trim();
+        if (!text) return;
+        const deeds = (lastData.deeds || []).map(x => Object.assign({}, x, { spread: (x.spread || []).slice() }));
+        const deed = deeds.find(d => d.id === rumDraft.deedId);
+        const rum = { id: 'r' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), text: text, hold: rumDraft.hold || '', truth: rumDraft.truth, kind: rumDraft.kind, deedId: rumDraft.deedId, day: rumDay() };
+        if (deed) deed.spread.push({ hold: rum.hold, truth: rum.truth, rumorId: rum.id, day: rumDay() });
+        lastData.deeds = deeds;
+        db.collection('sessions').doc(currentCode).update({
+            deeds: stripUndefinedDeep(deeds),
+            'journal.rumors': firebase.firestore.FieldValue.arrayUnion(stripUndefinedDeep(rum))
+        }).then(() => {
+            el('rum-result').textContent = '📢 Слух пущен' + (rum.hold ? ' (' + rum.hold + ')' : '') + '.';
+            rumDraft = null; rumShowDraft();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.rumDeleteDeed = function (id) {
+        rumSaveDeeds((lastData.deeds || []).filter(d => d.id !== id)).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.rumAddManual = function () {
+        const what = (el('rum-new-what').value || '').trim();
+        const kind = el('rum-new-kind').value || 'misc';
+        if (!what) { el('rum-result').textContent = 'Напиши, что сделали.'; return; }
+        const d = { kind: kind, what: what, who: rumPartyNames(), place: (el('rum-new-place').value || '').trim() };
+        if (kind === 'kill') { d.enemy = what; d.count = 1; }
+        const h = el('rum-new-hold').value; if (h) d.hold = h;
+        window.rumAddDeed(d).then(() => { el('rum-new-what').value = ''; el('rum-new-place').value = ''; el('rum-result').textContent = '✅ Деяние записано.'; });
+    };
+    window.gmRevealRumor = function (id) {
+        const rest = ((lastData.journal || {}).rumors || []).map(r => r.id === id ? Object.assign({}, r, { verdict: r.truth || 'true' }) : r);
+        db.collection('sessions').doc(currentCode).update({ 'journal.rumors': stripUndefinedDeep(rest) }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.gmDeleteRumor = function (id) {
+        const rest = ((lastData.journal || {}).rumors || []).filter(r => r.id !== id);
+        db.collection('sessions').doc(currentCode).update({ 'journal.rumors': rest }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.gmDeleteJournalEntry = function (id) {
+        const rest = ((lastData.journal || {}).entries || []).filter(e => e.id !== id);
+        db.collection('sessions').doc(currentCode).update({ 'journal.entries': rest }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Подготовка сессии: всё по выбранному владению на одном экране ----------
+    let prepHold = null;       // выбранное владение (если мастер выбрал руками)
+    let prepRenderedKey = '';  // что сейчас нарисовано — чтобы не схлопывать шторки на каждом снимке сессии
+
+    function prepMatchEnemies(text) {
+        if (!text || !window.enemiesData) return [];
+        const toks = String(text).toLowerCase().split(/[^а-яёa-z]+/).filter(Boolean);
+        const res = [];
+        window.enemiesData.forEach((e, i) => {
+            const words = e.name.toLowerCase().split(/[^а-яё]+/).filter(Boolean);
+            if (words.length && words.every(w => { const st = w.length <= 4 ? w : w.slice(0, -2); return toks.some(t => t.startsWith(st)); })) res.push(i);
+        });
+        return res;
+    }
+
+    // «Название» — описание; «Название2» — описание2  →  [{title, desc}]
+    function prepParseQuests(text) {
+        if (!text) return [];
+        return String(text).split(/;\s*(?=«)/).map(s => s.trim()).filter(Boolean).map(s => {
+            const m = s.match(/^«([^»]+)»\s*[—-]?\s*(.*)$/s);
+            return m ? { title: m[1].trim(), desc: m[2].trim() } : { title: s.slice(0, 60), desc: s };
+        });
+    }
+
+    // Текст для игроков по умолчанию — первые предложения описания (до ~300 знаков), без перечня врагов и лута
+    function prepPlayerText(desc) {
+        const t = String(desc || '').trim();
+        if (!t) return '';
+        const sentences = t.split(/(?<=[.!?])\s+/);
+        let out = '';
+        for (const s of sentences) { if ((out + ' ' + s).trim().length > 300 && out) break; out = (out + ' ' + s).trim(); }
+        return out.length > 360 ? out.slice(0, 357) + '…' : out;
+    }
+    const prepPlaceId = (hold, name) => hold + '|' + name;
+    function prepOpenPlaces() { return Array.isArray(lastData.openPlaces) ? lastData.openPlaces : []; }
+
+    // Обновляет подписи/кнопки «открыто/скрыто» у мест без перерисовки всей панели (чтобы шторки не схлопывались)
+    function prepRefreshOpenState() {
+        const open = prepOpenPlaces();
+        document.querySelectorAll('#prep-body .prep-place').forEach(div => {
+            const p = open.find(x => x.id === prepPlaceId(div.dataset.hold, div.dataset.name));
+            const st = div.querySelector('.prep-open-state');
+            const hide = div.querySelector('.prep-hide');
+            const openBtn = div.querySelector('[data-act="openplace"]');
+            if (p) {
+                st.innerHTML = '<span style="color:#2ecc71;">🔓 открыто' + (typeof p.x === 'number' ? ' · с точкой на карте' : ' · без точки на карте') + '</span>';
+                hide.style.display = ''; openBtn.textContent = '💾 Обновить текст/точку';
+            } else {
+                st.textContent = ''; hide.style.display = 'none'; openBtn.textContent = '🔓 Открыть игрокам';
+            }
+        });
+        const listEl = el('prep-open-list');
+        if (listEl) {
+            listEl.innerHTML = open.length ? '<div style="font-size:13px; margin-bottom:2px;"><b>🔓 Открыто игрокам (' + open.length + '):</b></div>' + open.map(p => `<div style="display:flex; gap:6px; align-items:center; font-size:13px; margin-bottom:2px;">
+                <span style="flex:1;">${typeof p.x === 'number' ? '📍' : '·'} ${escapeHtml(p.name)} <span style="opacity:.6;">(${escapeHtml(p.hold || '')})</span></span>
+                <button style="font-size:11px; padding:1px 6px;" data-act="placepoint" data-id="${escapeHtml(p.id)}" title="Привязать к точке, выбранной на карте мастера, или к метке из справочника">📍 точка</button>
+                <button style="font-size:11px; padding:1px 6px;" data-act="hideplace" data-id="${escapeHtml(p.id)}">🔒</button></div>`).join('') : '<div style="font-size:12px; opacity:.6;">Игрокам пока не открыто ни одного места.</div>';
+        }
+    }
+
+    // Координаты места: метка из справочника (localStorage мастера) → иначе точка, выбранная сейчас на карте мастера
+    function prepPlaceCoords(hold, name) {
+        try {
+            const pins = window.HoldsMap && window.HoldsMap.loadPins ? window.HoldsMap.loadPins() : {};
+            const p = pins[hold] && pins[hold][name];
+            if (p && typeof p.x === 'number') return { x: p.x, y: p.y, src: 'метка из справочника' };
+        } catch (e) { }
+        if (gmMapSel && typeof gmMapSel.x === 'number' && (!gmMapSel.hold || gmMapSel.hold === hold)) return { x: gmMapSel.x, y: gmMapSel.y, src: 'точка, выбранная на карте мастера' };
+        return null;
+    }
+
+    function prepWritePlaces(arr, logText) {
+        const upd = { openPlaces: arr };
+        if (logText) upd.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: logText });
+        return db.collection('sessions').doc(currentCode).update(upd);
+    }
+
+    function prepHoldKey() {
+        const k = prepHold || (lastData && lastData.currentHold) || (lastData && lastData.partyPos && lastData.partyPos.hold) || '';
+        if (!k || !window.holdsData || window.holdsData[k]) return k;
+        // название из погоды/карты могло отличаться от ключа справочника — ищем по вхождению
+        return Object.keys(window.holdsData).find(h => h.includes(k) || k.includes(h)) || k;
+    }
+
+    function renderPrepNow() {
+        const box = el('prep-now');
+        if (!box) return;
+        const d = lastData || {};
+        const parts = [];
+        if (d.timePeriod) parts.push('🕒 ' + escapeHtml(d.timePeriod));
+        if (d.currentRegion) parts.push('📍 ' + escapeHtml(d.currentRegion));
+        if (d.currentWeather && WEATHER_LABELS[d.currentWeather]) parts.push(WEATHER_LABELS[d.currentWeather] + (WEATHER_EFFECTS[d.currentWeather] ? ' — ' + escapeHtml(WEATHER_EFFECTS[d.currentWeather]) : ''));
+        const pp = d.partyPos;
+        parts.push('🧭 Партия: ' + (pp && (pp.name || pp.hold) ? escapeHtml(pp.name || pp.hold) + (pp.hold && pp.name ? ' (' + escapeHtml(pp.hold) + ')' : '') : '<span style="opacity:.6;">метка не поставлена</span>'));
+        const people = Object.values(d.participants || {});
+        const party = people.length ? people.map(p => `${p.fallen ? '⚰️ ' : ''}${escapeHtml(p.name || '?')} ${p.curHp || 0}/${p.maxHp || 0} ХП`).join(' · ') : '<span style="opacity:.6;">игроков нет</span>';
+        box.innerHTML = '<div style="font-size:13px; line-height:1.6;">' + parts.join('<br>') + '<br>👥 ' + party + '</div>';
+    }
+
+    window.renderPrep = function (force) {
+        renderPrepNow();
+        setTimeout(prepRefreshOpenState, 0);
+        const sel = el('prep-hold');
+        if (!sel || !window.holdsData) return;
+        if (!sel.options.length) {
+            sel.innerHTML = '<option value="">— выбери владение —</option>' + Object.keys(window.holdsData).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        }
+        const key = prepHoldKey();
+        if (document.activeElement !== sel) sel.value = window.holdsData[key] ? key : '';
+        const filt = (el('prep-search') || {}).value || '';
+        const rk = key + '|' + (el('prep-all-people') && el('prep-all-people').checked) + '|' + filt;
+        if (!force && rk === prepRenderedKey) return;
+        prepRenderedKey = rk;
+        const out = el('prep-body');
+        const hold = window.holdsData[key];
+        if (!hold) { out.innerHTML = '<p style="opacity:.7; font-size:14px;">Выбери владение (или поставь метку партии на карте — оно подставится само).</p>'; return; }
+        const q = filt.trim().toLowerCase();
+        const allPeople = !!(el('prep-all-people') && el('prep-all-people').checked);
+        const info = hold.info && typeof hold.info === 'object' ? (hold.info['Описание'] || hold.info['Общее'] || hold.info['География'] || Object.values(hold.info)[0] || '') : (hold.info || '');
+        let h = info ? `<div style="font-size:13px; opacity:.85; margin-bottom:6px;">${escapeHtml(String(info).slice(0, 500))}${String(info).length > 500 ? '…' : ''}</div>` : '';
+
+        // Жители
+        let nPeople = 0, nQuests = 0;
+        let hp = '';
+        (hold.settlements || []).forEach(s => {
+            let sh = '';
+            (s.places || []).forEach(pl => {
+                (pl.people || []).forEach(pp => {
+                    const quests = prepParseQuests(pp.quests);
+                    if (!allPeople && !quests.length) return;
+                    if (q && !((pp.name || '') + ' ' + (pp.role || '') + ' ' + (pp.quests || '') + ' ' + (pl.name || '')).toLowerCase().includes(q)) return;
+                    nPeople++; nQuests += quests.length;
+                    sh += `<details style="margin:2px 0 2px 8px;"><summary style="cursor:pointer; font-size:13px;"><b>${escapeHtml(pp.name)}</b> <span style="opacity:.7;">— ${escapeHtml(pp.role || '')}, ${escapeHtml(pl.name || '')}</span>${quests.length ? ' <span style="color:var(--accent-color);">· квестов: ' + quests.length + '</span>' : ''}</summary>
+                        <div style="font-size:12px; opacity:.85; margin:3px 0 4px 10px;">${escapeHtml(pp.bio || '')}</div>
+                        ${quests.map(qq => `<div style="margin:2px 0 4px 10px; padding-left:6px; border-left:2px solid var(--accent-color); font-size:12px;">
+                            <b>«${escapeHtml(qq.title)}»</b> ${escapeHtml(qq.desc)}<br>
+                            <button style="font-size:11px; padding:1px 6px;" data-act="rumor" data-person="${escapeHtml(pp.name)}" data-title="${escapeHtml(qq.title)}">🗣 в слухи</button>
+                            <button style="font-size:11px; padding:1px 6px;" data-act="quest" data-person="${escapeHtml(pp.name)}" data-role="${escapeHtml(pp.role || '')}" data-title="${escapeHtml(qq.title)}" data-desc="${escapeHtml(qq.desc)}">📜 в форму квеста</button>
+                        </div>`).join('')}
+                    </details>`;
+                });
+            });
+            if (sh) hp += `<details open style="margin:4px 0;"><summary style="cursor:pointer; font-weight:bold;">${escapeHtml(s.name)}</summary>${sh}</details>`;
+        });
+        h += `<h3 style="margin:8px 0 2px;">🏘 Жители и зацепки <span style="font-weight:normal; font-size:12px; opacity:.7;">(${nPeople} чел., ${nQuests} квестов)</span></h3>` + (hp || '<p style="opacity:.6; font-size:13px;">Никого не найдено.</p>');
+
+        // Места
+        let lp = '', enemySet = new Set();
+        (hold.categories || []).forEach(c => {
+            let ch = '';
+            (c.locations || []).forEach(l => {
+                if (q && !((l.name || '') + ' ' + (l.desc || '') + ' ' + (l.enemies || '') + ' ' + (l.loot || '')).toLowerCase().includes(q)) return;
+                const en = prepMatchEnemies(l.enemies).slice(0, 8);
+                en.forEach(i => enemySet.add(i));
+                ch += `<details style="margin:2px 0 2px 8px;"><summary style="cursor:pointer; font-size:13px;"><b>${escapeHtml(l.name)}</b></summary>
+                    <div style="font-size:12px; margin:3px 0 4px 10px; line-height:1.5;">
+                        ${l.desc ? escapeHtml(l.desc) + '<br>' : ''}
+                        ${l.enemies ? '<b>Враги:</b> ' + escapeHtml(l.enemies) + '<br>' : ''}
+                        ${l.loot ? '<b>Лут:</b> ' + escapeHtml(l.loot) + '<br>' : ''}
+                        ${l.reward && l.reward !== l.loot ? '<b>Награда:</b> ' + escapeHtml(l.reward) + '<br>' : ''}
+                        ${l.features ? '<b>Особенности:</b> ' + escapeHtml(l.features) + '<br>' : ''}
+                        ${en.length ? '<span style="opacity:.7;">В бой:</span> ' + en.map(i => `<button style="font-size:11px; padding:1px 6px;" data-act="enemy" data-idx="${i}">+ ${escapeHtml(window.enemiesData[i].name)}</button>`).join(' ') + '<br>' : ''}
+                        <button style="font-size:11px; padding:1px 6px; margin-top:3px;" data-act="placerumor" data-place="${escapeHtml(l.name)}">🗣 слух об этом месте</button>
+                        <div class="prep-place" data-hold="${escapeHtml(key)}" data-name="${escapeHtml(l.name)}" data-cat="${escapeHtml(c.name || '')}" style="margin-top:6px; padding:5px 6px; border:1px dashed var(--border-color); border-radius:4px;">
+                            <div style="font-size:11px; opacity:.7;">Текст для игроков (правь, чтобы не выдать лишнего):</div>
+                            <textarea class="prep-place-text" rows="3" style="width:100%; font-size:12px;">${escapeHtml(prepPlayerText(l.desc))}</textarea>
+                            <button style="font-size:11px; padding:1px 6px;" data-act="openplace">🔓 Открыть игрокам</button>
+                            <button class="prep-hide" style="font-size:11px; padding:1px 6px; display:none;" data-act="hideplace">🔒 Скрыть</button>
+                            <span class="prep-open-state" style="font-size:11px; margin-left:4px;"></span>
+                        </div>
+                    </div></details>`;
+            });
+            if (ch) lp += `<details style="margin:4px 0;"><summary style="cursor:pointer; font-weight:bold;">${escapeHtml(c.name)}</summary>${ch}</details>`;
+        });
+        h += `<h3 style="margin:10px 0 2px;">🏰 Места и подземелья</h3>` + (lp || '<p style="opacity:.6; font-size:13px;">Ничего не найдено.</p>');
+
+        // Враги владения
+        const eList = [...enemySet].sort((a, b) => a - b);
+        h += `<h3 style="margin:10px 0 2px;">👹 Кто здесь водится <span style="font-weight:normal; font-size:12px; opacity:.7;">(подбор по описаниям мест; нажми, чтобы добавить в бой)</span></h3>` +
+            (eList.length ? eList.map(i => `<button style="font-size:12px; padding:2px 8px; margin:2px;" data-act="enemy" data-idx="${i}">+ ${escapeHtml(window.enemiesData[i].name)}</button>`).join('') : '<p style="opacity:.6; font-size:13px;">Не удалось подобрать.</p>');
+        out.innerHTML = h;
+    };
+
+    window.prepPickHold = function (v) { prepHold = v || null; window.renderPrep(true); };
+
+    window.prepRollEvent = function () {
+        const box = el('prep-event');
+        if (!window.randomEventsData || !window.randomEventsData.length) { box.textContent = 'Нет данных о событиях.'; return; }
+        const e = window.randomEventsData[Math.floor(Math.random() * window.randomEventsData.length)];
+        box.dataset.text = e.name;
+        box.innerHTML = `<b>${escapeHtml(e.name)}</b> <span style="opacity:.6;">(д100: ${e.roll})</span><br>${escapeHtml(e.desc)}${e.req ? '<br><span style="opacity:.65; font-size:12px;">Условие: ' + escapeHtml(e.req) + '</span>' : ''}
+            <br><button style="font-size:12px; margin-top:4px;" onclick="prepAnnounceEvent()">📣 Сообщить в журнал боя</button>`;
+    };
+    window.prepAnnounceEvent = function () {
+        const t = (el('prep-event').dataset.text || '').trim();
+        if (t) gmPostLogEntryText('🎲 Случайная встреча в пути: ' + t + '.');
+    };
+
+    function prepAddRumor(text) {
+        if (!currentCode) { alert('Нет активной сессии.'); return; }
+        db.collection('sessions').doc(currentCode).update({
+            'journal.rumors': firebase.firestore.FieldValue.arrayUnion({ id: 'r' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), text: text })
+        }).then(() => { el('prep-result').textContent = 'Слух добавлен: ' + text; }).catch(e => alert('Ошибка: ' + e.message));
+    }
+
+    function prepOnClick(ev) {
+        const b = ev.target.closest('button[data-act]');
+        if (!b) return;
+        ev.preventDefault();
+        const act = b.dataset.act;
+        if (act === 'rumor') {
+            prepAddRumor('Говорят, ' + b.dataset.person + ' ищет помощников — дело зовётся «' + b.dataset.title + '».');
+        } else if (act === 'placerumor') {
+            prepAddRumor('Ходят слухи о месте «' + b.dataset.place + '» — путники советуют быть осторожнее.');
+        } else if (act === 'quest') {
+            el('quest-title-input').value = b.dataset.title;
+            el('quest-desc-input').value = b.dataset.person + (b.dataset.role ? ' (' + b.dataset.role + ')' : '') + ': ' + b.dataset.desc;
+            el('quest-req-input').value = '';
+            el('quest-reward-input').value = '';
+            el('prep-result').textContent = 'Квест «' + b.dataset.title + '» подставлен в форму выдачи квестов — проверь награду и выдай.';
+            const f = el('quest-title-input'); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (act === 'openplace' || act === 'hideplace' || act === 'placepoint') {
+            if (!currentCode) { alert('Нет активной сессии.'); return; }
+            const res = el('prep-result');
+            const open = prepOpenPlaces().slice();
+            if (act === 'hideplace') {
+                const div = b.closest('.prep-place');
+                const id = b.dataset.id || prepPlaceId(div.dataset.hold, div.dataset.name);
+                const p = open.find(x => x.id === id);
+                prepWritePlaces(open.filter(x => x.id !== id)).then(() => { res.textContent = 'Место скрыто' + (p ? ': ' + p.name : '') + '.'; }).catch(e => alert('Ошибка: ' + e.message));
+            } else if (act === 'placepoint') {
+                const p = open.find(x => x.id === b.dataset.id); if (!p) return;
+                const c = prepPlaceCoords(p.hold, p.name);
+                if (!c) { alert('Нет точки: выбери её на карте мастера (в приближении владения) или поставь метку места в справочнике владений.'); return; }
+                const next = open.map(x => x.id === p.id ? Object.assign({}, x, { x: c.x, y: c.y }) : x);
+                prepWritePlaces(next).then(() => { res.textContent = '«' + p.name + '» привязано к карте (' + c.src + ').'; }).catch(e => alert('Ошибка: ' + e.message));
+            } else {
+                const div = b.closest('.prep-place');
+                const hold = div.dataset.hold, name = div.dataset.name, cat = div.dataset.cat;
+                const id = prepPlaceId(hold, name);
+                const text = (div.querySelector('.prep-place-text').value || '').trim();
+                const c = prepPlaceCoords(hold, name);
+                const entry = { id, hold, name, cat, desc: text, ts: Date.now() };
+                if (c) { entry.x = c.x; entry.y = c.y; }
+                const was = open.find(x => x.id === id);
+                if (was && !c && typeof was.x === 'number') { entry.x = was.x; entry.y = was.y; }
+                const next = open.filter(x => x.id !== id).concat([entry]);
+                prepWritePlaces(next, was ? null : '🔓 Открыто новое место: «' + name + '» (' + hold + ').').then(() => {
+                    res.textContent = (was ? 'Обновлено: ' : 'Открыто игрокам: ') + name + (entry.x !== undefined ? ' — с точкой на карте (' + (c ? c.src : 'прежняя точка') + ').' : ' — без точки на карте: игроки увидят его только в списке «Известные места». Выбери точку на карте мастера и нажми «📍 точка» в списке открытых.');
+                }).catch(e => alert('Ошибка: ' + e.message));
+            }
+        } else if (act === 'enemy') {
+            if (!currentCode) { alert('Нет активной сессии.'); return; }
+            const idx = b.dataset.idx;
+            el('enemy-db-select').value = idx;
+            window.onEnemyDbPicked();
+            window.addEnemy();
+            el('prep-result').textContent = 'В бой добавлен: ' + window.enemiesData[parseInt(idx)].name;
+        }
+    }
+    document.addEventListener('click', function (ev) { if (ev.target.closest && ev.target.closest('#prep-body')) prepOnClick(ev); });
+
     function renderAll() {
+        renderPrep();
+        rumRender();
+        renderJournalGm();
         renderParty(lastData.participants || {});
         renderEnemies(lastData.enemies || []);
         renderTurnOrder(lastData.turnOrder || []);
@@ -455,7 +977,7 @@
             const mpPct = Math.max(0, Math.min(100, (p.curMp || 0) / maxMp * 100));
             return `<div style="border:1px solid var(--border-color); border-radius:4px; padding:5px 8px; margin-bottom:4px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:bold;">
-                    <span>${escapeHtml(p.name || '?')}</span>
+                    <span>${p.fallen ? '⚰️ ' : ''}${escapeHtml(p.name || '?')} <span style="font-weight:normal; font-size:11px; opacity:.8;" title="Свободные жизни">❤ ${p.lives === undefined ? '?' : p.lives}</span></span>
                     <label style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:normal; margin:0;" title="Вне города игрок не может закупаться у торговцев">
                         <input type="checkbox" ${p.inTown === false ? '' : 'checked'} onchange="setParticipantTown('${uid}', this.checked)"> 🏙 В городе
                     </label>
@@ -472,6 +994,13 @@
                     <input type="number" value="${p.curMp || 0}" style="width:50px; padding:1px; font-size:12px;" onchange="setParticipantField('${uid}','curMp',this.value)">
                     <span style="font-size:11px; opacity:.6; width:34px;">/${maxMp}</span>
                 </div>
+                <div style="display:flex; flex-wrap:wrap; gap:3px; margin-top:4px;">
+                    ${p.fallen ? '<span style="font-size:11px; color:#e74c3c; font-weight:bold; width:100%;">⚰️ ПАЛ' + ((p.lives || 0) <= 0 ? ' — жизней нет, нужен квест божества' : '') + '</span>' : ''}
+                    <button style="font-size:11px; padding:1px 5px;" title="Игрок теряет 1–4 случайные стопки ненадетых вещей" onclick="gmDeathCmd('${uid}','loseItems')">🎒 Потеря вещей</button>
+                    <button style="font-size:11px; padding:1px 5px;" title="Воскресить (после квеста божества или по решению мастера)" onclick="gmDeathCmd('${uid}','revive')">✨ Воскресить</button>
+                    <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',1)">+❤</button>
+                    <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',-1)">−❤</button>
+                </div>
                 ${(p.summons || []).map(s => {
                     const sHpPct = Math.max(0, Math.min(100, (s.curHp || 0) / (s.maxHp || 1) * 100));
                     return `<div style="display:flex; align-items:center; gap:4px; margin-top:4px; padding-left:8px; border-left:2px solid var(--border-color);">
@@ -483,6 +1012,32 @@
             </div>`;
         }).join('');
     }
+
+    // Команды смерти/воскрешения игроку: уходят через очередь pendingStatusEffects, игрок применяет их у себя.
+    window.gmDeathCmd = function (uid, action, n) {
+        const p = ((lastData && lastData.participants) || {})[uid] || {};
+        const label = { loseItems: 'потеря части вещей', revive: 'воскрешение', addLives: 'жизни ' + (n > 0 ? '+' : '') + n, fall: 'пал' }[action] || action;
+        if (action === 'loseItems' && !confirm('Игрок «' + (p.name || '?') + '» потеряет 1–4 случайные стопки ненадетых вещей. Продолжить?')) return;
+        const cmd = { id: 'death-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'death', action: action, fromGm: true };
+        if (n !== undefined) cmd.n = n;
+        const patch = {};
+        patch['participants.' + uid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(cmd);
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '⚰️ ' + (p.name || '?') + ': ' + label + '.' });
+        db.collection('sessions').doc(currentCode).update(patch).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.gmPartyFell = function () {
+        const parts = (lastData && lastData.participants) || {};
+        const uids = Object.keys(parts);
+        if (!uids.length) return;
+        if (!confirm('Вся партия падает (0 ХП) и приходит в себя через несколько дней. Каждый игрок увидит экран «Персонаж пал». Продолжить?')) return;
+        const patch = {};
+        uids.forEach(uid => {
+            patch['participants.' + uid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'death-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'death', action: 'fall', fromGm: true });
+        });
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '☠ Вся партия пала. Очнуться можно через несколько дней — без части вещей.' });
+        db.collection('sessions').doc(currentCode).update(patch).catch(e => alert('Ошибка: ' + e.message));
+    };
 
     window.setParticipantTown = function (uid, flag) {
         const patch = {};
@@ -1681,6 +2236,7 @@
         saveCrimeState().then(() => {
             renderCrimePanel();
             gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${currentCrimeState.fineHold})${currentCrimeState.fineReason ? ': ' + currentCrimeState.fineReason : ''}.`);
+            try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: currentCrimeState.fineReason, hold: currentCrimeState.fineHold || undefined, who: [((lastData.participants || {})[currentInvPlayerUid] || {}).name].filter(Boolean) }); } catch (e) { }
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -1709,6 +2265,7 @@
         saveCrimeState().then(() => {
             renderCrimePanel();
             gmPostLogEntryText(`🔒 Игрок отправлен в тюрьму на ${days} дн. (${currentCrimeState.jailHold}).`);
+            try { window.rumAddDeed({ kind: 'jail', days: days, hold: currentCrimeState.jailHold || undefined, who: [((lastData.participants || {})[currentInvPlayerUid] || {}).name].filter(Boolean) }); } catch (e) { }
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -2837,6 +3394,7 @@
         Promise.all(uids.map(uid => grantQuestToUid(uid, quest))).then(() => {
             resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Квест «${escapeHtml(title)}» выдан (${uids.length} игрок(ов)).</span>`;
             gmPostLogEntryText(`📜 Мастер выдал квест «${title}» (${target === 'all' ? 'всей группе' : ((lastData.participants[target] || {}).name || target)}).`);
+            try { window.rumAddDeed({ kind: 'quest', what: title, who: target === 'all' ? rumPartyNames() : [((lastData.participants || {})[target] || {}).name].filter(Boolean) }); } catch (e) { }
             el('quest-title-input').value = '';
             el('quest-desc-input').value = '';
             el('quest-req-input').value = '';

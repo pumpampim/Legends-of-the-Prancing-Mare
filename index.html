@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
 
     <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css, чтобы класс
@@ -601,13 +601,14 @@
         <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
-        <button class="tab-link" onclick="openTab(event, 'tab5')">Инвентарь и квесты</button>
+        <button class="tab-link" id="tab5-btn" onclick="openTab(event, 'tab5')">Инвентарь и квесты</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
         <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
         <button class="tab-link" onclick="openTab(event, 'tab11')">📅 Календарь</button>
         <button class="tab-link" onclick="openTab(event, 'tab12')">🏪 Торговля</button>
-        <button class="tab-link" onclick="openTab(event, 'tab13')">🗺️ Карта</button>
+        <button class="tab-link" id="tab13-btn" onclick="openTab(event, 'tab13')">🗺️ Карта</button>
+        <button class="tab-link" id="tab14-btn" onclick="openTab(event, 'tab14')">📖 Дневник</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -659,7 +660,11 @@
                     </div>
                     <div>
                         <label>Запас Свободных Жизней</label>
-                        <input type="number" id="char-lives" value="50" onchange="saveLocalStorage()">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <input type="number" id="char-lives" value="50" min="0" onchange="renderDeathUi(); saveLocalStorage()" style="flex:1;">
+                            <button type="button" onclick="rollFreeLives()" title="В начале игры бросается d100 (Sistema 2.2, «Концепция смерти»)" style="white-space:nowrap;">🎲 d100</button>
+                        </div>
+                        <div id="lives-status" style="font-size:12px; margin-top:3px;"></div>
                     </div>
                 </div>
 
@@ -1119,16 +1124,26 @@
             <!-- Правая колонка: передача золота + заметки под ней (раньше заметки падали в следующий ряд, а справа оставалось пустое место) -->
             <div class="grid-col">
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
-            <div class="panel">
-                <h2>🤝 Передать союзнику</h2>
+            <div class="panel" id="trade-panel">
+                <h2>🤝 Обмен с игроком</h2>
                 <p style="font-size:13px; opacity:.75;">Работает только внутри активной сессии мастера. Выбери, кому передавать, — этот же выбор используется и для кнопки «→» у предметов в инвентаре ниже.</p>
                 <label>Кому</label>
                 <select id="trade-target-select" onchange="renderInventoryList()"></select>
 
-                <label>Золото</label>
+                <label>Отдаю: предметы</label>
+                <div id="trade-draft" style="padding:4px 0;"></div>
+                <label>Отдаю: золото</label>
                 <input type="number" id="trade-gold-amount" placeholder="0" value="0" min="0">
-                <button class="btn-success" style="width:100%; margin-top:4px;" onclick="tradeGoldToPlayer()">Передать золото</button>
+                <label>Прошу взамен: золото</label>
+                <input type="number" id="trade-want-gold" placeholder="0" value="0" min="0">
+                <label>Прошу взамен: что-то ещё (напиши словами, договоритесь голосом)</label>
+                <input type="text" id="trade-want-note" maxlength="200" placeholder="Например: зелье здоровья">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="sendTradeOffer()">📨 Отправить предложение</button>
                 <div id="trade-result" style="margin-top:8px; font-size:14px;"></div>
+                <h3 style="margin:10px 0 4px;">Входящие предложения</h3>
+                <div id="trade-incoming"></div>
+                <h3 style="margin:10px 0 4px;">Мои предложения</h3>
+                <div id="trade-outgoing"></div>
             </div>
 
             <!-- Заметки и рецепты -->
@@ -1569,6 +1584,15 @@
         </div>
     </div>
 
+    <button id="trade-toast" type="button" onclick="openTradePanel()" style="display:none; position:fixed; right:12px; top:12px; z-index:8998; width:auto; background:#2c4a2c; color:#fff; border:2px solid #2ecc71; padding:8px 12px;"></button>
+    <div id="death-overlay" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.9); overflow:auto;">
+        <div class="panel" style="max-width:520px; margin:8vh auto; border-color:#a02e23;">
+            <h2 style="color:#e74c3c;">⚰️ Персонаж пал</h2>
+            <div id="death-body"></div>
+        </div>
+    </div>
+    <button id="death-mini" type="button" onclick="minimizeDeath(false)" style="display:none; position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:8999; background:#7a1f17; color:#fff; border:2px solid #e74c3c; padding:8px 14px;">⚰️ Персонаж пал — открыть</button>
+
     <div id="tab13" class="tab-content">
         <div class="panel">
             <h2>🗺️ Карта Скайрима</h2>
@@ -1576,6 +1600,39 @@
             <div id="player-map-status" style="font-size:15px; margin-bottom:8px; color:var(--accent-color);"></div>
             <button id="player-map-back" style="display:none; margin-bottom:8px;" onclick="playerMapZoom('')">← Вся карта</button>
             <div id="player-map"></div>
+            <div id="player-map-place-info"></div>
+        </div>
+        <div class="panel">
+            <h2>📍 Известные места</h2>
+            <p style="font-size:13px; opacity:.75;">Места, которые открыл мастер: нажми на название, чтобы прочитать описание. Метки с точкой видны и на карте (приблизь владение).</p>
+            <div id="player-map-places"></div>
+        </div>
+    </div>
+
+    <div id="tab14" class="tab-content">
+        <div class="panel">
+            <h2>📜 Журнал сессии</h2>
+            <p style="font-size:13px; opacity:.75;">Это публикует мастер: что было на прошлой сессии и какие слухи ходят по Скайриму.</p>
+            <h3 style="margin:6px 0 2px;">Сводка прошлой сессии</h3>
+            <div id="journal-summary" style="font-size:14px; line-height:1.5; white-space:pre-wrap;"><span style="opacity:.6;">Подключись к сессии, чтобы видеть журнал.</span></div>
+            <h3 style="margin:10px 0 2px;">🗣️ Слухи</h3>
+            <div id="journal-rumors" style="font-size:14px;"></div>
+        </div>
+        <div class="panel">
+            <h2>🤝 Записи партии</h2>
+            <p style="font-size:13px; opacity:.75;">Общие заметки — их видит вся партия и мастер (имена, находки, договорённости).</p>
+            <div id="journal-entries" style="max-height:300px; overflow:auto; margin-bottom:8px;"></div>
+            <textarea id="journal-new" rows="2" placeholder="Что вы узнали или решили?"></textarea>
+            <button type="button" style="margin-top:4px;" onclick="postJournalEntry()">Записать для всех</button>
+        </div>
+        <div class="panel">
+            <h2>✍️ Мои записи</h2>
+            <p style="font-size:13px; opacity:.75;">Личный дневник персонажа. Хранится вместе с персонажем и видна только тебе.</p>
+            <input type="text" id="diary-new-title" placeholder="Заголовок (необязательно)">
+            <textarea id="diary-new-text" rows="3" placeholder="Что записать?" style="margin-top:4px;"></textarea>
+            <button type="button" style="margin:4px 0 8px;" onclick="addDiaryEntry()">+ Добавить запись</button>
+            <input type="text" id="diary-search" placeholder="🔍 Поиск по дневнику" oninput="renderDiary()">
+            <div id="diary-list" style="margin-top:8px;"></div>
         </div>
     </div>
 
@@ -1589,12 +1646,7 @@
             <label>Кому продаём</label>
             <div id="sell-stock-note" style="font-size:13px; opacity:.85; margin:2px 0 4px;"></div>
             <select id="sell-merchant-type" onchange="onSellMerchantChanged()">
-                <option value="food">🍲 Продавец еды (еда, напитки)</option>
-                <option value="blacksmith"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузнец (броня, оружие, боеприпасы)</option>
-                <option value="alchemist"><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Алхимик (зелья, яды, ингредиенты)</option>
-                <option value="mage"><span class="skyrim-icon icon-book" aria-hidden="true"></span> Колдун (книги, одеяния, свитки, камни душ)</option>
-                <option value="pawnbroker">🛒 Барахольщик (покупает всё, но дешевле)</option>
-                <option value="fence">🗡️ Скупщик Гильдии воров (единственный, кто купит краденое — нужно членство в гильдии)</option>
+                <option value="fence">🗡️ Тайный скупщик (краденое; нужна Гильдия воров)</option>
             </select>
 
             <label style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:8px;">
@@ -2430,8 +2482,12 @@ window.toggleSkillPanel = function (idx) {
         document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         ev.currentTarget.classList.add('active');
+        // на телефоне полоса вкладок прокручивается — подвигаем её, чтобы выбранная вкладка была на виду
+        try { ev.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch (e) { }
         if (tabId === 'tab7') initTab7IfNeeded();
-        if (tabId === 'tab13' && typeof window.renderPlayerMap === 'function') window.renderPlayerMap(true);
+        if (tabId === 'tab13' && typeof window.renderPlayerMap === 'function') { if (typeof window.markPlacesSeen === 'function') window.markPlacesSeen(); window.renderPlayerMap(true); }
+        if (tabId === 'tab5' && typeof renderTradePanel === 'function') renderTradePanel();
+        if (tabId === 'tab14') { if (typeof window.markJournalSeen === 'function') window.markJournalSeen(); renderDiary(); }
         // Пересчитываем всё заново при каждом переключении вкладки — защита от любых
         // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка). Через
         // scheduleUpdateAll(), не напрямую — см. пояснение выше.
@@ -4101,11 +4157,10 @@ window.toggleSkillPanel = function (idx) {
         if (profile === 'jeweler') return classifyItemBroad(item) === 'jewelry';
         return classifyItemForMerchant(item) === profile;
     }
-    // Список «Кому продаём»: живые торговцы сессии (общий пул с покупкой) + обычные профили без лавки.
+    // Список «Кому продаём»: только живые торговцы сессии (общий пул с покупкой). Единственное исключение —
+    // тайный скупщик краденого: у него нет лавки и ассортимента, поэтому его нельзя «завезти» как торговца.
     const SELL_GENERIC_OPTIONS = [
-        ['food', '🍲 Продавец еды (вне лавки)'], ['blacksmith', 'Кузнец (вне лавки)'], ['alchemist', 'Алхимик (вне лавки)'],
-        ['mage', 'Колдун (вне лавки)'], ['pawnbroker', '🛒 Барахольщик (покупает всё, но дешевле)'],
-        ['fence', '🗡️ Скупщик Гильдии воров (краденое; нужно членство в гильдии)']
+        ['fence', '🗡️ Тайный скупщик (краденое; нужна Гильдия воров)']
     ];
     function renderSellMerchantSelect() {
         const sel = document.getElementById('sell-merchant-type');
@@ -4117,12 +4172,12 @@ window.toggleSkillPanel = function (idx) {
         let html = '';
         if (keys.length) html += '<optgroup label="🏪 Торговцы (общий ассортимент: проданное можно выкупить)">' +
             keys.map(k => `<option value="stock:${escHtml(k)}">${escHtml(stocks[k].label)} — ${escHtml(stocks[k].hold)} (${stocks[k].gold} зол.)</option>`).join('') + '</optgroup>';
-        html += '<optgroup label="Без лавки (простая продажа)">' + SELL_GENERIC_OPTIONS.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('') + '</optgroup>';
+        html += '<optgroup label="Краденое">' + SELL_GENERIC_OPTIONS.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('') + '</optgroup>';
         if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; }
         const valid = Array.prototype.some.call(sel.options, o => o.value === prev);
         // Пока игрок сам ничего не выбирал, а живой торговец есть — по умолчанию он (общий пул с покупкой).
         const prefer = keys.length && !sel.dataset.userChosen;
-        sel.value = (valid && !prefer) ? prev : (keys.length ? (keys.some(k => 'stock:' + k === prev) ? prev : 'stock:' + keys[0]) : (valid ? prev : 'pawnbroker'));
+        sel.value = (valid && !prefer) ? prev : (keys.length ? (keys.some(k => 'stock:' + k === prev) ? prev : 'stock:' + keys[0]) : (valid ? prev : 'fence'));
     }
     // Селекторы «купить у…» и «продать…» смотрят на одного торговца.
     // Продавать, как и покупать, можно только в городе и только когда мастер завёз торговцев в сессию.
@@ -4590,7 +4645,7 @@ window.toggleSkillPanel = function (idx) {
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
                     ${item.upgradeMaterial ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
                     ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${(item.qualityRank && SHARPEN_TIERS[item.qualityRank-1]) ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
-                    <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Передать 1 шт. выбранному в «Передать союзнику» игроку (выше на этой же вкладке)">→</button>
+                    <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Добавить 1 шт. в предложение обмена (панель «Обмен с игроком» выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
             </div>
@@ -6423,6 +6478,7 @@ window.toggleSkillPanel = function (idx) {
     window.applyIncomingStatusEffects = function (effects) {
         let names = [], removedNames = [], ignoredNames = [];
         effects.forEach(e => {
+            if (e.cmd === 'death') { handleGmDeathCmd(e); return; } // команды мастера: потеря вещей / воскрешение / жизни
             if (e.undeadOnly && !(playerSupernaturalState && playerSupernaturalState.vampirism)) { // «не действует на живых существ»
                 ignoredNames.push(e.effectName);
                 return;
@@ -7952,56 +8008,207 @@ window.toggleSkillPanel = function (idx) {
         // Кнопки "→" у предметов в инвентаре появляются/пропадают в зависимости от того,
         // выбран ли получатель — перерисовываем список.
         if (typeof renderInventoryList === 'function') renderInventoryList();
+        if (typeof renderTradeDraft === 'function') renderTradeDraft();
+        if (typeof renderTradePanel === 'function') renderTradePanel();
     }
     window.renderTradeSelects = renderTradeSelects;
 
-    window.tradeGoldToPlayer = function () {
-        const targetUid = document.getElementById('trade-target-select').value;
-        const amount = parseInt(document.getElementById('trade-gold-amount').value) || 0;
-        const resultEl = document.getElementById('trade-result');
-        if (!targetUid) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери, кому передать.</span>'; return; }
-        if (amount <= 0) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи сумму больше нуля.</span>'; return; }
-        const goldInput = document.getElementById('char-gold');
-        const myGold = parseInt(goldInput.value) || 0;
-        if (myGold < amount) { resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
+    // ===== ОБМЕН МЕЖДУ ИГРОКАМИ (с подтверждением получателя) =====
+    // Предложение лежит в session.trades[id]: { id, from, fromName, to, toName, give:{items:[...], gold}, want:{gold, note},
+    // status: pending|accepted|declined|cancelled, ts, fromApplied, toApplied }. Предметы/золото отправителя уходят в «залог»
+    // (в само предложение) сразу при отправке; получатель принимает — и получает их, отказывает/отменяют — залог возвращается.
+    // Каждый клиент применяет свою часть ровно один раз (ключи в tradesDone, сохраняются вместе с персонажем).
+    let tradeDraft = { items: [], gold: 0 };
+    let tradesDone = {};
+    let tradesReady = false;
+    setTimeout(() => { tradesReady = true; }, 4000); // страховка, если персонаж не пришёл из облака (новый лист)
+    let _lastTrades = {};
+    const TRADE_STATUS_RU = { pending: 'ждёт ответа', accepted: 'принято', declined: 'отклонено', cancelled: 'отменено' };
 
-        window.CloudSync.transferGoldToPlayer(targetUid, amount).then(() => {
-            goldInput.value = myGold - amount;
-            const session = window.CloudSync.getSessionData();
-            const pname = (session.participants[targetUid] || {}).name || targetUid;
-            resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано ${amount} золота игроку ${escHtml(pname)}.</span>`;
-            if (window.CloudSync.postCombatLog) {
-                const myName = document.getElementById('char-name').value;
-                window.CloudSync.postCombatLog(`🤝 ${myName} передал(а) ${amount} золота игроку ${pname}.`, myName);
-            }
-            document.getElementById('trade-gold-amount').value = 0;
-            saveLocalStorage();
-        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
-    };
+    function tradeMyUid() { return window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null; }
+    function tradeName() { return (document.getElementById('char-name') || {}).value || 'Игрок'; }
+    function tradeGoldNow() { return parseInt(document.getElementById('char-gold').value) || 0; }
+    function tradeSetGold(v) { document.getElementById('char-gold').value = Math.max(0, Math.round(v)); }
+    function tradeLog(text) { if (window.CloudSync && window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(text, tradeName()); }
+    function tradeItemsText(items) { return (items || []).map(i => '«' + i.name + '»' + (i.count > 1 ? ' ×' + i.count : '')).join(', '); }
+    function tradeOfferText(o) {
+        const parts = [];
+        if (o && o.items && o.items.length) parts.push(tradeItemsText(o.items));
+        if (o && o.gold) parts.push(o.gold + ' зол.');
+        return parts.join(' + ');
+    }
+    function tradeClone(x) { return JSON.parse(JSON.stringify(x)); }
 
-    window.tradeItemToPlayer = function (itemId, qty) {
-        const targetUid = document.getElementById('trade-target-select').value;
-        qty = qty || 1;
-        const resultEl = document.getElementById('trade-result');
-        if (!targetUid) { alert('Сначала выбери получателя вверху панели «Передать союзнику».'); return; }
+    function tradeAddItemToMe(it) {
+        const c = Object.assign({}, it);
+        const itemId = c.itemId, name = c.name, count = c.count || 1, weight = c.weight, category = c.category, effect = c.effect;
+        ['itemId', 'name', 'count', 'weight', 'category', 'effect'].forEach(k => delete c[k]);
+        addToInventory(itemId, name, count, weight, category, effect, c);
+    }
+
+    // ---- черновик предложения ----
+    window.tradeItemToPlayer = function (itemId) { // кнопка «→» у предмета: добавить 1 шт. в предложение
         const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item) { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">Предмет не найден.</span>'; return; }
-        if (item.count < qty) { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">У тебя столько нет.</span>'; return; }
-
-        const itemData = Object.assign({}, item, { count: qty });
-        window.CloudSync.transferItemToPlayer(targetUid, itemData).then(() => {
-            removeFromInventoryByName(itemId, qty);
-            const session = window.CloudSync.getSessionData();
-            const pname = (session.participants[targetUid] || {}).name || targetUid;
-            if (resultEl) resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Передано «${escHtml(item.name)}» ×${qty} игроку ${escHtml(pname)}.</span>`;
-            if (window.CloudSync.postCombatLog) {
-                const myName = document.getElementById('char-name').value;
-                window.CloudSync.postCombatLog(`🤝 ${myName} передал(а) «${item.name}» ×${qty} игроку ${pname}.`, myName);
-            }
-            renderInventoryList();
-            saveLocalStorage();
-        }).catch(e => { if (resultEl) resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escHtml(e.message) + '</span>'; });
+        if (!item) return;
+        const worn = Object.keys(equippedSlots).some(k => equippedSlots[k] === itemId);
+        if (worn) { alert('«' + item.name + '» надет(а) — сначала сними, потом предлагай.'); return; }
+        const d = tradeDraft.items.find(i => i.itemId === itemId);
+        if (d) { if (d.qty >= item.count) { alert('У тебя больше нет «' + item.name + '».'); return; } d.qty++; }
+        else tradeDraft.items.push({ itemId, qty: 1 });
+        renderTradeDraft();
+        const box = document.getElementById('trade-draft'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
     };
+    window.tradeDraftRemove = function (itemId) {
+        const d = tradeDraft.items.find(i => i.itemId === itemId); if (!d) return;
+        d.qty--; if (d.qty <= 0) tradeDraft.items = tradeDraft.items.filter(i => i.itemId !== itemId);
+        renderTradeDraft();
+    };
+    function renderTradeDraft() {
+        const box = document.getElementById('trade-draft'); if (!box) return;
+        // выкидываем то, чего уже нет в инвентаре
+        tradeDraft.items = tradeDraft.items.filter(d => { const it = playerInventory.find(i => i.itemId === d.itemId); if (!it) return false; d.qty = Math.min(d.qty, it.count); return d.qty > 0; });
+        box.innerHTML = tradeDraft.items.length ? tradeDraft.items.map(d => {
+            const it = playerInventory.find(i => i.itemId === d.itemId);
+            return `<div style="display:flex; gap:6px; align-items:center; font-size:14px; margin-bottom:2px;"><span style="flex:1;">«${escHtml(it.name)}» × ${d.qty}</span><button type="button" style="width:auto; padding:1px 8px;" onclick="tradeDraftRemove('${escHtml(d.itemId)}')">−</button></div>`;
+        }).join('') : '<span style="opacity:.6; font-size:13px;">Предметов нет — нажми «→» у вещи в инвентаре ниже.</span>';
+    }
+
+    // ---- отправка ----
+    window.sendTradeOffer = function () {
+        const resultEl = document.getElementById('trade-result');
+        const say = (t, ok) => { resultEl.innerHTML = '<span style="color:' + (ok ? '#2ecc71' : '#e74c3c') + ';">' + escHtml(t) + '</span>'; };
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const myUid = tradeMyUid();
+        const to = document.getElementById('trade-target-select').value;
+        if (!session || !myUid) { say('Обмен работает только внутри активной сессии.'); return; }
+        if (!to) { say('Выбери, с кем меняешься.'); return; }
+        const giveGold = Math.max(0, parseInt(document.getElementById('trade-gold-amount').value) || 0);
+        const wantGold = Math.max(0, parseInt(document.getElementById('trade-want-gold').value) || 0);
+        const note = (document.getElementById('trade-want-note').value || '').trim().slice(0, 200);
+        if (!tradeDraft.items.length && !giveGold) { say('Добавь в предложение предмет или золото.'); return; }
+        if (giveGold > tradeGoldNow()) { say('У тебя нет столько золота.'); return; }
+        const items = [];
+        for (const d of tradeDraft.items) {
+            const it = playerInventory.find(i => i.itemId === d.itemId);
+            if (!it || it.count < d.qty) { say('Предмета «' + (it ? it.name : d.itemId) + '» не хватает.'); return; }
+            items.push(Object.assign(tradeClone(it), { count: d.qty }));
+        }
+        const id = 't' + Date.now() + Math.random().toString(36).slice(2, 6);
+        const toName = ((session.participants || {})[to] || {}).name || '?';
+        const trade = { id, from: myUid, fromName: tradeName(), to, toName, give: { items, gold: giveGold }, want: { gold: wantGold, note }, status: 'pending', ts: Date.now() };
+        // залог: убираем предметы/золото у себя сразу
+        tradeDraft.items.forEach(d => removeFromInventoryByName(d.itemId, d.qty));
+        if (giveGold) tradeSetGold(tradeGoldNow() - giveGold);
+        tradesDone[id + ':escrow'] = 1;
+        refreshInventoryViews();
+        saveLocalStorage(true);
+        window.CloudSync.createTrade(id, trade).then(() => {
+            say('📨 Предложение отправлено игроку ' + toName + ': отдаёшь ' + (tradeOfferText(trade.give) || '—') + (wantGold || note ? ', просишь ' + [wantGold ? wantGold + ' зол.' : '', note].filter(Boolean).join(' · ') : '') + '. Пока он не ответит, вещи лежат в предложении; отменить можно в любой момент.', true);
+            tradeLog('🤝 ' + tradeName() + ' предлагает ' + toName + ' обмен: отдаёт ' + tradeOfferText(trade.give) + (wantGold ? ', хочет ' + wantGold + ' зол.' : '') + (note ? ' («' + note + '»)' : '') + '.');
+            tradeDraft = { items: [], gold: 0 };
+            document.getElementById('trade-gold-amount').value = 0; document.getElementById('trade-want-gold').value = 0; document.getElementById('trade-want-note').value = '';
+            renderTradeDraft();
+        }).catch(e => { // не вышло — возвращаем залог
+            trade.give.items.forEach(tradeAddItemToMe);
+            if (giveGold) tradeSetGold(tradeGoldNow() + giveGold);
+            delete tradesDone[id + ':escrow'];
+            saveLocalStorage(true);
+            say('Не удалось отправить: ' + e.message);
+        });
+    };
+
+    // ---- ответы ----
+    window.acceptTrade = function (id) {
+        const t = _lastTrades[id]; if (!t || t.to !== tradeMyUid() || t.status !== 'pending') return;
+        if ((t.want.gold || 0) > tradeGoldNow()) { alert('У тебя не хватает золота: просят ' + t.want.gold + '.'); return; }
+        window.CloudSync.respondTrade(id, ['pending'], 'accepted').then(() => {
+            tradeLog('🤝 ' + tradeName() + ' принял(а) обмен от ' + t.fromName + '.');
+        }).catch(e => alert(e.message));
+    };
+    window.declineTrade = function (id) {
+        const t = _lastTrades[id]; if (!t || t.to !== tradeMyUid()) return;
+        window.CloudSync.respondTrade(id, ['pending'], 'declined').then(() => tradeLog('🤝 ' + tradeName() + ' отклонил(а) обмен от ' + t.fromName + '.')).catch(e => alert(e.message));
+    };
+    window.cancelTrade = function (id) {
+        const t = _lastTrades[id]; if (!t || t.from !== tradeMyUid()) return;
+        window.CloudSync.respondTrade(id, ['pending'], 'cancelled').then(() => tradeLog('🤝 ' + tradeName() + ' отменил(а) своё предложение обмена.')).catch(e => alert(e.message));
+    };
+
+    // ---- применение (каждая сторона один раз) ----
+    window.processTrades = function (trades, force) {
+        trades = trades || {};
+        _lastTrades = trades;
+        const myUid = tradeMyUid();
+        if (!myUid) return;
+        const ready = force || tradesReady || (window.CloudSync && window.CloudSync.isDataReady && window.CloudSync.isDataReady());
+        if (ready) {
+            let changed = false;
+            const msgs = [];
+            Object.keys(trades).forEach(id => {
+                const t = trades[id]; if (!t) return;
+                const kFrom = id + ':from', kTo = id + ':to';
+                if (t.from === myUid && !tradesDone[kFrom]) {
+                    if (t.status === 'accepted') {
+                        tradesDone[kFrom] = 1; changed = true;
+                        if (t.want.gold) tradeSetGold(tradeGoldNow() + t.want.gold);
+                        msgs.push('✅ ' + t.toName + ' принял(а) твой обмен' + (t.want.gold ? ': получено ' + t.want.gold + ' зол.' : '') + '.');
+                        window.CloudSync.flagTrade(id, 'fromApplied').catch(() => { });
+                    } else if (t.status === 'declined' || t.status === 'cancelled') {
+                        tradesDone[kFrom] = 1; changed = true;
+                        (t.give.items || []).forEach(tradeAddItemToMe);
+                        if (t.give.gold) tradeSetGold(tradeGoldNow() + t.give.gold);
+                        msgs.push((t.status === 'declined' ? '❌ ' + t.toName + ' отклонил(а) обмен' : '↩️ Обмен отменён') + ' — вещи и золото вернулись к тебе.');
+                        window.CloudSync.flagTrade(id, 'fromApplied').catch(() => { });
+                    }
+                }
+                if (t.to === myUid && t.status === 'accepted' && !tradesDone[kTo]) {
+                    tradesDone[kTo] = 1; changed = true;
+                    (t.give.items || []).forEach(tradeAddItemToMe);
+                    tradeSetGold(tradeGoldNow() + (t.give.gold || 0) - Math.min(tradeGoldNow() + (t.give.gold || 0), t.want.gold || 0));
+                    msgs.push('🎁 Обмен с ' + t.fromName + ' завершён: получено ' + (tradeOfferText(t.give) || '—') + (t.want.gold ? ', отдано ' + t.want.gold + ' зол.' : '') + '.');
+                    window.CloudSync.flagTrade(id, 'toApplied').catch(() => { });
+                }
+            });
+            if (changed) { refreshInventoryViews(); updateAll(); saveLocalStorage(true); }
+            if (msgs.length) setTimeout(() => alert(msgs.join('\n')), 50);
+            // уборка: когда обе стороны применили итог — запись удаляем
+            Object.keys(trades).forEach(id => {
+                const t = trades[id]; if (!t || t.status === 'pending') return;
+                if (t.from !== myUid && t.to !== myUid) return;
+                const needTo = t.status === 'accepted';
+                const fromOk = t.fromApplied || (t.from === myUid && tradesDone[id + ':from']);
+                const toOk = !needTo || t.toApplied || (t.to === myUid && tradesDone[id + ':to']);
+                if (fromOk && toOk) window.CloudSync.deleteTrade(id).catch(() => { });
+            });
+        }
+        renderTradePanel();
+    };
+
+    function renderTradePanel() {
+        const myUid = tradeMyUid();
+        const inc = document.getElementById('trade-incoming'), out = document.getElementById('trade-outgoing');
+        const btn = document.getElementById('tab5-btn'), toast = document.getElementById('trade-toast');
+        const list = Object.values(_lastTrades || {}).filter(t => t && (t.from === myUid || t.to === myUid)).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        const incoming = list.filter(t => t.to === myUid && t.status === 'pending');
+        const outgoing = list.filter(t => t.from === myUid);
+        if (inc) inc.innerHTML = incoming.length ? incoming.map(t => `<div style="border:1px solid var(--accent-color); border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+            <b>${escHtml(t.fromName)}</b> предлагает обмен:<br>
+            <span style="font-size:14px;">Отдаёт: <b>${escHtml(tradeOfferText(t.give) || '—')}</b></span><br>
+            <span style="font-size:14px;">Хочет взамен: <b>${escHtml([t.want.gold ? t.want.gold + ' зол.' : '', t.want.note || ''].filter(Boolean).join(' · ') || 'ничего')}</b></span>
+            ${(t.want.gold || 0) > tradeGoldNow() ? '<div style="color:#e74c3c; font-size:12px;">У тебя не хватает золота.</div>' : ''}
+            <div style="display:flex; gap:6px; margin-top:4px;"><button class="btn-success" onclick="acceptTrade('${escHtml(t.id)}')" ${(t.want.gold || 0) > tradeGoldNow() ? 'disabled' : ''}>✅ Принять</button><button class="btn-danger" onclick="declineTrade('${escHtml(t.id)}')">❌ Отклонить</button></div></div>`).join('')
+            : '<span style="opacity:.6; font-size:13px;">Входящих предложений нет.</span>';
+        if (out) out.innerHTML = outgoing.length ? outgoing.map(t => `<div style="font-size:13px; margin-bottom:4px;">→ <b>${escHtml(t.toName)}</b>: отдаю ${escHtml(tradeOfferText(t.give) || '—')}${t.want.gold || t.want.note ? '; прошу ' + escHtml([t.want.gold ? t.want.gold + ' зол.' : '', t.want.note || ''].filter(Boolean).join(' · ')) : ''} — <i>${TRADE_STATUS_RU[t.status] || t.status}</i>
+            ${t.status === 'pending' ? ` <button type="button" style="width:auto; padding:1px 8px; font-size:12px;" onclick="cancelTrade('${escHtml(t.id)}')">Отменить</button>` : ''}</div>`).join('')
+            : '<span style="opacity:.6; font-size:13px;">Исходящих нет.</span>';
+        const hasIn = incoming.length > 0;
+        if (btn) btn.textContent = hasIn && !btn.classList.contains('active') ? 'Инвентарь и квесты ●' : 'Инвентарь и квесты';
+        if (toast) {
+            toast.style.display = hasIn ? 'block' : 'none';
+            toast.textContent = hasIn ? '🤝 ' + incoming[0].fromName + ' предлагает обмен — открыть' : '';
+        }
+    }
+    window.openTradePanel = function () { const b = document.getElementById('tab5-btn'); if (b) b.click(); setTimeout(() => { const p = document.getElementById('trade-incoming'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); };
 
     window.renderAttackTargetSelect = function () {
         const select = document.getElementById('attack-target-select');
@@ -8021,19 +8228,59 @@ window.toggleSkillPanel = function (idx) {
     let playerMapHold = '';
     window.playerMapZoom = function (h) { playerMapHold = h || ''; window.renderPlayerMap(true); };
     let _playerMapSig = null;
+    let _playerPlaceSel = null; // id выбранного открытого места (показываем карточку)
+    // Открытые мастером места (session.openPlaces): [{id, hold, name, cat, desc, x?, y?, ts}]
+    window.playerShowPlace = function (id) { _playerPlaceSel = id; _playerMapSig = null; window.renderPlayerMap(true); };
+    window.playerOpenPlaceHold = function (h) { _playerMapSig = null; window.playerMapZoom(h); };
+    function renderOpenPlaces(session) {
+        const listEl = document.getElementById('player-map-places'), infoEl = document.getElementById('player-map-place-info');
+        const places = (session && Array.isArray(session.openPlaces)) ? session.openPlaces : [];
+        // метка «есть новое» на вкладке
+        const sigNew = places.map(p => p.id).join(',');
+        let seen = ''; try { seen = localStorage.getItem('placesSeen') || ''; } catch (e) { }
+        window._placesSig = sigNew;
+        const btn = document.getElementById('tab13-btn');
+        if (btn) btn.textContent = (sigNew && sigNew !== seen && !btn.classList.contains('active')) ? '🗺️ Карта ●' : '🗺️ Карта';
+        if (btn && btn.classList.contains('active')) window.markPlacesSeen();
+        if (infoEl) {
+            const p = places.find(x => x.id === _playerPlaceSel);
+            infoEl.innerHTML = p ? `<div style="border:1px solid var(--accent-color); border-radius:4px; padding:8px 10px; margin-top:8px;">
+                <strong>${escHtml(p.name)}</strong> <span style="opacity:.7; font-size:13px;">· ${escHtml(p.hold || '')}${p.cat ? ' · ' + escHtml(p.cat) : ''}</span>
+                <div style="font-size:14px; line-height:1.5; margin-top:4px; white-space:pre-wrap;">${escHtml(p.desc || 'Мастер не оставил описания.')}</div></div>` : '';
+        }
+        if (!listEl) return;
+        if (!places.length) { listEl.innerHTML = '<p style="opacity:.65; font-size:13px;">Открытых мест пока нет — мастер добавит их по ходу игры.</p>'; return; }
+        const byHold = {};
+        places.forEach(p => { (byHold[p.hold || 'Без владения'] = byHold[p.hold || 'Без владения'] || []).push(p); });
+        listEl.innerHTML = Object.keys(byHold).map(h => `<details open style="margin:4px 0;"><summary style="cursor:pointer; font-weight:bold;">${escHtml(h)} <span style="opacity:.6; font-weight:normal;">(${byHold[h].length})</span></summary>` +
+            byHold[h].map(p => `<div style="margin:2px 0 2px 10px; font-size:14px;">
+                <a href="#" style="color:var(--accent-color);" onclick="playerShowPlace('${escHtml(p.id)}'); return false;">${p.x !== undefined ? '📍' : '·'} ${escHtml(p.name)}</a>
+                ${p.cat ? '<span style="opacity:.6; font-size:12px;"> — ' + escHtml(p.cat) + '</span>' : ''}
+                ${HOLDS_HAS(h) ? ` <a href="#" style="font-size:12px; opacity:.8;" onclick="playerOpenPlaceHold('${escHtml(h)}'); return false;">на карте</a>` : ''}</div>`).join('') + '</details>').join('');
+    }
+    function HOLDS_HAS(h) { return !!(window.HoldsMap && window.HoldsMap.HOLDS && window.HoldsMap.HOLDS[h]); }
+    window.markPlacesSeen = function () {
+        try { localStorage.setItem('placesSeen', window._placesSig || ''); } catch (e) { }
+        const btn = document.getElementById('tab13-btn'); if (btn) btn.textContent = '🗺️ Карта';
+    };
     window.renderPlayerMap = function (force) {
         const box = document.getElementById('player-map');
         if (!box || !window.HoldsMap) return;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const party = window.HoldsMap.partyFromSession(session);
         const hl = (session && session.currentHold) || (party && party.hold) || null;
-        const sig = JSON.stringify([playerMapHold, party, hl]);
+        const places = (session && Array.isArray(session.openPlaces)) ? session.openPlaces : [];
+        const sig = JSON.stringify([playerMapHold, party, hl, places, _playerPlaceSel]);
         if (!force && sig === _playerMapSig) return;
         _playerMapSig = sig;
+        const pins = {};
+        places.forEach(p => { if (typeof p.x === 'number' && typeof p.y === 'number' && p.hold) { (pins[p.hold] = pins[p.hold] || {})[p.name] = { x: p.x, y: p.y, cat: p.cat || '' }; } });
         window.HoldsMap.render(box, {
-            hold: playerMapHold || null, hl, party,
-            onHold: h => window.playerMapZoom(h)
+            hold: playerMapHold || null, hl, party, pins, pinsAll: true,
+            onHold: h => window.playerMapZoom(h),
+            onPin: (h, n) => { const p = places.find(x => x.hold === h && x.name === n); if (p) window.playerShowPlace(p.id); }
         });
+        renderOpenPlaces(session);
         const st = document.getElementById('player-map-status');
         if (st) st.innerHTML = party ? `⚑ Партия сейчас: <strong>${escHtml(party.name || 'на карте')}</strong>${party.hold ? ' · ' + escHtml(party.hold) : ''}` : (hl ? `⚑ Партия во владении: <strong>${escHtml(hl)}</strong>` : 'Мастер ещё не отметил положение партии.');
         const back = document.getElementById('player-map-back');
@@ -9686,6 +9933,230 @@ function updateHungerPenalty() {
         const maxMp = parseInt(document.getElementById('max-mp').value) || 1;
         const mpFill = document.getElementById('mp-bar-fill');
         if (mpFill) mpFill.style.width = Math.max(0, Math.min(100, (curMp / maxMp) * 100)) + '%';
+        try { checkDeath(); } catch (e) { /* deathState ещё не инициализирован при самой ранней отрисовке */ }
+    }
+
+    // ===== ДНЕВНИК ИГРОКА (личные записи) =====
+    // Общий журнал сессии (сводка, слухи, записи партии) рисуется из cloud.js; здесь — личные заметки,
+    // они сохраняются вместе с персонажем (поле diary) и уходят в облако/файл экспорта.
+    let playerDiary = []; // [{ id, ts, title, text, pinned }]
+    function _diaryEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+    window.addDiaryEntry = function () {
+        const t = document.getElementById('diary-new-title'), x = document.getElementById('diary-new-text');
+        const title = (t.value || '').trim(), text = (x.value || '').trim();
+        if (!title && !text) return;
+        playerDiary.unshift({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), title: title, text: text, pinned: false });
+        t.value = ''; x.value = '';
+        renderDiary(); saveLocalStorage();
+    };
+    window.addRumorDiaryEntry = function (r) {
+        playerDiary.unshift({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), title: '🗣 Слух' + (r.hold ? ' · ' + r.hold : ''), text: r.text || '', pinned: false });
+        renderDiary(); saveLocalStorage();
+        const b = document.getElementById('tab14-btn'); if (b) { const o = b.textContent; b.textContent = '📖 Записано ✔'; setTimeout(() => { b.textContent = o; }, 1200); }
+    };
+    window.deleteDiaryEntry = function (id) {
+        const e = playerDiary.find(d => d.id === id);
+        if (!e || !confirm('Удалить запись' + (e.title ? ' «' + e.title + '»' : '') + '?')) return;
+        playerDiary = playerDiary.filter(d => d.id !== id);
+        renderDiary(); saveLocalStorage();
+    };
+    window.toggleDiaryPin = function (id) {
+        const e = playerDiary.find(d => d.id === id); if (!e) return;
+        e.pinned = !e.pinned; renderDiary(); saveLocalStorage();
+    };
+    window.editDiaryEntry = function (id, field, value) {
+        const e = playerDiary.find(d => d.id === id); if (!e) return;
+        e[field] = value; saveLocalStorage();
+    };
+    window.renderDiary = function () {
+        const box = document.getElementById('diary-list'); if (!box) return;
+        const q = ((document.getElementById('diary-search') || {}).value || '').trim().toLowerCase();
+        const list = playerDiary.filter(d => !q || (d.title + ' ' + d.text).toLowerCase().includes(q))
+            .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.ts - a.ts);
+        if (!list.length) { box.innerHTML = '<p style="opacity:.7;font-size:14px;">' + (q ? 'Ничего не найдено.' : 'Записей пока нет. Пиши сюда имена, обещания, подсказки и всё, что не хочется забыть.') + '</p>'; return; }
+        box.innerHTML = list.map(d => '<div style="border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; margin-bottom:6px;' + (d.pinned ? 'border-color:var(--accent-color);' : '') + '">' +
+            '<div style="display:flex; gap:6px; align-items:center;">' +
+            '<input type="text" value="' + _diaryEsc(d.title) + '" placeholder="Заголовок" style="flex:1; font-weight:bold;" onchange="editDiaryEntry(\'' + d.id + '\',\'title\',this.value)">' +
+            '<button type="button" title="Закрепить" onclick="toggleDiaryPin(\'' + d.id + '\')">' + (d.pinned ? '★' : '☆') + '</button>' +
+            '<button type="button" title="Удалить" onclick="deleteDiaryEntry(\'' + d.id + '\')">🗑</button></div>' +
+            '<textarea rows="3" style="width:100%; margin-top:4px;" onchange="editDiaryEntry(\'' + d.id + '\',\'text\',this.value)">' + _diaryEsc(d.text) + '</textarea>' +
+            '<div style="font-size:11px; opacity:.6;">' + new Date(d.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</div></div>').join('');
+    };
+
+    // ===== СМЕРТЬ И «СВОБОДНЫЕ ЖИЗНИ» (Sistema 2.2, «Концепция смерти») =====
+    // В начале игры бросается d100 — это запас свободных жизней. Падение до 0 ХП тратит одну:
+    // персонаж приходит в себя через несколько дней (если донесли до города — без потерь, если
+    // очнулся сам или пала вся партия — без части вещей). Когда жизни кончились, воскреснуть
+    // можно только выполнив квест своего божества (подтверждает мастер).
+    let deathState = { fallen: false, rolled: false, deaths: 0, minimized: false };
+    const WAKE_HP_FRACTION = 0.5; // после пробуждения — половина максимума (полное ХП даёт только припарка при длительном отдыхе)
+
+    function _dEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    function _dName() { return (document.getElementById('char-name') || {}).value || 'Игрок'; }
+    function _dLog(text) { if (window.CloudSync && window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(text, _dName()); }
+    function _dLives() { return parseInt((document.getElementById('char-lives') || {}).value) || 0; }
+    function _dSetLives(n) { const e = document.getElementById('char-lives'); if (e) e.value = Math.max(0, n); }
+    function _dGodName() {
+        const sel = document.getElementById('faith-god');
+        if (!sel || !sel.value || sel.value === 'none') return '';
+        return (sel.selectedOptions[0] || {}).textContent || '';
+    }
+
+    window.rollFreeLives = function () {
+        if (deathState.rolled && !confirm('Свободные жизни уже бросались. Перебросить d100?')) return;
+        const v = Math.floor(Math.random() * 100) + 1;
+        _dSetLives(v);
+        deathState.rolled = true;
+        _dLog('🎲 ' + _dName() + ' бросает d100 на свободные жизни: ' + v + '.');
+        alert('Бросок d100: ' + v + ' свободных жизней.');
+        renderDeathUi();
+        saveLocalStorage(true);
+    };
+
+    function refreshInventoryViews() {
+        renderInventoryList();
+        if (typeof renderKitchenPot === 'function') renderKitchenPot();
+        if (typeof renderEquipPanel === 'function') renderEquipPanel();
+        if (typeof renderAlchEatSelect === 'function') renderAlchEatSelect();
+        if (typeof renderAlchIngredientSelects === 'function') renderAlchIngredientSelects();
+        if (typeof renderSellList === 'function') renderSellList();
+        if (typeof renderWeaponChargeSelect === 'function') renderWeaponChargeSelect();
+        if (typeof renderTradeSelects === 'function') renderTradeSelects();
+        if (typeof renderTemperSelect === 'function') renderTemperSelect();
+        if (typeof renderMagicStaffList === 'function') renderMagicStaffList();
+        if (typeof renderPouchPanel === 'function') renderPouchPanel();
+        updateAll();
+    }
+
+    // Теряется часть НЕнадетых вещей: n случайных стопок (стопка из нескольких штук — половина).
+    function loseRandomItems(n) {
+        const worn = new Set(Object.keys(equippedSlots).map(k => equippedSlots[k]).filter(Boolean));
+        const pool = playerInventory.filter(i => i && i.count > 0 && !worn.has(i.itemId));
+        const lost = [];
+        for (let k = 0; k < n && pool.length; k++) {
+            const idx = Math.floor(Math.random() * pool.length);
+            const it = pool.splice(idx, 1)[0];
+            const qty = it.count > 1 ? Math.ceil(it.count / 2) : 1;
+            lost.push(it.name + (qty > 1 ? ' ×' + qty : ''));
+            removeFromInventoryByName(it.itemId, qty);
+        }
+        refreshInventoryViews();
+        return lost;
+    }
+
+    window.wakeUp = function (mode) {
+        const lives = _dLives();
+        if (lives <= 0) { renderDeathUi(); return; }
+        _dSetLives(lives - 1);
+        deathState.deaths = (deathState.deaths || 0) + 1;
+        deathState.fallen = false; deathState.minimized = false;
+        const maxHp = parseInt(document.getElementById('max-hp').value) || 1;
+        document.getElementById('cur-hp').value = Math.max(1, Math.ceil(maxHp * WAKE_HP_FRACTION));
+        let lost = [], days;
+        if (mode === 'alone') {
+            days = 2 + (Math.floor(Math.random() * 4) + 1); // 3–6 дней
+            lost = loseRandomItems(Math.floor(Math.random() * 4) + 1);
+        } else {
+            days = 2; // донесли до города — «пара деньков»
+        }
+        const msg = mode === 'alone'
+            ? 'очнулся(ась) через ' + days + ' дн. без части вещей' + (lost.length ? ' (потеряно: ' + lost.join(', ') + ')' : ' (терять оказалось нечего)')
+            : 'друзья донесли до города, поднялся(ась) через ' + days + ' дн. без потерь';
+        _dLog('⚰️ ' + _dName() + ' пал(а) и ' + msg + '. Свободных жизней осталось: ' + (lives - 1) + '. Мастер: сдвиньте календарь на ' + days + ' дн.');
+        updateVitalBars(); updateAll();
+        renderDeathUi();
+        saveLocalStorage(true);
+        alert('Ты ' + msg + '. Свободных жизней осталось: ' + (lives - 1) + '.\nХП: половина максимума. Мастеру нужно сдвинуть календарь на ' + days + ' дн.');
+    };
+
+    window.reviveByQuest = function (fromGm) {
+        if (!fromGm && !confirm('Квест божества выполнен и мастер подтвердил воскрешение?')) return;
+        deathState.fallen = false; deathState.minimized = false;
+        deathState.deaths = (deathState.deaths || 0) + 1;
+        const maxHp = parseInt(document.getElementById('max-hp').value) || 1;
+        document.getElementById('cur-hp').value = Math.max(1, Math.ceil(maxHp * WAKE_HP_FRACTION));
+        _dLog('✨ ' + _dName() + ' воскрешён(а) божеством' + (_dGodName() ? ' (' + _dGodName() + ')' : '') + ' после выполненного квеста.');
+        updateVitalBars(); updateAll();
+        renderDeathUi();
+        saveLocalStorage(true);
+    };
+
+    window.askGodQuest = function () {
+        const god = _dGodName();
+        const text = '🙏 ' + _dName() + ' пал(а), свободные жизни закончились. Нужен квест ' + (god ? 'божества «' + god + '»' : 'ближайшего по делам божества') + ' для воскрешения.';
+        if (typeof window.CloudSync !== 'undefined' && window.CloudSync.sendWhisperToGm) window.CloudSync.sendWhisperToGm(text, _dName());
+        _dLog(text);
+        alert('Мастеру отправлено. Он выдаст квест божества.');
+    };
+
+    window.minimizeDeath = function (flag) { deathState.minimized = !!flag; renderDeathUi(); };
+
+    function renderDeathUi() {
+        const lives = _dLives();
+        const st = document.getElementById('lives-status');
+        if (st) {
+            st.innerHTML = (deathState.rolled ? '' : '<span style="color:#e6b800;">d100 ещё не бросали. </span>') +
+                (deathState.deaths ? 'Падений: ' + deathState.deaths + '. ' : '') +
+                (deathState.fallen ? '<b style="color:#e74c3c;">⚰️ Персонаж пал</b>' : '');
+        }
+        const ov = document.getElementById('death-overlay'), mini = document.getElementById('death-mini');
+        const body = document.getElementById('death-body');
+        const show = !!deathState.fallen;
+        if (mini) mini.style.display = show && deathState.minimized ? 'block' : 'none';
+        if (ov) ov.style.display = show && !deathState.minimized ? 'block' : 'none';
+        if (!show || !body) return;
+        let h = '<p style="font-size:15px;">Здоровье упало до нуля. Свободных жизней: <b>' + lives + '</b>.</p>';
+        if (lives > 0) {
+            h += '<p style="font-size:13px;opacity:.85;">Тратится одна жизнь, ХП вернутся до половины максимума.</p>' +
+                '<button class="btn-success" style="width:100%;margin-bottom:6px;" onclick="wakeUp(\'carried\')">🤝 Друзья донесли до города — без потери вещей, ~2 дня</button>' +
+                '<button class="btn-danger" style="width:100%;margin-bottom:6px;" onclick="wakeUp(\'alone\')">💤 Очнулся один / пала вся партия — потеря части вещей, 3–6 дней</button>';
+        } else {
+            const god = _dGodName();
+            h += '<p style="font-size:14px;">Свободные жизни закончились. Чтобы воскреснуть, нужно выполнить <b>квест божества</b>' +
+                (god ? ' «' + _dEsc(god) + '»' : ' (вера не выбрана — поможет ближайшее по делам божество)') + '.</p>' +
+                '<button style="width:100%;margin-bottom:6px;" onclick="askGodQuest()">🙏 Попросить мастера о квесте божества</button>' +
+                '<button class="btn-success" style="width:100%;margin-bottom:6px;" onclick="reviveByQuest(false)">✨ Квест выполнен — воскреснуть</button>';
+        }
+        h += '<button style="width:100%;opacity:.8;" onclick="minimizeDeath(true)">Свернуть (пока друзья лечат / несут)</button>';
+        body.innerHTML = h;
+    }
+
+    function checkDeath() {
+        const el = document.getElementById('cur-hp');
+        if (!el || el.value === '') return;
+        const hp = parseInt(el.value);
+        if (isNaN(hp)) return;
+        if (hp <= 0 && !deathState.fallen) {
+            deathState.fallen = true; deathState.minimized = false;
+            _dLog('⚰️ ' + _dName() + ' падает без сил (0 ХП). Свободных жизней: ' + _dLives() + '.');
+            renderDeathUi();
+            saveLocalStorage(true);
+        } else if (hp > 0 && deathState.fallen) { // подняли зельем/лечением/правкой мастера
+            deathState.fallen = false; deathState.minimized = false;
+            _dLog('💚 ' + _dName() + ' приходит в себя (ХП ' + hp + ').');
+            renderDeathUi();
+            saveLocalStorage(true);
+        }
+    }
+    setInterval(checkDeath, 1500);
+
+    // Команды мастера из панели «Отряд» (приходят через очередь pendingStatusEffects)
+    function handleGmDeathCmd(e) {
+        if (e.action === 'loseItems') {
+            const lost = loseRandomItems(Math.max(1, parseInt(e.n) || (Math.floor(Math.random() * 4) + 1)));
+            _dLog('🎒 ' + _dName() + ' теряет вещи: ' + (lost.length ? lost.join(', ') : 'терять нечего') + '.');
+            alert('Мастер: ты теряешь часть вещей — ' + (lost.length ? lost.join(', ') : 'терять нечего') + '.');
+        } else if (e.action === 'revive') {
+            reviveByQuest(true);
+        } else if (e.action === 'addLives') {
+            _dSetLives(_dLives() + (parseInt(e.n) || 0));
+            alert('Мастер изменил число свободных жизней: теперь ' + _dLives() + '.');
+        } else if (e.action === 'fall') {
+            document.getElementById('cur-hp').value = 0;
+            updateVitalBars(); checkDeath();
+        }
+        renderDeathUi();
     }
 
     // ===== ОТДЕЛЬНАЯ ФУНКЦИЯ updateCombat (исправленная) =====
@@ -9997,6 +10468,9 @@ function updateHungerPenalty() {
             sign: document.getElementById('char-sign').value,
             lvl: characterLevel, // дублируем в старое поле для обратной совместимости, не читаем при восстановлении
             lives: document.getElementById('char-lives').value,
+            diary: playerDiary,
+            tradesDone: tradesDone,
+            deathState: { fallen: !!deathState.fallen, rolled: !!deathState.rolled, deaths: deathState.deaths || 0 },
             gold: document.getElementById('char-gold').value,
             starve: document.getElementById('food-starve').value,
             faithGod: document.getElementById('faith-god').value,
@@ -10271,7 +10745,10 @@ function updateHungerPenalty() {
             document.getElementById('char-race').value = data.race || 'nord';
             document.getElementById('char-sign').value = data.sign || 'none';
             // char-level больше не восстанавливается отдельно — его выставит updateAll() из characterLevel
-            document.getElementById('char-lives').value = data.lives || 50;
+            document.getElementById('char-lives').value = (data.lives === undefined || data.lives === null || data.lives === '') ? 50 : data.lives;
+            playerDiary = Array.isArray(data.diary) ? data.diary : []; renderDiary();
+            tradesDone = (data.tradesDone && typeof data.tradesDone === 'object') ? data.tradesDone : {}; tradesReady = true;
+            { const ds = data.deathState || {}; deathState = { fallen: !!ds.fallen, rolled: !!ds.rolled, deaths: ds.deaths || 0, minimized: false }; renderDeathUi(); }
             document.getElementById('char-gold').value = data.gold || 150;
             document.getElementById('food-starve').value = data.starve || 0;
             document.getElementById('faith-god').value = data.faithGod || 'none';

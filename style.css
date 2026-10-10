@@ -1690,3 +1690,90 @@ input[type="number"] {
     min-width: 0;
 }
 .grid-col > .panel { margin-bottom: 0; }
+
+
+/* ==========================================================
+   МОБИЛЬНЫЙ ВИД v2 (телефон, ширина до 700px)
+   Идёт последним, поэтому перекрывает декоративные правила выше.
+   Цели: меньше «рамок в рамках» (больше места под содержимое), липкая полоса вкладок,
+   поля не вызывают зум в iOS (шрифт полей ≥16px), кнопки удобно нажимать, ничего не вылезает вбок.
+   ========================================================== */
+@media (max-width: 700px) {
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body { padding: 4px 4px calc(10px + env(safe-area-inset-bottom)); }
+    img, svg, canvas, video { max-width: 100%; }
+    .panel, .tab-content, .stat-block, .party-row, .enemy-row { overflow-wrap: anywhere; }
+    pre, code { white-space: pre-wrap; word-break: break-word; }
+
+    /* Заголовок страницы — компактнее: экран нужен под содержимое */
+    h1 { font-size: 15px; letter-spacing: .6px; line-height: 1.25; padding: 0 22px; margin: 6px 0 4px; }
+    h1::before, h1::after { font-size: 13px; }
+
+    /* Полоса вкладок: липкая, одна строка, прокрутка пальцем, без декора и стрелок */
+    .nav-tabs {
+        position: sticky; top: 0; z-index: 60;
+        margin: 2px 0 6px; padding: 0; min-height: 42px;
+        clip-path: none;
+        background: rgba(8, 10, 11, .96);
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 26px), transparent 100%);
+        mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 26px), transparent 100%);
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .tab-link {
+        min-height: 42px; padding: 8px 12px; font-size: 13px; letter-spacing: .3px;
+        max-width: none; flex: 0 0 auto; scroll-snap-align: center;
+    }
+    .tab-link::before, .tab-link::after { display: none; }
+
+    /* Меньше вложенных отступов */
+    .tab-content { padding: 6px 3px 14px; }
+    .panel { padding: 10px 9px 9px; margin-bottom: 8px; }
+    .panel h2, .section-header h2 { font-size: 16px; letter-spacing: .4px; line-height: 1.25; }
+    .panel h3 { font-size: 14px; }
+    .panel::before, .panel::after { transform: scale(.6); }
+    label { font-size: 14px; }
+
+    /* Поля: 16px — иначе iOS при фокусе приближает страницу; удобная высота */
+    input, select, textarea,
+    input[type="number"], input[type="text"] { font-size: 16px; min-height: 40px; max-width: 100%; }
+    textarea { min-height: 64px; }
+    select { width: 100%; }
+    input[type="checkbox"], input[type="radio"] { min-height: 0; width: 20px; height: 20px; }
+    .vital-inputs input { width: 64px; font-size: 16px; }
+    .stat-block input { width: 62px; }
+
+    /* Кнопки */
+    button { min-height: 38px; }
+    .tab-link, .section-chevron { min-height: 0; }
+    .tab-link { min-height: 42px; }
+
+    /* Строки с кнопками (инвентарь, торговля, заклинания): название сверху, кнопки ниже на всю ширину */
+    .stat-block:has(button) { flex-direction: column; align-items: stretch; }
+    .stat-block:has(button) > span { max-width: 100%; }
+    .stat-block:has(button) > span:last-child { justify-content: flex-start !important; }
+    .stat-block button { padding: 6px 10px !important; font-size: 13px !important; }
+    .party-row, .enemy-row { padding: 7px 8px; }
+    .party-row .row-name, .enemy-row .row-name { flex-wrap: wrap; gap: 4px; }
+
+    /* Сворачиваемые шторки: крупнее зона нажатия */
+    summary { padding: 6px 0; }
+    details > summary { cursor: pointer; }
+
+    /* Всплывашки и оверлеи не выходят за экран */
+    #trade-toast { left: 8px; right: 8px; top: 8px; width: auto; text-align: left; }
+    #death-mini { max-width: calc(100vw - 20px); }
+    #death-overlay .panel { margin: 4vh 8px; }
+    #prep-body { max-height: 70vh !important; }
+    .initiative-row { flex-wrap: wrap; }
+    table { max-width: 100%; }
+    div[style*="display:flex"] > div { min-width: 0; }
+    #skill-progress-list > div { grid-template-columns: 1fr !important; }
+    #skill-progress-list .party-row > span { flex: 1 1 auto !important; }
+}
+@media (max-width: 380px) {
+    h1 { font-size: 14px; }
+    .tab-link { padding: 8px 10px; font-size: 12.5px; }
+    .panel { padding: 9px 7px 8px; }
+}

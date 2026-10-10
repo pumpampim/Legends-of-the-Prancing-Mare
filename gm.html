@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Экран Мастера — «Скурим» TTRPG</title>
 
     <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css (см. пояснение
@@ -98,6 +98,7 @@
         <div class="grid-2">
             <div class="panel">
                 <h2><span class="skyrim-icon icon-shield" aria-hidden="true"></span> Отряд</h2>
+                <div style="margin-bottom:6px;"><button class="btn-danger" style="font-size:12px;" onclick="gmPartyFell()" title="Вся партия падает: игроки видят экран «Персонаж пал»">☠ Вся партия пала</button></div>
                 <div id="gm-party-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px;"></div>
             </div>
 
@@ -126,6 +127,86 @@
                     <button class="btn-success" style="margin-top:8px; width:100%;" onclick="addEnemy()">Добавить противника</button>
                 </div>
             </div>
+        </div>
+
+        <div class="panel">
+            <h2>🧭 Подготовка сессии</h2>
+            <p style="font-size:13px; opacity:.75;">Всё по владению на одном экране: жители с квестами, места, враги, погода и положение партии. Владение подставляется по метке партии на карте, но его можно выбрать вручную.</p>
+            <div id="prep-now" style="margin-bottom:8px; padding:6px 8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
+                <select id="prep-hold" style="flex:1 1 200px;" onchange="prepPickHold(this.value)"></select>
+                <input type="text" id="prep-search" placeholder="🔍 Фильтр: имя, роль, место, враг" style="flex:1 1 200px;" oninput="renderPrep(true)">
+                <label style="display:flex; align-items:center; gap:4px; font-size:12px; margin:0;"><input type="checkbox" id="prep-all-people" onchange="renderPrep(true)"> показывать всех жителей</label>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                <button class="btn-success" onclick="prepRollEvent()">🎲 Случайная встреча в пути</button>
+            </div>
+            <div id="prep-event" style="font-size:13px; margin-bottom:6px;"></div>
+            <div id="prep-result" style="font-size:13px; color:#2ecc71; margin-bottom:6px;"></div>
+            <div id="prep-open-list" style="margin-bottom:8px;"></div>
+            <div id="prep-body" style="max-height:600px; overflow:auto;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📖 Журнал сессии</h2>
+            <p style="font-size:13px; opacity:.75;">Игроки видят это на вкладке «Дневник». Сводку можно перезаписывать, слухи добавляются списком.</p>
+            <label>Сводка прошлой сессии</label>
+            <textarea id="gm-journal-summary" rows="5" placeholder="Что произошло в прошлый раз, где остановились, какие нити остались открытыми..."></textarea>
+            <button class="btn-success" style="margin-top:4px;" onclick="gmPublishSummary()">📢 Опубликовать сводку</button>
+            <span id="gm-journal-summary-state" style="font-size:12px; opacity:.7; margin-left:8px;"></span>
+            <label style="margin-top:10px;">Слухи (видны всем игрокам)</label>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="gm-journal-rumor" placeholder="Например: говорят, в Бриарвуде видели вампиров" style="flex:1;">
+                <button onclick="gmAddRumor()">+ Слух</button>
+            </div>
+            <div id="gm-journal-rumors" style="margin-top:6px;"></div>
+            <label style="margin-top:10px;">Записи партии (пишут игроки)</label>
+            <div id="gm-journal-entries" style="max-height:220px; overflow:auto;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🗣 Молва</h2>
+            <p style="font-size:13px; opacity:.75;">Сайт запоминает деяния партии (победы, павшие, штрафы, тюрьма, выданные квесты) и превращает их в слухи: верные, искажённые или ложные. Игроки читают слухи во вкладке «Дневник» — у каждого слуха пометка, в каком владении его слышали; когда партия приходит в это владение, он оказывается сверху.</p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
+                <label style="display:flex; align-items:center; gap:4px; font-size:13px; margin:0;"><input type="checkbox" id="rum-auto" onchange="rumSetSetting('auto', this.checked)"> Слухи расходятся сами с каждым новым днём</label>
+                <select id="rum-tone" style="flex:0 1 190px;" onchange="rumSetSetting('tone', this.value)">
+                    <option value="truth">Больше правды</option>
+                    <option value="normal" selected>Обычная молва</option>
+                    <option value="liar">Много вранья</option>
+                </select>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
+                <span style="font-size:13px; opacity:.8;">Для ручного слуха:</span>
+                <select id="rum-mode" style="flex:0 1 170px;">
+                    <option value="auto">Вид — по случаю</option>
+                    <option value="true">Верный слух</option>
+                    <option value="twist">Искажённый</option>
+                    <option value="false">Ложный</option>
+                </select>
+                <select id="rum-hold" style="flex:1 1 180px;"></select>
+            </div>
+            <div id="rum-draft" style="display:none; border:1px solid var(--accent-color); border-radius:4px; padding:8px; margin-bottom:8px;">
+                <div id="rum-draft-info" style="font-size:12px; opacity:.85; margin-bottom:4px;"></div>
+                <textarea id="rum-draft-text" rows="3"></textarea>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                    <button style="width:auto;" onclick="rumReroll()">🎲 Другой вариант</button>
+                    <button class="btn-success" style="width:auto;" onclick="rumPublishDraft()">📢 Пустить слух</button>
+                    <button style="width:auto;" onclick="rumCancelDraft()">Отмена</button>
+                </div>
+            </div>
+            <label>Деяния партии</label>
+            <div id="rum-deeds" style="max-height:300px; overflow:auto;"></div>
+            <details style="margin-top:6px;">
+                <summary>＋ Записать деяние вручную</summary>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                    <select id="rum-new-kind" style="flex:1 1 160px;"></select>
+                    <select id="rum-new-hold" style="flex:1 1 160px;"></select>
+                </div>
+                <input type="text" id="rum-new-what" placeholder="Что сделали — в прошедшем времени, например: спасли караван" style="margin-top:6px;">
+                <input type="text" id="rum-new-place" placeholder="Место (необязательно): Бриарвуд, Ржавый ручей…" style="margin-top:6px;">
+                <button style="margin-top:6px;" onclick="rumAddManual()">＋ В список деяний</button>
+            </details>
+            <div id="rum-result" style="font-size:13px; color:#2ecc71; margin-top:6px;"></div>
         </div>
 
         <div class="panel">
@@ -807,6 +888,7 @@
 <script src="skill-books-data.js"></script>
 <script src="unique-weapons-data.js"></script>
 <script src="holds-data.js"></script>
+<script src="rumors-data.js"></script>
 <script src="holds-map.js"></script>
 <script src="spell-tomes-data.js"></script>
 <script src="cooking-data.js"></script>
