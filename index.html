@@ -5884,7 +5884,7 @@ window.toggleSkillPanel = function (idx) {
     function renderSummonTemplateSelect() {
         const select = document.getElementById('summon-template-select');
         if (!select) return;
-        const catLabels = { weapon: 'Оружие', corpse: 'Труп/зомби', wolf: 'Питомец', pet: 'Питомец', daedra: 'Даэдра', atronach: 'Атронах', skeleton: 'Скелет (постоянный)' };
+        const catLabels = { weapon: 'Оружие', corpse: 'Труп/зомби', wolf: 'Питомец', pet: 'Питомец', daedra: 'Даэдра', atronach: 'Атронах', skeleton: 'Скелет (постоянный)', armor: 'Броня-плоть' };
         select.innerHTML = summonTemplates.map((t, i) => `<option value="${i}">${escHtml(t.name)} (${catLabels[t.category]})</option>`).join('');
         updateSummonTemplateInfo();
     }

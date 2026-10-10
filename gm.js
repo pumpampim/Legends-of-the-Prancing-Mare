@@ -258,6 +258,7 @@
         if (!doc.exists) return;
         lastData = doc.data();
         try { rumOnSnapshot(lastData); } catch (e) { console.error(e); }
+        try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
@@ -465,6 +466,28 @@
         }).then(() => { inp.value = ''; }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // ---------- Обслуживание сессии: документ Firestore ограничен 1 МБ ----------
+    // Боевой журнал, шёпоты, слухи и записи партии только растут (arrayUnion). На долгой кампании
+    // документ упёрся бы в лимит, и ЛЮБАЯ запись (ХП, ходы, инвентарь) перестала бы проходить.
+    // Раз в минуту мастер обрезает самые старые записи и предупреждает, если документ всё ещё тяжёлый.
+    let _maintLast = 0;
+    const SESSION_TRIM = { combatLog: [400, 250], whispers: [300, 200], gmWhispers: [300, 200], rumors: [80, 60], entries: [300, 200] };
+    function gmMaintainSession(d) {
+        if (!currentCode || Date.now() - _maintLast < 60000) return;
+        _maintLast = Date.now();
+        const upd = {}, j = d.journal || {};
+        const cut = (arr, key, field) => { const [hi, lo] = SESSION_TRIM[key]; if (Array.isArray(arr) && arr.length > hi) upd[field] = arr.slice(-lo); };
+        cut(d.combatLog, 'combatLog', 'combatLog'); cut(d.whispers, 'whispers', 'whispers'); cut(d.gmWhispers, 'gmWhispers', 'gmWhispers');
+        cut(j.rumors, 'rumors', 'journal.rumors'); cut(j.entries, 'entries', 'journal.entries');
+        if (Object.keys(upd).length) db.collection('sessions').doc(currentCode).update(stripUndefinedDeep(upd)).catch(e => console.error('Чистка сессии:', e));
+        let size = 0; try { size = JSON.stringify(d).length; } catch (e) { }
+        let w = el('gm-size-warn');
+        if (size > 700000) {
+            if (!w) { w = document.createElement('div'); w.id = 'gm-size-warn'; w.className = 'panel'; w.style.cssText = 'border-color:#e74c3c; color:#e74c3c; font-size:14px;'; const sb = el('session-block'); if (sb) sb.insertBefore(w, sb.firstChild); }
+            w.textContent = '⚠ Документ сессии очень большой (~' + Math.round(size / 1024) + ' КБ из 1024). Нажми «Очистить журнал» в боевом журнале и убери ненужные слухи/записи, иначе скоро перестанут сохраняться изменения.';
+        } else if (w) w.remove();
+    }
+
     // ---------- Молва: деяния партии → слухи ----------
     const RUM_MAX_DEEDS = 60;
     let rumDraft = null;          // { deedId, text, hold, truth }
@@ -523,13 +546,13 @@
         const enemies = d.enemies || [], parts = d.participants || {};
         if (rumFirst) {
             rumFirst = false;
-            rumSeenDead = new Set(enemies.filter(e => (e.curHp || 0) <= 0).map(e => e.id));
+            rumSeenDead = new Set(enemies.filter(e => (e.curHp || 0) <= 0).map(e => e.id)); // (включая шаблоны с 0 ХП)
             rumSeenFallen = new Set(Object.keys(parts).filter(u => parts[u] && parts[u].fallen));
             rumDayDone = (d.rumorSettings && d.rumorSettings.lastDay != null) ? d.rumorSettings.lastDay : (d.gameDayCounter || 0);
             return;
         }
         // победы
-        const fresh = enemies.filter(e => (e.curHp || 0) <= 0 && !rumSeenDead.has(e.id));
+        const fresh = enemies.filter(e => (e.curHp || 0) <= 0 && (e.maxHp || 0) > 0 && !rumSeenDead.has(e.id));
         fresh.forEach(e => rumSeenDead.add(e.id));
         if (fresh.length) {
             const groups = {};
