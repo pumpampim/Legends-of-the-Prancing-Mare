@@ -540,6 +540,7 @@
     <script src="spell-tomes-data.js"></script>
 <script src="powers-data.js"></script>
     <script src="enemies-data.js"></script>
+    <script src="holds-map.js"></script>
 </head>
 <body>
 
@@ -606,6 +607,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
         <button class="tab-link" onclick="openTab(event, 'tab11')">📅 Календарь</button>
         <button class="tab-link" onclick="openTab(event, 'tab12')">🏪 Торговля</button>
+        <button class="tab-link" onclick="openTab(event, 'tab13')">🗺️ Карта</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -790,7 +792,7 @@
 
            <div class="day-controls" style="margin-top:10px;">
                 <span class="date-display" id="date-display">📅 10 Высокого солнца, 4Э 201</span>
-                <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()">⏭️ Следующий день</button>
+                <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()" title="Новый день = длительный отдых: мана и Мудрость на свитки восстанавливаются, здоровье — полностью только при использовании «Лечебной припарки»">⏭️ Следующий день (длительный отдых)</button>
                 <button class="btn btn-danger" style="width:auto; margin:0; padding:6px 14px;" onclick="resetData()">🗑️ Сброс персонажа</button>
                 <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="exportCharacterToFile()" title="Скачать персонажа в файл — на случай если облако отвалится или пропадёт доступ к аккаунту">💾 Скачать в файл</button>
                 <label class="btn" style="width:auto; margin:0; padding:6px 14px; display:inline-block; cursor:pointer;">
@@ -809,7 +811,7 @@
             <div id="crime-status-widget" style="font-size:13px; margin-top:4px;"></div>
 
             <div class="rest-btn" style="margin-top:8px;">
-                <button class="btn btn-success" onclick="restoreAll()">🛌 Отдых (восстановить HP/MP)</button>
+                <button class="btn btn-success" onclick="shortRest()" title="Восстанавливает только ману (знак Атронаха — половину израсходованной). Здоровье не лечится.">⏳ Короткий отдых (только мана)</button>
             </div>
         </div>
     </div>
@@ -1420,8 +1422,13 @@
                 <button class="btn-success" style="width:100%;" onclick="goFishing()">🎣 Закинуть удочку</button>
                 <div id="fishing-result" style="margin-top:8px; font-size:15px;"></div>
 
+                <h3 style="margin-top:16px;">🔎 Поиск ингредиента по свойству</h3>
+                <input type="text" id="alch-prop-filter" list="alch-prop-list" placeholder="Например: здоровье, невидимость, паралич…" oninput="onAlchPropFilter()">
+                <datalist id="alch-prop-list"></datalist>
+                <div id="alch-prop-filter-info" style="font-size:13px; opacity:.8; margin:4px 0;"></div>
+
                 <h2 style="margin-top:16px;">🍽️ Съесть ингредиент</h2>
-                <p style="font-size:14px; opacity:.8;">Съедая ингредиент, ты узнаёшь одно его свойство (+1 за каждый ранг «Экспериментатора»). Ингредиент при этом расходуется.</p>
+                <p style="font-size:14px; opacity:.8;">Съедая ингредиент, ты узнаёшь его ПЕРВОЕ свойство (ещё по одному — 2-е, 3-е, 4-е — за каждый ранг «Экспериментатора»). Остальные свойства открываются при варке из этого ингредиента. Ингредиент при этом расходуется.</p>
                 <select id="alch-eat-select" style="width:100%;"></select>
                 <div id="alch-eat-info" style="font-size:14px; opacity:.85; margin:6px 0;"></div>
                 <button class="btn-success" style="width:100%;" onclick="eatIngredient()">Съесть</button>
@@ -1452,7 +1459,7 @@
 
                 <div id="alch-rules-note" style="display:none; margin-top:12px; padding:8px; border:1px solid var(--accent-color); border-radius:4px; font-size:14px;">📜 Алхимия переработана по новой таблице: свойства ингредиентов изменились, поэтому изученные свойства и рецепты сброшены. Зелья, яды и ингредиенты в инвентаре остались.</div>
                 <h3 style="margin-top:16px;"><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Известные свойства ингредиентов</h3>
-                <input type="text" id="alch-known-search" placeholder="Поиск ингредиента..." oninput="renderKnownIngredients()">
+                <input type="text" id="alch-known-search" placeholder="Поиск ингредиента или известного свойства..." oninput="renderKnownIngredients()">
                 <div id="alch-known-list" style="max-height:320px; overflow-y:auto; margin-top:8px;"></div>
             </div>
         </div>
@@ -1559,6 +1566,16 @@
             <p style="font-size:13px; opacity:.75;">Текущая дата подсвечена. Праздник может дать скидку у торговцев, если это явно указано в его описании (применяет мастер кнопкой «Запустить праздник вручную» на своём экране).</p>
             <div id="calendar-today-widget" style="padding:8px; background:var(--input-bg); border:1px solid var(--accent-color); border-radius:4px; margin-bottom:10px;"></div>
             <div id="calendar-list" style="max-height:500px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div id="tab13" class="tab-content">
+        <div class="panel">
+            <h2>🗺️ Карта Скайрима</h2>
+            <p style="font-size:13px; opacity:.75;">Схема владений. Жёлтая метка — где сейчас партия (её ставит мастер). Нажми на владение, чтобы приблизить, и на «← вся карта», чтобы вернуться.</p>
+            <div id="player-map-status" style="font-size:15px; margin-bottom:8px; color:var(--accent-color);"></div>
+            <button id="player-map-back" style="display:none; margin-bottom:8px;" onclick="playerMapZoom('')">← Вся карта</button>
+            <div id="player-map"></div>
         </div>
     </div>
 
@@ -2414,6 +2431,7 @@ window.toggleSkillPanel = function (idx) {
         document.getElementById(tabId).classList.add('active');
         ev.currentTarget.classList.add('active');
         if (tabId === 'tab7') initTab7IfNeeded();
+        if (tabId === 'tab13' && typeof window.renderPlayerMap === 'function') window.renderPlayerMap(true);
         // Пересчитываем всё заново при каждом переключении вкладки — защита от любых
         // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка). Через
         // scheduleUpdateAll(), не напрямую — см. пояснение выше.
@@ -2819,12 +2837,19 @@ window.toggleSkillPanel = function (idx) {
         return e;
     }
     // Накладывает удар духа: стихийный урон (с резистом цели) + мана/замедление/горение.
+    // Возвращает {finalDmg (сумма по всем рукам), resist, hits, killed, newHp, enemy} — чтобы игрок видел урон духа в итоговом окне.
     function applySpiritHit(x, targetId, playerName) {
-        let p = window.CloudSync.applyDamageToEnemy(targetId, x.dmg, playerName, x.logText, x.type, 0);
-        if (x.mpDrain) p = p.then(() => window.CloudSync.modifyEnemyVitals(targetId, 0, -x.mpDrain, playerName, `⚡ «${x.name}»: цель теряет ${x.mpDrain} маны`));
+        const hits = Math.max(1, x.count || 1);
+        const sum = { finalDmg: 0, resist: 0, hits: hits, killed: false, newHp: null, enemy: null, enemyName: '' };
+        let p = Promise.resolve();
+        for (let i = 0; i < hits; i++) {
+            p = p.then(() => window.CloudSync.applyDamageToEnemy(targetId, x.dmg, playerName, x.logText + (hits > 1 ? ` (рука ${i + 1})` : ''), x.type, 0))
+                .then(r => { if (r) { sum.finalDmg += r.finalDmg || 0; sum.resist = r.resist || 0; sum.newHp = r.newHp; sum.enemy = r.enemy; sum.enemyName = r.enemyName; if (r.killed) sum.killed = true; } });
+            if (x.mpDrain) p = p.then(() => window.CloudSync.modifyEnemyVitals(targetId, 0, -x.mpDrain, playerName, `⚡ «${x.name}»: цель теряет ${x.mpDrain} маны`));
+        }
         if (x.slow) p = p.then(() => window.CloudSync.applyStatusToEnemy(targetId, 'Замедление (Дух мороза)', `−${x.slow} фт скорости`, 2, playerName, { unique: true }));
         if (x.ignite) p = p.then(() => window.CloudSync.applyStatusToEnemy(targetId, 'Горение (Дух огня)', 'Цель подожжена — подожжённые несут дополнительный урон (решает мастер)', 3, playerName, { unique: true }));
-        return p;
+        return p.then(() => sum);
     }
 
     // Плоская добавка к урону оружия от эффектов («Повреждение наносимого физ.урона» — отрицательная).
@@ -2970,7 +2995,6 @@ window.toggleSkillPanel = function (idx) {
         let opts = '<option value="self">Цель: на себя</option>';
         const mwn = (document.getElementById('wep-melee-name') || {}).value, rwn = (document.getElementById('wep-ranged-name') || {}).value;
         opts += `<option value="weapon:melee">Цель: моё оружие — ближнее${mwn ? ' (' + escHtml(mwn) + ')' : ''}</option>`;
-        opts += `<option value="weapon:ranged">Цель: моё оружие — дальнее${rwn ? ' (' + escHtml(rwn) + ')' : ''}</option>`;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         if (session && session.participants) {
             const myName = document.getElementById('char-name').value;
@@ -3163,6 +3187,29 @@ window.toggleSkillPanel = function (idx) {
             const dT = '+' + unT + ' к рукопашному урону (кулаки), +' + hpT + ' к максимуму ХП, +' + wT + ' к переносимому весу на ' + stT.duration + ' х.';
             const whoT = giveBuff({ hp: hpT, weight: wT, unarmedDmg: unT }, dT, stT.duration);
             extraMsg = whoT === 'self' ? ' 💪 ' + dT : whoT === 'ally' ? ' 💪 «' + allyName + '»: ' + dT : ' ⚠ Выбери цель: на себя или на союзника.';
+        } else if (spellName === 'Трансформация Арктуса') {
+            const fullA = findSpellDescByName(spellName) || desc;
+            const txtA = splitEnhancedDesc(fullA, enhanced);
+            const hpA = parseInt((txtA.match(/получает\s+(\d+)\s*хп/i) || [])[1]) || (enhanced ? 75 : 25);
+            let dmgA = parseInt((txtA.match(/физ[а-яё]*\s+урона?\s+на\s+(\d+)\s*%/i) || [])[1]) || (enhanced ? 30 : 15);
+            const spdA = parseInt((txtA.match(/скорость[^.]*?на\s+(\d+)/i) || [])[1]) || 5;
+            const upA = parseManaPerTurn(txtA) || (enhanced ? 32 : 16);
+            const stA = { duration: Infinity, plain: null, percentEffects: [{ type: 'weaponDamagePercent', value: dmgA }] };
+            applyBoostToTimed(txtA, stA);
+            dmgA = stA.percentEffects[0].value;
+            if (targetVal !== 'self') {
+                extraMsg = ' ⚠ Трансформация Арктуса накладывается только на себя.';
+            } else {
+                const hadObjA = activeTimedEffects.find(x => x.effectName === spellName && x.tempHp && (x.turnsRemaining > 0 || x.turnsRemaining === Infinity));
+                const hadTempA = hadObjA ? (hadObjA.tempHp || 0) : 0; // запоминаем до обновления (эффект могут править на месте)
+                const dA = `+${hpA} временных ХП (сгорают, когда эффект закончится), физ. урон +${dmgA}%, скорость +${spdA} фт. Поддержание ${upA} маны/ход.`;
+                pushOrRefreshTimedEffect({ id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6), name: spellName, effectName: spellName, description: dA,
+                    turnsRemaining: Infinity, manaPerTurn: upA, tempHp: hpA, speed: spdA, percentEffects: stA.percentEffects });
+                const addHpA = Math.max(0, hpA - hadTempA);
+                if (addHpA) { const hpElA = document.getElementById('cur-hp'); hpElA.value = (parseInt(hpElA.value) || 0) + addHpA; }
+                renderActiveEffects();
+                extraMsg = ' 🐻 ' + dA + ' Держится, пока хватает маны (списывается каждый ход) или пока не снимешь.';
+            }
         } else if (spellName === 'Вихревой плащ') {
             const fullV = findSpellDescByName(spellName) || desc;
             const txtV = splitEnhancedDesc(fullV, enhanced);
@@ -3317,7 +3364,7 @@ window.toggleSkillPanel = function (idx) {
                 extraMsg = ' ⚠ Нет сессии — круг лишь отмечен (нежить до ' + maxC + ' ур. бежит ' + fleeC + ' х.).';
             }
         } else if (targetVal.indexOf('weapon:') === 0) {
-            const slotW = targetVal.slice(7) === 'ranged' ? 'ranged' : 'melee';
+            const slotW = 'melee'; // духи стихий — только на оружие ближнего боя
             const spInfo = WEAPON_SPIRITS[spellName];
             const wName = (document.getElementById('wep-' + slotW + '-name') || {}).value || (slotW === 'ranged' ? 'дальнее оружие' : 'ближнее оружие');
             if (!spInfo) {
@@ -3331,11 +3378,14 @@ window.toggleSkillPanel = function (idx) {
                 let upkeep = (!isFree && lastSpellCastCost > 0) ? lastSpellCastCost : 0;
                 if (!upkeep && nums.cost) upkeep = nums.cost[ix];
                 activeTimedEffects = activeTimedEffects.filter(x => !x.weaponSpirit); // на оружии держится один дух
-                const dText = `«${wName}» наносит +${dmgS} урона ${spInfo.word}${drainS ? ` и ${drainS} по мане цели` : ''}${spInfo.type === 'frost' ? ', замедляет на 5 фт' : ''}${spInfo.type === 'fire' ? ', поджигает' : ''}; ${upkeep} маны за ход`;
+                const dualOn = !!document.getElementById('chk-dual-wield').checked;
+                const offNm = (document.getElementById('wep-melee-offhand-name') || {}).value || '';
+                const offKey = dualOn ? (offNm || '(второе оружие)') : '';
+                const dText = `«${wName}»${offKey ? ' и «' + offKey + '»' : ''} наносят по +${dmgS} урона ${spInfo.word}${drainS ? ` и ${drainS} по мане цели` : ''}${spInfo.type === 'frost' ? ', замедляет на 5 фт' : ''}${spInfo.type === 'fire' ? ', поджигает' : ''}; ${upkeep} маны за ход`;
                 pushOrRefreshTimedEffect({
                     id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6), name: spellName, effectName: spellName,
                     description: dText, turnsRemaining: Infinity, manaPerTurn: upkeep,
-                    weaponSpirit: { type: spInfo.type, dmg: dmgS, mpDrain: drainS, slow: spInfo.type === 'frost' ? 5 : 0, ignite: spInfo.type === 'fire', slot: slotW, weaponName: wName, icon: spInfo.icon }
+                    weaponSpirit: { type: spInfo.type, dmg: dmgS, mpDrain: drainS, slow: spInfo.type === 'frost' ? 5 : 0, ignite: spInfo.type === 'fire', slot: slotW, weaponName: wName, offName: offKey, icon: spInfo.icon }
                 });
                 renderActiveEffects();
                 extraMsg = ` ${spInfo.icon} ${dText}. Держится, пока хватает маны (списывается каждый ход) или пока ты не развеешь эффект.`;
@@ -3596,14 +3646,15 @@ window.toggleSkillPanel = function (idx) {
             const nmS = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
             if (WEAPON_SPIRITS[nmS]) {
                 const tv = (card.querySelector('.spell-target-select') || {}).value || 'self';
-                if (tv.indexOf('weapon:') !== 0) { alert('«' + nmS + '» накладывается на оружие: выбери в списке «Цель: моё оружие».'); return; }
+                if (tv !== 'weapon:melee') { alert('«' + nmS + '» накладывается только на оружие ближнего боя: выбери «Цель: моё оружие — ближнее». Мана не потрачена.'); return; }
+                if (!((document.getElementById('wep-melee-name') || {}).value || '').trim() && !(parseInt((document.getElementById('wep-melee-dmg') || {}).value) > 0)) { alert('Сначала надень оружие ближнего боя — духу не на что лечь. Мана не потрачена.'); return; }
                 const nS = parseSpiritNumbers(findSpellDescByName(nmS) || card.querySelector('.spell-desc').value);
                 if (enhanced && nS.cost && nS.cost[0]) finalCost = Math.round(baseFinalCost * nS.cost[1] / nS.cost[0] * (1 - getGearEnhancedCostCut('destr') / 100)); // перчатки магистра Разрушения тоже удешевляют усиленного духа
             }
         }
         { // Невидимость и Нечестивый барьер — только на себя: проверяем до траты маны
             const nmO = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
-            if (nmO === 'Невидимость' || nmO === 'Шаг сквозь тень' || nmO === 'Ночной клинок' || nmO === 'Приглушение шагов' || nmO === 'Равновесие' || /^Нечестивый барьер \d$/.test(nmO)) {
+            if (nmO === 'Невидимость' || nmO === 'Трансформация Арктуса' || nmO === 'Шаг сквозь тень' || nmO === 'Ночной клинок' || nmO === 'Приглушение шагов' || nmO === 'Равновесие' || /^Нечестивый барьер \d$/.test(nmO)) {
                 const tvO = (card.querySelector('.spell-target-select') || {}).value || 'self';
                 if (tvO !== 'self') { alert('«' + nmO + '» накладывается только на себя — выбери «Цель: на себя». Мана не потрачена.'); return; }
             }
@@ -4074,6 +4125,14 @@ window.toggleSkillPanel = function (idx) {
         sel.value = (valid && !prefer) ? prev : (keys.length ? (keys.some(k => 'stock:' + k === prev) ? prev : 'stock:' + keys[0]) : (valid ? prev : 'pawnbroker'));
     }
     // Селекторы «купить у…» и «продать…» смотрят на одного торговца.
+    // Продавать, как и покупать, можно только в городе и только когда мастер завёз торговцев в сессию.
+    function getSellBlockReason() {
+        if (!isPlayerInTown()) return '🏕 Ты вне города — торговцев здесь нет, продавать некому. Отметь «Я в городе», когда доберёшься до поселения (или попроси мастера).';
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const keys = Object.keys((session && session.merchantStocks) || {});
+        if (!keys.length) return '🕓 Мастер ещё не завёз торговцев (ассортимент) — продавать пока некому.';
+        return '';
+    }
     window.onSellMerchantChanged = function () {
         const selU = document.getElementById('sell-merchant-type'); if (selU) selU.dataset.userChosen = '1';
         const t = getSellTarget();
@@ -4163,7 +4222,7 @@ window.toggleSkillPanel = function (idx) {
             window.CloudSync.setMyInTown(flag).catch(e => alert('Не удалось сохранить: ' + e.message));
         }
         window.__inTownLocal = !!flag;
-        renderBuyList();
+        renderBuyList(); renderSellList();
         setTimeout(() => { window.__inTownLocal = undefined; }, 4000);
     };
 
@@ -4317,6 +4376,8 @@ window.toggleSkillPanel = function (idx) {
         }
         if (target.stock && (target.stock.disposition || 0) <= -2) { listEl.innerHTML = ''; return; }
 
+        const blockReason = getSellBlockReason();
+        if (blockReason) { listEl.innerHTML = '<p style="color:#e67e22; font-size:14px;">' + blockReason + '</p>'; return; }
         const sellable = playerInventory.filter(i => i.price);
         const catFilterEl = document.getElementById('sell-category-filter');
         const catFilter = catFilterEl ? catFilterEl.value : 'all';
@@ -4389,8 +4450,14 @@ window.toggleSkillPanel = function (idx) {
         return Math.floor(base * mult);
     }
 
+    // Торговля даёт на 20% меньше успехов Красноречия, чем раньше (дробный остаток копится и сохраняется).
+    const SPEECH_TRADE_XP_FACTOR = 0.8;
     function trackSpeechTrade(amount, isPurchase, isOffProfile) {
-        const successes = calcSpeechSuccesses(amount, !!isPurchase, !!isOffProfile);
+        const rawSuccesses = calcSpeechSuccesses(amount, !!isPurchase, !!isOffProfile);
+        if (!rawSuccesses) return 0;
+        const carry = (skillProgress._speechCarry || 0) + rawSuccesses * SPEECH_TRADE_XP_FACTOR;
+        const successes = Math.floor(carry + 1e-9);
+        skillProgress._speechCarry = Math.round((carry - successes) * 100) / 100;
         for (let i = 0; i < successes; i++) {
             if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Красноречие');
         }
@@ -4398,6 +4465,7 @@ window.toggleSkillPanel = function (idx) {
     }
 
     window.sellItem = function (itemId) {
+        { const br = getSellBlockReason(); if (br) { alert(br.replace(/^\S+\s/, '')); return; } }
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item) return;
         const qtyInput = document.getElementById('sell-qty-' + itemId);
@@ -6840,8 +6908,35 @@ window.toggleSkillPanel = function (idx) {
         return getSkillRawValue('Алхимия');
     }
 
+    // Поиск по СВОЙСТВУ: учитываются только уже известные игроку свойства (неизвестные не выдаём).
+    function alchNorm(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').trim(); }
+    function getKnownPropNames(name) {
+        const data = (window.alchemyIngredients || {})[name];
+        const known = knownIngredientProps[name] || [];
+        return data ? data.effects.filter((e, i) => known[i]) : [];
+    }
+    function alchPropFilterMatch(name) {
+        const q = alchNorm((document.getElementById('alch-prop-filter') || {}).value);
+        if (!q) return true;
+        return getKnownPropNames(name).some(p => alchNorm(p).indexOf(q) !== -1);
+    }
     function getAlchemyIngredientsInInventory() {
-        return playerInventory.filter(i => window.alchemyIngredients && window.alchemyIngredients.hasOwnProperty(i.itemId) && i.count > 0);
+        return playerInventory.filter(i => window.alchemyIngredients && window.alchemyIngredients.hasOwnProperty(i.itemId) && i.count > 0 && alchPropFilterMatch(i.itemId));
+    }
+    window.onAlchPropFilter = function () {
+        renderAlchEatSelect();
+        renderAlchIngredientSelects();
+        renderKnownIngredients();
+        const info = document.getElementById('alch-prop-filter-info');
+        const q = (document.getElementById('alch-prop-filter') || {}).value;
+        if (info) info.textContent = q ? `Показаны только ингредиенты с известным свойством «${q}» (в списках «Съесть», «Варка» и «Известные свойства»).` : '';
+    };
+    function renderAlchPropDatalist() {
+        const dl = document.getElementById('alch-prop-list');
+        if (!dl) return;
+        const set = new Set();
+        Object.keys(knownIngredientProps || {}).forEach(n => getKnownPropNames(n).forEach(p => set.add(p)));
+        dl.innerHTML = Array.from(set).sort().map(p => `<option value="${escHtml(p)}"></option>`).join('');
     }
 
     function renderAlchEatSelect() {
@@ -6864,7 +6959,9 @@ window.toggleSkillPanel = function (idx) {
         const known = knownIngredientProps[name] || [false, false, false, false];
         const knownCount = known.filter(Boolean).length;
         const perkState = getAlchemyPerkState();
-        infoEl.innerHTML = `Известно свойств: ${knownCount}/4. При поедании узнаешь ещё до ${Math.min(1 + perkState.experimentatorRank, 4 - knownCount)}.`;
+        const eatN = Math.min(4, 1 + perkState.experimentatorRank);
+        const eatNew = known.slice(0, eatN).filter(k => !k).length;
+        infoEl.innerHTML = `Известно свойств: ${knownCount}/4. Поедание открывает первые ${eatN} (по порядку; сейчас новых: ${eatNew}) — остальные открываются при варке${eatN < 4 ? ' или с рангами «Экспериментатора»' : ''}.`;
     };
     document.getElementById('alch-eat-select') && document.getElementById('alch-eat-select').addEventListener('change', window.updateAlchEatInfo);
 
@@ -6972,11 +7069,13 @@ window.toggleSkillPanel = function (idx) {
         if (countInInventory(name) <= 0) { resultEl.innerHTML = '<span style="color:#e74c3c;">Ингредиента больше нет в инвентаре.</span>'; return; }
 
         const perkState = getAlchemyPerkState();
-        const toReveal = 1 + perkState.experimentatorRank;
+        // Съев ингредиент, игрок узнаёт ИМЕННО его первое свойство (а не «следующее неизвестное»), и по одному дополнительному
+        // свойству (2-е, 3-е, 4-е) за каждый ранг «Экспериментатора». Остальные свойства открываются только при варке.
+        const revealCount = Math.min(4, 1 + perkState.experimentatorRank);
         if (!knownIngredientProps[name]) knownIngredientProps[name] = [false, false, false, false];
         const known = knownIngredientProps[name];
         let revealed = [];
-        for (let i = 0; i < 4 && revealed.length < toReveal; i++) {
+        for (let i = 0; i < revealCount; i++) {
             if (!known[i]) { known[i] = true; revealed.push(data.effects[i]); }
         }
         removeFromInventoryByName(name, 1);
@@ -7149,7 +7248,9 @@ window.toggleSkillPanel = function (idx) {
         const listEl = document.getElementById('alch-known-list');
         if (!listEl) return;
         const search = (document.getElementById('alch-known-search').value || '').toLowerCase();
-        const names = Object.keys(window.alchemyIngredients || {}).filter(n => n.toLowerCase().includes(search)).sort();
+        renderAlchPropDatalist();
+        const propQ = alchNorm((document.getElementById('alch-prop-filter') || {}).value);
+        const names = Object.keys(window.alchemyIngredients || {}).filter(n => (n.toLowerCase().includes(search) || getKnownPropNames(n).some(p => alchNorm(p).indexOf(alchNorm(search)) !== -1 && alchNorm(search))) && (!propQ || alchPropFilterMatch(n))).sort();
         listEl.innerHTML = names.map(name => {
             const known = knownIngredientProps[name] || [false, false, false, false];
             const data = window.alchemyIngredients[name];
@@ -7915,8 +8016,33 @@ window.toggleSkillPanel = function (idx) {
         if (alive.some(e => e.id === prev)) select.value = prev;
     };
 
+
+    // Карта владений для игрока: схема + метка «партия здесь» (session.partyPos, ставит мастер).
+    let playerMapHold = '';
+    window.playerMapZoom = function (h) { playerMapHold = h || ''; window.renderPlayerMap(true); };
+    let _playerMapSig = null;
+    window.renderPlayerMap = function (force) {
+        const box = document.getElementById('player-map');
+        if (!box || !window.HoldsMap) return;
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const party = window.HoldsMap.partyFromSession(session);
+        const hl = (session && session.currentHold) || (party && party.hold) || null;
+        const sig = JSON.stringify([playerMapHold, party, hl]);
+        if (!force && sig === _playerMapSig) return;
+        _playerMapSig = sig;
+        window.HoldsMap.render(box, {
+            hold: playerMapHold || null, hl, party,
+            onHold: h => window.playerMapZoom(h)
+        });
+        const st = document.getElementById('player-map-status');
+        if (st) st.innerHTML = party ? `⚑ Партия сейчас: <strong>${escHtml(party.name || 'на карте')}</strong>${party.hold ? ' · ' + escHtml(party.hold) : ''}` : (hl ? `⚑ Партия во владении: <strong>${escHtml(hl)}</strong>` : 'Мастер ещё не отметил положение партии.');
+        const back = document.getElementById('player-map-back');
+        if (back) back.style.display = playerMapHold ? '' : 'none';
+    };
+
     // Читает регион/погоду/время суток, заданные мастером в сессии, и показывает их игроку.
     window.updateWeatherDisplay = function () {
+        if (typeof window.renderPlayerMap === 'function') window.renderPlayerMap();
         const el = document.getElementById('weather-display');
         if (!el) return;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
@@ -8535,6 +8661,7 @@ window.nextDay = function () {
     powersUsedToday = {};     // новый день — «раз в день» способности снова доступны
     activeTimedEffects = activeTimedEffects.filter(e => !e.untilDayEnd); // «до конца дня» (хриплый голос после боевого клича)
     clampTempHp();
+    const longRestNotes = applyLongRest();
     gameDayNum++;
     if (gameDayNum > 30) {
         gameDayNum = 1;
@@ -8618,7 +8745,9 @@ window.nextDay = function () {
     // Лёгкое уведомление
     const nowFood = daysWithoutFood;
     if (nowFood > 0) {
-        setTimeout(() => alert(`Прошёл день: ${gameDayNum} ${MONTH_NAMES[gameMonth]} 4Э ${gameYear}.\nДней без еды: ${nowFood} (−${nowFood*2} к кубам).`), 50);
+        setTimeout(() => alert(`Прошёл день: ${gameDayNum} ${MONTH_NAMES[gameMonth]} 4Э ${gameYear}.\nДлительный отдых: ${longRestNotes.join('; ')}.\nДней без еды: ${nowFood} (−${nowFood*2} к кубам).`), 50);
+    } else {
+        setTimeout(() => alert(`Прошёл день: ${gameDayNum} ${MONTH_NAMES[gameMonth]} 4Э ${gameYear}.\nДлительный отдых: ${longRestNotes.join('; ')}.`), 50);
     }
 };
 
@@ -8732,7 +8861,11 @@ function updateHungerPenalty() {
                 const w = spiritE.weaponSpirit;
                 const boostD = getSkillBoostPercent('Разрушение') + ((typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0);
                 const sd = Math.round(w.dmg * (1 + boostD / 100));
-                extraElem = { name: spiritE.effectName, type: w.type, dmg: sd, mpDrain: w.mpDrain || 0, slow: w.slow || 0, ignite: !!w.ignite, icon: w.icon,
+                // Дух лежит на обоих одноручных оружиях, если при касте были «двойные» руки и сейчас они всё ещё в деле
+                const offNow = (document.getElementById('wep-melee-offhand-name') || {}).value || '';
+                const bothHands = actionVal === 'melee' && !!w.offName && document.getElementById('chk-dual-wield').checked && (offNow || '(второе оружие)') === w.offName;
+                const cnt = bothHands ? 2 : 1;
+                extraElem = { name: spiritE.effectName, type: w.type, dmg: sd, count: cnt, mpDrain: w.mpDrain || 0, slow: w.slow || 0, ignite: !!w.ignite, icon: w.icon,
                     logText: `${w.icon} «${spiritE.effectName}» (оружие): урон ${sd}` };
             }
             // Выброс адреналина (редгард): к броску атаки И к урону добавляется d10 (только оружие, не заклинания).
@@ -8953,7 +9086,7 @@ function updateHungerPenalty() {
         if (hit) {
             html += `<strong style="color:#2ecc71;">✅ Попадание!</strong> Урон: <span style="color:#e74c3c; font-size:17px; font-weight:bold;">${dmg}</span> ед. по «${escHtml(target.name)}»`;
             if (penetrationPct) html += `<br><span style="font-size:12px; opacity:.75;">🗡️ Пробитие защиты цели: ${penetrationPct}% (снижает её резист на этот удар)</span>`;
-            if (extraElem) html += `<br><span style="font-size:13px;">${extraElem.icon} «${escHtml(extraElem.name)}»: ещё <strong>${extraElem.dmg}</strong> урона (${extraElem.type === 'fire' ? 'огонь' : extraElem.type === 'frost' ? 'холод' : 'электричество'})${extraElem.mpDrain ? `, −${extraElem.mpDrain} маны цели` : ''}${extraElem.slow ? ', замедление' : ''}${extraElem.ignite ? ', поджог' : ''} — отдельным ударом с учётом резиста цели</span>`;
+            if (extraElem) html += `<br><span style="font-size:13px;">${extraElem.icon} «${escHtml(extraElem.name)}»: ещё <strong>${extraElem.dmg * (extraElem.count || 1)}</strong> урона${extraElem.count > 1 ? ` (${extraElem.count} руки по ${extraElem.dmg})` : ''} (${extraElem.type === 'fire' ? 'огонь' : extraElem.type === 'frost' ? 'холод' : 'электричество'})${extraElem.mpDrain ? `, −${extraElem.mpDrain} маны цели` : ''}${extraElem.slow ? ', замедление' : ''}${extraElem.ignite ? ', поджог' : ''} — отдельным ударом с учётом резиста цели</span>`;
         } else {
             html += `<strong style="color:#e74c3c;">❌ Промах.</strong>`;
         }
@@ -9020,7 +9153,15 @@ function updateHungerPenalty() {
         const attackTargetId = pendingPlayerAttack.targetId;
         const elemNow = pendingPlayerAttack.extraElem || null;
         let mainHit = window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType, pendingPlayerAttack.penetrationPct);
-        if (elemNow) mainHit = mainHit.then(r0 => applySpiritHit(elemNow, attackTargetId, playerName || 'Игрок').then(() => r0));
+        if (elemNow) mainHit = mainHit.then(r0 => {
+            if (!r0 || r0.killed) return r0; // добитую цель дух уже не бьёт
+            return applySpiritHit(elemNow, attackTargetId, playerName || 'Игрок').then(sp => {
+                const out = Object.assign({}, r0, { spirit: { name: elemNow.name, icon: elemNow.icon, dmg: sp.finalDmg, resist: sp.resist, hits: sp.hits } });
+                if (sp.newHp !== null) out.newHp = sp.newHp;
+                if (sp.killed) { out.killed = true; if (sp.enemy) out.enemy = sp.enemy; }
+                return out;
+            });
+        });
         const onHitNow = pendingPlayerAttack.onHit || null;
         if (onHitNow) mainHit = mainHit.then(r0 => {
             let pp = Promise.resolve();
@@ -9078,7 +9219,8 @@ function updateHungerPenalty() {
                     hpElF.value = newF; saveLocalStorage();
                     healMsg += ` 🩸 Жизнеотвод: +${newF - curF} ХП тебе.`;
                 }
-                alert(`Урон применён! «${res.enemyName}»: ${res.resist ? `${res.finalDmg} ед. (резист ${res.resist}%)` : res.finalDmg + ' ед.'}, осталось ${res.newHp} HP.${healMsg}${soulMsg}`);
+                const spiritMsg = res.spirit ? ` + ${res.spirit.icon} «${res.spirit.name}»: ${res.spirit.dmg} ед.${res.spirit.resist ? ` (резист ${res.spirit.resist}%)` : ''}${res.spirit.hits > 1 ? ` (${res.spirit.hits} руки)` : ''}` : '';
+                alert(`Урон применён! «${res.enemyName}»: ${res.resist ? `${res.finalDmg} ед. (резист ${res.resist}%)` : res.finalDmg + ' ед.'}${spiritMsg}, осталось ${res.newHp} HP.${healMsg}${soulMsg}`);
                 if (devourIdNow && activeSummons.some(s => s.id === devourIdNow)) { // «Пожирающая сила»: закончил ход — умирает
                     const smD = activeSummons.find(s => s.id === devourIdNow);
                     window.dismissSummon(devourIdNow);
@@ -9115,18 +9257,60 @@ function updateHungerPenalty() {
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
-    function restoreAll() {
-        let maxHp = parseInt(document.getElementById('max-hp').value) || 0;
-        let maxMp = parseInt(document.getElementById('max-mp').value) || 0;
-        document.getElementById('cur-hp').value = maxHp;
-        document.getElementById('cur-mp').value = maxMp;
-        // Сбрасываем потраченную Мудрость
-        scrollWisdomSpent = 0;
-        let wis = parseInt(document.getElementById('stat-wis').value) || 10;
-        document.getElementById('val-scrolls').innerText = wis;
-        alert("Отдых завершён! HP, MP и Мудрость восстановлены.");
+    // Восстановление маны при отдыхе. Знак Атронаха («Медленное восстановление магии», Sistema 2.2):
+    // восстанавливается только ПОЛОВИНА израсходованной маны, округляя вверх (минимум 1).
+    function restoreManaForRest() {
+        const maxMp = parseInt(document.getElementById('max-mp').value) || 0;
+        const curMp = parseInt(document.getElementById('cur-mp').value) || 0;
+        const spent = Math.max(0, maxMp - curMp);
+        const atronach = document.getElementById('char-sign').value === 'atronach';
+        const gain = atronach ? (spent > 0 ? Math.max(1, Math.ceil(spent / 2)) : 0) : spent;
+        document.getElementById('cur-mp').value = Math.min(maxMp, curMp + gain);
+        return { gain, spent, atronach, maxMp };
+    }
+
+    // Короткий отдых: восстанавливается только мана (для Атронаха — половина израсходованной).
+    // Здоровье не лечится, Мудрость на свитки не возвращается — это даёт длительный отдых («Следующий день»).
+    window.shortRest = function () {
+        const r = restoreManaForRest();
+        let msg;
+        if (r.spent === 0) msg = 'Короткий отдых: мана и так полная.';
+        else if (r.atronach) msg = `Короткий отдых: знак Атронаха — восстановлена только половина израсходованной маны: +${r.gain} из ${r.spent}. Здоровье не изменилось.`;
+        else msg = `Короткий отдых: мана восстановлена полностью (+${r.gain}). Здоровье не изменилось.`;
+        alert(msg);
         updateAll();
         saveLocalStorage();
+    };
+    // Старое имя оставлено для совместимости (раньше была одна кнопка «Отдых» с полным восстановлением).
+    function restoreAll() { window.shortRest(); }
+
+    // Длительный отдых (часть «Следующего дня»): мана (Атронах — половина), Мудрость на свитки — полностью;
+    // здоровье — на полное ТОЛЬКО если использована «Лечебная припарка» (тратится 1 шт.), иначе не восстанавливается.
+    function applyLongRest() {
+        const notes = [];
+        const r = restoreManaForRest();
+        if (r.spent > 0) notes.push(r.atronach ? `мана: знак Атронаха — +${r.gain} (половина израсходованной)` : `мана восстановлена полностью (+${r.gain})`);
+        scrollWisdomSpent = 0;
+        const wis = parseInt(document.getElementById('stat-wis').value) || 10;
+        document.getElementById('val-scrolls').innerText = wis;
+        const maxHp = parseInt(document.getElementById('max-hp').value) || 0;
+        const curHp = parseInt(document.getElementById('cur-hp').value) || 0;
+        const poultice = playerInventory.find(i => /^Лечебная припарка/.test(i.itemId || '') || /^Лечебная припарка/.test(i.name || ''));
+        if (curHp >= maxHp) {
+            notes.push('здоровье и так полное — припарка не нужна');
+        } else if (poultice && poultice.count > 0) {
+            if (confirm(`Длительный отдых: использовать «Лечебную припарку» (осталось ${poultice.count})?\nОК — здоровье восстановится полностью (HP ${curHp} → ${maxHp}).\nОтмена — здоровье не восстановится.`)) {
+                removeFromInventoryByName(poultice.itemId, 1);
+                document.getElementById('cur-hp').value = maxHp;
+                notes.push(`использована лечебная припарка — HP ${curHp} → ${maxHp}`);
+                renderInventoryList();
+            } else {
+                notes.push('припарка не использована — здоровье не восстановилось');
+            }
+        } else {
+            notes.push('нет «Лечебной припарки» — здоровье не восстановилось');
+        }
+        return notes;
     }
 
     // Получение бонусов от бога

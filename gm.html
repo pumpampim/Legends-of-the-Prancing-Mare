@@ -243,6 +243,23 @@
                 <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
 
+            <!-- ===== КАРТА И ПОЛОЖЕНИЕ ПАРТИИ ===== -->
+            <div class="panel">
+                <h2>🗺️ Карта и положение партии</h2>
+                <p style="font-size:13px; opacity:.75;">Схема Скайрима. Клик по владению — приблизить. В приближении клик по городу, метке места или любой точке выбирает позицию; «Партия здесь» показывает её игрокам на вкладке «Карта» и ставит текущее владение (для цен и сбора ингредиентов). Метки подземелий расставляются в справочнике «Владения».</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                    <select id="gm-map-hold" style="flex:1 1 200px;" onchange="gmMapPickHold(this.value)"><option value="">— вся карта —</option></select>
+                    <input type="text" id="gm-map-label" placeholder="Подпись для своей точки (необязательно)" style="flex:1 1 200px;">
+                </div>
+                <div id="gm-map"></div>
+                <div id="gm-map-selected" style="margin-top:6px; font-size:14px;"></div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn-success" style="flex:1;" onclick="gmMapSetParty()">📍 Партия здесь</button>
+                    <button style="flex:1;" onclick="gmMapClearParty()">Убрать метку партии</button>
+                </div>
+                <div id="gm-map-result" style="margin-top:6px; font-size:14px;"></div>
+            </div>
+
             <!-- ===== СЛУЧАЙНЫЕ СОБЫТИЯ (Задача E) ===== -->
             <div class="panel">
                 <h2>🎲 Случайное событие в пути</h2>
@@ -790,6 +807,7 @@
 <script src="skill-books-data.js"></script>
 <script src="unique-weapons-data.js"></script>
 <script src="holds-data.js"></script>
+<script src="holds-map.js"></script>
 <script src="spell-tomes-data.js"></script>
 <script src="cooking-data.js"></script>
 <script src="alchemy-data.js"></script>

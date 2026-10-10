@@ -23,40 +23,41 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
     <style>
-        .hold-header {
-            cursor: pointer;
-            padding: 14px 16px;
-            background: var(--panel-sub, #1a1712);
-            border: 1px solid #363025;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            font-weight: bold;
-            font-size: 19px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .hold-header:hover { border-color: var(--accent-color); }
-        .hold-body { display: none; padding: 4px 2px 18px; }
-        .hold-body.open { display: block; }
-        .npc-card, .loc-card {
-            background: var(--input-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 8px 10px;
-            margin-bottom: 6px;
-            font-size: 15px;
-        }
-        .npc-card strong, .loc-card strong { color: var(--accent-color); }
-        .loc-meta { font-size: 14px; margin-top: 4px; line-height: 1.5; }
-        .loc-meta .lbl { opacity: .7; }
-        .section-sub-header {
-            font-size: 16px;
-            margin: 14px 0 8px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid var(--border-color);
-        }
+        .hold-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 10px 0 12px; }
+        .hold-toolbar select { flex: 1 1 260px; font-size: 18px; padding: 10px 12px; font-weight: bold; }
+        .hold-toolbar input { flex: 2 1 300px; }
+        #search-results { margin: 0 0 14px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); display:none; max-height: 340px; overflow:auto; }
+        #search-results .sr { padding: 7px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 15px; }
+        #search-results .sr:last-child { border-bottom: none; }
+        #search-results .sr:hover { background: rgba(255,255,255,.06); }
+        #search-results .sr small { opacity: .65; display:block; }
+        #search-results .sr-head { padding: 6px 12px; font-size: 13px; opacity:.7; }
+        details.h-sheet { margin: 0 0 8px; border: 1px solid #363025; border-radius: 6px; background: var(--panel-sub, #1a1712); }
+        details.h-sheet > summary { cursor: pointer; padding: 11px 14px; font-weight: bold; list-style: none; display:flex; justify-content: space-between; align-items:center; gap:10px; }
+        details.h-sheet > summary::-webkit-details-marker { display:none; }
+        details.h-sheet > summary::after { content: '▸'; opacity: .7; }
+        details.h-sheet[open] > summary::after { content: '▾'; }
+        details.h-sheet > summary:hover { color: var(--accent-color); }
+        details.h-sheet > summary .cnt { font-weight: normal; opacity: .6; font-size: 14px; margin-left: auto; margin-right: 6px; }
+        details.lvl1 > summary { font-size: 19px; }
+        details.lvl2 { margin-left: 10px; background: rgba(255,255,255,.02); }
+        details.lvl2 > summary { font-size: 17px; }
+        details.lvl3 { margin-left: 10px; background: rgba(255,255,255,.03); }
+        details.lvl3 > summary { font-size: 16px; }
+        .h-inner { padding: 4px 12px 12px; }
+        .npc-card { background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 10px; margin: 6px 0; font-size: 15px; }
+        .npc-card > summary { cursor:pointer; }
+        .npc-card strong, .loc-name { color: var(--accent-color); }
+        .npc-role { opacity: .8; }
+        .fld { display:block; font-size: 13px; opacity: .7; margin: 8px 0 2px; }
+        .h-inner textarea, .h-inner input.fi { width: 100%; box-sizing: border-box; min-height: 38px; resize: vertical; font-size: 14px; }
+        .desc-text { line-height: 1.5; margin: 4px 0 6px; }
+        .child-line { font-size: 14px; opacity: .8; margin-top: 4px; }
+        .note-box { font-size: 14px; opacity: .85; line-height: 1.5; border-left: 3px solid var(--accent-color); padding: 4px 10px; margin: 6px 0; }
         .empty-hold { opacity: .6; font-size: 15px; padding: 10px; }
+        .flash { animation: hflash 2.2s ease-out; }
+        @keyframes hflash { 0% { box-shadow: 0 0 0 3px var(--accent-color); } 100% { box-shadow: 0 0 0 0 transparent; } }
+        .sec-title { font-size: 20px; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); }
     </style>
 </head>
 <body>
@@ -66,100 +67,270 @@
         <span>🏰 Владения Скайрима — справочник мастера</span>
         <a href="gm.html" style="font-size:15px; color:var(--accent-color);">← Назад к экрану мастера</a>
     </h1>
-    <p style="font-size:15px; opacity:.8;">Города, жители (с ролями/профессиями) и подземелья/точки интереса каждого владения. Данные о жителях и названиях мест — из исходной таблицы владений; описания подземелий (враги, награда, особенности вроде рудных жил или кузни внутри) мастер дополняет сам по ходу подготовки — большинство пока пустые, заполняй перед сессией.</p>
+    <p style="font-size:15px; opacity:.8;">Выбери владение — внутри раскрываются шторки: поселения → места (магазины, дома, таверны) → жители, а ниже категории локаций (пещеры, руины, форты, шахты…) → конкретные места с описанием, врагами, лутом и особенностями. Описания локаций — по данным вики (UESP); карта — схема, метки мест расставляешь сам; поля «Подробности», «Возможные квесты», врагов, лута и особенностей можно править — правки сохраняются в браузере.</p>
 
-    <input type="text" id="hold-search" placeholder="Поиск по имени NPC или локации во всех владениях..." style="margin-bottom:16px;">
+    <div class="hold-toolbar">
+        <select id="hold-select" onchange="selectHold(this.value)"></select>
+        <input type="text" id="hold-search" placeholder="Поиск по всем владениям: житель, место, пещера, враг…" autocomplete="off">
+    </div>
+    <div id="search-results"></div>
 
     <div id="holds-container"></div>
 </div>
 
 <script src="holds-data.js"></script>
+<script src="holds-map.js"></script>
 <script>
-    // Раньше кавычки (") не экранировались — а esc() используется внутри HTML-атрибутов в
-    // двойных кавычках (data-search="...", value="..." и т.д.). Незаэкранированная кавычка в
-    // тексте (например, название "Таверна "Верески"") обрывает атрибут раньше времени — браузер
-    // интерпретирует всё, что после неё, как произвольную разметку, и это могло ломать поиск не
-    // только для той конкретной карточки, но и искажать всё, что рендерится ПОСЛЕ неё в том же
-    // innerHTML (весь список владений строится одной большой строкой).
     function esc(s) {
-        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function norm(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е'); }
+
+    const HOLDS = Object.keys(window.holdsData || {});
+    // Правки мастера: подземелья — {hold:{loc:{desc,enemies,loot,features}}}, жители — {hold:{"место|имя":{bio,quests}}}
+    let dungeonOverrides = {}, npcNotes = {};
+    try { dungeonOverrides = JSON.parse(localStorage.getItem('holdsDungeonOverrides') || '{}') || {}; } catch (e) { dungeonOverrides = {}; }
+    try { npcNotes = JSON.parse(localStorage.getItem('holdsNpcNotes') || '{}') || {}; } catch (e) { npcNotes = {}; }
+    function persist(key, obj) { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { } }
+
+    function saveDungeonField(inp) {
+        const h = inp.dataset.hold, l = inp.dataset.loc, f = inp.dataset.field;
+        if (!dungeonOverrides[h]) dungeonOverrides[h] = {};
+        if (!dungeonOverrides[h][l]) dungeonOverrides[h][l] = {};
+        dungeonOverrides[h][l][f] = inp.value;
+        persist('holdsDungeonOverrides', dungeonOverrides);
+    }
+    window.saveDungeonField = saveDungeonField;
+    function saveNpcField(inp) {
+        const h = inp.dataset.hold, k = inp.dataset.key, f = inp.dataset.field;
+        if (!npcNotes[h]) npcNotes[h] = {};
+        if (!npcNotes[h][k]) npcNotes[h][k] = {};
+        npcNotes[h][k][f] = inp.value;
+        persist('holdsNpcNotes', npcNotes);
+    }
+    window.saveNpcField = saveNpcField;
+
+    function ta(hold, attrs, label, value, ph, cb) {
+        return `<label class="fld">${label}</label><textarea rows="2" ${attrs} data-hold="${esc(hold)}" onchange="${cb}(this)" placeholder="${esc(ph)}">${esc(value)}</textarea>`;
     }
 
-    function toggleHold(name) {
-        const body = document.getElementById('hold-body-' + name);
-        const chevron = document.getElementById('hold-chevron-' + name);
-        if (!body) return;
-        const willOpen = !body.classList.contains('open');
-        document.querySelectorAll('.hold-body').forEach(el => el.classList.remove('open'));
-        document.querySelectorAll('[id^="hold-chevron-"]').forEach(el => el.textContent = '▸');
-        if (willOpen) {
-            body.classList.add('open');
-            if (chevron) chevron.textContent = '▾';
-        }
-    }
-    window.toggleHold = toggleHold;
-
-    function renderHoldBody(holdName, data) {
-        if (!data || (!data.npcs.length && !data.locations.length)) {
-            return '<div class="empty-hold">Это владение ещё не заполнено — появится в одной из следующих партий.</div>';
-        }
-        let html = '';
-        if (data.npcs.length) {
-            html += `<div class="section-sub-header">👤 Жители (${data.npcs.length})</div>`;
-            data.npcs.forEach(n => {
-                html += `<div class="npc-card" data-search="${esc((n.name + ' ' + n.role + ' ' + n.bio).toLowerCase())}">
-                    <strong>${esc(n.name)}</strong>${n.role ? ' — ' + esc(n.role) : ''}
-                    ${n.bio ? `<div style="margin-top:3px; opacity:.85;">${esc(n.bio)}</div>` : ''}
-                </div>`;
-            });
-        }
-        if (data.locations.length) {
-            html += `<div class="section-sub-header">🗺️ Подземелья и точки интереса (${data.locations.length})</div>`;
-            data.locations.forEach((l, idx) => {
-                const dyn = (dungeonOverrides[holdName] || {})[l.name] || {};
-                html += `<div class="loc-card" data-search="${esc((l.name + ' ' + l.desc).toLowerCase())}">
-                    <strong>${esc(l.name)}</strong>
-                    ${l.desc ? `<div style="margin-top:3px;">${esc(l.desc)}</div>` : ''}
-                    <div class="loc-meta">
-                        <label style="font-size:13px; opacity:.7; margin-top:4px;">⚔️ Враги (какие и сколько)</label>
-                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="enemies" value="${esc(dyn.enemies || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
-                        <label style="font-size:13px; opacity:.7; margin-top:4px;">💰 Лут</label>
-                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="loot" value="${esc(dyn.loot || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
-                        <label style="font-size:13px; opacity:.7; margin-top:4px;">✨ Особенности (рудная жила, кузня, алхимическая станция, неотмеченная локация рядом...)</label>
-                        <input type="text" data-hold="${esc(holdName)}" data-loc="${esc(l.name)}" data-field="features" value="${esc(dyn.features || '')}" onchange="saveDungeonField(this)" placeholder="Ещё не заполнено">
-                    </div>
-                </div>`;
-            });
-        }
-        return html;
+    function renderNpc(hold, hi, si, pi, ni, place, q) {
+        const key = place.name + '|' + q.name;
+        const ov = (npcNotes[hold] || {})[key] || {};
+        const bio = ov.bio !== undefined ? ov.bio : (q.bio || '');
+        return `<details class="npc-card" id="n-${hi}-${si}-${pi}-${ni}">
+            <summary><strong>${esc(q.name)}</strong>${q.role ? ` <span class="npc-role">— ${esc(q.role)}</span>` : ''}</summary>
+            ${ta(hold, `data-key="${esc(key)}" data-field="bio"`, '📖 Подробности о жителе', bio, 'Ещё не заполнено — впиши, кто это, чем занят, как относится к игрокам', 'saveNpcField')}
+            ${q.src ? `<div class="child-line">Источник: <a href="${esc(q.src)}" target="_blank" rel="noopener" style="color:var(--accent-color);">вики</a></div>` : ''}
+            ${ta(hold, `data-key="${esc(key)}" data-field="quests"`, '📜 Возможные квесты', ov.quests !== undefined ? ov.quests : (q.quests || ''), 'Ещё не заполнено — какие поручения может дать этот персонаж', 'saveNpcField')}
+        </details>`;
     }
 
-    function renderAllHolds() {
-        const container = document.getElementById('holds-container');
-        const allHolds = ['Вайтран', 'Винтерхолд', 'Рифт', 'Фолкрит', 'Солитьюд (Хаафингар)',
-            'Хьялмарк (Морфал)', 'Истмарк (Виндхельм)', 'Белый берег (Данстар)', 'Маркарт (Предел)', 'Схолстейм'];
-        container.innerHTML = allHolds.map(name => {
-            const data = (window.holdsData || {})[name];
-            return `<div class="hold-header" onclick="toggleHold('${name}')">
-                <span>${esc(name)}</span><span id="hold-chevron-${name}">▸</span>
+    function renderLoc(hold, hi, ci, li, l) {
+        const ov = (dungeonOverrides[hold] || {})[l.name] || {};
+        const v = (f, def) => ov[f] !== undefined ? ov[f] : (def || '');
+        const attr = f => `data-loc="${esc(l.name)}" data-field="${f}"`;
+        const kids = (l.children || []).length ? `<div class="child-line">Внутренние части: ${l.children.map(esc).join('; ')}</div>` : '';
+        return `<details class="h-sheet lvl3" id="l-${hi}-${ci}-${li}">
+            <summary><span class="loc-name">${esc(l.name)}</span></summary>
+            <div class="h-inner">
+                ${ta(hold, attr('desc'), '📝 Описание', v('desc', l.desc), 'Ещё не заполнено', 'saveDungeonField')}
+                ${ta(hold, attr('enemies'), '⚔️ Враги (какие и сколько)', v('enemies', l.enemies), 'Ещё не заполнено', 'saveDungeonField')}
+                ${ta(hold, attr('loot'), '💰 Лут', v('loot', l.loot || l.reward), 'Ещё не заполнено', 'saveDungeonField')}
+                ${ta(hold, attr('features'), '✨ Особенности (рудная жила, кузня, станции, скрытые места рядом…)', v('features', l.features), 'Ещё не заполнено', 'saveDungeonField')}
+                ${kids}
             </div>
-            <div class="hold-body" id="hold-body-${name}">${renderHoldBody(name, data)}</div>`;
-        }).join('');
+        </details>`;
     }
 
-    document.getElementById('hold-search').addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
-        document.querySelectorAll('.npc-card, .loc-card').forEach(card => {
-            const match = !q || (card.dataset.search || '').includes(q);
-            card.style.display = match ? '' : 'none';
+
+    // ---- Карта владения: метки подземелий расставляет мастер (хранятся в браузере) ----
+    let mapPins = window.HoldsMap ? window.HoldsMap.loadPins() : {};
+    let mapCurrent = '';
+    function mapLocs(name) {
+        const d = window.holdsData[name], hi = HOLDS.indexOf(name), out = [];
+        (d.categories || []).forEach((c, ci) => c.locations.forEach((l, li) => out.push({ n: l.name, cat: c.name, id: `l-${hi}-${ci}-${li}` })));
+        return out;
+    }
+    function mapHtml(name) {
+        const placed = Object.keys(mapPins[name] || {}).length, total = mapLocs(name).length;
+        return `<details class="h-sheet lvl1" id="map-all-sheet"><summary>🗺 Карта Скайрима (нажми на владение)</summary><div class="h-inner"><div id="map-all"></div></div></details>
+        <details class="h-sheet lvl1" id="map-hold-sheet" open><summary>🗺 Карта владения «${esc(name)}»<span class="cnt" id="map-cnt">меток: ${placed} из ${total}</span></summary><div class="h-inner">
+            <p class="desc-text" style="font-size:13px; opacity:.75;">Выбери локацию в списке и кликни по карте — метка встанет. Метки можно перетаскивать; клик по метке открывает карточку места. Наведи на метку, чтобы увидеть название.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                <select id="map-pick" style="flex:1 1 280px;"></select>
+                <button onclick="mapRemovePin()" style="flex:0 0 auto;">Убрать метку</button>
+            </div>
+            <div id="map-hold"></div>
+            <div id="map-legend" style="font-size:13px; margin-top:6px; opacity:.85;"></div>
+        </div></details>`;
+    }
+    function mapFillPick(name, keep) {
+        const sel = document.getElementById('map-pick'); if (!sel) return;
+        const pins = mapPins[name] || {};
+        const prev = keep !== undefined ? keep : sel.value;
+        sel.innerHTML = '<option value="">— выбери локацию для метки —</option>' + mapLocs(name).map(l =>
+            `<option value="${esc(l.n)}">${pins[l.n] ? '✓ ' : ''}${esc(l.n)} · ${esc(l.cat)}</option>`).join('');
+        if (prev) sel.value = prev;
+        const cnt = document.getElementById('map-cnt');
+        if (cnt) cnt.textContent = `меток: ${Object.keys(pins).length} из ${mapLocs(name).length}`;
+    }
+    function mapRefresh(name) {
+        if (!window.HoldsMap) return;
+        const hi = HOLDS.indexOf(name);
+        const allBox = document.getElementById('map-all');
+        if (allBox) window.HoldsMap.render(allBox, { hl: name, onHold: h => selectHold(h) });
+        const box = document.getElementById('map-hold');
+        if (!box) return;
+        const locs = mapLocs(name), byName = {}; locs.forEach(l => byName[l.n] = l);
+        window.HoldsMap.render(box, {
+            hold: name, pins: mapPins,
+            onMap: (x, y) => {
+                const sel = document.getElementById('map-pick');
+                const n = sel && sel.value; if (!n) return;
+                if (!mapPins[name]) mapPins[name] = {};
+                mapPins[name][n] = { x, y, cat: (byName[n] || {}).cat || '' };
+                window.HoldsMap.savePins(mapPins);
+                mapFillPick(name, n); mapRefresh(name);
+            },
+            onPinMove: (h, n, x, y) => {
+                if (mapPins[h] && mapPins[h][n]) { mapPins[h][n].x = x; mapPins[h][n].y = y; window.HoldsMap.savePins(mapPins); }
+            },
+            onPin: (h, n) => { if (byName[n]) jumpTo(h, byName[n].id); }
         });
-        // при поиске раскрываем все владения, чтобы результаты были видны
-        if (q) {
-            document.querySelectorAll('.hold-body').forEach(el => el.classList.add('open'));
+        const used = {}; Object.values(mapPins[name] || {}).forEach(p => { if (p.cat) used[p.cat] = 1; });
+        const lg = document.getElementById('map-legend');
+        if (lg) lg.innerHTML = Object.keys(used).map(c => `<span style="margin-right:12px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${window.HoldsMap.catColor(c)};border:1px solid #000;"></span> ${esc(c)}</span>`).join('');
+    }
+    function mapMount(name) { mapCurrent = name; mapFillPick(name, ''); mapRefresh(name); }
+    window.mapRemovePin = function () {
+        const sel = document.getElementById('map-pick'); const n = sel && sel.value;
+        if (!n || !mapPins[mapCurrent] || !mapPins[mapCurrent][n]) return;
+        delete mapPins[mapCurrent][n];
+        window.HoldsMap.savePins(mapPins);
+        mapFillPick(mapCurrent, n); mapRefresh(mapCurrent);
+    };
+
+    function renderHold(name) {
+        const box = document.getElementById('holds-container');
+        const d = (window.holdsData || {})[name];
+        const hi = HOLDS.indexOf(name);
+        if (!d) { box.innerHTML = '<div class="empty-hold">Нет данных по этому владению.</div>'; return; }
+        let html = mapHtml(name);
+        const info = d.info || {};
+        const infoKeys = Object.keys(info).filter(k => info[k]);
+        if (infoKeys.length) {
+            html += `<details class="h-sheet lvl1" id="info-${hi}"><summary>🌿 Флора и фауна</summary><div class="h-inner">` +
+                infoKeys.map(k => `<div class="desc-text"><strong>${esc(k)}.</strong> ${esc(info[k])}</div>`).join('') + '</div></details>';
         }
+        (d.notes || []).forEach(n => { html += `<div class="note-box">📌 ${esc(n)}</div>`; });
+
+        // Поселения → места → жители
+        const sett = d.settlements || [];
+        html += `<div class="sec-title">🏘 Города и поселения (${sett.length})</div>`;
+        sett.forEach((st, si) => {
+            const pc = st.places.reduce((a, p) => a + p.people.length, 0);
+            html += `<details class="h-sheet lvl1" id="s-${hi}-${si}"><summary>🏘 ${esc(st.name)}<span class="cnt">${st.places.length} мест · ${pc} жителей</span></summary><div class="h-inner">`;
+            st.places.forEach((p, pi) => {
+                html += `<details class="h-sheet lvl2" id="p-${hi}-${si}-${pi}"><summary>🏠 ${esc(p.name)}<span class="cnt">${p.people.length ? p.people.length + ' жит.' : ''}</span></summary><div class="h-inner">`;
+                if (p.note) html += `<div class="note-box">${esc(p.note)}</div>`;
+                if (!p.people.length) html += '<div class="empty-hold">Жителей в таблице не указано.</div>';
+                p.people.forEach((q, ni) => { html += renderNpc(name, hi, si, pi, ni, p, q); });
+                html += '</div></details>';
+            });
+            html += '</div></details>';
+        });
+
+        // Категории локаций → конкретные места
+        const cats = d.categories || [];
+        const total = cats.reduce((a, c) => a + c.locations.length, 0);
+        html += `<div class="sec-title">🗺 Подземелья и точки интереса (${total})</div>`;
+        cats.forEach((c, ci) => {
+            html += `<details class="h-sheet lvl1" id="c-${hi}-${ci}"><summary>${esc(c.name)}<span class="cnt">${c.locations.length}</span></summary><div class="h-inner">`;
+            c.locations.forEach((l, li) => { html += renderLoc(name, hi, ci, li, l); });
+            html += '</div></details>';
+        });
+        if (!sett.length && !cats.length) html = '<div class="empty-hold">Это владение ещё не заполнено.</div>';
+        box.innerHTML = html;
+        mapMount(name);
+    }
+
+    function selectHold(name) {
+        const sel = document.getElementById('hold-select');
+        if (sel.value !== name) sel.value = name;
+        try { localStorage.setItem('holdsLastHold', name); } catch (e) { }
+        renderHold(name);
+    }
+    window.selectHold = selectHold;
+
+    // ---- Поиск по всем владениям ----
+    let searchIndex = null;
+    function buildIndex() {
+        searchIndex = [];
+        HOLDS.forEach((h, hi) => {
+            const d = window.holdsData[h];
+            d.settlements.forEach((st, si) => {
+                searchIndex.push({ hold: h, id: `s-${hi}-${si}`, label: '🏘 ' + st.name, sub: h + ' · поселение', name: norm(st.name), body: '' });
+                st.places.forEach((p, pi) => {
+                    searchIndex.push({ hold: h, id: `p-${hi}-${si}-${pi}`, label: '🏠 ' + p.name, sub: `${h} · ${st.name}`, name: norm(p.name), body: norm(p.note) });
+                    p.people.forEach((q, ni) => {
+                        searchIndex.push({ hold: h, id: `n-${hi}-${si}-${pi}-${ni}`, label: '👤 ' + q.name + (q.role ? ' — ' + q.role : ''), sub: `${h} · ${st.name} · ${p.name}`, name: norm(q.name + ' ' + q.role), body: norm((q.bio || '') + ' ' + (q.quests || '')) });
+                    });
+                });
+            });
+            d.categories.forEach((c, ci) => c.locations.forEach((l, li) => {
+                searchIndex.push({ hold: h, id: `l-${hi}-${ci}-${li}`, label: '🗺 ' + l.name, sub: `${h} · ${c.name}`, name: norm(l.name), body: norm([l.desc, l.enemies, l.loot, l.features].join(' ')) });
+            }));
+        });
+    }
+
+    function runSearch(q) {
+        const box = document.getElementById('search-results');
+        q = norm(q.trim());
+        if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        if (!searchIndex) buildIndex();
+        const words = q.split(/\s+/).filter(Boolean);
+        const hits = [];
+        searchIndex.forEach(e => {
+            const inName = words.every(w => e.name.includes(w));
+            const inAll = inName || words.every(w => (e.name + ' ' + e.body).includes(w));
+            if (inAll) hits.push({ e, rank: inName ? 0 : 1 });
+        });
+        hits.sort((a, b) => a.rank - b.rank);
+        const shown = hits.slice(0, 60);
+        box.style.display = 'block';
+        if (!shown.length) { box.innerHTML = '<div class="sr-head">Ничего не найдено.</div>'; return; }
+        box.innerHTML = `<div class="sr-head">Найдено: ${hits.length}${hits.length > shown.length ? ' (показаны первые 60)' : ''} — нажми, чтобы открыть</div>` +
+            shown.map(h => `<div class="sr" data-hold="${esc(h.e.hold)}" data-id="${esc(h.e.id)}">${esc(h.e.label)}<small>${esc(h.e.sub)}${h.rank ? ' · найдено в описании' : ''}</small></div>`).join('');
+    }
+
+    function jumpTo(hold, id) {
+        selectHold(hold);
+        const target = document.getElementById(id);
+        if (!target) return;
+        let n = target;
+        while (n && n.id !== 'holds-container') {
+            if (n.tagName === 'DETAILS') n.open = true;
+            n = n.parentElement;
+        }
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
+    }
+    window.jumpTo = jumpTo;
+
+    document.getElementById('hold-search').addEventListener('input', function () { runSearch(this.value); });
+    document.getElementById('search-results').addEventListener('click', function (ev) {
+        const row = ev.target.closest('.sr');
+        if (row) jumpTo(row.dataset.hold, row.dataset.id);
     });
 
-    renderAllHolds();
+    (function init() {
+        const sel = document.getElementById('hold-select');
+        sel.innerHTML = HOLDS.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
+        let last = '';
+        try { last = localStorage.getItem('holdsLastHold') || ''; } catch (e) { }
+        selectHold(HOLDS.includes(last) ? last : HOLDS[0]);
+    })();
 </script>
 </body>
 </html>

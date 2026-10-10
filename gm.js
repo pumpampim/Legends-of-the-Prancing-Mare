@@ -436,6 +436,7 @@
         if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
         if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
+        if (typeof window.renderGmMap === 'function') window.renderGmMap();
     }
 
     // ---------- Отряд ----------
@@ -3779,6 +3780,60 @@
         const pool = basePool.concat(biasTypes, biasTypes);
         pendingWeatherKey = pool[Math.floor(Math.random() * pool.length)];
         el('weather-gm-result').innerHTML = `Выпало: <strong>${WEATHER_LABELS[pendingWeatherKey]}</strong> — жми «Применить», чтобы сообщить игрокам.`;
+    };
+
+
+    // ---------- Карта и положение партии ----------
+    let gmMapHold = '', gmMapSel = null, gmMapSig = null;
+    function gmMapParty() { return window.HoldsMap ? window.HoldsMap.partyFromSession(lastData) : null; }
+    window.renderGmMap = function (force) {
+        const box = el('gm-map');
+        if (!box || !window.HoldsMap) return;
+        const party = gmMapParty();
+        const sig = JSON.stringify([gmMapHold, party, gmMapSel]);
+        if (!force && sig === gmMapSig) return;
+        gmMapSig = sig;
+        const sel = el('gm-map-hold');
+        if (sel && sel.options.length < 2) {
+            sel.innerHTML = '<option value="">— вся карта —</option>' + Object.keys(window.HoldsMap.HOLDS).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        }
+        if (sel) sel.value = gmMapHold;
+        const pins = window.HoldsMap.loadPins();
+        window.HoldsMap.render(box, {
+            hold: gmMapHold || null, hl: (lastData && lastData.currentHold) || null, party, pins, sel: gmMapSel,
+            onHold: h => { gmMapHold = h; gmMapSel = null; window.renderGmMap(true); },
+            onSettlement: (h, n, x, y) => { gmMapSel = { hold: h, name: n, x, y }; gmMapShowSel(); window.renderGmMap(true); },
+            onPin: (h, n) => { const p = ((pins[h] || {})[n]); if (p) { gmMapSel = { hold: h, name: n, x: p.x, y: p.y }; gmMapShowSel(); window.renderGmMap(true); } },
+            onMap: gmMapHold ? (x, y, h) => { gmMapSel = { hold: h || gmMapHold, name: (el('gm-map-label').value || '').trim(), x, y }; gmMapShowSel(); window.renderGmMap(true); } : null
+        });
+        gmMapShowSel();
+    };
+    function gmMapShowSel() {
+        const b = el('gm-map-selected');
+        if (!b) return;
+        const p = gmMapParty();
+        let t = p ? `Сейчас у игроков: <strong>${escapeHtml(p.name || 'своя точка')}</strong>${p.hold ? ' (' + escapeHtml(p.hold) + ')' : ''}. ` : 'Метка партии не стоит. ';
+        t += gmMapSel ? `Выбрано: <strong>${escapeHtml(gmMapSel.name || 'точка на карте')}</strong>${gmMapSel.hold ? ' (' + escapeHtml(gmMapSel.hold) + ')' : ''}.` : 'Выбери город или точку на карте.';
+        b.innerHTML = t;
+    }
+    window.gmMapPickHold = function (h) { gmMapHold = h || ''; gmMapSel = null; window.renderGmMap(true); };
+    window.gmMapSetParty = function () {
+        if (!gmMapSel) { el('gm-map-result').textContent = 'Сначала выбери город или точку на карте.'; return; }
+        if (!currentCode) { el('gm-map-result').textContent = 'Нет активной сессии.'; return; }
+        const pos = { hold: gmMapSel.hold || '', name: gmMapSel.name || '', x: gmMapSel.x, y: gmMapSel.y };
+        const upd = { partyPos: pos };
+        if (pos.hold) upd.currentHold = pos.hold;
+        db.collection('sessions').doc(currentCode).update(upd).then(() => {
+            el('gm-map-result').innerHTML = `<span style="color:#2ecc71;">✅ Партия: ${escapeHtml(pos.name || 'точка на карте')}${pos.hold ? ' (' + escapeHtml(pos.hold) + ')' : ''}.</span>`;
+            gmPostLogEntryText(`🗺️ Партия прибывает: ${pos.name || 'новое место'}${pos.hold ? ' (' + pos.hold + ')' : ''}.`);
+            gmMapSel = null;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmMapClearParty = function () {
+        if (!currentCode) return;
+        db.collection('sessions').doc(currentCode).update({ partyPos: null }).then(() => {
+            el('gm-map-result').textContent = 'Метка партии убрана.';
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
 
     window.setSessionTimeWeather = function () {

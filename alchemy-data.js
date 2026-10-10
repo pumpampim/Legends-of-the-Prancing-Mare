@@ -204,7 +204,7 @@ const alchemyBaseEffects = {
     "Повышение навыка: Восстановление": { kind: 'skill', skill: 'восстановление', base: 5, dur: 1, unit: "%", polarity: "positive", priceBase: 8, desc: "" },
     "Повышение навыка: Изменение": { kind: 'skill', skill: 'изменение', base: 5, dur: 1, unit: "%", polarity: "positive", priceBase: 8, desc: "" },
     // --- только длительность ---
-    "Невидимость": { kind: 'invis', base: null, dur: 1, unit: "", polarity: "positive", priceBase: 250, desc: "Дарует невидимость." },
+    "Невидимость": { kind: 'invis', base: null, dur: 1, unit: "", polarity: "positive", priceBase: 75, desc: "Дарует невидимость." },
     "Водное дыхание": { kind: 'water', base: null, dur: 2, unit: "", polarity: "positive", priceBase: 30, desc: "Дарует водное дыхание." },
     "Паралич": { kind: 'paralysis', base: null, dur: 1, unit: "", polarity: "negative", priceBase: 100, desc: "Жертва не может двигаться и действовать." },
     "Обезоруживание": { kind: 'disarm', base: null, dur: 1, unit: "", polarity: "negative", priceBase: 20, desc: "Оружие жертвы падает на землю, использовать его нельзя." },
