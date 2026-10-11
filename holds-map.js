@@ -353,6 +353,15 @@ ${showName ? `<text class="lbl" x="${px}" y="${py + 17 * u}" text-anchor="middle
         s += '</svg>';
         container.innerHTML = s;
         const svg = container.querySelector('svg');
+        // картинка не загрузилась (например, папку maps/ не выложили рядом с сайтом) — рисуем схему и говорим об этом
+        if (img) {
+            const imEl = svg.querySelector('image[data-img]');
+            if (imEl) imEl.addEventListener('error', () => {
+                if (o._fb) return;
+                render(container, Object.assign({}, o, { schematic: true, _fb: true }));
+                container.insertAdjacentHTML('afterbegin', '<div style="font-size:12px; color:#e6b34d; margin:0 0 4px;">⚠ Картинка владения не загрузилась (проверь, что папка <b>maps</b> лежит рядом с сайтом) — показана схема.</div>');
+            });
+        }
         const toSvg = ev => { const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; const m = svg.getScreenCTM(); return m ? pt.matrixTransform(m.inverse()) : { x: 0, y: 0 }; };
         // из точки SVG — в схематичные координаты (+ доли картинки)
         const fromSvg = p => {
