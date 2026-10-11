@@ -247,6 +247,28 @@
     ok(FD.every(catchable), 'Рыбы: каждая ловится хотя бы где-то');
     ['freezing', 'lake', 'stream', 'underground'].forEach(w => ok(FD.some(f => f.habitats.some(h => h[0] === w)), `Рыбы: в воде «${w}» есть что ловить`));
     ok(FD.filter(f => f.estimated).length <= 3, 'Рыбы: оценочных (без точных цифр с вики) не больше трёх', FD.filter(f => f.estimated).map(f => f.name).join(', '));
+    // ---------- ОХОТА (hunt-data.js) ----------
+    const HD = W.huntData || { animals: {}, holdFauna: {}, regionMod: {} };
+    const HA = HD.animals, enemyByName = {};
+    (W.enemiesData || []).forEach(e => { enemyByName[e.name] = e; });
+    ok(Object.keys(HA).length >= 6, `Охота: звери на месте (${Object.keys(HA).length})`);
+    ok(Object.keys(HA).every(n => enemyByName[n]), 'Охота: каждый зверь есть в базе врагов (категория «Животные»)', Object.keys(HA).filter(n => !enemyByName[n]).join(', '));
+    ok(Object.keys(HA).every(n => enemyByName[n] && enemyByName[n].category === 'Животные' && (enemyByName[n].weaponDmg || 0) <= 15), 'Охота: только небоевые животные (урон ≤ 15, нет хищников)');
+    ok(Object.keys(HA).every(n => HA[n].drops.length && HA[n].drops.every(d => itemNames.has(d.item) && d.min >= 1 && d.max >= d.min)), 'Охота: вся добыча есть в базе предметов', Object.keys(HA).map(n => HA[n].drops.filter(d => !itemNames.has(d.item)).map(d => d.item)).flat().join(', '));
+    ok(Object.keys(HD.holdFauna).length === 10, `Охота: фауна заведена для всех 10 владений (${Object.keys(HD.holdFauna).length})`);
+    ok(Object.keys(HD.holdFauna).every(h => Object.keys(HD.holdFauna[h]).every(n => HA[n])), 'Охота: в фауне владений нет неизвестных зверей');
+    ok(Object.keys(HA).every(n => Object.keys(HD.holdFauna).some(h => HD.holdFauna[h][n])), 'Охота: каждый зверь водится хотя бы в одном владении');
+    const HF = HD.holdFauna || {};
+    ok(['Кролик', 'Олень (самка)', 'Олень (самец)', 'Лось', 'Лиса', 'Коза'].every(n => HF['Фолкрит'][n] && HF['Вайтран'][n]) && HF['Фолкрит']['Олень (самка)'] > HF['Вайтран']['Олень (самка)'] && HF['Фолкрит']['Олень (самец)'] > HF['Вайтран']['Олень (самец)'] && !HF['Фолкрит']['Снежная лиса'], 'Охота: Фолкрит — звери как в Вайтране, но оленей больше');
+    ok(!HF['Маркарт (Предел)']['Олень (самка)'] && !HF['Маркарт (Предел)']['Олень (самец)'] && Object.keys(HF['Маркарт (Предел)']).every(n => HF['Вайтран'][n]) && ['Кролик', 'Лиса', 'Коза'].every(n => HF['Маркарт (Предел)'][n]), 'Охота: Предел — как в Вайтране, но без оленей');
+    ok(Object.keys(HF['Вайтран']).concat(Object.keys(HF['Белый берег (Данстар)'])).every(n => HF['Солитьюд (Хаафингар)'][n]), 'Охота: Хаафингар — звери и Вайтрана, и Белого берега');
+    ok(typeof W.getHuntingPool === 'function' && W.getHuntingPool('Рифт', 'Подземелье').length === 0, 'Охота: под землёй дичи нет');
+    ok(W.getHuntingPool('Рифт', 'Лес').length > 0 && W.getHuntingPool(null, null).length > 0, 'Охота: без владения тоже есть дичь по умолчанию');
+    ok(W.getHuntingPool('Винтерхолд', null).some(p => p.name === 'Снежная лиса') && !W.getHuntingPool('Рифт', null).some(p => p.name === 'Снежная лиса'), 'Охота: снежная лиса — на севере, не в Рифте');
+    ok(W.rollHunt('Рифт', 'Лес', () => 0.05).nothing === true, 'Охота: при низком броске — «зверь ушёл»');
+    const hr = W.rollHunt('Рифт', 'Лес', () => 0.99);
+    ok(!hr.nothing && hr.drops.length && hr.drops.every(d => d.qty >= 1), 'Охота: при высоком броске есть добыча');
+    ok(W.rollHunt('Рифт', 'Подземелье', () => 0.99).noGame === true, 'Охота: в подземелье rollHunt сообщает «дичи нет»');
     // Кухня: все ингредиенты ВСЕХ рецептов известны кухне (иначе блюдо невозможно приготовить)
     const CK = W.cookingIngredients || {};
     const badKitchen = [];

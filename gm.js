@@ -779,9 +779,9 @@
         try {
             const pins = window.HoldsMap && window.HoldsMap.loadPins ? window.HoldsMap.loadPins() : {};
             const p = pins[hold] && pins[hold][name];
-            if (p && typeof p.x === 'number') return { x: p.x, y: p.y, src: 'метка из справочника' };
+            if (p && typeof p.x === 'number') return Object.assign({ x: p.x, y: p.y, src: 'метка из справочника' }, typeof p.u === 'number' && typeof p.v === 'number' ? { u: p.u, v: p.v } : {});
         } catch (e) { }
-        if (gmMapSel && typeof gmMapSel.x === 'number' && (!gmMapSel.hold || gmMapSel.hold === hold)) return { x: gmMapSel.x, y: gmMapSel.y, src: 'точка, выбранная на карте мастера' };
+        if (gmMapSel && typeof gmMapSel.x === 'number' && (!gmMapSel.hold || gmMapSel.hold === hold)) return Object.assign({ x: gmMapSel.x, y: gmMapSel.y, src: 'точка, выбранная на карте мастера' }, typeof gmMapSel.u === 'number' && typeof gmMapSel.v === 'number' ? { u: gmMapSel.u, v: gmMapSel.v } : {});
         return null;
     }
 
@@ -948,7 +948,7 @@
                 const p = open.find(x => x.id === b.dataset.id); if (!p) return;
                 const c = prepPlaceCoords(p.hold, p.name);
                 if (!c) { alert('Нет точки: выбери её на карте мастера (в приближении владения) или поставь метку места в справочнике владений.'); return; }
-                const next = open.map(x => x.id === p.id ? Object.assign({}, x, { x: c.x, y: c.y }) : x);
+                const next = open.map(x => x.id === p.id ? Object.assign({}, x, { x: c.x, y: c.y }, c.u !== undefined ? { u: c.u, v: c.v } : {}) : x);
                 prepWritePlaces(next).then(() => { res.textContent = '«' + p.name + '» привязано к карте (' + c.src + ').'; }).catch(e => alert('Ошибка: ' + e.message));
             } else {
                 const div = b.closest('.prep-place');
@@ -957,9 +957,9 @@
                 const text = (div.querySelector('.prep-place-text').value || '').trim();
                 const c = prepPlaceCoords(hold, name);
                 const entry = { id, hold, name, cat, desc: text, ts: Date.now() };
-                if (c) { entry.x = c.x; entry.y = c.y; }
+                if (c) { entry.x = c.x; entry.y = c.y; if (c.u !== undefined) { entry.u = c.u; entry.v = c.v; } }
                 const was = open.find(x => x.id === id);
-                if (was && !c && typeof was.x === 'number') { entry.x = was.x; entry.y = was.y; }
+                if (was && !c && typeof was.x === 'number') { entry.x = was.x; entry.y = was.y; if (was.u !== undefined) { entry.u = was.u; entry.v = was.v; } }
                 const next = open.filter(x => x.id !== id).concat([entry]);
                 prepWritePlaces(next, was ? null : '🔓 Открыто новое место: «' + name + '» (' + hold + ').').then(() => {
                     res.textContent = (was ? 'Обновлено: ' : 'Открыто игрокам: ') + name + (entry.x !== undefined ? ' — с точкой на карте (' + (c ? c.src : 'прежняя точка') + ').' : ' — без точки на карте: игроки увидят его только в списке «Известные места». Выбери точку на карте мастера и нажми «📍 точка» в списке открытых.');
@@ -2374,7 +2374,9 @@
         // не должно (по прямой просьбе).
         'Красноводная скума', 'Лунный сахар',
         // Вампирский напиток — в таверне его не наливают
-        'Зелье крови'
+        'Зелье крови',
+        // Прах Берита у торговцев не продаётся (по просьбе)
+        'Прах Берита'
     ]);
     // Одеяния и перчатки мастеров школ «выдаются в Коллегии при полном изучении школы» — купить их
     // нельзя ни у кого. Раньше в списке исключений были не все (не хватало Робы разрушения,
@@ -2433,7 +2435,7 @@
             const shuffledStaves = staves.slice().sort(() => Math.random() - 0.5).slice(0, keepStaffCount);
             pool = otherItems.concat(shuffledStaves);
         }
-        return pool;
+        return pool.filter(i => !(MERCH_GEAR_CATS.test(i.category || '') && MERCH_NEVER_RE.test(i.name)));
     }
 
     // Генерирует новый ассортимент (10-20 предметов) + сбрасывает золото до базового. Ключ —
@@ -2453,89 +2455,263 @@
         'Винтерхолд': /^(Стальн|Стеклянн)/i
     };
 
+    // ---------- Ассортимент «как в Скайриме» ----------
+    // Раньше витрина была случайной выборкой из ОДНОГО общего списка: чего в базе больше (например, 16 видов
+    // луков против 8 видов стрел), того больше и на прилавке. Теперь у каждого типа торговца есть РАЗДЕЛЫ с
+    // долей товара (как у списков торговцев в игре: кузнец — оружие, броня, слитки, кожа; торговец луками —
+    // луки, стрелы, болты…), внутри раздела дешёвое попадается чаще дорогого, а обязательные товары лежат всегда.
+    // Фалмерское, изгойское и древненордское оружие/броня у торговцев не продаётся вообще (по просьбе)
+    const MERCH_NEVER_RE = /фалмер|изгое|древн/i;
+    const MERCH_GEAR_CATS = /^(Оружие|Броня|Луки|Боеприпасы|Легкая броня \(лут\)|Тяжелая броня \(лут\)|Одноручное \(лут\)|Двуручное \(лут\)|Луки \(лут\))$/;
+    const MERCH_SPECIAL_RE = /небесн|риклинг|бич магов/i; // редкое: максимум пара позиций
+    // снаряжение, которое продают только в «своих» владениях
+    const MERCH_REGION_ONLY = [[/хитинов/i, ['Схолстейм']], [/братьев бури/i, ['Истмарк']]];
+    // Региональные пристрастия: во сколько раз чаще (>1) или реже (<1) встречается материал в лавке владения.
+    // Двемерское — у Маркарта, нордское резное — в Истмарке, имперское — в Солитьюде и т.д.
+    const MERCH_AFFINITY = {
+        'Вайтран': [[/^железн/i, 2], [/^стальн/i, 2], [/^имперск/i, 1.5], [/^(охотнич|длинн)/i, 1.5], [/^нордск/i, 1.3], [/^двемерск/i, 0.4], [/^эбонит/i, 0.5], [/^стеклянн/i, 0.6]],
+        'Рифт': [[/^стальн/i, 2], [/^орочь/i, 2], [/^железн/i, 1.5], [/^эльфийск/i, 1.3], [/^(кожан|мехов)/i, 1.5], [/^нордск/i, 1.2], [/^двемерск/i, 0.6]],
+        'Хаафингар': [[/^имперск/i, 3], [/^эльфийск/i, 2], [/^стальн/i, 1.5], [/^стеклянн/i, 1.5], [/^нордск/i, 0.7], [/^двемерск/i, 0.5], [/^мехов/i, 0.6]],
+        'Хьялмарк': [[/^железн/i, 2], [/^кожан/i, 2], [/^(мехов|сыромятн)/i, 1.5], [/^орочь/i, 1.2], [/^двемерск/i, 0.5], [/^эльфийск/i, 0.6], [/^стеклянн/i, 0.5]],
+        'Истмарк': [[/^нордск/i, 4], [/^мехов/i, 2], [/братьев бури/i, 4], [/^стальн/i, 1.5], [/^железн/i, 1.3], [/^имперск/i, 0.5], [/^двемерск/i, 0.3], [/^эльфийск/i, 0.4]],
+        'Фолкрит': [[/^(кожан|сыромятн)/i, 2], [/^мехов/i, 1.5], [/^железн/i, 1.5], [/^охотнич/i, 2], [/^имперск/i, 1.2], [/^двемерск/i, 0.4], [/^эбонит/i, 0.4]],
+        'Предел': [[/^двемерск/i, 5], [/^эльфийск/i, 2], [/^орочь/i, 2], [/серебр/i, 2], [/^нордск/i, 0.6], [/^имперск/i, 0.7], [/^мехов/i, 0.8]],
+        'Белый Берег': [[/^нордск/i, 2], [/^стальн/i, 2], [/^железн/i, 2], [/^мехов/i, 2], [/^небесн/i, 1.5], [/^двемерск/i, 0.5], [/^эльфийск/i, 0.5]],
+        'Винтерхолд': [[/^стеклянн/i, 2], [/^эльфийск/i, 1.5], [/^стальн/i, 1.5], [/^мехов/i, 2], [/^сталгрим/i, 2], [/^нордск/i, 1.3], [/^двемерск/i, 0.7]],
+        'Схолстейм': [[/хитинов/i, 4], [/^сталгрим/i, 3], [/^эбонит/i, 2], [/^нордск/i, 1.5], [/^мехов/i, 2], [/^орочь/i, 0.7], [/^имперск/i, 0.4]]
+    };
+    // Региональные пристрастия алхимика и торговцев едой — по описанию флоры и фауны владений (справочник «Владения»).
+    // Правило: [регулярка по названию, {владение: во сколько раз чаще/реже}, множитель для остальных владений (по умолчанию 1)].
+    const _V = 'Вайтран', _R = 'Рифт', _H = 'Хаафингар', _K = 'Хьялмарк', _E = 'Истмарк', _F = 'Фолкрит', _P = 'Предел', _B = 'Белый Берег', _W = 'Винтерхолд', _S = 'Схолстейм';
+    const MERCH_ING_AFFINITY = [
+        [/^(Лаванда|Пушица)$/, { [_V]: 3, [_R]: 1.3, [_W]: 0.2, [_B]: 0.2, [_P]: 0.5 }],
+        [/горноцвет/, { [_V]: 2, [_F]: 2, [_R]: 2, [_H]: 1.5, [_B]: 1.5, [_K]: 1.5, [_P]: 0.6, [_W]: 0.6 }],
+        [/^Голубой горноцвет$/, { [_K]: 2.5, [_B]: 1.5 }],
+        [/^Желтый горноцвет$/, { [_V]: 0.15 }],
+        [/^Мора тапинелла$/, { [_V]: 1.5, [_R]: 2, [_F]: 2.5, [_H]: 1.5, [_K]: 1.5, [_E]: 2, [_P]: 0.8, [_W]: 0.3, [_B]: 0.3, [_S]: 0.5 }],
+        [/^Ветка чертополоха$/, { [_V]: 1.5, [_R]: 2, [_F]: 3, [_H]: 1.5, [_E]: 2, [_K]: 0.7, [_P]: 0.7, [_W]: 0.3, [_B]: 0.3 }],
+        [/^Паслён$/, { [_F]: 3, [_K]: 1.5, [_H]: 1.5, [_E]: 0.7 }, 0.5],
+        [/^Снежные ягоды$/, { [_W]: 3, [_B]: 3, [_E]: 2, [_S]: 2, [_F]: 1.5, [_H]: 1.5, [_K]: 1.5 }],
+        [/^Морской жёлудь$/, { [_H]: 3, [_B]: 2.5, [_E]: 1.5, [_S]: 1 }, 0.4],
+        [/^Собачий корень$/, { [_H]: 2, [_K]: 2.5 }, 0.6],
+        [/^(Ядовитый колокольчик|Болотный стручок|Гигантский лишайник)$/, { [_K]: 4 }, 0.25],
+        [/^(Хвост злокрыса|Клешня грязевого краба)$/, { [_K]: 3, [_S]: 1.5 }, 0.7],
+        [/^(Яйцо коруса|Усик коруса-охотника)$/, { [_K]: 3 }, 0.5],
+        [/^(Язык дракона|Виноград джазби|Ползучая лоза)$/, { [_E]: 4 }, 0.3],
+        [/^(Ягоды можжевельника|Бородатый мох)$/, { [_P]: 4 }, 0.4],
+        [/^(Пепельная ползучая лоза|Императорский зонтичный мох|Стручок пепельной травы|Пепел порождения|Корень трамы|Желе пепельного прыгуна|Желе нетча|Перья фельсадской крачки|Кабаний клык|Древесина горелого сприггана)$/, { [_S]: 5 }, 0.15],
+        [/^(Корень Нирна|Алый корень Нирна)$/, { [_K]: 2.5, [_E]: 1.2 }, 0.8],
+        [/^(Морозная мириам|Морозная соль|Зубы ледяного привидения|Жир тролля|Глаз саблезуба|Клык саблезуба|Медвежьи когти)$/, { [_W]: 2.5, [_B]: 2.5, [_E]: 1.5, [_K]: 1.5, [_H]: 1.3, [_P]: 0.7 }, 0.8],
+        [/^(Палец великана|Толчёный бивень мамонта)$/, { [_V]: 2, [_F]: 1.5, [_H]: 1.5, [_B]: 1.5, [_E]: 1.5, [_P]: 1.5, [_R]: 0.1, [_W]: 0.7 }],
+        [/^Большие рога$/, { [_F]: 2.5, [_W]: 2, [_R]: 1.5, [_P]: 0.1 }],
+        [/^Маленькие рога$/, { [_F]: 2, [_W]: 2, [_R]: 1.5, [_P]: 0.6 }],
+        [/^(Крыло монарха|Крыло синей бабочки|Крыло лунного мотылька|Торакс светлячка)$/, { [_V]: 2, [_R]: 2.5, [_W]: 0.5, [_B]: 0.5 }],
+        [/^(Синяя стрекоза|Оранжевая стрекоза)$/, { [_R]: 2.5, [_K]: 1.5, [_H]: 1.5, [_W]: 0.4, [_B]: 0.4 }],
+        [/^(Абесинский окунь|Серебристый окунь|Бойцовая рыбка|Сиродильский лопатохвост|Хисткарп|Лососевая икра)$/, { [_F]: 2.5, [_V]: 1.5, [_R]: 2, [_K]: 1.5, [_W]: 0.5, [_B]: 0.5 }, 0.7],
+        [/^(Пчела|Пчелиное гнездо|Медовые соты)$/, { [_R]: 2.5, [_V]: 2, [_F]: 1.5, [_W]: 0.4 }, 0.8],
+        [/^(Пшеница|Чеснок|Куриное яйцо)$/, { [_V]: 2, [_E]: 1.5, [_R]: 1.5, [_H]: 1.5, [_W]: 0.5, [_B]: 0.7, [_P]: 0.7 }],
+        [/^Сердце даэдра$/, {}, 4],   // редкость как у эбонитового и сталгримового снаряжения (около 3% витрин)
+        [/^(Яйцо соснового дрозда|Яйцо ястреба|Перья ястреба|Клюв ястреба)$/, { [_V]: 1.5, [_F]: 1.5, [_P]: 1.3 }],
+        [/^Паучье яйцо$/, { [_K]: 1.5, [_B]: 1.5, [_W]: 1.5 }]
+    ];
+    const MERCH_FOOD_AFFINITY = [
+        [/^Оленина$/, { [_F]: 3, [_W]: 2, [_R]: 2, [_S]: 1.5, [_P]: 0.1 }],
+        [/^Козий окорок$/, { [_W]: 2, [_P]: 2.5, [_V]: 1.5, [_E]: 1.5 }],
+        [/кроличья ножка/, { [_W]: 2, [_R]: 1.5, [_S]: 1.5, [_V]: 1.3 }],
+        [/^Мясо хоркера$/, { [_W]: 3, [_S]: 3, [_B]: 2, [_H]: 1.5 }, 0.5],
+        [/^Хобот мамонта$/, { [_V]: 2, [_F]: 2, [_H]: 2, [_P]: 1.5, [_B]: 1.3, [_R]: 0.1 }],
+        [/^Конина$/, { [_V]: 2, [_H]: 1.5, [_F]: 1.2 }],
+        [/^Сырая говядина$/, { [_V]: 2, [_R]: 1.5, [_E]: 1.5, [_H]: 1.5, [_W]: 0.6 }],
+        [/^Куриная грудка$/, { [_V]: 1.5, [_E]: 1.5, [_R]: 1.5 }],
+        [/^Фазанья грудка$/, { [_R]: 2.5, [_V]: 1.2 }],
+        [/^Мясо кабана$/, { [_S]: 3 }, 0.8],
+        [/^Мясо устрицы$/, { [_H]: 3, [_B]: 2, [_W]: 1.5, [_S]: 1.5 }, 0.4],
+        [/пепельн/, { [_S]: 6 }, 0.1],
+        [/^Полярный/, { [_W]: 3, [_B]: 3, [_E]: 1.5, [_K]: 1.5 }, 0.5],
+        [/^(Карп|Сом|Страж-рыба|Мелководный окунь|Лосось|Лососина|Стеклянный окунь|Стеклянный сомик|Люторыба|Лирохвостый окунь|Золотая рыбка)$/, { [_F]: 2.5, [_V]: 1.5, [_R]: 2, [_K]: 1.5, [_H]: 1.2, [_W]: 0.6, [_B]: 0.6, [_P]: 0.5 }, 0.7],
+        [/^(Треска|Скорпена)$/, { [_H]: 2, [_B]: 2, [_W]: 2, [_S]: 1.5 }, 0.6],
+        [/^(Капуста|Морковь|Тыква|Картофель|Лук-порей|Помидор|Капустный суп|Печёный картофель|Жареный лук-порей)$/, { [_V]: 2, [_E]: 2, [_R]: 2, [_H]: 2, [_F]: 1.3, [_B]: 0.7, [_W]: 0.5, [_P]: 0.5, [_S]: 0.7 }],
+        [/яблок|Яблочный пирог/, { [_R]: 2, [_H]: 2, [_F]: 1.5, [_V]: 1.2, [_W]: 0.5, [_B]: 0.6 }],
+        [/^Мёд Хоннинга$/, { [_V]: 4 }],
+        [/^Черновересковый мёд/, { [_R]: 4 }],
+        [/^Нордский мёд$/, { [_E]: 2, [_V]: 1.5, [_B]: 1.5, [_W]: 1.5 }],
+        [/^Мед с можжевеловыми ягодами$/, { [_P]: 4 }],
+        [/^Аргонианский эль$/, { [_K]: 3 }],
+        [/^(Суджамма|Флин|Шейн|Мацт)$/, { [_E]: 3, [_S]: 2 }],
+        [/^Зольный мед/, { [_S]: 4 }, 0.3],
+        [/^Угольное вино$/, { [_S]: 2, [_E]: 1.5 }],
+        [/^(Вино «Алто»|Коловианский бренди|Пряное вино)$/, { [_H]: 3, [_V]: 1.3 }],
+        [/^Строс М'Кайский ром$/, { [_H]: 1.5, [_E]: 1.5 }]
+    ];
+    // Уникальная броня владений (поле location у предмета) → в лавке какого владения продаётся
+    const MERCH_REGIONAL_ARMOR = { 'Фолкрит': 'Фолкрит', 'Хьялмарк': 'Хьялмарк', 'Белый Берег': 'Белый берег и Винтерхолд', 'Винтерхолд': 'Белый берег и Винтерхолд' };
+    function merchantCatalogue() {
+        const WR = window.weaponRecipes || [], WN = window.weaponsNonCraftable || [], AR = window.armorRecipes || [], AN = window.armorNonCraftable || [];
+        const C = { w1: [], w2: [], gaunt: [], bow: [], xbow: [], arrow: [], bolt: [], fxAmmo: [], light: [], heavy: [], shield: [], specialMelee: [], specialRanged: [], specialArmor: [] };
+        const seen = new Set();
+        const ammoCat = n => /болт/i.test(n) ? 'bolt' : 'arrow';
+        const put = (kind, e, dom) => {
+            if (!(typeof e.price === 'number' && e.price > 0) || seen.has(e.name)) return;
+            seen.add(e.name);
+            if (MERCH_NEVER_RE.test(e.name)) return;
+            if (MERCH_SPECIAL_RE.test(e.name)) { (C['special' + dom] || C.specialMelee).push(e); return; }
+            if (C[kind]) C[kind].push(e);
+        };
+        const weapon = w => {
+            const sub = w.subcat || '', cat = w.category || '';
+            if (/Кастет/.test(sub) || cat === 'Кастеты') return put('gaunt', { name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Melee');
+            if (cat === 'Луки') return put('bow', { name: w.name, category: 'Луки', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Ranged');
+            if (cat === 'Арбалеты') return put('xbow', { name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Ranged');
+            if (cat === 'Стрелы' || cat === 'Болты') {
+                const e = { name: w.name, category: 'Боеприпасы', price: w.price, weight: w.weight, dmg: w.damage };
+                if (w.price >= 50) return put('fxAmmo', e, 'Ranged');
+                if (cat === 'Стрелы') return MERCHANT_ARROW_NAMES.includes(w.name) ? put('arrow', e, 'Ranged') : (MERCH_SPECIAL_RE.test(w.name) ? put('arrow', e, 'Ranged') : undefined);
+                return /сталгрим|серебр/i.test(w.name) ? undefined : put('bolt', e, 'Ranged');
+            }
+            if (cat === 'Двуручное') return put('w2', { name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Melee');
+            if (cat === 'Одноручное') return put('w1', { name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Melee');
+        };
+        WR.forEach(weapon); WN.forEach(weapon);
+        const armor = (a, slot) => {
+            const kind = slot === 'shield' ? 'shield' : (/Тяжел/i.test(a.armorType) ? 'heavy' : 'light');
+            put(kind, { name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot }, 'Armor');
+        };
+        AR.forEach(a => armor(a, GM_SMITHING_SLOT_MAP[a.slot] || null));
+        AN.forEach(a => armor(a, normalizeArmorSlot(a.slot)));
+        return C;
+    }
+
+    function buildMerchantItems(typeKey, hold) {
+        const C = merchantCatalogue(), out = [], used = new Set();
+        const ALL = (window.allItems && window.allItems.length ? window.allItems : gmAllItems) || [];
+        const STACK = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
+        const affList = (typeKey === 'blacksmith2' || typeKey === 'fletcher') ? (MERCH_AFFINITY[hold] || []) : [];
+        const floraRules = typeKey === 'alchemist2' ? MERCH_ING_AFFINITY : (['foodVendor', 'grocer', 'innkeeper'].indexOf(typeKey) !== -1 ? MERCH_FOOD_AFFINITY : []);
+        const affMult = name => {
+            let m = affList.reduce((m, [re, k]) => re.test(name) ? m * k : m, 1);
+            floraRules.forEach(([re, map, d]) => { if (re.test(name)) m *= (map[hold] != null ? map[hold] : (d != null ? d : 1)); });
+            return m;
+        };
+        const regionBlocked = name => MERCH_REGION_ONLY.some(([re, hs]) => re.test(name) && hs.indexOf(hold) === -1);
+        const itemsOf = (cats, f) => ALL.filter(i => cats.includes(i.category) && typeof i.price === 'number' && i.price > 0 && !isMerchantExcluded(i) && (!f || f(i)));
+        const push = (i, qty) => {
+            const q = qty ? randInt(qty[0], qty[1]) : (i.category === 'Боеприпасы' ? randInt(10, 30) : (STACK.includes(i.category) ? randInt(2, 6) : 1));
+            // Firestore отвергает undefined — добавляем поле, только если оно есть
+            const o = { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, effect: i.effect || '', qty: q };
+            if (typeof i.dmg === 'number') o.dmg = i.dmg;
+            if (typeof i.armor === 'number') o.armor = i.armor;
+            if (i.slot) o.slot = i.slot;
+            if (typeof i.capacity === 'number') o.capacity = i.capacity;
+            out.push(o); used.add(i.name);
+        };
+        // раздел: от lo до hi РАЗНЫХ позиций; дешёвое попадается чаще дорогого (вес ~ 1/(1+цена/медиана)^0.8)
+        const take = (list, lo, hi, o) => {
+            o = o || {};
+            const c = (list || []).filter(i => i && typeof i.price === 'number' && i.price > 0 && !used.has(i.name) && !regionBlocked(i.name));
+            const n = Math.min(c.length, randInt(lo, hi));
+            if (n <= 0) return;
+            const pr = c.map(i => i.price).sort((x, y) => x - y), ref = Math.max(5, pr[Math.floor(pr.length / 2)]);
+            c.map(i => { const w = (1 / Math.pow(1 + i.price / ref, 0.8)) * affMult(i.name); return { i, k: Math.pow(Math.random(), 1 / w) }; })
+                .sort((x, y) => y.k - x.k).slice(0, n).forEach(x => push(x.i, o.qty));
+        };
+        // обязательный товар (всегда на прилавке)
+        const always = (name, lo, hi) => {
+            const it = ALL.find(i => i.name === name) || [].concat(C.arrow, C.bolt, C.bow, C.w1, C.w2).find(i => i.name === name);
+            if (it && !used.has(name)) push(it, [lo, hi]);
+        };
+        const POT = i => !/^(Пергамент|Чернила)$/.test(i.name);
+        switch (typeKey) {
+            case 'blacksmith2':
+                take(C.w1, 3, 5); take(C.w2, 1, 3);
+                take(C.heavy, 3, 5); take(C.light, 2, 4); take(C.shield, 1, 2);
+                take(itemsOf(['Кузнечные ингредиенты'], i => /руда/i.test(i.name) && i.name !== 'Серебряная руда'), 1, 3, { qty: [2, 6] });
+                always('Кожа', 3, 8); always('Полоски кожи', 4, 12);
+                take(C.arrow, 1, 2); take(C.gaunt, 0, 1);
+                take(C.specialMelee.concat(C.specialArmor), 0, 2);
+                if (MERCH_REGIONAL_ARMOR[hold]) take(itemsOf(['Уникальная броня'], i => i.location === MERCH_REGIONAL_ARMOR[hold]), 1, 3);
+                take(itemsOf(['Одноручное (лут)', 'Двуручное (лут)', 'Тяжелая броня (лут)', 'Легкая броня (лут)']), 0, 2);
+                break;
+            case 'fletcher':
+                always('Железная стрела', 15, 30);
+                take(C.bow, 5, 7); take(C.xbow, 0, 2);
+                take(C.arrow, 5, 7); take(C.bolt, 2, 4);
+                take(C.fxAmmo, 0, 2, { qty: [2, 6] });
+                take(C.specialRanged, 0, 1);
+                take(itemsOf(['Луки (лут)']), 0, 1);
+                break;
+            case 'alchemist2':
+                always('Лечебная припарка', 3, 8);
+                take(itemsOf(['Ингредиенты для алхимии']), 14, 20);
+                break;
+            case 'pawnbrokerLive':
+                always('Пергамент', 3, 8); always('Чернила', 2, 6);
+                take(itemsOf(['Бытовые предметы'], POT), 5, 8);
+                take(itemsOf(['Походное снаряжение']), 2, 4);
+                take(itemsOf(['Сырые продукты']), 2, 4);
+                take(itemsOf(['Ювелирные изделия']), 1, 2);
+                take(itemsOf(['Драгоценные камни']), 0, 2);
+                take(itemsOf(['Шкуры']), 1, 2);
+                break;
+            case 'courtWizard':
+                always('Пергамент', 3, 8); always('Чернила', 2, 6);
+                take(itemsOf(['Свитки (прописанные)']), 4, 7);
+                take(window.spellTomesData || [], 4, 7);
+                take(itemsOf(['Посохи']), 2, 4);
+                take(itemsOf(['Магические одеяния']), 2, 4);
+                take(itemsOf(['Камни душ'], i => !/^Заполненный/.test(i.name)), 2, 4, { qty: [1, 4] });
+                take(itemsOf(['Камни душ'], i => /^Заполненный/.test(i.name)), 0, 1, { qty: [1, 2] });
+                break;
+            case 'jeweler':
+                take(itemsOf(['Ювелирные изделия', 'Ювелирное изделие (лут)']), 6, 10);
+                take(itemsOf(['Драгоценные камни']), 3, 6);
+                take(itemsOf(['Кузнечные ингредиенты'], i => /^(Золотая|Серебряная) руда$/.test(i.name)), 0, 2, { qty: [2, 5] });
+                break;
+            case 'innkeeper':
+                take(itemsOf(['Готовые продукты']), 5, 9); take(itemsOf(['Напитки']), 4, 7); take(itemsOf(['Сырые продукты']), 2, 4);
+                break;
+            case 'grocer':
+                take(itemsOf(['Сырые продукты']), 8, 12); take(itemsOf(['Готовые продукты']), 1, 3); take(itemsOf(['Напитки']), 1, 2);
+                take(itemsOf(['Шкуры']), 1, 3); take(itemsOf(['Бытовые предметы'], POT), 2, 4);
+                break;
+            case 'foodVendor':
+                take(itemsOf(['Сырые продукты']), 6, 9); take(itemsOf(['Готовые продукты']), 3, 6); take(itemsOf(['Напитки']), 1, 3);
+                break;
+            case 'khajiitCaravan':
+                // скума и лунный сахар — эксклюзив каравана (у остальных исключены), здесь лежат всегда
+                [['Красноводная скума', 2, 5], ['Лунный сахар', 2, 5]].forEach(([nm, lo, hi]) => { const it = ALL.find(i => i.name === nm); if (it) push(it, [lo, hi]); });
+                take(itemsOf(['Сырые продукты']), 3, 5); take(itemsOf(['Бытовые предметы'], POT), 3, 5);
+                take(itemsOf(['Ювелирные изделия']), 2, 4); take(itemsOf(['Шкуры']), 1, 3);
+                take(itemsOf(['Ингредиенты для алхимии']), 4, 7);
+                break;
+            default:
+                take(getMerchantItemPool(typeKey), 15, 26);
+        }
+        // Слитки: у кузнеца и барахольщика гарантированно 2-5 (по прямой просьбе), у ювелира — серебряный и золотой.
+        // Золотой слиток по вики купить нельзя вообще, серебряный почти не продаётся — их у них нет; серебряную руду продают.
+        if (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive') {
+            const NOT_FOR_SALE = ['Золотой слиток', 'Серебряный слиток'];
+            const ingots = ALL.filter(i => i.category === 'Кузнечные ингредиенты' && (/слиток/i.test(i.name) || i.name === 'Серебряная руда') && NOT_FOR_SALE.indexOf(i.name) === -1 && !used.has(i.name)).sort(() => Math.random() - 0.5);
+            const cnt = Math.min(ingots.length, randInt(2, 5));
+            for (let k = 0; k < cnt; k++) push(ingots[k], [2, 6]);
+        }
+        if (typeKey === 'jeweler') {
+            ['Серебряный слиток', 'Золотой слиток'].forEach(nm => { const it = ALL.find(i => i.name === nm); if (it && !used.has(nm)) push(it, [2, 5]); });
+        }
+        // Солстейм: хитиновую пластину и шкуру нетча продают кузнецы и торговцы общими товарами только там
+        if (hold === 'Схолстейм' && (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive')) {
+            [['Хитиновая пластина', 3, 8], ['Шкура нетча', 2, 5]].forEach(([nm, lo, hi]) => { const it = ALL.find(i => i.name === nm); if (it && !used.has(nm)) push(it, [lo, hi]); });
+        }
+        return out;
+    }
+
+
     window.refreshMerchantStock = function () {
         const typeKey = el('merchant-type-select').value;
         const hold = el('merchant-hold-select').value;
         if (!hold) { alert('Выбери владение.'); return; }
         const def = LIVING_MERCHANT_TYPES[typeKey];
-        let pool = getMerchantItemPool(typeKey);
-        if (!pool.length) { alert('Нет предметов в базе для этого типа торговца.'); return; }
-
-        // У кузнеца — вес местного материала (по владению) в 3 раза выше, остальное не пропадает,
-        // просто попадается реже. Строим "взвешенный" пул простым дублированием записей.
-        let weightedPool = pool;
-        if (typeKey === 'blacksmith2' && HOLD_MATERIAL_AFFINITY[hold]) {
-            const affinity = HOLD_MATERIAL_AFFINITY[hold];
-            weightedPool = [];
-            pool.forEach(i => {
-                const weight = affinity.test(i.name) ? 3 : 1;
-                for (let w = 0; w < weight; w++) weightedPool.push(i);
-            });
-        }
-
-        const count = Math.min(pool.length, randInt(15, 26)); // было 10-20, теперь +5-6 позиций
-        const shuffled = weightedPool.slice().sort(() => Math.random() - 0.5);
-        const items = [];
-        const usedNames = new Set();
-        for (const i of shuffled) {
-            if (items.length >= count) break;
-            if (usedNames.has(i.name)) continue; // без повторов позиций — количество штук решается ниже
-            usedNames.add(i.name);
-            items.push(i);
-        }
-        // Задача: у торговца несколько штук одной вещи (3 пшеницы, 5 соли и т.п.) — расходники
-        // (еда/ингредиенты/боеприпасы/самоцветы) получают случайное количество 2-6, штучные вещи
-        // (оружие/броня/книги/украшения) остаются по 1.
-        const STACKABLE_CATEGORIES = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
-        const finalItems = items.map(i => {
-            const qty = i.category === 'Боеприпасы' ? randInt(10, 30) : (STACKABLE_CATEGORIES.includes(i.category) ? randInt(2, 6) : 1);
-            // Firestore ЦЕЛИКОМ отвергает .update(), если хоть ОДНО поле где-то внутри — undefined
-            // (было тут: dmg/armor/slot/capacity у предмета без этих свойств, например у еды) —
-            // отсюда "торговец не появляется" после нажатия "Обновить ассортимент": запись просто
-            // молча проваливалась. Добавляем поле, только если оно реально есть.
-            const out = { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, effect: i.effect || '', qty };
-            if (typeof i.dmg === 'number') out.dmg = i.dmg;
-            if (typeof i.armor === 'number') out.armor = i.armor;
-            if (i.slot) out.slot = i.slot;
-            if (typeof i.capacity === 'number') out.capacity = i.capacity;
-            return out;
-        });
-        // Гарантированные 2-5 слитков у кузнеца и барахольщика — по прямой просьбе "к уже их
-        // ассортименту", то есть ГАРАНТИРОВАННО, не просто доступны для случайного отбора (пул
-        // выше — рандомная выборка 15-26 из общего списка, слитки могли бы ни разу не попасть).
-        if (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive') {
-            // Золотой слиток по вики купить нельзя вообще, серебряный слиток почти не продаётся — их исключаем.
-            // Зато серебряную РУДУ кузнецы и торговцы общими товарами продают (по вики) — добавляем в тот же пул.
-            const NOT_FOR_SALE = ['Золотой слиток', 'Серебряный слиток'];
-            const allIngots = (window.allItems || gmAllItems).filter(i => i.category === 'Кузнечные ингредиенты' && (/слиток/i.test(i.name) || i.name === 'Серебряная руда') && NOT_FOR_SALE.indexOf(i.name) === -1);
-            const usedNames2 = new Set(finalItems.map(i => i.name));
-            const freshIngots = allIngots.filter(i => !usedNames2.has(i.name)).sort(() => Math.random() - 0.5);
-            const ingotCount = Math.min(freshIngots.length, randInt(2, 5));
-            for (let k = 0; k < ingotCount; k++) {
-                const ing = freshIngots[k];
-                finalItems.push({ name: ing.name, category: ing.category, price: ing.price, weight: ing.weight || 0, effect: ing.effect || '', qty: randInt(2, 6) });
-            }
-        }
-        // Ювелиры торгуют слитками (UESP: "traded by jewelry merchants as well as blacksmiths") —
-        // гарантированно серебряный и золотой слиток у ювелира.
-        if (typeKey === 'jeweler') {
-            ['Серебряный слиток', 'Золотой слиток'].forEach(nm => {
-                const it = (window.allItems || gmAllItems).find(i => i.name === nm);
-                if (it && !finalItems.some(f => f.name === nm)) {
-                    finalItems.push({ name: it.name, category: it.category, price: it.price, weight: it.weight || 0, effect: it.effect || '', qty: randInt(2, 5) });
-                }
-            });
-        }
-        // Солстейм: по вики (UESP) хитиновую пластину и шкуру нетча продают кузнецы и торговцы общими
-        // товарами ТОЛЬКО на Солстейме — гарантированно добавляем их туда (как и слитки выше).
-        if (hold === 'Схолстейм' && (typeKey === 'blacksmith2' || typeKey === 'pawnbrokerLive')) {
-            [['Хитиновая пластина', 3, 8], ['Шкура нетча', 2, 5]].forEach(([nm, lo, hi]) => {
-                const it = (window.allItems || gmAllItems).find(i => i.name === nm);
-                if (it && !finalItems.some(f => f.name === nm)) {
-                    finalItems.push({ name: it.name, category: it.category, price: it.price, weight: it.weight || 0, effect: it.effect || '', qty: randInt(lo, hi) });
-                }
-            });
-        }
+        const finalItems = buildMerchantItems(typeKey, hold);
+        if (!finalItems.length) { alert('Нет предметов в базе для этого типа торговца.'); return; }
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
         // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
@@ -4410,13 +4586,44 @@
 
 
     // ---------- Карта и положение партии ----------
-    let gmMapHold = '', gmMapSel = null, gmMapSig = null;
+    let gmMapHold = '', gmMapSel = null, gmMapSig = null, gmRoute = null;
     function gmMapParty() { return window.HoldsMap ? window.HoldsMap.partyFromSession(lastData) : null; }
+    function gmMapMarks() { return lastData && Array.isArray(lastData.mapMarks) ? lastData.mapMarks : []; }
+    const gmClean = o => JSON.parse(JSON.stringify(o)); // убирает undefined — Firestore их не принимает
+    // Туман войны: настройки в сессии (mapFog). По умолчанию выключен — игроки видят всё, как раньше.
+    function gmFog() {
+        const f = (lastData && lastData.mapFog) || {};
+        return { on: !!f.on, auto: f.auto !== false, r: f.r || 35, holds: (f.holds || []).slice(), circles: (f.circles || []).slice() };
+    }
+    function gmFogWrite(f, msg) {
+        if (!currentCode) { el('gm-map-result').textContent = 'Нет активной сессии.'; return; }
+        db.collection('sessions').doc(currentCode).update({ mapFog: gmClean(f) }).then(() => {
+            if (msg) el('gm-map-result').innerHTML = `<span style="color:#2ecc71;">${msg}</span>`;
+        }).catch(e => alert('Ошибка: ' + e.message));
+    }
+    const GM_FOG_MAX = 300;
+    // добавляет круг, если он ещё не перекрыт почти таким же; true — добавлен
+    function gmFogAdd(f, c) {
+        if (f.circles.some(o => o.r >= c.r * 0.9 && Math.hypot(o.x - c.x, o.y - c.y) < c.r * 0.35)) return false;
+        if (f.circles.length >= GM_FOG_MAX) return false;
+        f.circles.push(gmClean({ x: Math.round(c.x), y: Math.round(c.y), r: Math.round(c.r), hold: c.hold || undefined, u: c.u, v: c.v }));
+        return true;
+    }
+    // выбранное поселение; если на картинке владения известно его точное место — запоминаем u,v
+    function gmSettleSel(h, n, x, y, u, v) {
+        const im = window.HoldsMap && window.HoldsMap.IMG[h];
+        if (u == null && im && im.settle && im.settle[n]) { u = im.settle[n][0]; v = im.settle[n][1]; }
+        return { hold: h, name: n, x, y, u, v };
+    }
+    function gmCfg() { return window.HoldsMap.travelCfg(lastData && lastData.mapCfg); }
+
     window.renderGmMap = function (force) {
         const box = el('gm-map');
         if (!box || !window.HoldsMap) return;
         const party = gmMapParty();
-        const sig = JSON.stringify([gmMapHold, party, gmMapSel]);
+        const marks = gmMapMarks();
+        const fogS = gmFog();
+        const sig = JSON.stringify([gmMapHold, party, gmMapSel, marks, fogS, gmRoute && gmRoute.pts, lastData && lastData.travelRoute && lastData.travelRoute.ts, lastData && lastData.mapCfg]);
         if (!force && sig === gmMapSig) return;
         gmMapSig = sig;
         const sel = el('gm-map-hold');
@@ -4424,15 +4631,70 @@
             sel.innerHTML = '<option value="">— вся карта —</option>' + Object.keys(window.HoldsMap.HOLDS).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
         }
         if (sel) sel.value = gmMapHold;
+        const ss = el('gm-map-settle');
+        if (ss && ss.options.length < 2) {
+            const S = window.HoldsMap.SETTLE;
+            ss.innerHTML = '<option value="">— выбрать поселение из списка —</option>' + Object.keys(S).map(h => `<optgroup label="${escapeHtml(h)}">` + Object.keys(S[h]).map(n => `<option value="${escapeHtml(h + '|' + n)}">${escapeHtml(n)}</option>`).join('') + '</optgroup>').join('');
+        }
         const pins = window.HoldsMap.loadPins();
+        // метки, выставленные игрокам, показываем и мастеру (красным) — чтобы было видно, что именно открыто
+        marks.forEach(m => {
+            if (!m || typeof m.x !== 'number') return;
+            const hk = m.hold || '';
+            pins[hk] = pins[hk] || {};
+            let key = m.name || 'Метка';
+            if (pins[hk][key] && pins[hk][key].cat !== 'Метка для игроков') key += ' ★';
+            pins[hk][key] = { x: m.x, y: m.y, u: m.u, v: m.v, cat: 'Метка для игроков' };
+        });
+        const pubRoute = lastData && lastData.travelRoute && Array.isArray(lastData.travelRoute.pts) ? lastData.travelRoute : null;
         window.HoldsMap.render(box, {
             hold: gmMapHold || null, hl: (lastData && lastData.currentHold) || null, party, pins, sel: gmMapSel,
+            fog: fogS.on ? window.HoldsMap.fogFromSession(lastData, true) : null,
+            route: gmRoute ? { pts: gmRoute.pts } : (pubRoute ? { pts: pubRoute.pts } : null),
             onHold: h => { gmMapHold = h; gmMapSel = null; window.renderGmMap(true); },
-            onSettlement: (h, n, x, y) => { gmMapSel = { hold: h, name: n, x, y }; gmMapShowSel(); window.renderGmMap(true); },
-            onPin: (h, n) => { const p = ((pins[h] || {})[n]); if (p) { gmMapSel = { hold: h, name: n, x: p.x, y: p.y }; gmMapShowSel(); window.renderGmMap(true); } },
-            onMap: gmMapHold ? (x, y, h) => { gmMapSel = { hold: h || gmMapHold, name: (el('gm-map-label').value || '').trim(), x, y }; gmMapShowSel(); window.renderGmMap(true); } : null
+            onSettlement: (h, n, x, y, u, v) => { gmMapSel = gmSettleSel(h, n, x, y, u, v); gmMapShowSel(); window.renderGmMap(true); },
+            onPin: (h, n) => { const p = ((pins[h] || {})[n]); if (p) { gmMapSel = { hold: h, name: n, x: p.x, y: p.y, u: p.u, v: p.v }; gmMapShowSel(); window.renderGmMap(true); } },
+            onMap: gmMapHold ? (x, y, h, u, v) => { gmMapSel = { hold: h || gmMapHold, name: (el('gm-map-label').value || '').trim(), x, y, u, v }; gmMapShowSel(); window.renderGmMap(true); } : null
         });
         gmMapShowSel();
+        gmMapRenderMarks();
+        gmFogShowInfo();
+        gmCfgFill();
+    };
+    function gmMapRenderMarks() {
+        const b = el('gm-map-marks');
+        if (!b) return;
+        const marks = gmMapMarks();
+        b.innerHTML = marks.length
+            ? '<div style="font-size:13px; margin-bottom:2px;"><b>📌 Метки, видимые игрокам (' + marks.length + '):</b></div>' + marks.map(m => `<div style="display:flex; gap:6px; align-items:center; font-size:13px; margin-bottom:2px;">
+                <span style="flex:1;">📌 ${escapeHtml(m.name || 'Метка')} <span style="opacity:.6;">${m.hold ? '(' + escapeHtml(m.hold) + ')' : ''}</span></span>
+                <button style="font-size:11px; padding:1px 6px;" onclick="gmMapRemoveMark('${escapeHtml(m.id)}')" title="Убрать метку у игроков">🗑</button></div>`).join('')
+            : '<div style="font-size:12px; opacity:.6;">Игрокам пока не выставлено ни одной своей метки.</div>';
+    }
+    // координаты точки для записи в сессию: x,y — схема, u,v — доли картинки владения (если есть)
+    function gmPosOf(sel) {
+        const o = { x: Math.round(sel.x), y: Math.round(sel.y) };
+        if (typeof sel.u === 'number' && typeof sel.v === 'number') { o.u = sel.u; o.v = sel.v; }
+        return o;
+    }
+    window.gmMapAddMark = function () {
+        const res = el('gm-map-result');
+        if (!gmMapSel || typeof gmMapSel.x !== 'number') { res.textContent = 'Сначала выбери точку на карте (в приближении владения) или метку места.'; return; }
+        if (!currentCode) { res.textContent = 'Нет активной сессии.'; return; }
+        const name = ((el('gm-map-label').value || '').trim() || gmMapSel.name || 'Метка').slice(0, 60);
+        const mark = Object.assign({ id: 'm' + Date.now().toString(36) + Math.floor(Math.random() * 1000), name, hold: gmMapSel.hold || gmMapHold || '', ts: Date.now() }, gmPosOf(gmMapSel));
+        const next = gmMapMarks().concat([mark]);
+        db.collection('sessions').doc(currentCode).update({ mapMarks: next }).then(() => {
+            res.innerHTML = `<span style="color:#2ecc71;">📌 Метка «${escapeHtml(name)}» теперь видна игрокам.</span>`;
+            gmMapSel = null; el('gm-map-label').value = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmMapRemoveMark = function (id) {
+        if (!currentCode) return;
+        const next = gmMapMarks().filter(m => m.id !== id);
+        db.collection('sessions').doc(currentCode).update({ mapMarks: next }).then(() => {
+            el('gm-map-result').textContent = 'Метка убрана у игроков.';
+        }).catch(e => alert('Ошибка: ' + e.message));
     };
     function gmMapShowSel() {
         const b = el('gm-map-selected');
@@ -4442,13 +4704,24 @@
         t += gmMapSel ? `Выбрано: <strong>${escapeHtml(gmMapSel.name || 'точка на карте')}</strong>${gmMapSel.hold ? ' (' + escapeHtml(gmMapSel.hold) + ')' : ''}.` : 'Выбери город или точку на карте.';
         b.innerHTML = t;
     }
+    window.gmMapPickSettle = function (v) {
+        if (!v) return;
+        const [h, n] = v.split('|'), c = window.HoldsMap.SETTLE[h] && window.HoldsMap.SETTLE[h][n];
+        if (!c) return;
+        gmMapSel = gmSettleSel(h, n, c[0], c[1]);
+        const s = el('gm-map-settle'); if (s) s.value = '';
+        gmMapShowSel(); window.renderGmMap(true);
+    };
     window.gmMapPickHold = function (h) { gmMapHold = h || ''; gmMapSel = null; window.renderGmMap(true); };
     window.gmMapSetParty = function () {
         if (!gmMapSel) { el('gm-map-result').textContent = 'Сначала выбери город или точку на карте.'; return; }
         if (!currentCode) { el('gm-map-result').textContent = 'Нет активной сессии.'; return; }
-        const pos = { hold: gmMapSel.hold || '', name: gmMapSel.name || '', x: gmMapSel.x, y: gmMapSel.y };
+        const pos = Object.assign({ hold: gmMapSel.hold || '', name: gmMapSel.name || '' }, gmPosOf(gmMapSel));
         const upd = { partyPos: pos };
         if (pos.hold) upd.currentHold = pos.hold;
+        // туман войны: партия открывает карту вокруг себя (след остаётся)
+        const f = gmFog();
+        if (f.on && f.auto && gmFogAdd(f, { x: pos.x, y: pos.y, r: f.r, hold: pos.hold, u: pos.u, v: pos.v })) upd.mapFog = gmClean(f);
         db.collection('sessions').doc(currentCode).update(upd).then(() => {
             el('gm-map-result').innerHTML = `<span style="color:#2ecc71;">✅ Партия: ${escapeHtml(pos.name || 'точка на карте')}${pos.hold ? ' (' + escapeHtml(pos.hold) + ')' : ''}.</span>`;
             gmPostLogEntryText(`🗺️ Партия прибывает: ${pos.name || 'новое место'}${pos.hold ? ' (' + pos.hold + ')' : ''}.`);
@@ -4460,6 +4733,106 @@
         db.collection('sessions').doc(currentCode).update({ partyPos: null }).then(() => {
             el('gm-map-result').textContent = 'Метка партии убрана.';
         }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Туман войны (панель мастера) ----------
+    function gmFogShowInfo() {
+        const b = el('gm-fog-info'), btn = el('gm-fog-toggle'), auto = el('gm-fog-auto');
+        const f = gmFog();
+        if (btn) btn.textContent = f.on ? '🌫 Туман войны: ВКЛ (нажми, чтобы выключить)' : '🌫 Туман войны: выкл (нажми, чтобы включить)';
+        if (auto && document.activeElement !== auto) auto.checked = f.auto;
+        if (b) b.innerHTML = f.on
+            ? `Открыто: кругов — <b>${f.circles.length}</b>, владений целиком — <b>${f.holds.length}</b>${f.holds.length ? ' (' + f.holds.map(escapeHtml).join(', ') + ')' : ''}. Игроки видят карту только вокруг партии, открытых мест, меток и открытых областей; на твоей карте закрытое слегка затемнено.`
+            : 'Выключен: игроки видят всю карту. Включи — и карта закроется туманом, а «Партия здесь» будет открывать окрестности.';
+    }
+    window.gmFogToggle = function () {
+        const f = gmFog(); f.on = !f.on;
+        if (f.on && !f.circles.length) { const p = gmMapParty(); if (p) gmFogAdd(f, { x: p.x, y: p.y, r: f.r, hold: p.hold, u: p.u, v: p.v }); }
+        gmFogWrite(f, f.on ? '🌫 Туман войны включён.' : 'Туман войны выключен — игроки видят всю карту.');
+    };
+    window.gmFogSetAuto = function (v) { const f = gmFog(); f.auto = !!v; gmFogWrite(f); };
+    window.gmFogRevealHere = function () {
+        if (!gmMapSel || typeof gmMapSel.x !== 'number') { el('gm-map-result').textContent = 'Сначала выбери точку на карте.'; return; }
+        const f = gmFog(); f.on = true;
+        const r = +(el('gm-fog-r') || {}).value || f.r;
+        const added = gmFogAdd(f, { x: gmMapSel.x, y: gmMapSel.y, r, hold: gmMapSel.hold || gmMapHold, u: gmMapSel.u, v: gmMapSel.v });
+        if (!added) { el('gm-map-result').textContent = f.circles.length >= GM_FOG_MAX ? 'Слишком много открытых кругов — открой владение целиком или сбрось туман.' : 'Эта область уже открыта.'; return; }
+        gmFogWrite(f, '🔆 Область открыта.');
+    };
+    window.gmFogRevealHold = function (open) {
+        const h = (gmMapSel && gmMapSel.hold) || gmMapHold;
+        if (!h) { el('gm-map-result').textContent = 'Выбери владение (приблизь его или выбери точку в нём).'; return; }
+        const f = gmFog(); f.on = true;
+        f.holds = f.holds.filter(x => x !== h);
+        if (open) f.holds.push(h);
+        gmFogWrite(f, open ? `🔆 Владение «${escapeHtml(h)}» открыто целиком.` : `Владение «${escapeHtml(h)}» снова скрыто (открытые круги остаются).`);
+    };
+    window.gmFogReset = function () {
+        if (!confirm('Закрыть всю карту туманом заново? Открытые области и владения будут забыты.')) return;
+        const f = gmFog(); f.circles = []; f.holds = [];
+        gmFogWrite(f, 'Туман сброшен: вся карта закрыта.');
+    };
+
+    // ---------- Маршруты и расстояния (панель мастера) ----------
+    function gmCfgFill() {
+        const c = gmCfg();
+        [['gm-cfg-km', c.kmPerUnit], ['gm-cfg-foot', c.foot], ['gm-cfg-horse', c.horse], ['gm-cfg-cart', c.cart], ['gm-cfg-ship', c.ship]].forEach(([id, v]) => {
+            const i = el(id); if (i && document.activeElement !== i) i.value = v;
+        });
+    }
+    window.gmCfgSave = function () {
+        if (!currentCode) return;
+        const g = id => parseFloat((el(id) || {}).value);
+        const cfg = { kmPerUnit: g('gm-cfg-km'), foot: g('gm-cfg-foot'), horse: g('gm-cfg-horse'), cart: g('gm-cfg-cart'), ship: g('gm-cfg-ship') };
+        Object.keys(cfg).forEach(k => { if (!(cfg[k] > 0)) delete cfg[k]; });
+        db.collection('sessions').doc(currentCode).update({ mapCfg: cfg }).then(() => {
+            el('gm-map-result').innerHTML = '<span style="color:#2ecc71;">Масштаб и скорости сохранены.</span>';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    function gmRouteText(r) {
+        const legs = r.legs.filter(l => l.km > 0.5).map(l => `${escapeHtml(l.from || 'точка')} → ${escapeHtml(l.to || 'точка')} <span style="opacity:.7;">(${l.type === 'road' ? 'дорога' : l.type === 'sea' ? 'море' : 'бездорожье'}, ${Math.round(l.km)} км)</span>`);
+        return `<div>${escapeHtml(window.HoldsMap.describeRoute(r))}</div>${legs.length ? '<div style="font-size:12px; opacity:.85; margin-top:3px;">' + legs.join('<br>') + '</div>' : ''}`;
+    }
+    window.gmRoutePlan = function () {
+        const out = el('gm-route-info'), party = gmMapParty();
+        if (!party) { out.textContent = 'Сначала поставь метку партии («📍 Партия здесь»).'; return; }
+        if (!gmMapSel || typeof gmMapSel.x !== 'number') { out.textContent = 'Выбери на карте город или точку назначения.'; return; }
+        const nm = n => (n && window.HoldsMap.NODES[n]) ? n : '';
+        const r = window.HoldsMap.planRoute(Object.assign({ name: nm(party.name) }, party), Object.assign({ name: nm(gmMapSel.name) }, gmMapSel), lastData && lastData.mapCfg);
+        gmRoute = { pts: r.pts, r, from: party.name || 'партия', to: gmMapSel.name || 'выбранная точка' };
+        out.innerHTML = `<b>${escapeHtml(gmRoute.from)} → ${escapeHtml(gmRoute.to)}</b>` + gmRouteText(r);
+        window.renderGmMap(true);
+    };
+    window.gmRoutePublish = function () {
+        if (!gmRoute) { el('gm-route-info').textContent = 'Сначала проложи маршрут.'; return; }
+        if (!currentCode) return;
+        const r = gmRoute.r;
+        const tr = gmClean({ ts: Date.now(), from: gmRoute.from, to: gmRoute.to, km: Math.round(r.km), direct: Math.round(r.direct), kmRoad: Math.round(r.kmRoad), kmOff: Math.round(r.kmOff), kmSea: Math.round(r.kmSea),
+            days: { foot: +r.days.foot.toFixed(2), horse: +r.days.horse.toFixed(2), cart: +r.days.cart.toFixed(2) },
+            pts: r.pts.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), name: p.name || undefined, hold: p.hold || undefined, u: p.u, v: p.v })) });
+        db.collection('sessions').doc(currentCode).update({ travelRoute: tr }).then(() => {
+            el('gm-route-info').innerHTML += '<div style="color:#2ecc71; margin-top:4px;">📣 Маршрут показан игрокам.</div>';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmRouteClear = function () {
+        gmRoute = null; el('gm-route-info').textContent = 'Маршрут убран.';
+        if (currentCode && lastData && lastData.travelRoute) db.collection('sessions').doc(currentCode).update({ travelRoute: null }).catch(e => alert('Ошибка: ' + e.message));
+        window.renderGmMap(true);
+    };
+    // открывает туман кругами вдоль проложенного маршрута
+    window.gmRouteReveal = function () {
+        if (!gmRoute) { el('gm-route-info').textContent = 'Сначала проложи маршрут.'; return; }
+        const f = gmFog(); f.on = true;
+        const step = Math.max(10, f.r * 1.1); let added = 0;
+        for (let i = 0; i + 1 < gmRoute.pts.length; i++) {
+            const a = gmRoute.pts[i], b = gmRoute.pts[i + 1], d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.round(d / step));
+            for (let k = 0; k <= n; k++) {
+                const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n;
+                const hk = window.HoldsMap.holdAt(x, y) || undefined;
+                if (gmFogAdd(f, { x, y, r: f.r, hold: hk })) added++;
+            }
+        }
+        gmFogWrite(f, `🔆 Открыто вдоль маршрута: ${added} областей.`);
     };
 
     window.setSessionTimeWeather = function () {

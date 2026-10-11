@@ -534,6 +534,7 @@
     <script src="spell-data.js"></script>
     <script src="alchemy-data.js"></script>
     <script src="fish-data.js"></script>
+    <script src="hunt-data.js"></script>
     <script src="holidays-data.js"></script>
     <script src="skill-books-data.js"></script>
     <script src="unique-weapons-data.js"></script>
@@ -1298,6 +1299,12 @@
             <div class="profession-body" id="prof-body-smithing">
                 <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Кузница</h2>
                 <p style="font-size:14px; opacity:.8;">Здесь видны только рецепты, которые мастер открыл лично тебе (см. правило «нужно найти мастера, который научит»). Материалы списываются из инвентаря автоматически.</p>
+                <div id="hunt-box" style="margin:8px 0 12px; border:1px solid var(--border-color, #555); border-radius:6px; padding:8px 10px;">
+                    <strong>🏹 Охота</strong> <span style="font-size:12px; opacity:.7;">— шкуры, мясо, рога</span>
+                    <p style="font-size:13px; opacity:.75; margin:6px 0;">Один выход на дичь. Кого встретишь, зависит от <strong>владения</strong> и <strong>региона</strong>, которые задал мастер: кролики, олени, лоси, лисы и козы — только безобидные звери, не хищники. Бывает, что зверь ушёл и добычи нет (≈20%); под землёй дичи нет совсем.</p>
+                    <button class="btn-success" style="width:100%;" onclick="goHunting()">🏹 Отправиться на охоту</button>
+                    <div id="hunting-result" style="margin-top:8px; font-size:15px;"></div>
+                </div>
                 <details id="smelting-box" style="margin:8px 0 12px; border:1px solid var(--border-color, #555); border-radius:6px; padding:6px 10px;">
                     <summary style="cursor:pointer; font-weight:bold;">🔥 Плавильня и дубильная рама <span style="font-weight:normal; font-size:12px; opacity:.7;">— руды → слитки, шкуры → кожа, кожа → полоски</span></summary>
                     <p style="font-size:13px; opacity:.75; margin:6px 0;">Доступно всем кузнецам без рецептов — нужны только материалы в инвентаре. Пропорции: сталь — 1 железная + 1 корундовая руда, тугоплавкие руды (орихалк, малахит, эбонит) — по 2 на слиток; крупные шкуры дают больше кожи, из 1 кожи выходит 2 полоски.</p>
@@ -1372,6 +1379,13 @@
 
                 <button class="btn-success" style="width:100%; margin-top:8px;" onclick="enchantItem()">Зачаровать (потратить камень душ)</button>
                 <div id="enchant-result" style="margin-top:10px; font-size:15px;"></div>
+
+                <h3 style="margin-top:16px;">💥 Изучение зачарований</h3>
+                <p style="font-size:14px; opacity:.8;">Чтобы наложить зачарование, его нужно знать. Узнать можно, <strong>разрушив</strong> вещь с таким зачарованием: она пропадёт навсегда, а эффект станет известен и появится в списке «Эффект» выше.</p>
+                <select id="disenchant-item-select" onchange="renderDisenchantInfo()"></select>
+                <div id="disenchant-item-info" style="font-size:13px; opacity:.75; margin:4px 0 6px;"></div>
+                <button class="btn-danger" style="width:100%;" onclick="disenchantSelected()">💥 Разрушить и изучить зачарование</button>
+                <div id="known-enchants-list" style="margin-top:8px; font-size:14px;"></div>
 
                 <h3 style="margin-top:16px;">🪄 Посохи</h3>
                 <p style="font-size:14px; opacity:.8;">Посох зачаровывается сразу как готовый предмет (эффект оружия) и держит заряд 5 дней — после этого его нужно подзарядить ещё одним камнем душ.</p>
@@ -1645,7 +1659,7 @@
         <!-- ПРОДАЖА ПРЕДМЕТОВ -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
-            <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка от 30 септимов также даёт успехи Красноречия — считается автоматически.</p>
+            <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка даёт долю успеха Красноречия — она копится по сумме сделок (мелкие покупки и продажи тоже считаются), автоматически.</p>
             <div id="speech-trade-progress" style="font-size:13px; margin-bottom:8px; color:var(--accent-color);"></div>
 
             <label>Кому продаём</label>
@@ -4196,7 +4210,10 @@ window.toggleSkillPanel = function (idx) {
 
         // Зачарованные вещи (любой слот) — профиль мага, независимо от того, что это в
         // остальном оружие/броня. Раньше не проверялось вообще, падало в кузнеца по категории.
-        if (item.enchantment || (item.effect && ['melee', 'ranged', 'helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'amulet', 'circlet'].includes(item.slot))) {
+        // Служебное описание выкованной вещи («Сопротивление 20 · Лёгкая броня», «Урон 11») — это не магия: раньше
+        // любая броня/лук с таким текстом считалась «магической» и у кузнеца и торговца луками шла как «не профиль».
+        const craftDesc = /^\s*(урон|сопротивление)\s+\d/i.test(item.effect || '');
+        if (item.enchantment || (item.effect && !craftDesc && ['melee', 'ranged', 'helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'amulet', 'circlet'].includes(item.slot))) {
             return 'mage';
         }
         // "свиток" (ед.ч.) не матчит "свитки" (мн.ч., как хранятся выданные мастером и
@@ -4243,7 +4260,10 @@ window.toggleSkillPanel = function (idx) {
     function isSellProfileMatch(item, profile) {
         if (profile === 'pawnbroker' || profile === 'fence') return true;
         if (profile === 'jeweler') return classifyItemBroad(item) === 'jewelry';
-        return classifyItemForMerchant(item) === profile;
+        if (classifyItemForMerchant(item) === profile) return true;
+        // Кузнец и торговец луками берут и зачарованное оружие/броню (в их же ассортименте такие вещи есть) — только не посохи и не одеяния.
+        if (profile === 'blacksmith' && ['helmet', 'chest', 'gloves', 'boots', 'shield', 'melee', 'ranged'].includes(item.slot) && !item.isStaff && !/посох/i.test(item.category || '')) return true;
+        return false;
     }
     // Список «Кому продаём»: только живые торговцы сессии (общий пул с покупкой). Единственное исключение —
     // тайный скупщик краденого: у него нет лавки и ассортимента, поэтому его нельзя «завезти» как торговца.
@@ -4301,8 +4321,7 @@ window.toggleSkillPanel = function (idx) {
         } else if (merchantType === 'jeweler') {
             if (classifyItemBroad(item) !== 'jewelry') mult *= 0.8;
         } else {
-            const cat = classifyItemForMerchant(item);
-            if (cat !== merchantType) mult *= 0.8; // не его профиль — минус 20%
+            if (!isSellProfileMatch(item, merchantType)) mult *= 0.8; // не его профиль — минус 20%
         }
         if (charmActive) mult *= 1.1; // перк «Очарование»
         // Задача C: репутация в текущем владении сессии ±5% (тут привязки к конкретному
@@ -4579,18 +4598,20 @@ window.toggleSkillPanel = function (idx) {
     }
     window.renderSellList = renderSellList;
 
-    // Задача A: успехи Красноречия начисляются за КАЖДУЮ сделку отдельно (не накопительно).
+    // Задача A: успехи Красноречия начисляются за каждую сделку, дробный остаток копится между сделками.
     // База = целая часть от (сумма / 150), но сумма 30-149 даёт ровно 1 успех, макс. 5 за сделку.
-    // Покупка — успехи ×0.5 (округление вниз). Непрофильный торговец — тоже ×0.5. Складываются
-    // (покупка непрофильного = ×0.25). Сумма < 30 — успехов нет вообще.
+    // Покупка — успехи ×0.5. Непрофильный торговец — тоже ×0.5. Складываются (покупка непрофильного = ×0.25).
+    // Возвращает ДРОБНОЕ число успехов: раньше сделка дешевле 30 септимов не давала ничего, а покупка со множителем ×0.5
+    // округлялась вниз до нуля — новые игроки с маленькими суммами почти не качали Красноречие. Теперь доля копится
+    // (см. trackSpeechTrade): сумма меньше 30 даёт сумма/150 успеха, 30–149 — целый успех, дальше — по 1 за каждые 150.
     function calcSpeechSuccesses(amount, isPurchase, isOffProfile) {
-        if (!amount || amount < 30) return 0;
-        let base = amount < 150 ? 1 : Math.floor(amount / 150);
+        if (!amount || amount <= 0) return 0;
+        let base = amount < 30 ? amount / 150 : (amount < 150 ? 1 : Math.floor(amount / 150));
         base = Math.min(5, base);
         let mult = 1;
         if (isPurchase) mult *= 0.5;
         if (isOffProfile) mult *= 0.5;
-        return Math.floor(base * mult);
+        return base * mult;
     }
 
     // Торговля даёт на 20% меньше успехов Красноречия, чем раньше (дробный остаток копится и сохраняется).
@@ -4697,6 +4718,10 @@ window.toggleSkillPanel = function (idx) {
     function renderInventoryList() {
         const el = document.getElementById('player-inventory-list');
         if (!el) return;
+        try { renderDisenchantSelect(); } catch (e) { /* блок вкладки «Зачарование» — не критично */ }
+        // Список «зелья для подсумка» строится из инвентаря: раньше он не перерисовывался при продаже/покупке/использовании
+        // и показывал уже проданные зелья, пока не открыть подсумок заново.
+        try { renderPouchPanel(); } catch (e) { /* не критично */ }
         const infoEl = document.getElementById('price-multiplier-info');
         if (infoEl) {
             const speech = getSkillRawValue('Красноречие');
@@ -4731,8 +4756,8 @@ window.toggleSkillPanel = function (idx) {
                     ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${escHtml(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
                     ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${escHtml(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${escHtml(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
-                    ${item.upgradeMaterial ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
-                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number') ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${(item.qualityRank && SHARPEN_TIERS[item.qualityRank-1]) ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
+                    ${(item.upgradeMaterial && !isAmmoItem(item)) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#4a3a1c;" onclick="improveItem('${escHtml(item.itemId)}')" title="Требует: ${escHtml(item.upgradeMaterial)} ×${item.upgradeQty || 1}. Улучшено раз: ${item.upgradeCount || 0}/5">🔨 Улучшить</button>` : ''}
+                    ${(item.upgradeMaterial && typeof item.weaponDmg === 'number' && !isAmmoItem(item)) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3a4a1c;" onclick="sharpenWeapon('${escHtml(item.itemId)}')" title="Заточка по рангу качества — требует навыка Кузнечного дела. Текущий ранг: ${(item.qualityRank && SHARPEN_TIERS[item.qualityRank-1]) ? SHARPEN_TIERS[item.qualityRank-1].name : 'нет'}">⚒️ Наточить</button>` : ''}
                     <button style="width:auto; padding:2px 8px; font-size:13px; background:#3a5a3a;" onclick="tradeItemToPlayer('${escHtml(item.itemId)}', 1)" title="Добавить 1 шт. в предложение обмена (панель «Обмен с игроком» выше на этой же вкладке)">→</button>
                     <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="adjustInventoryQty('${escHtml(item.itemId)}', -1)">−</button>
                 </span>
@@ -5139,7 +5164,38 @@ window.toggleSkillPanel = function (idx) {
         return playerInventory.filter(i => i.slot && !i.enchantment && !i.isStaff);
     }
 
+    // Блок «Изучение зачарований» во вкладке Зачарование: выбор зачарованной вещи, которую можно разрушить.
+    function renderDisenchantSelect() {
+        const select = document.getElementById('disenchant-item-select');
+        if (!select) return;
+        const prev = select.value;
+        const items = playerInventory.filter(i => i.enchantment && i.enchantment.name);
+        select.innerHTML = items.length
+            ? items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} — ${escHtml(i.enchantment.name)}${knownEnchantments.includes(i.enchantment.name) ? ' (уже известно)' : ''}</option>`).join('')
+            : '<option value="">Нет зачарованных вещей в инвентаре</option>';
+        if (items.some(i => i.itemId === prev)) select.value = prev;
+        renderDisenchantInfo();
+    }
+    window.renderDisenchantInfo = function () {
+        const infoEl = document.getElementById('disenchant-item-info');
+        const listEl = document.getElementById('known-enchants-list');
+        const sel = document.getElementById('disenchant-item-select');
+        if (infoEl && sel) {
+            const it = playerInventory.find(i => i.itemId === sel.value);
+            infoEl.textContent = it && it.enchantment
+                ? (knownEnchantments.includes(it.enchantment.name) ? 'Это зачарование ты уже знаешь — разрушать вещь ради него незачем.' : `Узнаешь «${it.enchantment.name}»${it.enchantment.description ? ': ' + it.enchantment.description : ''}`)
+                : '';
+        }
+        if (listEl) listEl.innerHTML = '<strong>Известные зачарования:</strong> ' + (knownEnchantments.length ? knownEnchantments.map(escHtml).join(', ') : '<span style="opacity:.6;">пока ни одного</span>');
+    };
+    window.disenchantSelected = function () {
+        const sel = document.getElementById('disenchant-item-select');
+        if (!sel || !sel.value) { alert('Нет зачарованной вещи для разрушения.'); return; }
+        window.disenchantItem(sel.value);
+    };
+
     function renderEnchantItemSelect() {
+        renderDisenchantSelect();
         const select = document.getElementById('enchant-item-select');
         if (!select) return;
         const items = getEnchantableInventoryItems();
@@ -5157,7 +5213,7 @@ window.toggleSkillPanel = function (idx) {
     // перков кузнечного дела в ваниле — точило без перка тоже не даёт бесконечно улучшать).
     window.improveItem = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item || !item.upgradeMaterial) return;
+        if (!item || !item.upgradeMaterial || isAmmoItem(item)) return; // стрелы и болты улучшить/заточить нельзя
         normalizeUpgradeMaterial(item);
         const upgradeCount = item.upgradeCount || 0;
         if (upgradeCount >= 5) { alert('Эта вещь уже улучшена по максимуму (5/5).'); return; }
@@ -5230,7 +5286,7 @@ window.toggleSkillPanel = function (idx) {
     ];
     window.sharpenWeapon = function (itemId) {
         const item = playerInventory.find(i => i.itemId === itemId);
-        if (!item || typeof item.weaponDmg !== 'number' || !item.upgradeMaterial) return;
+        if (!item || typeof item.weaponDmg !== 'number' || !item.upgradeMaterial || isAmmoItem(item)) return; // боеприпасы не точатся
         normalizeUpgradeMaterial(item);
         const skill = getEffectiveSkillValue('Кузнечное дело');
         const currentRank = item.qualityRank || 0;
@@ -5279,7 +5335,7 @@ window.toggleSkillPanel = function (idx) {
         if (!knownEnchantments.includes(name)) knownEnchantments.push(name);
         removeFromInventoryByName(itemId, 1);
         renderInventoryList();
-        if (typeof onEnchantItemPicked === 'function') onEnchantItemPicked();
+        renderEnchantItemSelect(); // обновляет и список эффектов (теперь с новым зачарованием), и блок разрушения
         saveLocalStorage();
         alert(`Зачарование «${name}» узнано.`);
     };
@@ -6241,9 +6297,11 @@ window.toggleSkillPanel = function (idx) {
         loadSelect.disabled = false;
         capEl.textContent = `Занято: ${pouchContents.length} / ${capacity}`;
         const potions = playerInventory.filter(i => potionKindOf(i) && i.count > 0);
+        const prevPick = loadSelect.value;
         loadSelect.innerHTML = potions.length
             ? potions.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
             : '<option value="">Нет зелий/ядов в инвентаре</option>';
+        if (potions.some(i => i.itemId === prevPick)) loadSelect.value = prevPick;
         listEl.innerHTML = pouchContents.length
             ? pouchContents.map((entry, idx) => `
                 <div class="party-row">
@@ -7203,6 +7261,31 @@ window.toggleSkillPanel = function (idx) {
         saveLocalStorage();
     };
 
+    // ---------- Охота (hunt-data.js: небоевая дичь владения) ----------
+    window.goHunting = function () {
+        const resultEl = document.getElementById('hunting-result');
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const region = (session && session.currentRegion) || null;
+        const hold = (session && session.currentHold) || null;
+        const where = `${hold || 'владение не задано — считаем обычным лесом и полями'}${region ? ', ' + region : ''}`;
+        const res = window.rollHunt(hold, region);
+        if (res.nothing) {
+            resultEl.innerHTML = res.noGame
+                ? `<span style="opacity:.8;">🏹 Под землёй дичи нет. (${escHtml(where)})</span>`
+                : `<span style="opacity:.8;">🏹 Зверь ушёл — добычи нет. (${escHtml(where)})</span>`;
+            return;
+        }
+        const got = [];
+        res.drops.forEach(d => {
+            const info = (window.allItems || []).find(i => i.name === d.name) || {};
+            addToInventory(d.name, d.name, d.qty, info.weight || 0.5, info.category || 'Шкуры', '', { price: info.price || 1 });
+            got.push(`${d.name} ×${d.qty}`);
+        });
+        resultEl.innerHTML = `<strong>🏹 Добыт зверь: ${escHtml(res.animal)}</strong><div>Добыча: ${got.map(escHtml).join(', ')}</div><span style="opacity:.75;">(${escHtml(where)})</span>`;
+        renderInventoryList();
+        saveLocalStorage();
+    };
+
     window.gatherIngredients = function () {
         const resultEl = document.getElementById('gather-result');
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
@@ -7350,7 +7433,7 @@ window.toggleSkillPanel = function (idx) {
         if (!name1 || !name2) { previewEl.innerHTML = '<span style="opacity:.7;">Выбери минимум 2 ингредиента.</span>'; return; }
         if (new Set(picked).size !== picked.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ Один и тот же ингредиент выбран дважды — так нельзя, выбери разные.</span>'; return; }
         const { effects, mode, mixed } = computeBrewEffects();
-        if (!effects.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ У первых двух ингредиентов нет общих свойств — варево не получится.</span>'; return; }
+        if (!effects.length) { previewEl.innerHTML = '<span style="color:#e74c3c;">⚠ У первых двух ингредиентов нет общих свойств — варево не получится.</span>' + brewThirdHint(name1, name2, name3, effects); return; }
         if (modeEl) {
             modeEl.value = mode;
             modeEl.disabled = !mixed; // выбор есть, только когда в вареве и хорошие, и плохие свойства
@@ -7359,8 +7442,30 @@ window.toggleSkillPanel = function (idx) {
         previewEl.innerHTML = head + effects.map(e => {
             const bad = e.polarity === 'negative';
             return `<div>${bad ? '☠' : '🧪'} <strong>${escHtml(e.name)}</strong>: ${escHtml(window.describeAlchemyEffect(e).slice(e.name.length + 2) || '—')} <span style="opacity:.6;">(${e.price} септ.)</span></div>`;
-        }).join('');
+        }).join('') + brewThirdHint(name1, name2, name3, effects);
     };
+
+    // Подсказка про третий ингредиент: что он добавил в варево — или почему не добавил ничего (и как поменять порядок).
+    function brewThirdHint(name1, name2, name3, effects) {
+        if (!name1 || !name2) return '';
+        const sh = window.getSharedAlchemyEffectsFor;
+        if (typeof sh !== 'function') return '';
+        const note = (txt, color) => `<div style="margin-top:6px; font-size:13px; color:${color || 'inherit'}; opacity:${color ? 1 : .85};">${txt}</div>`;
+        const pairOnly = sh(name1, name2, null);
+        if (!pairOnly.length) {
+            // у первых двух нет общего — смотрим, не совпадает ли третий с одним из них (тогда достаточно поменять порядок)
+            if (!name3) return '';
+            const alt = [[name1, name3, name2], [name2, name3, name1]].map(([x, y, z]) => ({ x, y, z, s: sh(x, y, null) })).filter(o => o.s.length)[0];
+            return alt
+                ? note(`💡 У «${escHtml(alt.x)}» и «${escHtml(alt.y)}» есть общее свойство («${escHtml(alt.s.join('», «'))}»). Правило: общее свойство должно быть у <strong>первых двух</strong> ингредиентов — поставь их первым и вторым, а «${escHtml(alt.z)}» третьим.`, '#e67e22')
+                : note('Третий ингредиент тоже ни с кем не совпал.');
+        }
+        if (!name3) return '';
+        const added = effects.map(e => e.name).filter(n => !pairOnly.includes(n));
+        return added.length
+            ? note(`➕ Третий ингредиент («${escHtml(name3)}») добавил свойства: ${added.map(escHtml).join(', ')}.`)
+            : note(`ℹ Третий ингредиент («${escHtml(name3)}») ничего не добавил: ни одно его свойство не совпало со свойствами первых двух. Он не усиливает варево — лишь добавляет совпавшие свойства.`, '#e67e22');
+    }
 
     function renderAlchGearInfo() {
         const el = document.getElementById('alch-gear-info');
@@ -7866,7 +7971,8 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function getTemperableItems() {
-        return playerInventory.filter(i => (typeof i.armorValue === 'number' || typeof i.weaponDmg === 'number') && findSmithingRecipeByName(i.name));
+        // Боеприпасы (стрелы, болты) не улучшаются и не затачиваются — в список не попадают.
+        return playerInventory.filter(i => (typeof i.armorValue === 'number' || typeof i.weaponDmg === 'number') && !isAmmoItem(i) && findSmithingRecipeByName(i.name));
     }
 
     function renderTemperSelect() {
@@ -7903,6 +8009,7 @@ window.toggleSkillPanel = function (idx) {
         const resultEl = document.getElementById('temper-result');
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item) { resultEl.innerHTML = '<span style="color:#e74c3c;">Выбери предмет.</span>'; return; }
+        if (isAmmoItem(item)) { resultEl.innerHTML = '<span style="color:#e74c3c;">Стрелы и болты улучшить или заточить нельзя.</span>'; return; }
         const recipe = findSmithingRecipeByName(item.name);
         const material = getPrimaryTemperMaterial(recipe);
         if (!material) { resultEl.innerHTML = '<span style="color:#e74c3c;">Не удалось определить материал.</span>'; return; }
@@ -8357,8 +8464,17 @@ window.toggleSkillPanel = function (idx) {
     window.playerMapZoom = function (h) { playerMapHold = h || ''; window.renderPlayerMap(true); };
     let _playerMapSig = null;
     let _playerPlaceSel = null; // id выбранного открытого места (показываем карточку)
+    let _playerMapNote = null;  // {title, sub, target:{x,y,name}} — клик по городу: расстояние от партии
     // Открытые мастером места (session.openPlaces): [{id, hold, name, cat, desc, x?, y?, ts}]
-    window.playerShowPlace = function (id) { _playerPlaceSel = id; _playerMapSig = null; window.renderPlayerMap(true); };
+    window.playerShowPlace = function (id) { _playerPlaceSel = id; _playerMapNote = null; _playerMapSig = null; window.renderPlayerMap(true); };
+    // маршрут и расстояние от партии до точки (по дорогам между поселениями); '' — если партия не отмечена
+    function playerDistText(session, target) {
+        const party = window.HoldsMap && window.HoldsMap.partyFromSession(session);
+        if (!party || !target || typeof target.x !== 'number') return '';
+        const N = window.HoldsMap.NODES, nm = n => (n && N[n]) ? n : '';
+        const r = window.HoldsMap.planRoute(Object.assign({}, party, { name: nm(party.name) }), Object.assign({}, target, { name: nm(target.name) }), session && session.mapCfg);
+        return window.HoldsMap.describeRoute(r);
+    }
     window.playerOpenPlaceHold = function (h) { _playerMapSig = null; window.playerMapZoom(h); };
     function renderOpenPlaces(session) {
         const listEl = document.getElementById('player-map-places'), infoEl = document.getElementById('player-map-place-info');
@@ -8371,10 +8487,21 @@ window.toggleSkillPanel = function (idx) {
         if (btn) btn.textContent = (sigNew && sigNew !== seen && !btn.classList.contains('active')) ? '🗺️ Карта ●' : '🗺️ Карта';
         if (btn && btn.classList.contains('active')) window.markPlacesSeen();
         if (infoEl) {
-            const p = places.find(x => x.id === _playerPlaceSel);
-            infoEl.innerHTML = p ? `<div style="border:1px solid var(--accent-color); border-radius:4px; padding:8px 10px; margin-top:8px;">
+            let p = places.find(x => x.id === _playerPlaceSel);
+            if (!p && String(_playerPlaceSel || '').indexOf('mark:') === 0) {
+                const mm = (session && Array.isArray(session.mapMarks) ? session.mapMarks : []).find(x => 'mark:' + x.id === _playerPlaceSel);
+                if (mm) p = { name: mm.name || 'Метка', hold: mm.hold || '', cat: 'Метка мастера', desc: 'Мастер отметил это место на карте.', x: mm.x, y: mm.y, u: mm.u, v: mm.v };
+            }
+            const pm = (p && typeof p.x === 'number') ? playerDistText(session, { x: p.x, y: p.y, u: p.u, v: p.v, hold: p.hold, name: p.name }) : '';
+            if (!p && _playerMapNote) {
+                const dt = playerDistText(session, _playerMapNote.target);
+                infoEl.innerHTML = `<div style="border:1px solid var(--accent-color); border-radius:4px; padding:8px 10px; margin-top:8px;">
+                    <strong>${escHtml(_playerMapNote.title)}</strong> <span style="opacity:.7; font-size:13px;">· ${escHtml(_playerMapNote.sub || '')}</span>
+                    <div style="font-size:14px; line-height:1.5; margin-top:4px;">${dt ? '📏 От партии: ' + escHtml(dt) : '<span style="opacity:.7;">Мастер ещё не отметил положение партии — расстояние посчитать не от чего.</span>'}</div></div>`;
+            } else infoEl.innerHTML = p ? `<div style="border:1px solid var(--accent-color); border-radius:4px; padding:8px 10px; margin-top:8px;">
                 <strong>${escHtml(p.name)}</strong> <span style="opacity:.7; font-size:13px;">· ${escHtml(p.hold || '')}${p.cat ? ' · ' + escHtml(p.cat) : ''}</span>
-                <div style="font-size:14px; line-height:1.5; margin-top:4px; white-space:pre-wrap;">${escHtml(p.desc || 'Мастер не оставил описания.')}</div></div>` : '';
+                <div style="font-size:14px; line-height:1.5; margin-top:4px; white-space:pre-wrap;">${escHtml(p.desc || 'Мастер не оставил описания.')}</div>
+                ${pm ? `<div style="font-size:13px; margin-top:6px; opacity:.9;">📏 От партии: ${escHtml(pm)}</div>` : ''}</div>` : '';
         }
         if (!listEl) return;
         if (!places.length) { listEl.innerHTML = '<p style="opacity:.65; font-size:13px;">Открытых мест пока нет — мастер добавит их по ходу игры.</p>'; return; }
@@ -8398,19 +8525,44 @@ window.toggleSkillPanel = function (idx) {
         const party = window.HoldsMap.partyFromSession(session);
         const hl = (session && session.currentHold) || (party && party.hold) || null;
         const places = (session && Array.isArray(session.openPlaces)) ? session.openPlaces : [];
-        const sig = JSON.stringify([playerMapHold, party, hl, places, _playerPlaceSel]);
+        const marks = (session && Array.isArray(session.mapMarks)) ? session.mapMarks : [];
+        const fog = window.HoldsMap.fogFromSession(session, false);
+        const troute = session && session.travelRoute && Array.isArray(session.travelRoute.pts) && session.travelRoute.pts.length > 1 ? session.travelRoute : null;
+        const sig = JSON.stringify([playerMapHold, party, hl, places, marks, _playerPlaceSel, _playerMapNote, session && session.mapFog, troute && troute.ts, session && session.mapCfg]);
         if (!force && sig === _playerMapSig) return;
         _playerMapSig = sig;
         const pins = {};
-        places.forEach(p => { if (typeof p.x === 'number' && typeof p.y === 'number' && p.hold) { (pins[p.hold] = pins[p.hold] || {})[p.name] = { x: p.x, y: p.y, cat: p.cat || '' }; } });
+        places.forEach(p => { if (typeof p.x === 'number' && typeof p.y === 'number' && p.hold) { (pins[p.hold] = pins[p.hold] || {})[p.name] = { x: p.x, y: p.y, u: p.u, v: p.v, cat: p.cat || '', show: true }; } });
+        // метки, которые мастер поставил игрокам на карте (в т.ч. без привязки к открытому месту)
+        const markKeys = {};
+        marks.forEach(m => {
+            if (!m || typeof m.x !== 'number' || typeof m.y !== 'number') return;
+            const hk = m.hold || '';
+            pins[hk] = pins[hk] || {};
+            let key = m.name || 'Метка';
+            if (pins[hk][key]) key += ' ★';
+            pins[hk][key] = { x: m.x, y: m.y, u: m.u, v: m.v, cat: 'Метка для игроков', show: true };
+            markKeys[hk + '|' + key] = m.id;
+        });
         window.HoldsMap.render(box, {
-            hold: playerMapHold || null, hl, party, pins, pinsAll: true,
+            hold: playerMapHold || null, hl, party, pins, pinsAll: true, fog,
+            route: troute ? { pts: troute.pts } : null,
             onHold: h => window.playerMapZoom(h),
-            onPin: (h, n) => { const p = places.find(x => x.hold === h && x.name === n); if (p) window.playerShowPlace(p.id); }
+            onSettlement: (h, n, x, y, u, v) => { _playerPlaceSel = null; _playerMapNote = { title: n, sub: h, target: { x, y, u, v, hold: h, name: n } }; _playerMapSig = null; window.renderPlayerMap(true); },
+            onPin: (h, n) => {
+                const mid = markKeys[h + '|' + n];
+                if (mid) { window.playerShowPlace('mark:' + mid); return; }
+                const p = places.find(x => x.hold === h && x.name === n); if (p) window.playerShowPlace(p.id);
+            }
         });
         renderOpenPlaces(session);
         const st = document.getElementById('player-map-status');
         if (st) st.innerHTML = party ? `⚑ Партия сейчас: <strong>${escHtml(party.name || 'на карте')}</strong>${party.hold ? ' · ' + escHtml(party.hold) : ''}` : (hl ? `⚑ Партия во владении: <strong>${escHtml(hl)}</strong>` : 'Мастер ещё не отметил положение партии.');
+        if (st && troute) {
+            const d = troute.days || {}, F = window.HoldsMap.fmtDays;
+            st.innerHTML += `<div style="margin-top:4px;">🧭 Маршрут от мастера: <strong>${escHtml(troute.from || '')} → ${escHtml(troute.to || '')}</strong> — ≈ ${troute.km} км (по прямой ${troute.direct} км). Пешком ${F(d.foot || 0)}, верхом ${F(d.horse || 0)}, на повозке ${F(d.cart || 0)}.</div>`;
+        }
+        if (st && fog) st.innerHTML += '<div style="margin-top:4px; opacity:.8; font-size:13px;">🌫 Часть карты скрыта туманом — она откроется по мере путешествия.</div>';
         const back = document.getElementById('player-map-back');
         if (back) back.style.display = playerMapHold ? '' : 'none';
     };

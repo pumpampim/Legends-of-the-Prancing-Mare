@@ -327,17 +327,67 @@
             <!-- ===== КАРТА И ПОЛОЖЕНИЕ ПАРТИИ ===== -->
             <div class="panel">
                 <h2>🗺️ Карта и положение партии</h2>
-                <p style="font-size:13px; opacity:.75;">Схема Скайрима. Клик по владению — приблизить. В приближении клик по городу, метке места или любой точке выбирает позицию; «Партия здесь» показывает её игрокам на вкладке «Карта» и ставит текущее владение (для цен и сбора ингредиентов). Метки подземелий расставляются в справочнике «Владения».</p>
+                <p style="font-size:13px; opacity:.75;">Схема Скайрима. Клик по владению — приблизить. В приближении клик по городу, метке места или любой точке выбирает позицию; «Партия здесь» показывает её игрокам на вкладке «Карта» и ставит текущее владение (для цен и сбора ингредиентов). Приближённое владение показывается картой-картинкой. Метки подземелий расставляются в справочнике «Владения» и видны только тебе; чтобы показать метку игрокам, выбери её (или любую точку) и нажми «📌 Метка для игроков» — подпись берётся из поля ниже.</p>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
                     <select id="gm-map-hold" style="flex:1 1 200px;" onchange="gmMapPickHold(this.value)"><option value="">— вся карта —</option></select>
                     <input type="text" id="gm-map-label" placeholder="Подпись для своей точки (необязательно)" style="flex:1 1 200px;">
                 </div>
                 <div id="gm-map"></div>
                 <div id="gm-map-selected" style="margin-top:6px; font-size:14px;"></div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center;">
+                    <select id="gm-map-settle" style="flex:1 1 220px;" onchange="gmMapPickSettle(this.value)"><option value="">— выбрать поселение из списка —</option></select>
+                    <span style="font-size:12px; opacity:.7; flex:1 1 220px;">Точное положение на картинке есть только у столиц; остальные поселения выбирай здесь или на общей схеме.</span>
+                </div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn-success" style="flex:1;" onclick="gmMapSetParty()">📍 Партия здесь</button>
                     <button style="flex:1;" onclick="gmMapClearParty()">Убрать метку партии</button>
                 </div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn-success" style="flex:1;" onclick="gmMapAddMark()" title="Выбранная точка или метка места появится на карте у всех игроков">📌 Метка для игроков (на выбранную точку)</button>
+                </div>
+                <div id="gm-map-marks" style="margin-top:6px;"></div>
+
+                <details style="margin-top:10px; border:1px solid var(--border-color, #555); border-radius:6px; padding:6px 10px;">
+                    <summary style="cursor:pointer; font-weight:bold;">🌫 Туман войны</summary>
+                    <p style="font-size:13px; opacity:.75; margin:6px 0;">Когда туман включён, игроки видят на карте только то, что вокруг партии, открытые места и метки, а также области и владения, которые открыл ты. «📍 Партия здесь» сама открывает окрестности (след остаётся).</p>
+                    <button id="gm-fog-toggle" style="width:100%;" onclick="gmFogToggle()">🌫 Туман войны: выкл</button>
+                    <label style="display:block; margin:6px 0; font-size:14px;"><input type="checkbox" id="gm-fog-auto" checked onchange="gmFogSetAuto(this.checked)"> «Партия здесь» открывает область вокруг партии</label>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <select id="gm-fog-r" style="flex:0 0 auto;">
+                            <option value="20">Малая область</option>
+                            <option value="35" selected>Средняя область</option>
+                            <option value="60">Большая область</option>
+                            <option value="100">Огромная область</option>
+                        </select>
+                        <button style="flex:1 1 180px;" onclick="gmFogRevealHere()">🔆 Открыть область на выбранной точке</button>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                        <button style="flex:1 1 150px;" onclick="gmFogRevealHold(true)">Открыть владение целиком</button>
+                        <button style="flex:1 1 150px;" onclick="gmFogRevealHold(false)">Скрыть владение</button>
+                        <button style="flex:1 1 150px;" onclick="gmFogReset()">Сбросить туман</button>
+                    </div>
+                    <div id="gm-fog-info" style="margin-top:6px; font-size:13px;"></div>
+                </details>
+
+                <details style="margin-top:8px; border:1px solid var(--border-color, #555); border-radius:6px; padding:6px 10px;">
+                    <summary style="cursor:pointer; font-weight:bold;">📏 Маршруты и расстояния</summary>
+                    <p style="font-size:13px; opacity:.75; margin:6px 0;">Маршрут считается от метки партии до выбранной точки: по дорогам между поселениями, а где дорог нет — напрямик по бездорожью (медленнее). Масштаб схемы условный — подстрой под свою игру.</p>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; font-size:13px;">
+                        <label>км в 1 ед. карты <input type="number" id="gm-cfg-km" step="0.1" min="0.1" style="width:70px;"></label>
+                        <label>пешком км/день <input type="number" id="gm-cfg-foot" min="1" style="width:60px;"></label>
+                        <label>верхом <input type="number" id="gm-cfg-horse" min="1" style="width:60px;"></label>
+                        <label>повозка <input type="number" id="gm-cfg-cart" min="1" style="width:60px;"></label>
+                        <label>корабль <input type="number" id="gm-cfg-ship" min="1" style="width:60px;"></label>
+                        <button onclick="gmCfgSave()">Сохранить</button>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                        <button class="btn-success" style="flex:1 1 200px;" onclick="gmRoutePlan()">📏 Маршрут: партия → выбранная точка</button>
+                        <button style="flex:1 1 150px;" onclick="gmRoutePublish()">📣 Показать игрокам</button>
+                        <button style="flex:1 1 150px;" onclick="gmRouteReveal()">🔆 Открыть вдоль маршрута</button>
+                        <button style="flex:1 1 120px;" onclick="gmRouteClear()">Убрать маршрут</button>
+                    </div>
+                    <div id="gm-route-info" style="margin-top:6px; font-size:14px;"></div>
+                </details>
                 <div id="gm-map-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
 

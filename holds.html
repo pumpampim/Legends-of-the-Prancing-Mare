@@ -185,16 +185,17 @@
         const locs = mapLocs(name), byName = {}; locs.forEach(l => byName[l.n] = l);
         window.HoldsMap.render(box, {
             hold: name, pins: mapPins,
-            onMap: (x, y) => {
+            onMap: (x, y, h, u, v) => {
                 const sel = document.getElementById('map-pick');
                 const n = sel && sel.value; if (!n) return;
                 if (!mapPins[name]) mapPins[name] = {};
                 mapPins[name][n] = { x, y, cat: (byName[n] || {}).cat || '' };
+                if (typeof u === 'number' && typeof v === 'number') { mapPins[name][n].u = u; mapPins[name][n].v = v; }
                 window.HoldsMap.savePins(mapPins);
                 mapFillPick(name, n); mapRefresh(name);
             },
-            onPinMove: (h, n, x, y) => {
-                if (mapPins[h] && mapPins[h][n]) { mapPins[h][n].x = x; mapPins[h][n].y = y; window.HoldsMap.savePins(mapPins); }
+            onPinMove: (h, n, x, y, u, v) => {
+                if (mapPins[h] && mapPins[h][n]) { mapPins[h][n].x = x; mapPins[h][n].y = y; if (typeof u === 'number' && typeof v === 'number') { mapPins[h][n].u = u; mapPins[h][n].v = v; } window.HoldsMap.savePins(mapPins); }
             },
             onPin: (h, n) => { if (byName[n]) jumpTo(h, byName[n].id); }
         });
