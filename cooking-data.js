@@ -438,7 +438,7 @@ const recipes = [
 
 // Блюдо, которое получится, если игрок готовит без рецепта / не угадал состав.
 // Источник: свод правил, раздел "Кулинария и еда".
-const failedDish = { name: "Похлёбка", weight: 1, price: 0, effect: "+10 хп на 75 ходов" };
+const failedDish = { name: "Похлёбка", weight: 0.5, price: 10, effect: "+10 хп на 75 ходов" };
 
 window.cookingIngredients = cookingIngredients;
 window.recipes = recipes;
