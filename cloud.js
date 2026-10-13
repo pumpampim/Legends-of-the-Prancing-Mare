@@ -538,7 +538,7 @@
         // может писать и без сессии.
         // Задача C: покупка у живого торговца — убирает купленный товар из ассортимента (он
         // штучный, не бесконечный) и добавляет цену к золоту торговца в сессии.
-        buyFromMerchantStock: function (key, itemIdx, price) {
+        buyFromMerchantStock: function (key, itemIdx, price, qty) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             return ref.get().then(doc => {
@@ -548,8 +548,11 @@
                 const stock = stocks[key];
                 if (!stock || !stock.items[itemIdx]) throw new Error('Товар уже не в наличии.');
                 const items = stock.items.slice();
-                // Покупка забирает ОДНУ штуку — раньше из стопки «есть: 5» исчезала вся позиция целиком.
-                if ((items[itemIdx].qty || 1) > 1) items[itemIdx] = Object.assign({}, items[itemIdx], { qty: items[itemIdx].qty - 1 });
+                // Покупка забирает ровно qty штук (по умолчанию одну) — не всю позицию целиком.
+                const want = Math.max(1, parseInt(qty) || 1);
+                const have = items[itemIdx].qty || 1;
+                if (have < want) throw new Error('У торговца осталось только ' + have + ' шт.');
+                if (have > want) items[itemIdx] = Object.assign({}, items[itemIdx], { qty: have - want });
                 else items.splice(itemIdx, 1);
                 stocks[key] = Object.assign({}, stock, { items: items, gold: (stock.gold || 0) + (price || 0) });
                 return ref.update({ merchantStocks: stocks });
