@@ -926,12 +926,38 @@
             <div id="bandit-mage-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedMageBanditToCombat()">Добавить в бой</button>
         </div>
+
+        <!-- ===== ГЕНЕРАТОР ДРАУГРОВ ===== -->
+        <div class="panel">
+            <h2>⚰️ Генератор драугра</h2>
+            <p style="font-size:13px; opacity:.75;">Как у бандитов: случайное древненордское оружие и броня (оружие и броня могут быть зачарованными — у старших типов зачарование почти всегда), заклинания и крики берутся из записи выбранного типа. С трупа выпадает не всё: часть снаряжения «потрёпана», плюс костная мука, золото, драгоценности и свитки. Зачарованные вещи игрок может разрушить и узнать зачарование.</p>
+            <label>Тип драугра</label>
+            <select id="draugr-gen-type"></select>
+            <label>Средний уровень группы (для случайного типа)</label>
+            <input type="number" id="draugr-avg-level" value="10" min="1" max="30">
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateDraugr()">🎲 Сгенерировать драугра</button>
+            <div id="draugr-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+            <button style="width:100%; margin-top:6px;" onclick="addGeneratedDraugrToCombat()">Добавить в бой</button>
+        </div>
+
+        <!-- ===== ГЕНЕРАТОР ИЗГОЕВ ===== -->
+        <div class="panel">
+            <h2>🌿 Генератор изгоя</h2>
+            <p style="font-size:13px; opacity:.75;">Случайные оружие и броня изгоев (топор или лук; у шамана — кинжал; у «Верескового сердца» броня ×2). Особые свойства (похищение ХП/МП, заклинания шаманов) берутся из записи выбранного типа.</p>
+            <label>Тип изгоя</label>
+            <select id="forsworn-gen-type"></select>
+            <label>Средний уровень группы (для случайного типа)</label>
+            <input type="number" id="forsworn-avg-level" value="8" min="1" max="30">
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateForsworn()">🎲 Сгенерировать изгоя</button>
+            <div id="forsworn-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+            <button style="width:100%; margin-top:6px;" onclick="addGeneratedForswornToCombat()">Добавить в бой</button>
+        </div>
     </div>
 </div>
 
 <script src="firebase-config.js?v=3"></script>
-<script src="items-data.js?v=3"></script>
-<script src="smithing-data.js?v=3"></script>
+<script src="items-data.js?v=4"></script>
+<script src="smithing-data.js?v=4"></script>
 <script src="enchant-data.js?v=3"></script>
 <script src="holidays-data.js?v=3"></script>
 <script src="random-events-data.js?v=3"></script>
@@ -946,6 +972,7 @@
 <script src="fish-data.js?v=3"></script>
 <script src="spell-data.js?v=3"></script>
 <script src="enemies-data.js?v=3"></script>
-<script src="gm.js?v=3"></script>
+<script src="enemy-loot.js?v=1"></script>
+<script src="gm.js?v=4"></script>
 </body>
 </html>

@@ -1201,13 +1201,21 @@
                 '<div><label style="font-size:12px;">MP (' + (e.maxMp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curMp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curMp\',this.value)"></div>' +
                 '</div>' +
-                (e.isRaisable && (e.curHp || 0) <= 0
-                    ? '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:12px;">' +
-                      '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
-                      (e.ashes ? '<div style="opacity:.75;">🔥 Обращён в пепел (Трансмутация смерти) — обыскать и поднять нельзя.</div>' : e.corpseLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>' : '<div style="opacity:.6;">Уже обыскан.</div>') +
-                      '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' +
-                      '</div>'
-                    : '') +
+                (function () {
+                    // Труп показываем у любого павшего врага, у которого есть что обыскать (готовая добыча или текст «лут» с вики),
+                    // а не только у поднимаемых гуманоидов — раньше «Обыскать» работало лишь у сгенерированных бандитов.
+                    const isDead = (e.curHp || 0) <= 0;
+                    const hasLootText = !!(e.loot && String(e.loot).trim());
+                    const canLoot = !e.ashes && !e.looted && !!(e.corpseLoot || hasLootText);
+                    if (!isDead || !(e.isRaisable || canLoot || e.looted)) return '';
+                    return '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:12px;">' +
+                        '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
+                        (e.ashes ? '<div style="opacity:.75;">🔥 Обращён в пепел (Трансмутация смерти) — обыскать и поднять нельзя.</div>'
+                            : canLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>'
+                            : e.looted ? '<div style="opacity:.6;">Уже обыскан.</div>' : '<div style="opacity:.6;">Здесь нечего брать.</div>') +
+                        (e.isRaisable ? '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' : '') +
+                        '</div>';
+                })() +
                 '</div>';
         }).join('');
     }
@@ -1257,6 +1265,7 @@
         if (Object.keys(e.resist).length) info += `Резист: ${Object.entries(e.resist).map(([k, v]) => k + ' ' + v + '%').join(', ')}<br>`;
         if (e.spells.length) info += `Заклинания: ${e.spells.map(s => s.name + ' (' + s.dmg + '/' + s.cost + ')').join(', ')}<br>`;
         if (e.shouts.length) info += `Крики: ${e.shouts.map(s => s.name).join(', ')}<br>`;
+        if (window.EnemyGear && window.EnemyGear.familyOf(e.name)) info += `🎲 Оружие и броня определятся случайно при добавлении в бой (${/драугр/i.test(e.name) ? 'древненордские, возможно зачарованные' : 'изгойские'}), лут — как у бандитов.<br>`;
         if (e.loot) info += `Лут: ${escapeHtml(e.loot)}`;
         infoEl.innerHTML = info;
     };
@@ -1290,6 +1299,15 @@
             if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
             if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
             if (currentEnemyDbPick.loot) extra.loot = currentEnemyDbPick.loot;
+            // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
+            if (window.EnemyGear && window.EnemyGear.familyOf(currentEnemyDbPick.name)) {
+                const gen = window.EnemyGear.generate(currentEnemyDbPick, enemyLootCtx(currentEnemyDbPick.level));
+                if (gen) {
+                    extra.weaponDmg = gen.weaponDmg; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
+                    extra.corpseLoot = { gold: gen.gold, items: gen.lootItems };
+                    extra.loot = genLootText(gen);
+                }
+            }
             if (currentEnemyDbPick.soul) extra.soul = currentEnemyDbPick.soul; // размер души для захвата душ
             if (currentEnemyDbPick.level) extra.level = currentEnemyDbPick.level; // уровень и тип — для заклинаний «до N уровня»
             if (currentEnemyDbPick.kind) extra.kind = currentEnemyDbPick.kind;
@@ -3537,6 +3555,7 @@
     if (typeof renderAllWeatherReference === 'function') renderAllWeatherReference();
     if (typeof renderAllEnchantsReference === 'function') renderAllEnchantsReference();
     if (typeof populateEnemyDbSelect === 'function') populateEnemyDbSelect();
+    if (typeof initEnemyGearPanels === 'function') initEnemyGearPanels();
     if (typeof window.renderCalcEnchEffects === 'function') window.renderCalcEnchEffects();
 
     // ---------- Выдача квестов ----------
@@ -4489,34 +4508,150 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // ---------- Лут с трупов любых врагов и генераторы драугров/изгоев (логика — в enemy-loot.js) ----------
+
+    function enemyLootCtx(level) {
+        return { pool: gmAllItems || [], level: level || 1, gearPool: typeof getBanditGearPool === 'function' ? getBanditGearPool : null };
+    }
+    // Бросок добычи по текстовому полю «лут» врага (дроп с вики): шанс, количество, золото, общие слова вроде «драг. камень».
+    function rollEnemyCorpseLoot(enemy) {
+        if (!window.EnemyLoot) return { gold: 0, items: [] };
+        return window.EnemyLoot.rollFromText(enemy.loot, enemyLootCtx(enemy.level));
+    }
+    function describeLootItems(items) {
+        return (items || []).map(i => i.name + ((i.qty || 1) > 1 ? ' ×' + i.qty : '')).join(', ');
+    }
+    function genLootText(gen) {
+        return [gen.gold ? gen.gold + ' зол.' : '', describeLootItems(gen.lootItems)].filter(Boolean).join(', ');
+    }
+
     window.lootCorpse = function (enemyId) {
         const enemy = (lastData.enemies || []).find(e => e.id === enemyId);
-        if (!enemy || !enemy.corpseLoot) { alert('У этого противника нет привязанного лута.'); return; }
+        if (!enemy) { alert('Противник не найден.'); return; }
+        if (enemy.looted) { alert('Этот труп уже обыскан.'); return; }
         const targetUid = el('loot-gen-target-player').value;
         if (!targetUid) { alert('Выбери игрока (внизу, в генераторе лута) — ему уйдёт добыча.'); return; }
+        // Готовая добыча (бандиты, драугры, изгои) или бросок по тексту лута из базы врагов
+        const loot = enemy.corpseLoot || rollEnemyCorpseLoot(enemy);
+        const items = loot.items || [];
+        const gold = loot.gold || 0;
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-            (enemy.corpseLoot.items || []).forEach(it => {
-                const itemId = it.name;
-                const existing = inv.find(x => x.itemId === itemId);
+            items.forEach((it, idx) => {
+                const qty = Math.max(1, parseInt(it.qty) || 1);
                 const extra = {};
                 if (it.slot) extra.slot = it.slot;
                 if (typeof it.armor === 'number') extra.armorValue = it.armor;
                 if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
                 if (typeof it.price === 'number') extra.price = it.price;
-                if (existing) { existing.count += 1; Object.assign(existing, extra); }
-                else inv.push(Object.assign({ itemId, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect: '' }, extra));
+                const effect = it.effect || '';
+                if (it.enchantment) {
+                    // Зачарованная вещь — отдельной записью (имя#время, как у вещей игрока), чтобы её можно было разрушить и узнать зачарование.
+                    extra.enchantment = it.enchantment;
+                    if (typeof it.chargeDaysLeft === 'number') extra.chargeDaysLeft = it.chargeDaysLeft;
+                    inv.push(Object.assign({ itemId: it.name + '#' + Date.now() + idx, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect }, extra));
+                    return;
+                }
+                const existing = inv.find(x => x.itemId === it.name);
+                if (existing) { existing.count += qty; Object.assign(existing, extra); }
+                else inv.push(Object.assign({ itemId: it.name, name: it.name, count: qty, weight: it.weight || 0, category: it.category || '', effect }, extra));
             });
-            const newGold = (parseInt(data.gold) || 0) + (enemy.corpseLoot.gold || 0);
-            return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
+            const newGold = (parseInt(data.gold) || 0) + gold;
+            return db.collection('characters').doc(targetUid).update({ inventory: stripUndefinedDeep(inv), gold: newGold });
         }).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
             const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? Object.assign({}, e, { corpseLoot: null, looted: true }) : e);
+            const summary = [gold ? gold + ' септ.' : '', describeLootItems(items)].filter(Boolean).join(', ') || 'ничего ценного';
             return db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
-                alert(`Добыча с трупа «${enemy.name}» выдана игроку ${pname}.`);
-                gmPostLogEntryText(`💀 ${pname} обыскал(а) труп «${enemy.name}» и забрал(а) добычу.`);
+                alert(`Добыча с трупа «${enemy.name}» выдана игроку ${pname}: ${summary}.`);
+                gmPostLogEntryText(`💀 ${pname} обыскал(а) труп «${enemy.name}» и забрал(а): ${summary}.`);
             });
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function initEnemyGearPanels() {
+        const fill = (selId, family) => {
+            const sel = el(selId);
+            if (!sel || !window.enemiesData || !window.EnemyGear) return;
+            const list = window.enemiesData.filter(e => window.EnemyGear.familyOf(e.name) === family);
+            sel.innerHTML = '<option value="random">🎲 Случайный (по среднему уровню группы)</option>' +
+                list.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)} (ур. ${e.level}, ${e.hp} ХП)</option>`).join('');
+        };
+        fill('draugr-gen-type', 'draugr');
+        fill('forsworn-gen-type', 'forsworn');
+    }
+
+    function pickEnemyGenType(family, selectId, levelInputId) {
+        const all = (window.enemiesData || []).filter(e => window.EnemyGear && window.EnemyGear.familyOf(e.name) === family);
+        const v = el(selectId).value;
+        if (v !== 'random') return all.find(e => e.name === v) || null;
+        const avg = parseInt(el(levelInputId).value) || 10;
+        let near = all.filter(e => Math.abs((e.level || 1) - avg) <= 6);
+        if (!near.length) near = all.slice().sort((a, b) => Math.abs((a.level || 1) - avg) - Math.abs((b.level || 1) - avg)).slice(0, 2);
+        return near[Math.floor(Math.random() * near.length)];
+    }
+
+    function renderGeneratedEnemy(gen, resultEl) {
+        const ench = gen.lootItems.filter(l => l.enchantment);
+        let html = `<strong>${escapeHtml(gen.name)} · ур. ${gen.level}</strong><br>`;
+        html += `ХП: ${gen.hp}${gen.mp ? ' · МП: ' + gen.mp : ''} · Урон: ${gen.weaponDmg}${gen.isRanged ? ' (дальний бой)' : ''} · Броня: ${gen.armor} (физ. резист ${gen.resist.physical || 0}%)<br>`;
+        html += `Снаряжение: ${escapeHtml(gen.weaponNote || '—')}${gen.gear.worn.length ? ' · надето: ' + gen.gear.worn.map(escapeHtml).join(', ') : ''}<br>`;
+        if (gen.spells.length) html += `Заклинания: ${gen.spells.map(s => escapeHtml(s.name) + ' (' + (s.dmg || 0) + '/' + (s.cost || 0) + ')').join(', ')}<br>`;
+        if (gen.shouts.length) html += `Крики: ${gen.shouts.map(s => escapeHtml(s.name)).join(', ')}<br>`;
+        html += `Лут (может выпасть не всё): ${gen.gold ? '💰' + gen.gold + ', ' : ''}${escapeHtml(describeLootItems(gen.lootItems)) || '—'}`;
+        if (ench.length) html += `<br>🔮 Зачарованное: ${ench.map(l => escapeHtml(l.name) + ' — ' + escapeHtml(l.enchantment.description || '')).join('; ')}`;
+        resultEl.innerHTML = html;
+    }
+
+    function enemyFromGenerated(gen) {
+        return stripUndefinedDeep({
+            id: genId('e'), name: gen.name + ' (ур.' + gen.level + ')', maxHp: gen.hp, curHp: gen.hp, maxMp: gen.mp || 0, curMp: gen.mp || 0,
+            weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist,
+            spells: gen.spells, shouts: gen.shouts, soul: gen.soul, level: gen.level, kind: gen.kind,
+            loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }
+        });
+    }
+
+    let lastGeneratedDraugr = null, lastGeneratedForsworn = null;
+
+    window.generateDraugr = function () {
+        const resultEl = el('draugr-gen-result');
+        if (!window.EnemyGear) { resultEl.innerHTML = '<span style="color:#e74c3c;">enemy-loot.js не подключён.</span>'; return; }
+        const base = pickEnemyGenType('draugr', 'draugr-gen-type', 'draugr-avg-level');
+        if (!base) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных о драуграх (enemies-data.js).</span>'; return; }
+        const gen = window.EnemyGear.generate(base, enemyLootCtx(base.level));
+        if (!gen) { resultEl.innerHTML = '<span style="color:#e74c3c;">Не удалось сгенерировать.</span>'; return; }
+        lastGeneratedDraugr = gen;
+        renderGeneratedEnemy(gen, resultEl);
+    };
+    window.addGeneratedDraugrToCombat = function () {
+        if (!lastGeneratedDraugr) { alert('Сначала сгенерируй драугра.'); return; }
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push(enemyFromGenerated(lastGeneratedDraugr));
+        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+            lastGeneratedDraugr = null;
+            el('draugr-gen-result').innerHTML = '';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.generateForsworn = function () {
+        const resultEl = el('forsworn-gen-result');
+        if (!window.EnemyGear) { resultEl.innerHTML = '<span style="color:#e74c3c;">enemy-loot.js не подключён.</span>'; return; }
+        const base = pickEnemyGenType('forsworn', 'forsworn-gen-type', 'forsworn-avg-level');
+        if (!base) { resultEl.innerHTML = '<span style="color:#e74c3c;">Нет данных об изгоях (enemies-data.js).</span>'; return; }
+        const gen = window.EnemyGear.generate(base, enemyLootCtx(base.level));
+        if (!gen) { resultEl.innerHTML = '<span style="color:#e74c3c;">Не удалось сгенерировать.</span>'; return; }
+        lastGeneratedForsworn = gen;
+        renderGeneratedEnemy(gen, resultEl);
+    };
+    window.addGeneratedForswornToCombat = function () {
+        if (!lastGeneratedForsworn) { alert('Сначала сгенерируй изгоя.'); return; }
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push(enemyFromGenerated(lastGeneratedForsworn));
+        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+            lastGeneratedForsworn = null;
+            el('forsworn-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
