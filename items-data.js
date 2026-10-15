@@ -110,12 +110,9 @@ const allItems = [
     { name: "Карта владения", category: "Походное снаряжение", type: "misc", weight: 1, price: 150 },
     { name: "Котелок с столовыми приборами", category: "Походное снаряжение", type: "misc", weight: 10, price: 75 },
     { name: "Набор для костра", category: "Походное снаряжение", type: "misc", weight: 5, price: 25 },
-    { name: "Походный рюкзак", category: "Походное снаряжение", type: "misc", weight: 5, price: 250 },
     // Экипируемые рюкзаки — отдельный слот (см. equippedSlots.backpack в index.html), дают
-    // грузоподъёмность. Категория "Рюкзаки" отдельная от "Походного снаряжения" специально —
-    // ПОСЛЕДНИЙ пункт ниже называется так же, как уже существующий лагерный предмет выше
-    // ("Походный рюкзак", 250/5, без слота) — это РАЗНЫЕ предметы с одинаковым названием, по
-    // прямой просьбе пользователя (не переименовывал).
+    // грузоподъёмность. Лагерный «Походный рюкзак» (вес 5, цена 250, без слота) удалён по просьбе автора —
+    // остался один «Походный рюкзак» (категория "Рюкзаки", слот backpack).
     // Две новые валюты (древние монеты) — продаются кузнецу и барахольщику (их профиль).
     // Категория "Кузнечные ингредиенты" та же, что у слитков — уже корректно маршрутизируется
     // в classifyItemForMerchant() на 'blacksmith' при продаже, барахольщик берёт любую категорию
@@ -181,7 +178,6 @@ const allItems = [
     { name: "Череп тролля", category: "Бытовые предметы", type: "misc", weight: 3, price: 5 },
     { name: "Деревянный меч", category: "Бытовые предметы", type: "misc", weight: 2, price: 25 },
     { name: "Зелёное/красное платье для девочки", category: "Бытовые предметы", type: "misc", weight: 1, price: 25 },
-    { name: "Соль", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 2 },
     { name: "Мешок муки", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
     { name: "Масло", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 2 },
     { name: "Тарелка", category: "Бытовые предметы", type: "misc", weight: 0.2, price: 1 },
@@ -445,12 +441,10 @@ const allItems = [
     { name: "Броня Брурида", category: "Уникальная броня", type: "armor", slot: "chest", armor: 32, weight: 3, price: 1500, material: "Сталь", location: "Тревская застава", effect: "+25 МП, +5 навыка Разрушения" },
     { name: "Перчатки Брурида", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 12, weight: 1, price: 800, material: "Сталь", location: "Тревская застава", effect: "+25 МП, +5 навыка Разрушения" },
     { name: "Сапоги Брурида", category: "Уникальная броня", type: "armor", slot: "boots", armor: 12, weight: 1, price: 800, material: "Сталь", location: "Тревская застава", effect: "+25 МП, +5% поглощения магии, +5 навыка Разрушения" },
-    { name: "Ламеллярный шлем", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 19, weight: 2, price: 1100, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +10 брони, +5% сопр. магии" },
-    { name: "Ламеллярная броня", category: "Уникальная броня", type: "armor", slot: "chest", armor: 31, weight: 3, price: 1400, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +25 брони, +5% сопр. магии" },
-    { name: "Ламеллярные перчатки", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 14, weight: 1, price: 700, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +10 брони, +5% сопр. магии" },
-    { name: "Ламеллярные сапоги", category: "Уникальная броня", type: "armor", slot: "boots", armor: 15, weight: 1, price: 700, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +25 брони, +5% сопр. магии" },
-    { name: "Ламеллярный щит", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 25, weight: 4, price: 1200, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +25 брони, +5% сопр. магии" },
-    { name: "Броня дезертира Стражи Рассвета", category: "Уникальная броня", type: "armor", slot: "chest", armor: 31, weight: 3, price: 1300, material: "Кожа (усиленная)", location: "Зуб Фалдара", effect: "Сопротивление холоду +20%, сопр. магии +10%" },
+    { name: "Шлем дезертира Стражи Рассвета", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 19, weight: 2, price: 1100, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +10 брони, +5% сопр. магии" },
+    { name: "Перчатки дезертира Стражи Рассвета", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 14, weight: 1, price: 700, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +10 брони, +5% сопр. магии" },
+    { name: "Сапоги дезертира Стражи Рассвета", category: "Уникальная броня", type: "armor", slot: "boots", armor: 15, weight: 1, price: 700, material: "Ламеллярный", location: "Зуб Фалдара", effect: "+10 ХП, +25 брони, +5% сопр. магии" },
+    { name: "Броня дезертира Стражи Рассвета", category: "Уникальная броня", type: "armor", slot: "chest", armor: 31, weight: 3, price: 1300, material: "Кожа (усиленная)", location: "Зуб Фалдара", effect: "Сопротивление холоду +20%, сопр. магии +15%, +10 ХП, +25 брони" },
     { name: "Шлем Туманной заставы", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 16, weight: 2, price: 900, material: "Ламеллярный", location: "Туманная застава", effect: "+40 МП, +15% защиты от стрел, +10% сопр. электричеству" },
     { name: "Броня Туманной заставы", category: "Уникальная броня", type: "armor", slot: "chest", armor: 28, weight: 3, price: 1200, material: "Ламеллярный", location: "Туманная застава", effect: "+40 ХП, +10% сопр. огню" },
     { name: "Перчатки Туманной заставы", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 12, weight: 1, price: 700, material: "Ламеллярный", location: "Туманная застава", effect: "+15% защиты от стрел, +15% урона оружием" },
@@ -488,10 +482,10 @@ const allItems = [
     { name: "Броня древнего вампира", category: "Уникальная броня", type: "armor", slot: "chest", armor: 40, weight: 4, price: 1700, material: "Эбонит (х1.1)", location: "Кровавый Трон", effect: "+25% сопр. огню, +15% сопр. магии" },
     { name: "Перчатки древнего вампира", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 18, weight: 1, price: 1000, material: "Эбонит (х1.1)", location: "Кровавый Трон", effect: "+25% сопр. огню, 50 пробития" },
     { name: "Сапоги древнего вампира", category: "Уникальная броня", type: "armor", slot: "boots", armor: 18, weight: 1, price: 1000, material: "Эбонит (х1.1)", location: "Кровавый Трон", effect: "+10 скорости, 10% поглощения магии" },
-    { name: "Стеклянный шлем", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 17, weight: 2, price: 1100, material: "Малахит", location: "Ветровая Дуга", effect: "+10% защиты от стихий, +30 брони" },
-    { name: "Стеклянная броня", category: "Уникальная броня", type: "armor", slot: "chest", armor: 32, weight: 3, price: 1500, material: "Малахит", location: "Северная сторожевая крепость", effect: "+10% поглощения магии, +70 ХП/МП" },
-    { name: "Стеклянные перчатки", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 13, weight: 1, price: 800, material: "Малахит", location: "Близ Талморского посольства", effect: "+20% урона, +1 к кубам атаки" },
-    { name: "Стеклянные сапоги", category: "Уникальная броня", type: "armor", slot: "boots", armor: 13, weight: 1, price: 800, material: "Малахит", location: "Кагрензел", effect: "+10% поглощения магии, +5 скорости" },
+    { name: "Шлем инквизитора", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 17, weight: 2, price: 1100, material: "Малахит", location: "Ветровая Дуга", effect: "+10% защиты от стихий, +30 брони" },
+    { name: "Броня инквизитора", category: "Уникальная броня", type: "armor", slot: "chest", armor: 32, weight: 3, price: 1500, material: "Малахит", location: "Северная сторожевая крепость", effect: "+10% поглощения магии, +70 ХП/МП" },
+    { name: "Перчатки инквизитора", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 13, weight: 1, price: 800, material: "Малахит", location: "Близ Талморского посольства", effect: "+20% урона, +1 к кубам атаки" },
+    { name: "Сапоги инквизитора", category: "Уникальная броня", type: "armor", slot: "boots", armor: 13, weight: 1, price: 800, material: "Малахит", location: "Кагрензел", effect: "+10% поглощения магии, +5 скорости" },
 
     // Уникальная броня владений (таблица «Уникальное оружие и броня»): продаётся кузнецами только в своих владениях
     { name: "Шлем Фолкритских Лесов", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 13, weight: 1, price: 83, material: "Кожа", location: "Фолкрит", effect: "+7 к броне в бою с животными", upgrade: "Шкура оленя", craft: "1 полоски кожи+шкура оленя" },
@@ -515,11 +509,10 @@ const allItems = [
     // --- 17. Уникальные щиты ---
     { name: "Стойкость", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 30, weight: 8, price: 1200, material: "Нордик", location: "Туманная застава", effect: "+30 ХП, +100 брони во время блока" },
     { name: "Тарч Кровожадности", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 26, weight: 4, price: 1000, material: "Сталь", location: "Альфтанд", effect: "+25 урона кровотечением при силовой атаке щитом" },
-    { name: "Бастион", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 28, weight: 6, price: 1100, material: "Ламеллярный", location: "Привал Хамвира", effect: "+10% урона оружием" },
-    { name: "Прочный железный щит", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 26, weight: 7, price: 900, material: "Железо", location: "Лагерь Тихих Лун", effect: "+20 ХП, 10% отражения урона" },
+    { name: "Бастион", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 28, weight: 6, price: 1100, material: "Ламеллярный", location: "Привал Хамвира", effect: "+10% урона оружием, +20 ХП, 10% отражения урона" },
     { name: "Этериевый щит", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 30, weight: 13, price: 1400, material: "Двемерский", location: "Кузница этерия", effect: "+40 ХП, +10% сопр. стихиям, +10% поглощения магии" },
     { name: "Равновесие", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 26, weight: 4, price: 1000, material: "Сталь", location: "Приют Редорана", effect: "+50 брони, +10% сопр. стихиям" },
-    { name: "Щит налетчика", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 27, weight: 4, price: 800, material: "Сталь", location: "Убийство налетчика", effect: "+25 урона кровотечением при силовой атаке" },
+    { name: "Щит налетчика", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 27, weight: 4, price: 800, material: "Сталь", location: "Убийство налетчика", effect: "+25 урона кровотечением при силовой атаке, +10 ХП, +25 брони, +5% сопр. магии" },
     { name: "Гордыня", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 28, weight: 4, price: 1300, material: "Эбонит", location: "Пещера Каменный Ручей", effect: "+55 ХП, 25% сопр. огню, 60 урона при ударе" },
     { name: "Печаль Исграмора", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 32, weight: 4, price: 1500, material: "Нордик", location: "Курган Ингола", effect: "25% сопр. электричеству, разрушает броню цели на 100 на 10 ходов" },
 

@@ -79,8 +79,35 @@
         return map[e.code] || ('Ошибка: ' + e.message);
     }
 
+    // 6.4: 1234 → «1 234» только для показа (в <input> остаются сырые числа)
+    function formatNumber(n) {
+        if (n === null || n === undefined || n === '' || isNaN(Number(n))) return n;
+        const parts = String(Number(n)).split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return parts.join('.');
+    }
+    window.formatNumber = formatNumber;
+
     function escapeHtml(str) {
         return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Строка для JS-аргумента inline-обработчика (см. jsq в index.html): экранирует \ и ', затем HTML.
+    function jsq(str) { return escapeHtml(String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
+
+    // Атомарная правка массива vitals у персонажа: свежий документ читается и пишется в ОДНОЙ транзакции,
+    // поэтому параллельная запись игрока (зелье, еда, урон) не затирается. mutate(vitals, data) меняет массив на месте;
+    // extra — дополнительные поля того же обновления. Раньше читали .get(), правили и писали весь массив отдельным update.
+    function updateCharacterVitals(uid, mutate, extra) {
+        const ref = db.collection('characters').doc(uid);
+        return db.runTransaction(tx => tx.get(ref).then(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            const v = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
+            while (v.length < 4) v.push(0);
+            mutate(v, data);
+            tx.update(ref, Object.assign({ vitals: v }, extra || {}));
+        }));
     }
 
     function genId(prefix) {
@@ -233,17 +260,53 @@
         });
     }
 
+    // Незавершённые обмены при закрытии сессии: предметы/золото отправителя лежат ЗАЛОГОМ в документе сессии и после закрытия пропали бы.
+    // Возвращаем их владельцам напрямую в инвентарь (транзакцией); принятые, но ещё не применённые обмены дозавершаем.
+    function gmSettleTradesBeforeClose() {
+        const trades = (lastData && lastData.trades) || {};
+        const ids = Object.keys(trades);
+        const grant = (uid, items, gold) => {
+            if (!uid || (!(items && items.length) && !gold)) return Promise.resolve();
+            const ref = db.collection('characters').doc(uid);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) return;
+                const data = doc.data();
+                const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+                (items || []).forEach(it => {
+                    const qty = Math.max(1, parseInt(it.count) || 1);
+                    const ex = inv.find(x => x.itemId === it.itemId);
+                    if (ex) ex.count = (ex.count || 0) + qty; else inv.push(Object.assign({}, it, { count: qty }));
+                });
+                tx.update(ref, { inventory: stripUndefinedDeep(inv), gold: Math.max(0, (parseInt(data.gold) || 0) + (gold || 0)) });
+            }));
+        };
+        const ops = [];
+        ids.forEach(id => {
+            const t = trades[id]; if (!t) return;
+            const giveItems = (t.give && t.give.items) || [], giveGold = (t.give && t.give.gold) || 0, wantGold = (t.want && t.want.gold) || 0;
+            if (t.status === 'pending' || ((t.status === 'declined' || t.status === 'cancelled') && !t.fromApplied)) {
+                ops.push(grant(t.from, giveItems, giveGold));                       // отправитель получает залог обратно
+            } else if (t.status === 'accepted') {
+                if (!t.toApplied) ops.push(grant(t.to, giveItems, giveGold - wantGold));   // получатель: вещи и золото, минус плата
+                if (!t.fromApplied) ops.push(grant(t.from, [], wantGold));                 // отправитель: плата
+            }
+        });
+        return Promise.all(ops).then(() => ids.length ? db.collection('sessions').doc(currentCode).update({ trades: {} }) : null).then(() => ids.length);
+    }
+
     window.closeSession = function () {
         if (!currentCode) return;
-        if (!confirm('Закрыть сессию? Игроки больше не смогут в неё зайти (текущие данные сохранятся).')) return;
-        db.collection('sessions').doc(currentCode).update({ status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp() }).finally(() => {
+        const nTr = Object.keys((lastData && lastData.trades) || {}).length;
+        if (!confirm('Закрыть сессию? Игроки больше не смогут в неё зайти (текущие данные сохранятся).' + (nTr ? '\n\nНезавершённых обменов: ' + nTr + ' — вещи и золото из них вернутся владельцам.' : ''))) return;
+        gmSettleTradesBeforeClose().then(() => db.collection('sessions').doc(currentCode).update({ status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp() }).finally(() => {
             if (_gmHeartbeatTimer) { clearInterval(_gmHeartbeatTimer); _gmHeartbeatTimer = null; }
             if (unsubSession) { unsubSession(); unsubSession = null; }
             localStorage.removeItem(GM_SESSION_KEY);
+            gmDropTimersFor(currentCode); // таймеры закрытой сессии больше не нужны
             currentCode = null;
             el('session-block').style.display = 'none';
             el('no-session-block').style.display = 'block';
-        });
+        })).catch(e => alert('Не удалось закрыть сессию: ' + e.message + '. Если ошибка при возврате вещей из обменов — сессия осталась открытой, попробуй ещё раз.'));
     };
 
     function enterSessionView(code) {
@@ -259,6 +322,8 @@
         lastData = doc.data();
         try { rumOnSnapshot(lastData); } catch (e) { console.error(e); }
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
+        try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
+        try { gmNotifyWatch(lastData); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
@@ -401,8 +466,12 @@
         const uids = Object.keys(participants);
         const writes = uids.map(uid => {
             const p = participants[uid];
-            return db.collection('characters').doc(uid).update({
-                'vitals.0': p.maxHp || 0, 'vitals.1': p.maxMp || 0,
+            // Раньше тут было update({'vitals.0': …, 'vitals.1': …}) — но vitals это МАССИВ: путь через точку превращал его в словарь
+            // {0:…, 1:…} и терялись макс. ХП/МП (индексы 2-3). Теперь правим массив целиком в транзакции.
+            return updateCharacterVitals(uid, v => {
+                v[0] = parseInt(v[2]) || p.maxHp || 0;
+                v[1] = parseInt(v[3]) || p.maxMp || 0;
+            }, {
                 pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({
                     id: 'rest-' + Date.now() + Math.random().toString(36).slice(2, 6),
                     name: 'Лагерь', effectName: 'Полноценный отдых', description: '+1 к кубам на все проверки навыков (весь следующий игровой день).', turnsRemaining: 20
@@ -471,13 +540,13 @@
     // документ упёрся бы в лимит, и ЛЮБАЯ запись (ХП, ходы, инвентарь) перестала бы проходить.
     // Раз в минуту мастер обрезает самые старые записи и предупреждает, если документ всё ещё тяжёлый.
     let _maintLast = 0, _stocksSanitized = false;
-    const SESSION_TRIM = { combatLog: [400, 250], whispers: [300, 200], gmWhispers: [300, 200], rumors: [80, 60], entries: [300, 200] };
+    const SESSION_TRIM = { oocChat: [260, 200], combatLog: [400, 250], whispers: [300, 200], gmWhispers: [300, 200], rumors: [80, 60], entries: [300, 200] };
     function gmMaintainSession(d) {
         if (!currentCode || Date.now() - _maintLast < 60000) return;
         _maintLast = Date.now();
         const upd = {}, j = d.journal || {};
         const cut = (arr, key, field) => { const [hi, lo] = SESSION_TRIM[key]; if (Array.isArray(arr) && arr.length > hi) upd[field] = arr.slice(-lo); };
-        cut(d.combatLog, 'combatLog', 'combatLog'); cut(d.whispers, 'whispers', 'whispers'); cut(d.gmWhispers, 'gmWhispers', 'gmWhispers');
+        cut(d.combatLog, 'combatLog', 'combatLog'); cut(d.oocChat, 'oocChat', 'oocChat'); cut(d.whispers, 'whispers', 'whispers'); cut(d.gmWhispers, 'gmWhispers', 'gmWhispers');
         cut(j.rumors, 'rumors', 'journal.rumors'); cut(j.entries, 'entries', 'journal.entries');
         // Один раз за вход в сессию: убираем из уже созданных ассортиментов то, что торговцы продавать
         // не должны (одеяния Коллегии, зелье крови), и заменяем безымянную «Стрелу» на железную.
@@ -759,7 +828,7 @@
             const hide = div.querySelector('.prep-hide');
             const openBtn = div.querySelector('[data-act="openplace"]');
             if (p) {
-                st.innerHTML = '<span style="color:#2ecc71;">🔓 открыто' + (typeof p.x === 'number' ? ' · с точкой на карте' : ' · без точки на карте') + '</span>';
+                st.innerHTML = '<span style="color:#2ecc71;">🔓 открыто' + (Array.isArray(p.toUids) && p.toUids.length ? ' (🔒 только: ' + escapeHtml(gmUidsText(p.toUids)) + ')' : '') + (typeof p.x === 'number' ? ' · с точкой на карте' : ' · без точки на карте') + '</span>';
                 hide.style.display = ''; openBtn.textContent = '💾 Обновить текст/точку';
             } else {
                 st.textContent = ''; hide.style.display = 'none'; openBtn.textContent = '🔓 Открыть игрокам';
@@ -768,21 +837,65 @@
         const listEl = el('prep-open-list');
         if (listEl) {
             listEl.innerHTML = open.length ? '<div style="font-size:13px; margin-bottom:2px;"><b>🔓 Открыто игрокам (' + open.length + '):</b></div>' + open.map(p => `<div style="display:flex; gap:6px; align-items:center; font-size:13px; margin-bottom:2px;">
-                <span style="flex:1;">${typeof p.x === 'number' ? '📍' : '·'} ${escapeHtml(p.name)} <span style="opacity:.6;">(${escapeHtml(p.hold || '')})</span></span>
+                <span style="flex:1;">${typeof p.x === 'number' ? '📍' : '·'} ${escapeHtml(p.name)} <span style="opacity:.6;">(${escapeHtml(p.hold || '')})</span>${Array.isArray(p.toUids) && p.toUids.length ? ' <span style="color:#e6b800;" title="Видит только этот игрок">🔒 ' + escapeHtml(gmUidsText(p.toUids)) + '</span>' : ''}</span>
                 <button style="font-size:11px; padding:1px 6px;" data-act="placepoint" data-id="${escapeHtml(p.id)}" title="Привязать к точке, выбранной на карте мастера, или к метке из справочника">📍 точка</button>
                 <button style="font-size:11px; padding:1px 6px;" data-act="hideplace" data-id="${escapeHtml(p.id)}">🔒</button></div>`).join('') : '<div style="font-size:12px; opacity:.6;">Игрокам пока не открыто ни одного места.</div>';
         }
     }
 
-    // Координаты места: метка из справочника (localStorage мастера) → иначе точка, выбранная сейчас на карте мастера
+    // ---------- Кому открывать точки и места: всем или одному игроку ----------
+    let gmOpenTarget = '';   // uid игрока; '' — всем
+    window.gmSetOpenTarget = function (v) {
+        gmOpenTarget = v || '';
+        ['gm-map-target', 'prep-target'].forEach(id => { const s = el(id); if (s && s.value !== gmOpenTarget) s.value = gmOpenTarget; });
+    };
+    function gmTargetUids() { return gmOpenTarget ? [gmOpenTarget] : null; }
+    function gmUidsText(uids) {
+        const pp = (lastData && lastData.participants) || {};
+        return (uids || []).map(u => (pp[u] || {}).name || 'игрок').join(', ');
+    }
+    function populateMapTargetSelects() {
+        const pp = (lastData && lastData.participants) || {};
+        const uids = Object.keys(pp);
+        if (gmOpenTarget && !uids.includes(gmOpenTarget)) gmOpenTarget = '';
+        const opts = uids.map(u => `<option value="${escapeHtml(u)}">Только: ${escapeHtml(pp[u].name || 'игрок')}</option>`).join('');
+        const sig = uids.map(u => u + ':' + (pp[u].name || '')).join('|');
+        [['gm-map-target', 'Кому: всем игрокам'], ['prep-target', 'Открывать: всем игрокам']].forEach(([id, all]) => {
+            const s = el(id); if (!s) return;
+            if (s.getAttribute('data-sig') !== sig) { s.innerHTML = `<option value="">${all}</option>` + opts; s.setAttribute('data-sig', sig); }
+            if (s.value !== gmOpenTarget) s.value = gmOpenTarget;
+        });
+    }
+
+    // Координаты места для привязки. ЯВНО выбранная на карте точка важнее метки из справочника (раньше было наоборот — старая метка
+    // из справочника молча перебивала точку, которую мастер только что выбрал). Если выбрано ПОСЕЛЕНИЕ — привязка требует подтверждения
+    // (иначе место «приклеивалось» к городу, выбранному ещё раньше для партии/маршрута: у игрока «пинговался» Солитьюд вместо статуи).
     function prepPlaceCoords(hold, name) {
+        const selOk = gmMapSel && typeof gmMapSel.x === 'number' && (!gmMapSel.hold || gmMapSel.hold === hold);
+        if (selOk) {
+            const isSettle = !!(gmMapSel.name && window.HoldsMap && window.HoldsMap.NODES[gmMapSel.name]);
+            const where = isSettle ? 'город «' + gmMapSel.name + '»' : (gmMapSel.name ? 'точка «' + gmMapSel.name + '»' : 'точка, выбранная на карте мастера');
+            return Object.assign({ x: gmMapSel.x, y: gmMapSel.y, src: where + ' (' + Math.round(gmMapSel.x) + ', ' + Math.round(gmMapSel.y) + ')', fromSel: true, isSettle, selName: gmMapSel.name || '' },
+                typeof gmMapSel.u === 'number' && typeof gmMapSel.v === 'number' ? { u: gmMapSel.u, v: gmMapSel.v } : {});
+        }
         try {
             const pins = window.HoldsMap && window.HoldsMap.loadPins ? window.HoldsMap.loadPins() : {};
             const p = pins[hold] && pins[hold][name];
-            if (p && typeof p.x === 'number') return Object.assign({ x: p.x, y: p.y, src: 'метка из справочника' }, typeof p.u === 'number' && typeof p.v === 'number' ? { u: p.u, v: p.v } : {});
+            if (p && typeof p.x === 'number') return Object.assign({ x: p.x, y: p.y, src: 'метка из справочника владений' }, typeof p.u === 'number' && typeof p.v === 'number' ? { u: p.u, v: p.v } : {});
         } catch (e) { }
-        if (gmMapSel && typeof gmMapSel.x === 'number' && (!gmMapSel.hold || gmMapSel.hold === hold)) return Object.assign({ x: gmMapSel.x, y: gmMapSel.y, src: 'точка, выбранная на карте мастера' }, typeof gmMapSel.u === 'number' && typeof gmMapSel.v === 'number' ? { u: gmMapSel.u, v: gmMapSel.v } : {});
         return null;
+    }
+    function prepConfirmCoords(c, placeName) {
+        if (c && c.isSettle) {
+            return confirm('Сейчас на карте выбран город «' + c.selName + '». Привязать «' + placeName + '» к координатам этого города?\n\nЕсли нужна другая точка — нажми «Отмена», кликни нужное место на карте владения и повтори.');
+        }
+        return true;
+    }
+    // после привязки: сбрасываем выбранную точку (чтобы она не «прилипла» к следующему месту) и показываем место на карте мастера
+    function prepAfterBind(c, hold) {
+        if (c && c.fromSel) gmMapSel = null;
+        if (hold && window.HoldsMap && window.HoldsMap.HOLDS[hold]) gmMapHold = hold;
+        if (typeof window.renderGmMap === 'function') window.renderGmMap(true);
     }
 
     function prepWritePlaces(arr, logText) {
@@ -948,20 +1061,26 @@
                 const p = open.find(x => x.id === b.dataset.id); if (!p) return;
                 const c = prepPlaceCoords(p.hold, p.name);
                 if (!c) { alert('Нет точки: выбери её на карте мастера (в приближении владения) или поставь метку места в справочнике владений.'); return; }
+                if (!prepConfirmCoords(c, p.name)) return;
                 const next = open.map(x => x.id === p.id ? Object.assign({}, x, { x: c.x, y: c.y }, c.u !== undefined ? { u: c.u, v: c.v } : {}) : x);
-                prepWritePlaces(next).then(() => { res.textContent = '«' + p.name + '» привязано к карте (' + c.src + ').'; }).catch(e => alert('Ошибка: ' + e.message));
+                prepWritePlaces(next).then(() => { res.textContent = '«' + p.name + '» привязано к карте: ' + c.src + '. Оно показано на карте мастера зелёным.'; prepAfterBind(c, p.hold); }).catch(e => alert('Ошибка: ' + e.message));
             } else {
                 const div = b.closest('.prep-place');
                 const hold = div.dataset.hold, name = div.dataset.name, cat = div.dataset.cat;
                 const id = prepPlaceId(hold, name);
                 const text = (div.querySelector('.prep-place-text').value || '').trim();
                 const c = prepPlaceCoords(hold, name);
+                if (c && !prepConfirmCoords(c, name)) return;
                 const entry = { id, hold, name, cat, desc: text, ts: Date.now() };
+                const tUids = gmTargetUids();
+                if (tUids) entry.toUids = tUids;   // открыто лично этим игрокам (без поля — всем)
                 if (c) { entry.x = c.x; entry.y = c.y; if (c.u !== undefined) { entry.u = c.u; entry.v = c.v; } }
                 const was = open.find(x => x.id === id);
                 if (was && !c && typeof was.x === 'number') { entry.x = was.x; entry.y = was.y; if (was.u !== undefined) { entry.u = was.u; entry.v = was.v; } }
                 const next = open.filter(x => x.id !== id).concat([entry]);
-                prepWritePlaces(next, was ? null : '🔓 Открыто новое место: «' + name + '» (' + hold + ').').then(() => {
+                const logTxt = was ? null : (tUids ? '🔓 Игроку (' + gmUidsText(tUids) + ') открыто место: «' + name + '».' : '🔓 Открыто новое место: «' + name + '» (' + hold + ').');
+                prepWritePlaces(next, logTxt).then(() => {
+                    prepAfterBind(c, hold);
                     res.textContent = (was ? 'Обновлено: ' : 'Открыто игрокам: ') + name + (entry.x !== undefined ? ' — с точкой на карте (' + (c ? c.src : 'прежняя точка') + ').' : ' — без точки на карте: игроки увидят его только в списке «Известные места». Выбери точку на карте мастера и нажми «📍 точка» в списке открытых.');
                 }).catch(e => alert('Ошибка: ' + e.message));
             }
@@ -981,6 +1100,10 @@
         rumRender();
         renderJournalGm();
         renderParty(lastData.participants || {});
+        renderGmStash(lastData);
+        if (window.renderEpic3Session) window.renderEpic3Session(lastData);
+        renderGmTimers();
+        renderCraftOrderSelects();
         renderEnemies(lastData.enemies || []);
         renderTurnOrder(lastData.turnOrder || []);
         renderTurnOrderPickSelect();
@@ -995,6 +1118,7 @@
         populateQuestTargetSelect();
         populateGmAttackSelects();
         populateLootTargetSelect();
+        populateMapTargetSelects();
         if (typeof renderGroupCheckResults === 'function') renderGroupCheckResults();
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
         if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
@@ -1017,7 +1141,7 @@
             const mpPct = Math.max(0, Math.min(100, (p.curMp || 0) / maxMp * 100));
             return `<div style="border:1px solid var(--border-color); border-radius:4px; padding:5px 8px; margin-bottom:4px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:bold;">
-                    <span>${p.fallen ? '⚰️ ' : ''}${escapeHtml(p.name || '?')} <span style="font-weight:normal; font-size:11px; opacity:.8;" title="Свободные жизни">❤ ${p.lives === undefined ? '?' : p.lives}</span></span>
+                    <span>${p.portraitThumb ? `<img src="${escapeHtml(p.portraitThumb)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;">` : ''}${p.fallen ? '⚰️ ' : ''}${escapeHtml(p.name || '?')} <span style="font-weight:normal; font-size:11px; opacity:.8;" title="Свободные жизни">❤ ${p.lives === undefined ? '?' : p.lives}</span></span>
                     <label style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:normal; margin:0;" title="Вне города игрок не может закупаться у торговцев">
                         <input type="checkbox" ${p.inTown === false ? '' : 'checked'} onchange="setParticipantTown('${uid}', this.checked)"> 🏙 В городе
                     </label>
@@ -1099,13 +1223,9 @@
         // менять один элемент массива через dot-notation).
         if (field === 'curHp' || field === 'curMp') {
             const vitalsIdx = field === 'curHp' ? 0 : 1;
-            db.collection('characters').doc(uid).get().then(doc => {
-                if (!doc.exists) return;
-                const data = doc.data();
-                const vitals = Array.isArray(data.vitals) ? data.vitals.slice() : [0, 0, 0, 0];
-                vitals[vitalsIdx] = Number(value) || 0;
-                return db.collection('characters').doc(uid).update({ vitals });
-            }).catch(e => console.error('Ошибка синхронизации ХП/МП с персонажем:', e));
+            const newVal = Number(value) || 0;
+            updateCharacterVitals(uid, v => { v[vitalsIdx] = newVal; })
+                .catch(e => console.error('Ошибка синхронизации ХП/МП с персонажем:', e));
         }
     };
 
@@ -1145,7 +1265,9 @@
 
     function renderEnemies(enemies) {
         const target = el('gm-enemies-list');
-        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; return; }
+        gmCheckMarked(enemies);
+        renderEnemyGrid(enemies);
+        if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; gmBulkCount(); return; }
         target.innerHTML = enemies.map(e => {
             const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
             const resistLine = resistEntries.length
@@ -1177,6 +1299,12 @@
                 '<input type="number" min="0" value="' + (e.level || '') + '" placeholder="?" style="width:50px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'level\',this.value)"> ' +
                 '<select style="width:auto; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'kind\',this.value)">' +
                 KIND_OPTS.map(o => '<option value="' + o[0] + '"' + ((e.kind || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>';
+            // Заклинания «Приказ даэдра»/«Изгнание даэдра» действуют полностью только на ПРИЗВАННЫХ даэдра. По умолчанию даэдра считается
+            // призванным; снять галочку — значит «дикий» (изгнание вместо этого наносит урон, приказ не работает).
+            const summonedLine = e.kind === 'daedra'
+                ? '<div style="font-size:12px; opacity:.9; margin-top:2px;"><label style="display:flex; align-items:center; gap:4px; cursor:pointer;">' +
+                  '<input type="checkbox" style="width:auto; margin:0;"' + (e.summoned === false ? '' : ' checked') + ' onchange="setEnemySummoned(\'' + e.id + '\', this.checked)"> 🔮 Призван (иначе «Приказ» и «Изгнание даэдра» не подействуют полностью)</label></div>'
+                : '';
             const lootLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">🎒 ' +
                 '<input type="text" value="' + escapeHtml(e.loot || '') + '" placeholder="лут текстом" style="flex:1; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'loot\',this.value)"></div>';
             const shoutsHtml = (e.shouts && e.shouts.length)
@@ -1191,10 +1319,12 @@
                         '<button style="width:auto; padding:1px 6px; font-size:11px;" onclick="tickShoutCd(\'' + e.id + '\',' + si + ')" ' + (cdLeft <= 0 ? 'disabled' : '') + '>−1 ход КД</button>' +
                         '</div></div>';
                 }).join('') : '';
-            return '<div class="enemy-row">' +
-                '<div class="row-name"><span class="name-with-avatar"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
-                '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></div>' +
-                statsLine + statusLine + levelLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
+            const isMarked = lastData && lastData.markedTarget === e.id;
+            return '<div class="enemy-row' + (isMarked ? ' st-marked' : '') + '" data-enemy-id="' + escapeHtml(e.id) + '">' +
+                '<div class="row-name"><span class="name-with-avatar"><input type="checkbox" class="st-enemy-sel" title="Выделить для массовых действий"' + (gmEnemySel.has(e.id) ? ' checked' : '') + ' onchange="gmToggleEnemySel(\'' + e.id + '\', this.checked)"><img class="enemy-avatar" src="' + enemyAvatarData(e) + '" alt=""><span>' + escapeHtml(e.name || '?') + '</span></span>' +
+                '<span style="display:flex; gap:4px;"><button style="width:auto;padding:2px 8px;font-size:12px;" onclick="gmToggleMark(\'' + e.id + '\')" title="Игроки увидят 🎯 и кнопку «Атаковать помеченного»">' + (isMarked ? '🎯 Снять метку' : '🎯 Пометить') + '</button>' +
+                '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></span></div>' +
+                statsLine + statusLine + levelLine + summonedLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -1218,11 +1348,12 @@
                 })() +
                 '</div>';
         }).join('');
+        gmBulkCount();
     }
 
     window.useShout = function (enemyId, shoutIdx, cooldown) {
         const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? { ...e, ['shoutCd_' + shoutIdx]: cooldown } : e);
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(err => console.error(err));
+        gmUpdateEnemies(enemies).catch(err => console.error(err));
         const enemy = enemies.find(e => e.id === enemyId);
         const shout = enemy && enemy.shouts && enemy.shouts[shoutIdx];
         if (shout) gmPostLogEntryText(`🗣️ ${enemy.name} кричит «${shout.name}»: ${shout.effect}`);
@@ -1237,7 +1368,7 @@
             const key = 'shoutCd_' + shoutIdx;
             return { ...e, [key]: Math.max(0, (e[key] || 0) - 1) };
         });
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(err => console.error(err));
+        gmUpdateEnemies(enemies).catch(err => console.error(err));
     };
 
     let currentEnemyDbPick = null;
@@ -1269,6 +1400,82 @@
         if (e.loot) info += `Лут: ${escapeHtml(e.loot)}`;
         infoEl.innerHTML = info;
     };
+
+    // ---------- Снаряжение и добыча врага по выбору мастера ----------
+    let enemyGearDraft = []; // [{ name, qty, chance }]
+
+    function gmItemDmg(i) { return typeof i.dmg === 'number' ? i.dmg : (typeof i.damage === 'number' ? i.damage : null); }
+    function gmItemArmor(i) { return typeof i.armor === 'number' ? i.armor : (typeof i.resistance === 'number' ? i.resistance : null); }
+    function enemyGearRole(i) {
+        if (!i) return 'loot';
+        const isAmmo = /стрел|болт/i.test(i.name || '');
+        if (gmItemDmg(i) !== null && (i.slot === 'melee' || i.slot === 'ranged') && !isAmmo) return 'weapon';
+        if (gmItemArmor(i) !== null && ['helmet', 'chest', 'gloves', 'boots', 'shield'].includes(i.slot)) return 'armor';
+        return 'loot';
+    }
+    function gmFindItemByName(name) {
+        return (gmAllItemsByKey && gmAllItemsByKey.get(name)) || (gmAllItems || []).find(i => i.name === name) || null;
+    }
+    window.populateEnemyGearDatalist = function () {
+        const dl = el('enemy-gear-datalist');
+        if (!dl) return;
+        const names = Array.from(new Set((gmAllItems || []).map(i => i.name))).sort((a, b) => a.localeCompare(b, 'ru'));
+        dl.innerHTML = names.map(n => '<option value="' + escapeHtml(n) + '"></option>').join('');
+    };
+    window.addEnemyGearItem = function () {
+        const name = (el('enemy-gear-name').value || '').trim();
+        if (!name) return;
+        const item = gmFindItemByName(name);
+        if (!item) { alert('Предмета «' + name + '» нет в базе — выбери из подсказок списка.'); return; }
+        const qty = Math.max(1, parseInt(el('enemy-gear-qty').value) || 1);
+        const chance = Math.min(100, Math.max(1, parseInt(el('enemy-gear-chance').value) || 100));
+        enemyGearDraft.push({ name: item.name, qty, chance });
+        el('enemy-gear-name').value = ''; el('enemy-gear-qty').value = 1; el('enemy-gear-chance').value = 100;
+        renderEnemyGearDraft();
+    };
+    window.removeEnemyGearItem = function (idx) { enemyGearDraft.splice(idx, 1); renderEnemyGearDraft(); };
+    function renderEnemyGearDraft() {
+        const box = el('enemy-gear-list');
+        if (!box) return;
+        const ROLE = { weapon: '⚔️ оружие', armor: '🛡 броня', loot: '🎒 лут' };
+        box.innerHTML = enemyGearDraft.length ? enemyGearDraft.map((d, idx) => {
+            const it = gmFindItemByName(d.name) || {};
+            const role = enemyGearRole(it);
+            const stat = role === 'weapon' ? ' · урон ' + gmItemDmg(it) : role === 'armor' ? ' · броня ' + gmItemArmor(it) : '';
+            const uniq = (typeof isUniqueLootItem === 'function' && isUniqueLootItem(it)) ? ' <span style="color:#e6b800;">★ уникальное</span>' : '';
+            return '<div class="party-row" style="display:flex; align-items:center; gap:6px; padding:3px 6px; font-size:13px;">' +
+                '<span style="flex:1;"><strong>' + escapeHtml(d.name) + '</strong>' + (d.qty > 1 ? ' ×' + d.qty : '') + uniq +
+                '<br><span style="opacity:.7;">' + ROLE[role] + stat + ' · шанс ' + d.chance + '%' + (it.effect ? ' · ' + escapeHtml(String(it.effect).slice(0, 70)) : '') + '</span></span>' +
+                '<button type="button" style="width:auto; margin:0; padding:2px 8px;" class="btn-danger" onclick="removeEnemyGearItem(' + idx + ')">×</button></div>';
+        }).join('') : '<p style="opacity:.6; font-size:13px; margin:2px 0;">Список пуст.</p>';
+    }
+    // Превращает список мастера в характеристики врага и готовую добычу (шанс выпадения бросается сразу, как у генераторов).
+    function buildEnemyGearExtra() {
+        const gold = Math.max(0, parseInt((el('enemy-gear-gold') || {}).value) || 0);
+        if (!enemyGearDraft.length && !gold) return null;
+        const items = [];
+        let weapon = null, armorSum = 0; const armorNames = [];
+        enemyGearDraft.forEach(d => {
+            const it = gmFindItemByName(d.name);
+            if (!it) return;
+            const role = enemyGearRole(it);
+            if (role === 'weapon' && (!weapon || gmItemDmg(it) > gmItemDmg(weapon))) weapon = it;
+            if (role === 'armor') { armorSum += gmItemArmor(it) * d.qty; armorNames.push(it.name); }
+            if (Math.random() * 100 < d.chance) {
+                const loot = window.EnemyLoot ? window.EnemyLoot.toLoot(it, d.qty) : { name: it.name, price: it.price || 0, weight: it.weight || 0, category: it.category || '', qty: d.qty };
+                if (loot.enchantment && (loot.slot === 'melee' || loot.slot === 'ranged') && typeof loot.chargeDaysLeft !== 'number') loot.chargeDaysLeft = 3;
+                items.push(loot);
+            }
+        });
+        const noteParts = [];
+        if (weapon) noteParts.push(weapon.name + (weapon.effect ? ' (' + String(weapon.effect).slice(0, 80) + ')' : ''));
+        if (armorNames.length) noteParts.push('надето: ' + armorNames.join(', '));
+        return {
+            weaponDmg: weapon ? gmItemDmg(weapon) : 0, isRanged: !!(weapon && weapon.slot === 'ranged'), weaponNote: noteParts.join(' · '),
+            physResist: armorSum ? Math.min(85, Math.round(armorSum / 10)) : 0,
+            corpseLoot: { gold, items }
+        };
+    }
 
     window.addEnemy = function () {
         const name = el('enemy-name-input').value.trim();
@@ -1315,14 +1522,24 @@
             // и подобные; звери/монстры/ловушки — нет).
             if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
         }
+        // Снаряжение/добыча по выбору мастера главнее и значений из базы, и автоматического генератора.
+        const gearExtra = buildEnemyGearExtra();
+        if (gearExtra) {
+            if (gearExtra.weaponDmg && !manualDmg) extra.weaponDmg = gearExtra.weaponDmg;
+            if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; }
+            if (gearExtra.physResist && !manualResist) extra.resist = Object.assign({}, extra.resist || {}, { physical: gearExtra.physResist });
+            extra.corpseLoot = gearExtra.corpseLoot;
+            extra.loot = genLootText(gearExtra.corpseLoot);
+        }
         enemies.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        gmUpdateEnemies(enemies).then(() => {
             el('enemy-name-input').value = '';
             el('enemy-hp-input').value = 10;
             el('enemy-mp-input').value = 0;
             el('enemy-dmg-input').value = 0;
             el('enemy-resist-input').value = 0;
             el('enemy-loot-input').value = '';
+            enemyGearDraft = []; renderEnemyGearDraft(); if (el('enemy-gear-gold')) el('enemy-gear-gold').value = 0;
             el('enemy-db-select').value = '';
             el('enemy-db-info').innerHTML = '';
             currentEnemyDbPick = null;
@@ -1332,20 +1549,164 @@
     // TEXT_ENEMY_FIELDS — поля, которые НЕ надо принудительно приводить к числу (раньше
     // Number(value)||0 стояло безусловно для любого поля — для текста типа "лут" это дало бы 0).
     const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name', 'kind'];
+    window.setEnemySummoned = function (id, checked) {
+        const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, summoned: !!checked } : e);
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
+    };
     window.setEnemyField = function (id, field, value) {
         const finalVal = TEXT_ENEMY_FIELDS.includes(field) ? value : (Number(value) || 0);
         const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: finalVal } : e);
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
     // Снятие статус-эффекта (Страх/Успокоение/Ярость/Полиморф) — тикается вручную мастером,
     // не по автоматическому счётчику ходов.
+    // ---------- Отмена последнего действия мастера (1 шаг, 30 секунд) ----------
+    // Раньше любая ошибка мастера с врагами (лишний урон, не тот убран) исправлялась вручную. Теперь ВСЕ записи списка врагов идут через
+    // gmUpdateEnemies(): перед записью сохраняем снимок прежнего состояния. Хранится только последнее действие и только 30 секунд.
+    // Обыск трупа в откат не входит (вещи уже выданы игроку). Откат перезаписывает врагов целиком — изменения игроков за эти секунды тоже откатятся.
+    const GM_UNDO_TTL = 30000;
+    function gmUpdateEnemies(enemies) {
+        const prev = (lastData && Array.isArray(lastData.enemies)) ? lastData.enemies : [];
+        window._gmUndo = { ts: Date.now(), sessionCode: currentCode, enemies: JSON.parse(JSON.stringify(prev)) };
+        gmUndoRefresh();
+        return db.collection('sessions').doc(currentCode).update({ enemies });
+    }
+    function gmUndoAvailable() { const u = window._gmUndo; return !!(u && u.sessionCode === currentCode && Date.now() - u.ts < GM_UNDO_TTL); }
+    function gmUndoRefresh() {
+        const b = el('gm-undo-btn'); if (!b) return;
+        const ok = gmUndoAvailable();
+        b.disabled = !ok;
+        b.classList.toggle('st-undo-ready', ok);
+        if (!ok && window._gmUndo && Date.now() - window._gmUndo.ts >= GM_UNDO_TTL) window._gmUndo = null;
+    }
+    setInterval(gmUndoRefresh, 1000);
+    window.gmUndoLast = function () {
+        if (!gmUndoAvailable()) { gmUndoRefresh(); return; }
+        const u = window._gmUndo;
+        db.collection('sessions').doc(currentCode).update({ enemies: stripUndefinedDeep(u.enemies) }).then(() => {
+            window._gmUndo = null; gmUndoRefresh();
+            gmPostLogEntryText('↶ Мастер отменил последнее действие.');
+        }).catch(e => alert('Ошибка отката: ' + e.message));
+    };
+
+    // ---------- Метка цели (1.3) ----------
+    // sessions/{code}.markedTarget = id врага | null. Игроки видят 🎯 в списке целей и кнопку «Атаковать помеченного» в боевом доке.
+    window.gmToggleMark = function (id) {
+        const e = (lastData.enemies || []).find(x => x.id === id); if (!e) return;
+        const next = lastData.markedTarget === id ? null : id;
+        db.collection('sessions').doc(currentCode).update({ markedTarget: next }).then(() => {
+            if (next) gmPostLogEntryText('🎯 Мастер пометил цель: «' + e.name + '».');
+        }).catch(err => alert('Ошибка: ' + err.message));
+    };
+    let _gmMarkClearing = false;
+    // Метка автоматически снимается, когда помеченный враг убит или убран (проверка при каждом обновлении списка у мастера)
+    function gmCheckMarked(enemies) {
+        const id = lastData && lastData.markedTarget;
+        if (!id || _gmMarkClearing) return;
+        const e = (enemies || []).find(x => x.id === id);
+        if (e && (e.curHp || 0) > 0) return;
+        _gmMarkClearing = true;
+        db.collection('sessions').doc(currentCode).update({ markedTarget: null }).catch(() => { }).finally(() => { _gmMarkClearing = false; });
+    }
+
+    // ---------- Массовые действия с врагами (1.6) ----------
+    const gmEnemySel = new Set();
+    window.gmToggleEnemySel = function (id, on) { if (on) gmEnemySel.add(id); else gmEnemySel.delete(id); gmBulkCount(); };
+    window.gmEnemySelectAll = function (on) {
+        gmEnemySel.clear();
+        if (on) (lastData.enemies || []).forEach(e => gmEnemySel.add(e.id));
+        renderEnemies(lastData.enemies || []);
+    };
+    function gmBulkCount() {
+        const ids = new Set((lastData.enemies || []).map(e => e.id));
+        Array.from(gmEnemySel).forEach(id => { if (!ids.has(id)) gmEnemySel.delete(id); });
+        const c = el('gm-bulk-count'); if (c) c.textContent = gmEnemySel.size;
+    }
+    window.gmBulkToggleMenu = function () {
+        const m = el('gm-bulk-menu'); if (!m) return;
+        m.style.display = m.style.display === 'none' ? 'block' : 'none';
+        const s = el('gm-bulk-status');
+        if (s && !s.options.length) s.innerHTML = Object.keys(GM_STATUS_EFFECTS).map(k => `<option value="${k}">${escapeHtml(GM_STATUS_EFFECTS[k].name)}</option>`).join('');
+    };
+    // общий каркас: берёт выделенных, меняет копией, пишет ОДНИМ update и одной строкой в журнал
+    function gmBulkApply(fn, logText) {
+        gmBulkCount();
+        if (!gmEnemySel.size) { alert('Сначала выдели врагов (галочка слева у карточки).'); return; }
+        if (!currentCode) { alert('Нет активной сессии.'); return; }
+        const turn = (lastData && lastData.sessionTurnCounter) || 0;
+        const notes = [];
+        const next = (lastData.enemies || []).map(e => gmEnemySel.has(e.id) ? fn(Object.assign({}, e), notes, turn) : e);
+        if (!notes.length) { alert('Среди выделенных нет подходящих целей (мёртвые пропускаются).'); return; }
+        gmUpdateEnemies(next).then(() => gmPostLogEntryText(logText(notes))).catch(err => alert('Ошибка: ' + err.message));
+    }
+    window.gmBulkDamage = function () {
+        const n = Math.max(0, parseInt(el('gm-bulk-n').value) || 0), type = el('gm-bulk-type').value;
+        if (!n) return;
+        gmBulkApply((e, notes, turn) => {
+            if ((e.curHp || 0) <= 0) return e;
+            const pv = window.StCombat.previewDamage(e, n, type, 0);   // тот же расчёт, что у игрока («Применить»)
+            const was = e.curHp || 0;
+            e.curHp = Math.max(0, was - pv.finalDmg);
+            if (was > 0 && e.curHp <= 0) e.diedAtTurn = turn;          // каждому погибшему — свой момент смерти (окно «поднять труп»)
+            notes.push(`${e.name} −${pv.finalDmg}${e.curHp <= 0 ? ' ☠' : ''}`);
+            return e;
+        }, notes => `💥 Мастер наносит ${n} (${window.StCombat.TYPE_LABEL[type] || type}) выделенным: ${notes.join(', ')}.`);
+    };
+    window.gmBulkHeal = function () {
+        const n = Math.max(0, parseInt(el('gm-bulk-n').value) || 0);
+        if (!n) return;
+        gmBulkApply((e, notes) => {
+            if ((e.curHp || 0) <= 0) return e;
+            const was = e.curHp || 0;
+            e.curHp = Math.min(e.maxHp || was, was + n);
+            notes.push(`${e.name} +${e.curHp - was}`);
+            return e;
+        }, notes => `💚 Мастер лечит выделенных на ${n}: ${notes.join(', ')}.`);
+    };
+    window.gmBulkStatus = function () {
+        const key = el('gm-bulk-status').value, def = GM_STATUS_EFFECTS[key];
+        if (!def) return;
+        const turns = Math.max(1, parseInt(el('gm-bulk-turns').value) || def.turns || 1);
+        gmBulkApply((e, notes) => {
+            if ((e.curHp || 0) <= 0) return e;
+            const st = { id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: def.name, desc: def.desc, turns };
+            if (def.rollPenalty) st.rollPenalty = def.rollPenalty;
+            e.statusEffects = (Array.isArray(e.statusEffects) ? e.statusEffects : []).concat([st]);
+            notes.push(e.name);
+            return e;
+        }, notes => `🌀 Мастер накладывает «${def.name}» (${turns} х.) на: ${notes.join(', ')}.`);
+    };
+    window.gmBulkRemove = function () {
+        gmBulkCount();
+        if (!gmEnemySel.size) { alert('Сначала выдели врагов.'); return; }
+        if (!confirm('Убрать выделенных врагов (' + gmEnemySel.size + ')?')) return;
+        const names = [], next = (lastData.enemies || []).filter(e => { if (gmEnemySel.has(e.id)) { names.push(e.name); return false; } return true; });
+        gmEnemySel.clear();
+        gmUpdateEnemies(next).then(() => gmPostLogEntryText('🗑 Мастер убирает: ' + names.join(', ') + '.')).catch(err => alert('Ошибка: ' + err.message));
+    };
+
+    // ---------- Предпросмотр урона по игроку (1.2) ----------
+    // Только читает документ игрока и считает; ничего не пишет. Случайные защиты (блок, уклонение, барьер, знак Атронаха) не учитываются.
+    window.previewGmAttack = function () {
+        const out = el('gm-attack-preview'); if (!out) return;
+        if (!pendingGmAttack) { out.textContent = ''; return; }
+        const { targetUid, dmg, dmgType } = pendingGmAttack;
+        if (!dmg) { out.textContent = 'Урона нет — только эффект/статус.'; return; }
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const resist = (data.resistances && data.resistances[dmgType]) || 0;
+            const pv = window.StCombat.previewDamage({ resist: { [dmgType]: resist } }, dmg, dmgType, 0);
+            out.textContent = `Ожидаемый урон по игроку: ~${pv.finalDmg} (базовый ${dmg}${pv.notes.length ? ', ' + pv.notes.join(', ') : ''}). Случайные защиты игрока (блок, уклонение, барьер) в предпросмотре не учтены.`;
+        }).catch(e => { out.textContent = 'Не удалось прочитать резисты: ' + e.message; });
+    };
+
     window.removeEnemyStatus = function (enemyId, statusId) {
         const enemies = (lastData.enemies || []).map(e => {
             if (e.id !== enemyId || !Array.isArray(e.statusEffects)) return e;
             return { ...e, statusEffects: e.statusEffects.filter(s => s.id !== statusId) };
         });
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
     // Редактирование урона/стоимости конкретного заклинания врага — раньше заклинания были
@@ -1357,12 +1718,12 @@
             spells[spellIdx] = Object.assign({}, spells[spellIdx], { [field]: Number(value) || 0 });
             return { ...e, spells };
         });
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
     window.removeEnemy = function (id) {
         const enemies = (lastData.enemies || []).filter(e => e.id !== id);
-        db.collection('sessions').doc(currentCode).update({ enemies }).catch(e => console.error(e));
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
     // ---------- Инициатива ----------
@@ -1488,10 +1849,12 @@
             });
             return copy;
         });
+        const firedTimers = gmTickTimers(); // эпик 3.7
         const logEntries = [{
             ts: Date.now(), author: 'Мастер',
             text: '⏭️ Новый ход! Не забудьте прокрутить длительность своих активных эффектов на листе.'
-        }].concat(tickLog.map((t, i) => ({ ts: Date.now() + i + 1, author: 'Мастер', text: t })));
+        }].concat(tickLog.map((t, i) => ({ ts: Date.now() + i + 1, author: 'Мастер', text: t })))
+          .concat(firedTimers.map((t, i) => ({ ts: Date.now() + 100 + i, author: 'Мастер', text: '⏰ Сработало событие: ' + t })));
         db.collection('sessions').doc(currentCode).update({
             enemies: stripUndefinedDeep(enemies),
             sessionTurnCounter: firebase.firestore.FieldValue.increment(1),
@@ -1524,7 +1887,7 @@
                 const parts = lastData.participants || {};
                 uid = Object.keys(parts).find(u => (parts[u] || {}).name === w.author) || '';
             }
-            const reply = uid ? ' <button style="width:auto; padding:0 6px; font-size:11px;" onclick="replyToWhisper(\'' + escapeHtml(uid) + '\')">↩ ответить</button>' : '';
+            const reply = uid ? ' <button style="width:auto; padding:0 6px; font-size:11px;" onclick="replyToWhisper(\'' + jsq(uid) + '\')">↩ ответить</button>' : '';
             return '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-author">' + escapeHtml(w.author || '?') + ':</span> ' + escapeHtml(w.text || '') + reply + '</div>';
         }).join('');
         target.scrollTop = target.scrollHeight;
@@ -1721,6 +2084,24 @@
         return out;
     }
 
+    // Одни и те же вещи приходят из двух источников (магазинная база + кузница/свитки) и показывались в списке мастера дважды.
+    // Схлопываем ТОЛЬКО заведомо одинаковые пары категорий; вещи, у которых одно имя, но разные характеристики
+    // (уникальная и обычная броня, два вида рюкзака), не трогаем — там нужно решение автора.
+    function dedupeGmItems(list) {
+        const PAIRS = [['Ювелирные изделия', 'Ювелирное изделие'], ['Свитки (прописанные)', 'Свитки (крафтящиеся)'], ['Бытовые предметы', 'Ингредиенты для алхимии']];
+        const byName = new Map();
+        list.forEach(i => { const g = byName.get(i.name); if (g) g.push(i); else byName.set(i.name, [i]); });
+        const drop = new Set();
+        byName.forEach(group => {
+            if (group.length < 2) return;
+            const pair = PAIRS.find(p => group.every(i => p.includes(i.category)));
+            if (!pair) return;
+            const keep = group.slice().sort((a, b) => pair.indexOf(a.category) - pair.indexOf(b.category))[0];
+            group.forEach(i => { if (i !== keep) { if (!keep.effect && i.effect) keep.effect = i.effect; drop.add(i); } });
+        });
+        return drop.size ? list.filter(i => !drop.has(i)) : list;
+    }
+
     window.loadGmItems = function() {
         if (!db) return;
         db.collection('items').get().then(snapshot => {
@@ -1744,6 +2125,7 @@
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
             gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
             gmAllItems = gmAllItems.concat(window.spellTomesData || []);
+            gmAllItems = dedupeGmItems(gmAllItems);
             // O(1) поиск по id/имени вместо O(n) .find() на каждый клик "Передать" — gmAllItems
             // уже перевалил за 400+ записей. gmAllItems как массив оставлен как есть (нужен для
             // рендера таблицы и .filter()-поисков, которым Map не поможет — там всё равно нужен
@@ -1760,6 +2142,7 @@
                 catSelect.appendChild(opt);
             });
             gmFilteredItems = gmAllItems;
+            if (typeof window.populateEnemyGearDatalist === 'function') window.populateEnemyGearDatalist();
             window.renderGmItemsTable();
         }).catch(e => console.error('Ошибка загрузки предметов для мастера:', e));
     };
@@ -1996,7 +2379,7 @@
                 ? `${r.category || ''} · ${r.subcat || ''}`
                 : (r.slot === 'jewelry' ? 'Ювелирное' : `${r.armorType || ''} · ${r.slot || ''}`);
             return `<label style="display:flex; align-items:center; gap:8px; padding:4px 2px; border-bottom:1px solid var(--border-color); font-size:14px;">
-                <input type="checkbox" ${checked} onchange="toggleRecipeKnown('${escapeHtml(r.name)}', this.checked)">
+                <input type="checkbox" ${checked} onchange="toggleRecipeKnown('${jsq(r.name)}', this.checked)">
                 <span style="flex:1;">${escapeHtml(r.name)} <span style="opacity:.6; font-size:12px;">(${escapeHtml(sub)})</span></span>
             </label>`;
         }).join('');
@@ -2206,20 +2589,30 @@
     function renderReputationPanel() {
         const listEl = el('reputation-list');
         if (!listEl) return;
+        renderRepWarn();
         if (!currentInvPlayerUid) { listEl.innerHTML = '<p style="opacity:.6; font-size:13px;">Игрок не выбран — выбери его в панели «Инвентарь и деньги» выше, этот же выбор используется здесь.</p>'; return; }
         const pname = (lastData.participants && lastData.participants[currentInvPlayerUid] && lastData.participants[currentInvPlayerUid].name) || currentInvPlayerUid;
         listEl.innerHTML = `<p style="font-size:13px; opacity:.8; margin-bottom:6px;">Игрок: <strong>${escapeHtml(pname)}</strong></p>` + REPUTATION_HOLDS.map(h => `
             <div class="party-row" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
                 <span>${escapeHtml(h)}</span>
                 <span style="display:flex; align-items:center; gap:4px;">
-                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${escapeHtml(h)}', -1)">−1</button>
-                    <input type="number" value="${currentReputationData[h] || 0}" style="width:60px; text-align:center;" onchange="setReputation('${escapeHtml(h)}', this.value)">
-                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${escapeHtml(h)}', 1)">+1</button>
-                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetReputation('${escapeHtml(h)}')">Сброс</button>
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${jsq(h)}', -1)">−1</button>
+                    <input type="number" value="${currentReputationData[h] || 0}" style="width:60px; text-align:center;" onchange="setReputation('${jsq(h)}', this.value)">
+                    <button style="width:auto; padding:2px 8px;" onclick="adjustReputation('${jsq(h)}', 1)">+1</button>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetReputation('${jsq(h)}')">Сброс</button>
                 </span>
             </div>`).join('');
     }
 
+    // Эпик 5.4. Уровни последствий и уведомление мастера при пересечении порога (при сохранении).
+    function repLevel(v) { return v >= 5 ? 2 : v <= -10 ? -3 : v <= -3 ? -2 : 0; }
+    const REP_LEVEL_TEXT = { 2: 'уважают (скидка ×0.9)', '-2': 'подозревают (наценка ×1.25, возможен отказ в дорогих товарах)', '-3': 'стража пытается арестовать', 0: 'нейтрально' };
+    let repBaseline = null;
+    function renderRepWarn() {
+        const w = el('reputation-warn'); if (!w) return;
+        const bad = REPUTATION_HOLDS.filter(h => (currentReputationData[h] || 0) <= -3);
+        w.innerHTML = bad.length ? bad.map(h => `<div style="color:#e6a23c;">⚠ ${escapeHtml(h)}: ${currentReputationData[h]} — ${REP_LEVEL_TEXT[repLevel(currentReputationData[h])]}.</div>`).join('') : '';
+    }
     window.adjustReputation = function (holdName, delta) {
         if (!currentInvPlayerUid) return;
         currentReputationData[holdName] = (currentReputationData[holdName] || 0) + delta;
@@ -2245,7 +2638,15 @@
     window.saveReputation = function () {
         if (!currentInvPlayerUid) { alert('Выбери игрока выше.'); return; }
         db.collection('characters').doc(currentInvPlayerUid).update({ reputationByRegion: currentReputationData })
-            .then(() => alert('Репутация сохранена.'))
+            .then(() => {
+                const base = repBaseline || defaultReputationData();
+                const pname = ((lastData.participants || {})[currentInvPlayerUid] || {}).name || 'игрок';
+                const changes = REPUTATION_HOLDS.filter(h => repLevel(base[h] || 0) !== repLevel(currentReputationData[h] || 0))
+                    .map(h => `${h}: ${currentReputationData[h]} — ${REP_LEVEL_TEXT[repLevel(currentReputationData[h] || 0)]}`);
+                repBaseline = Object.assign({}, currentReputationData);
+                if (changes.length) { alert('Репутация сохранена.\n\nПорог пересечён (' + pname + '):\n' + changes.join('\n')); }
+                else alert('Репутация сохранена.');
+            })
             .catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -2662,7 +3063,7 @@
                 take(itemsOf(['Ингредиенты для алхимии']), 14, 20);
                 break;
             case 'pawnbrokerLive':
-                always('Пергамент', 3, 8); always('Чернила', 2, 6);
+                always('Пергамент', 3, 8); always('Чернила', 2, 6); always('Соль', 2, 6);
                 take(itemsOf(['Бытовые предметы'], POT), 5, 8);
                 take(itemsOf(['Походное снаряжение']), 2, 4);
                 take(itemsOf(['Сырые продукты']), 2, 4);
@@ -2688,10 +3089,12 @@
                 take(itemsOf(['Готовые продукты']), 5, 9); take(itemsOf(['Напитки']), 4, 7); take(itemsOf(['Сырые продукты']), 2, 4);
                 break;
             case 'grocer':
+                always('Соль', 3, 8);
                 take(itemsOf(['Сырые продукты']), 8, 12); take(itemsOf(['Готовые продукты']), 1, 3); take(itemsOf(['Напитки']), 1, 2);
                 take(itemsOf(['Шкуры']), 1, 3); take(itemsOf(['Бытовые предметы'], POT), 2, 4);
                 break;
             case 'foodVendor':
+                always('Соль', 2, 6);
                 take(itemsOf(['Сырые продукты']), 6, 9); take(itemsOf(['Готовые продукты']), 3, 6); take(itemsOf(['Напитки']), 1, 3);
                 break;
             case 'khajiitCaravan':
@@ -2739,7 +3142,7 @@
         const existingDisposition = (stocks[key] && stocks[key].disposition) || 0;
         stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold, disposition: existingDisposition };
         db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
-            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${def.gold}.</span>`;
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${formatNumber(def.gold)}.</span>`;
             renderMerchantStaleness();
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -2762,10 +3165,10 @@
             const disp = s.disposition || 0;
             return `<div style="font-size:13px; display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; ${stale ? 'color:#e67e22;' : ''}">
                 <span>${stale ? '⚠️ ' : ''}${escapeHtml(s.label)} — ${escapeHtml(s.hold)}: ${daysAgo} игр. дн. назад${stale ? ' (пора обновить)' : ''}</span>
-                <select style="width:auto; font-size:11px; padding:1px;" onchange="setMerchantDisposition('${escapeHtml(k)}', this.value)">
+                <select style="width:auto; font-size:11px; padding:1px;" onchange="setMerchantDisposition('${jsq(k)}', this.value)">
                     ${Object.keys(DISPOSITION_LABELS).map(v => `<option value="${v}" ${String(disp) === v ? 'selected' : ''}>${DISPOSITION_LABELS[v]}</option>`).join('')}
                 </select>
-                <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:11px; flex-shrink:0;" onclick="removeMerchant('${escapeHtml(k)}')">Убрать</button>
+                <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:11px; flex-shrink:0;" onclick="removeMerchant('${jsq(k)}')">Убрать</button>
             </div>`;
         }).join('');
     }
@@ -2795,7 +3198,7 @@
     function renderMerchantTypeSelect() {
         const sel = el('merchant-type-select');
         if (!sel || sel.options.length) return;
-        sel.innerHTML = Object.entries(LIVING_MERCHANT_TYPES).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)} (база ${v.gold} золота)</option>`).join('');
+        sel.innerHTML = Object.entries(LIVING_MERCHANT_TYPES).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)} (база ${formatNumber(v.gold)} золота)</option>`).join('');
     }
 
     let currentSupernaturalState = defaultSupernaturalState();
@@ -2811,7 +3214,7 @@
             <div class="party-row" style="display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
                     <label style="display:flex; align-items:center; gap:6px; margin:0;">
-                        <input type="checkbox" ${gd.member ? 'checked' : ''} onchange="toggleGuildMembership('${escapeHtml(g)}', this.checked)">
+                        <input type="checkbox" ${gd.member ? 'checked' : ''} onchange="toggleGuildMembership('${jsq(g)}', this.checked)">
                         <strong>${escapeHtml(g)}</strong>
                     </label>
                     ${gd.member ? `<span style="font-size:12px; opacity:.8;">${escapeHtml(rank.rankName)}${rank.next ? ' → ещё ' + (rank.next.at - gd.orders) + ' до «' + escapeHtml(rank.next.name) + '»' : ' (максимум)'}</span>` : ''}
@@ -2820,9 +3223,9 @@
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
                     <span>Заказов: <strong>${gd.orders}</strong></span>
                     <span style="display:flex; gap:4px;">
-                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 1)">+1</button>
-                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${escapeHtml(g)}', 5)">+5</button>
-                        <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetGuildOrders('${escapeHtml(g)}')">Сброс</button>
+                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${jsq(g)}', 1)">+1</button>
+                        <button style="width:auto; padding:2px 8px;" onclick="adjustGuildOrders('${jsq(g)}', 5)">+5</button>
+                        <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resetGuildOrders('${jsq(g)}')">Сброс</button>
                     </span>
                 </div>` : ''}
             </div>`;
@@ -2985,7 +3388,7 @@
                 <button style="width:100%; margin-top:4px;" onclick="setVampireRank(${s.vampire.rank + 1})">+1 ранг вампира</button>
                 <label style="margin-top:8px;">Способности вампира-лорда (редкая ступень — не у всех вампиров)</label>
                 ${VAMPIRE_ABILITIES.map(a => `<div class="checkbox-group" style="align-items:flex-start;">
-                    <input type="checkbox" ${s.vampire.abilities[a.name] ? 'checked' : ''} onchange="toggleVampireAbility('${escapeHtml(a.name)}', this.checked)">
+                    <input type="checkbox" ${s.vampire.abilities[a.name] ? 'checked' : ''} onchange="toggleVampireAbility('${jsq(a.name)}', this.checked)">
                     <label><strong>${escapeHtml(a.name)}</strong> — ${escapeHtml(a.desc)}${a.prereq ? `<br><span style="opacity:.6; font-size:11px;">Требует: ${escapeHtml(a.prereq)}</span>` : ''}</label>
                 </div>`).join('')}
             </div>`;
@@ -3065,7 +3468,7 @@
                 perkPointsAvailable: parseInt(data.perkPointsAvailable) || 0
             };
             el('inv-gold-block').style.display = 'block';
-            el('inv-gold-current').textContent = currentPlayerInvData.gold;
+            el('inv-gold-current').textContent = formatNumber(currentPlayerInvData.gold);
             el('inv-level-block').style.display = 'block';
             el('inv-level-current').textContent = currentPlayerInvData.characterLevel;
             el('inv-perkpoints-current').textContent = currentPlayerInvData.perkPointsAvailable;
@@ -3091,6 +3494,7 @@
             // мастера. Подтягиваем из облака только при первом выборе этого игрока.
             if (firstSnapshot) {
                 currentReputationData = Object.assign(defaultReputationData(), data.reputationByRegion || {});
+                repBaseline = Object.assign({}, currentReputationData);
                 renderReputationPanel();
                 firstSnapshot = false;
             }
@@ -3189,7 +3593,7 @@
                     <span><strong>${escapeHtml(item.name)}</strong> × ${item.count}${item.weight ? ` <span style="opacity:.6; font-size:12px;">(вес ${item.weight})</span>` : ''}${typeof item.price === 'number' ? ` <span style="opacity:.6; font-size:12px;">· ${item.price} септ./шт.</span>` : ''}</span>
                     <span style="display:flex; align-items:center; gap:4px;">
                         <input type="number" id="del-qty-${escapeHtml(item.itemId)}" value="1" min="1" max="${item.count}" style="width:52px;">
-                        <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${escapeHtml(item.itemId)}')">Удалить</button>
+                        <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${jsq(item.itemId)}')">Удалить</button>
                     </span>
                 </div>
                 ${item.effect ? `<div style="font-size:12px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
@@ -3689,6 +4093,7 @@
 
         const sourceItem = itemId ? gmAllItemsByKey.get(itemId) : null; // O(1) вместо O(n) — см. loadGmItems
         const itemExtra = {};
+        const toStash = !!(el('party-reward-to-stash') && el('party-reward-to-stash').checked);
         if (sourceItem) {
             if (sourceItem.slot) itemExtra.slot = sourceItem.slot;
             if (typeof sourceItem.armor === 'number') itemExtra.armorValue = sourceItem.armor;
@@ -3696,6 +4101,32 @@
             if (typeof sourceItem.price === 'number') itemExtra.price = sourceItem.price;
             if (typeof sourceItem.capacity === 'number') itemExtra.capacity = sourceItem.capacity;
             if (typeof sourceItem.maxUses === 'number') { itemExtra.maxUses = sourceItem.maxUses; itemExtra.usesLeft = sourceItem.maxUses; }
+        }
+
+        // Эпик 2.1: раньше награда уходила каждому игроку напрямую, теперь по умолчанию — в общий сундук отряда,
+        // потому что группа сама решает, кому что нужно; галочка снята — старое поведение (всем поровну напрямую).
+        if (toStash) {
+            const ref = db.collection('sessions').doc(currentCode);
+            const stashItem = sourceItem ? stripUndefinedDeep(Object.assign({ itemId: sourceItem.name, name: sourceItem.name, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra)) : null;
+            db.runTransaction(tx => tx.get(ref).then(doc => {
+                const d = doc.data() || {};
+                const upd = {};
+                if (gold) upd.partyGold = (parseInt(d.partyGold) || 0) + gold;
+                if (stashItem) {
+                    const st = Array.isArray(d.partyStash) ? d.partyStash.slice() : [];
+                    const ex = st.find(s => s.itemId === stashItem.itemId);
+                    if (ex) ex.count = (ex.count || 0) + itemQty; else st.push(Object.assign({}, stashItem, { count: itemQty }));
+                    upd.partyStash = st;
+                }
+                tx.update(ref, upd);
+            })).then(() => {
+                const parts = [];
+                if (gold) parts.push(`${gold} золота`);
+                if (sourceItem) parts.push(`${itemQty}× «${sourceItem.name}»`);
+                resultEl.innerHTML = `<span style="color:#2ecc71;">✅ В сундук отряда: ${parts.join(' + ')}.</span>`;
+                gmPostLogEntryText(`🎁 Мастер положил в сундук отряда: ${parts.join(' + ')}.`);
+            }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+            return;
         }
 
         // Золото — атомарный FieldValue.increment(), а не "прочитать старое значение + прибавить
@@ -3734,6 +4165,102 @@
         }).catch(e => {
             resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>';
         });
+    };
+
+    // ---------- Запросы на крафт (эпик 2.8) ----------
+    // Заказ уходит игроку командой craftOrder через очередь pendingStatusEffects (как команды смерти) — GM не пишет в characters/{uid}.craftOrders напрямую,
+    // чтобы не затереть/не быть затёртым автосохранением игрока.
+    function renderCraftOrderSelects() {
+        const holdSel = el('craft-order-hold');
+        if (holdSel && window.holdsData && holdSel.options.length <= 1) holdSel.innerHTML = '<option value="">—</option>' + Object.keys(window.holdsData).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        const t = el('craft-order-target'); if (!t) return;
+        const cur = t.value;
+        const parts = lastData.participants || {};
+        t.innerHTML = '<option value="all">Всем игрокам</option>' + Object.keys(parts).map(u => `<option value="${u}">${escapeHtml((parts[u] || {}).name || '?')}</option>`).join('');
+        t.value = cur && (cur === 'all' || parts[cur]) ? cur : 'all';
+    }
+    window.filterCraftOrderItems = function () {
+        const q = (el('craft-order-item-search').value || '').toLowerCase();
+        const sel = el('craft-order-item-select');
+        if (!q) { sel.innerHTML = '<option value="">— выбери предмет —</option>'; return; }
+        const m = (gmAllItems || []).filter(i => (i.name || '').toLowerCase().includes(q)).slice(0, 30);
+        sel.innerHTML = '<option value="">— выбери предмет —</option>' + m.map(i => `<option value="${escapeHtml(i.name)}">${escapeHtml(i.name)} (${escapeHtml(i.category || '')})</option>`).join('');
+    };
+    window.sendCraftOrder = function () {
+        const resultEl = el('craft-order-result');
+        const npc = (el('craft-order-npc').value || '').trim();
+        const itemName = el('craft-order-item-select').value;
+        const qty = Math.max(1, parseInt(el('craft-order-qty').value) || 1);
+        const reward = Math.max(0, parseInt(el('craft-order-reward').value) || 0);
+        if (!npc || !itemName) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи NPC и предмет.</span>'; return; }
+        const target = el('craft-order-target').value;
+        const uids = target === 'all' ? Object.keys(lastData.participants || {}) : [target];
+        if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
+        const orderId = 'order_' + Date.now() + Math.random().toString(36).slice(2, 5);
+        const cmd = { id: 'co-' + orderId, cmd: 'craftOrder', orderId, npc, hold: el('craft-order-hold').value || '', itemName, qty, reward, fromGm: true };
+        const patch = {};
+        uids.forEach(u => { patch['participants.' + u + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(cmd); });
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `📋 Заказ от ${npc}: ${qty}× ${itemName} → ${formatNumber(reward)} зол.` });
+        db.collection('sessions').doc(currentCode).update(patch)
+            .then(() => { resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Заказ отправлен (${uids.length}).</span>`; })
+            .catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+    };
+
+    // ---------- Сундук отряда: отображение и «Раздать всем» (эпик 2.1) ----------
+    function renderGmStash(data) {
+        const g = el('gm-stash-gold'); if (!g) return;
+        g.textContent = formatNumber(parseInt(data.partyGold) || 0);
+        const items = Array.isArray(data.partyStash) ? data.partyStash : [];
+        el('gm-stash-list').innerHTML = items.length
+            ? items.map(i => `<div style="font-size:14px;">• ${escapeHtml(i.name)} × ${i.count}</div>`).join('')
+            : '<span style="opacity:.6; font-size:13px;">Предметов нет.</span>';
+    }
+    window.gmStashDistribute = function () {
+        const resultEl = el('gm-stash-result');
+        const uids = Object.keys(lastData.participants || {});
+        if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
+        const n = uids.length;
+        const ref = db.collection('sessions').doc(currentCode);
+        let plan = null;
+        // Сначала транзакция ВЫЧИТАЕТ из сундука долю (чтобы игроки не успели забрать то же самое), потом раздаём по персонажам.
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const d = doc.data() || {};
+            const gold = parseInt(d.partyGold) || 0;
+            const perGold = Math.floor(gold / n);
+            const st = Array.isArray(d.partyStash) ? d.partyStash : [];
+            const give = [];
+            const rest = st.map(s => {
+                const per = Math.floor((s.count || 0) / n);
+                if (per > 0) give.push(Object.assign({}, s, { count: per }));
+                return Object.assign({}, s, { count: (s.count || 0) - per * n });
+            }).filter(s => s.count > 0);
+            plan = { perGold, give };
+            if (!perGold && !give.length) return;
+            tx.update(ref, { partyGold: gold - perGold * n, partyStash: rest });
+        })).then(() => {
+            if (!plan || (!plan.perGold && !plan.give.length)) { resultEl.innerHTML = '<span style="color:#e6b800;">Делить нечего (на каждого меньше единицы).</span>'; return; }
+            return Promise.all(uids.map(uid => {
+                const cref = db.collection('characters').doc(uid);
+                const upd = {};
+                if (plan.perGold) upd.gold = firebase.firestore.FieldValue.increment(plan.perGold);
+                if (!plan.give.length) return cref.update(upd);
+                return cref.get().then(doc => {
+                    const inv = Array.isArray((doc.data() || {}).inventory) ? doc.data().inventory.slice() : [];
+                    plan.give.forEach(g => {
+                        const ex = inv.find(i => i.itemId === g.itemId);
+                        if (ex) ex.count = (ex.count || 0) + g.count; else inv.push(Object.assign({}, g));
+                    });
+                    upd.inventory = stripUndefinedDeep(inv);
+                    return cref.update(upd);
+                });
+            })).then(() => {
+                const parts = [];
+                if (plan.perGold) parts.push(plan.perGold + ' зол.');
+                plan.give.forEach(g => parts.push(g.count + '× ' + g.name));
+                resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Роздано каждому (${n}): ${escapeHtml(parts.join(', '))}.</span>`;
+                gmPostLogEntryText(`⚖ Мастер разделил сундук отряда поровну: каждому ${parts.join(', ')}.`);
+            });
+        }).catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
     };
 
     // ---------- Разрешить атаку (НПС → игрок) ----------
@@ -3865,6 +4392,7 @@
                 dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед.${dmgBreakdown} (резист цели вычтется автоматически при применении)` :
                     '<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
         resultBox.style.display = 'block';
+        if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
     };
 
     // Заклинания в enemies-data.js не хранят тип урона отдельно — определяем по названию.
@@ -3986,7 +4514,15 @@
                     newMp = vitals[1];
                 }
                 if (barrierMpSpent) { vitals[1] = Math.max(0, (parseInt(vitals[1]) || 0) - barrierMpSpent); newMp = vitals[1]; }
-                chores.push(db.collection('characters').doc(targetUid).update({ vitals }));
+                // newHp/newMp выше — для текста в журнале (по снимку); в базу пишем изменения по СВЕЖИМ данным в транзакции.
+                const fdmg = finalDmg, amp = absorbedMp || 0, bmp = barrierMpSpent || 0;
+                chores.push(updateCharacterVitals(targetUid, v => {
+                    v[0] = Math.max(0, (parseInt(v[0]) || 0) - fdmg);
+                    if (amp) { const mx = parseInt(v[3]) || 0, cu = parseInt(v[1]) || 0; v[1] = Math.max(cu, Math.min(mx, cu + amp)); }
+                    if (bmp) v[1] = Math.max(0, (parseInt(v[1]) || 0) - bmp);
+                }));
+                // Игроку с концентрационным заклинанием (Иллюзия/Колдовство) нужна проверка при каждом попадании — шлём команду в его очередь
+                if (fdmg > 0) chores.push(db.collection('characters').doc(targetUid).update({ pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({ cmd: 'damaged', dmg: fdmg, ts: Date.now() }) }).catch(() => { }));
                 if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}`;
             }
             if (defNotes.length) logExtra += '. ' + defNotes.join('. ');
@@ -4135,7 +4671,9 @@
         'Ингредиенты для алхимии', 'Кузнечные ингредиенты', 'Шкуры', 'Двемерские детали',
         // Уникальные предметы/артефакты не должны падать из случайного сундука.
         'Уникальная броня', 'Уникальные щиты', 'Даэдрические артефакты', 'Артефакты Азидала',
-        'Маски жрецов', 'Магические одеяния'
+        'Маски жрецов', 'Магические одеяния',
+        // Всё из таблицы «Уникальное оружие и броня»: Мораг Тонг и Азидал — только руками мастера (см. «Снаряжение и добыча» у врага)
+        'Броня Мораг Тонг'
     ];
 
     // Уникальное/именное не должно падать из случайного сундука. Раньше проверялся только список
@@ -4347,7 +4885,8 @@
 
         const gold = Math.round(randInt(5, 80) * (1 + (level - 1) * 0.1));
         const hasTrinket = Math.random() < 0.3;
-        const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' || (i.slot === 'ring' || i.slot === 'amulet'));
+        // Раньше сюда попадало ВСЁ со слотом кольцо/амулет — в том числе «Артефакты Азидала» и «Даэдрические артефакты».
+        const trinketPool = (gmAllItems || []).filter(i => (i.category === 'Ювелирное изделие' || (i.slot === 'ring' || i.slot === 'amulet')) && !isUniqueLootItem(i));
         const trinket = hasTrinket && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
         const foodPool = (gmAllItems || []).filter(i => i.category === 'Готовые продукты' || i.category === 'Сырые продукты');
         const foodItem = foodPool.length ? foodPool[Math.floor(Math.random() * foodPool.length)] : null;
@@ -4450,7 +4989,7 @@
         const mp = Math.round(randInt(80, 140) * (1 + (level - 1) * 0.08)); // маги — мана в разы больше воинов
         const gold = Math.round(randInt(15, 100) * (1 + (level - 1) * 0.1));
 
-        const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' && typeof i.price === 'number');
+        const trinketPool = (gmAllItems || []).filter(i => i.category === 'Ювелирное изделие' && typeof i.price === 'number' && !isUniqueLootItem(i));
         const trinket = Math.random() < 0.4 && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
 
         const lootItems = [];
@@ -4474,19 +5013,31 @@
         resultEl.innerHTML = html;
     };
 
-    window.addGeneratedBanditToCombat = function () {
-        if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
-        const b = lastGeneratedBandit;
-        const enemies = (lastData.enemies || []).slice();
+    // Объект бандита для боя вынесен в функцию (эпик 3.8), чтобы тот же самый враг мог уйти в шаблон без повторной случайности.
+    function banditEnemyObj(b) {
         // Физический резист от брони: 10 очков брони = 1% (та же формула, что у игроков).
         const physResist = Math.min(85, Math.round((b.armor || 0) / 10));
-        enemies.push({
+        return {
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
             weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [],
             isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
-        });
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        };
+    }
+    function mageBanditEnemyObj(b) {
+        return {
+            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
+            con: b.con, int: b.int, wis: b.wis,
+            weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
+            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+        };
+    }
+    window.addGeneratedBanditToCombat = function () {
+        if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
+        const b = lastGeneratedBandit;
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push(banditEnemyObj(b));
+        gmUpdateEnemies(enemies).then(() => {
             lastGeneratedBandit = null;
             el('bandit-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -4496,13 +5047,8 @@
         if (!lastGeneratedMageBandit) { alert('Сначала сгенерируй мага-бандита.'); return; }
         const b = lastGeneratedMageBandit;
         const enemies = (lastData.enemies || []).slice();
-        enemies.push({
-            id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
-            con: b.con, int: b.int, wis: b.wis,
-            weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
-            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
-        });
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        enemies.push(mageBanditEnemyObj(b));
+        gmUpdateEnemies(enemies).then(() => {
             lastGeneratedMageBandit = null;
             el('bandit-mage-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -4522,7 +5068,7 @@
         return (items || []).map(i => i.name + ((i.qty || 1) > 1 ? ' ×' + i.qty : '')).join(', ');
     }
     function genLootText(gen) {
-        return [gen.gold ? gen.gold + ' зол.' : '', describeLootItems(gen.lootItems)].filter(Boolean).join(', ');
+        return [gen.gold ? gen.gold + ' зол.' : '', describeLootItems(gen.lootItems || gen.items)].filter(Boolean).join(', ');
     }
 
     window.lootCorpse = function (enemyId) {
@@ -4629,7 +5175,7 @@
         if (!lastGeneratedDraugr) { alert('Сначала сгенерируй драугра.'); return; }
         const enemies = (lastData.enemies || []).slice();
         enemies.push(enemyFromGenerated(lastGeneratedDraugr));
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        gmUpdateEnemies(enemies).then(() => {
             lastGeneratedDraugr = null;
             el('draugr-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -4649,7 +5195,7 @@
         if (!lastGeneratedForsworn) { alert('Сначала сгенерируй изгоя.'); return; }
         const enemies = (lastData.enemies || []).slice();
         enemies.push(enemyFromGenerated(lastGeneratedForsworn));
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        gmUpdateEnemies(enemies).then(() => {
             lastGeneratedForsworn = null;
             el('forsworn-gen-result').innerHTML = '';
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -4707,18 +5253,113 @@
         'Осень': ['fog', 'cloudy']
     };
 
-    window.rollWeatherForRegion = function () {
-        const region = el('weather-region-select').value;
-        const season = el('weather-season-select').value;
+    // Выбор погоды вынесен в функцию (эпик 4.2), чтобы автосмена и кнопка «по региону» бросали одинаково.
+    function pickWeatherKey(region, season, rnd) {
         const basePool = REGION_WEATHER_POOL[region] || ['clear'];
         const biasTypes = (SEASON_WEATHER_BIAS[season] || []).filter(w => basePool.includes(w));
         // Сезонно уместная погода весит втрое больше, но пул региона остаётся границей
         // возможного — в лесу зимой не будет "clear-only подземелья", а метели не будет в лесу.
         const pool = basePool.concat(biasTypes, biasTypes);
-        pendingWeatherKey = pool[Math.floor(Math.random() * pool.length)];
+        return pool[Math.floor((rnd || Math.random)() * pool.length)];
+    }
+    window.rollWeatherForRegion = function () {
+        const region = el('weather-region-select').value;
+        const season = el('weather-season-select').value;
+        pendingWeatherKey = pickWeatherKey(region, season);
         el('weather-gm-result').innerHTML = `Выпало: <strong>${WEATHER_LABELS[pendingWeatherKey]}</strong> — жми «Применить», чтобы сообщить игрокам.`;
     };
 
+
+    // ---------- Эпик 4.2: автосмена погоды при новом игровом дне ----------
+    // «Новый день» = рост sessions.gameDayCounter (его двигает «Следующий день» у игрока либо кнопка мастера). Предложение, а не молчаливая замена:
+    // [Применить] / [Другое] / [Оставить].
+    let _wxDayLast = null;
+    function gmWeatherDayWatch(d) {
+        const day = d.gameDayCounter || 0;
+        if (_wxDayLast === null) { _wxDayLast = day; return; }   // первый снимок только запоминаем
+        if (day <= _wxDayLast) { _wxDayLast = day; return; }
+        _wxDayLast = day;
+        const cb = el('weather-auto-day');
+        if (cb && cb.checked) setTimeout(window.gmProposeWeather, 100);
+    }
+    window.gmProposeWeather = function (rnd) {
+        const region = (lastData && lastData.currentRegion) || el('weather-region-select').value;
+        const season = el('weather-season-select').value;
+        const hold = (lastData && lastData.currentHold) || '';
+        for (let i = 0; i < 6; i++) {
+            const key = pickWeatherKey(region, season, rnd);
+            const place = (hold ? hold.replace(/\s*\(.*\)/, '') : region);
+            if (confirm('В ' + (hold ? hold.replace(/\s*\(.*\)/, '') : 'регионе «' + region + '»') + ' сегодня: ' + WEATHER_LABELS[key] + '.\n\nОК — применить\nОтмена — другие варианты')) {
+                pendingWeatherKey = key;
+                db.collection('sessions').doc(currentCode).update({ currentWeather: key, currentRegion: region }).then(() => {
+                    gmPostLogEntryText('🌦 Новый день: ' + WEATHER_LABELS[key] + ' (' + place + ').');
+                    el('weather-gm-result').innerHTML = '<span style="color:#2ecc71;">✅ Погода дня: ' + WEATHER_LABELS[key] + '.</span>';
+                }).catch(e => alert('Ошибка: ' + e.message));
+                return key;
+            }
+            if (!confirm('Выбрать другую погоду?\n\nОК — перебросить\nОтмена — оставить как есть')) return null;
+        }
+        return null;
+    };
+    window.gmNewGameDay = function () {
+        if (!currentCode) return;
+        db.collection('sessions').doc(currentCode).update({ gameDayCounter: firebase.firestore.FieldValue.increment(1) }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Эпик 5.5/5.6: уведомления мастера и «Позвать» ----------
+    function gmNotify(title, body) {
+        try {
+            if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+            if (!document.hidden && !window.__stNotifyAlways) return;
+            new Notification(title, { body: body || '', icon: 'skyrim-bg.jpg' });
+        } catch (e) { }
+    }
+    window.gmNotify = gmNotify;
+    window.gmEnableNotifications = function () {
+        if (typeof Notification === 'undefined') { alert('Этот браузер не поддерживает уведомления.'); return; }
+        Notification.requestPermission().then(p => { const b = el('gm-btn-notify'); if (b) b.textContent = p === 'granted' ? '🔔 Уведомления включены' : '🔕 Уведомления запрещены'; });
+    };
+    let _ntf = null; // предыдущие счётчики: шёпот от игроков и число врагов
+    function gmNotifyWatch(d) {
+        const w = (d.whispers || []).length, e = (d.enemies || []).length;
+        if (_ntf) {
+            if (w > _ntf.w) { const last = d.whispers[w - 1] || {}; gmNotify('Шёпот от ' + (last.author || 'игрока'), last.text || ''); }
+            if (e > _ntf.e) gmNotify('Новый противник', ((d.enemies[e - 1] || {}).name) || '');
+        }
+        _ntf = { w, e };
+        const b = el('gm-btn-notify');
+        if (b && typeof Notification !== 'undefined') b.textContent = Notification.permission === 'granted' ? '🔔 Уведомления включены' : Notification.permission === 'denied' ? '🔕 Уведомления запрещены' : '🔔 Разрешить уведомления';
+    }
+    window.gmCallPlayers = function () {
+        const uids = Object.keys((lastData && lastData.participants) || {});
+        if (!currentCode || !uids.length) { alert('В сессии нет игроков.'); return; }
+        const cmd = { id: 'call-' + Date.now() + Math.random().toString(36).slice(2, 5), cmd: 'call', ts: Date.now(), fromGm: true };
+        const patch = {};
+        uids.forEach(u => { patch['participants.' + u + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(cmd); });
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '📣 Мастер зовёт всех в игру!' });
+        db.collection('sessions').doc(currentCode).update(patch).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // ---------- Эпик 4.5: встреча в пути при движении партии ----------
+    // d6, на 5–6 — случайное событие из таблицы; показывается окном с кнопкой «Сообщить партии» (в журнал уходит только по нажатию).
+    window.gmRollTravelEncounter = function (rnd) {
+        rnd = rnd || Math.random;
+        const roll = Math.floor(rnd() * 6) + 1;
+        if (roll < 5 || !window.randomEventsData || !window.randomEventsData.length) return null;
+        const e = window.randomEventsData[Math.floor(rnd() * window.randomEventsData.length)];
+        const old = document.getElementById('gm-encounter-modal'); if (old) old.remove();
+        const m = document.createElement('div');
+        m.id = 'gm-encounter-modal';
+        m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;';
+        m.innerHTML = '<div style="background:var(--panel-bg,#1e1a13);border:2px solid var(--accent-color,#c8a566);border-radius:8px;padding:16px 18px;max-width:92vw;width:420px;">' +
+            '<h3 style="margin:0 0 6px;">🎲 Встреча в пути (d6: ' + roll + ')</h3><div style="font-weight:bold;">' + escapeHtml(e.name) + '</div><div style="margin-top:4px;">' + escapeHtml(e.desc) + '</div>' +
+            (e.req ? '<div style="margin-top:4px;opacity:.7;">⚠️ Условие: ' + escapeHtml(e.req) + '</div>' : '') +
+            '<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn-success" style="flex:1;" id="gm-enc-tell">Сообщить партии</button><button style="width:auto;" id="gm-enc-close">Закрыть</button></div></div>';
+        document.body.appendChild(m);
+        el('gm-enc-close').onclick = () => m.remove();
+        el('gm-enc-tell').onclick = () => { gmPostLogEntryText('🎲 В пути: «' + e.name + '» — ' + e.desc); m.remove(); };
+        return { roll, event: e };
+    };
 
     // ---------- Карта и положение партии ----------
     let gmMapHold = '', gmMapSel = null, gmMapSig = null, gmRoute = null;
@@ -4751,6 +5392,36 @@
         return { hold: h, name: n, x, y, u, v };
     }
     function gmCfg() { return window.HoldsMap.travelCfg(lastData && lastData.mapCfg); }
+    // Положения поселений, назначенные мастером (session.mapSettle[name] = {hold,x,y,u?,v?})
+    function gmSettleOv() { return (lastData && lastData.mapSettle && typeof lastData.mapSettle === 'object') ? lastData.mapSettle : {}; }
+    window.gmMapAssignSettle = function () {
+        const res = el('gm-map-result');
+        const v = (el('gm-map-settle-set') || {}).value;
+        if (!v) { res.textContent = 'Выбери поселение в списке рядом с кнопкой «Назначить».'; return; }
+        if (!gmMapSel || typeof gmMapSel.x !== 'number') { res.textContent = 'Сначала выбери точку: приблизь владение и кликни там, где поселение стоит на картинке.'; return; }
+        if (!currentCode) { res.textContent = 'Нет активной сессии.'; return; }
+        const [hk, n] = v.split('|');
+        if (gmMapSel.hold && gmMapSel.hold !== hk) { res.textContent = 'Выбранная точка в другом владении («' + gmMapSel.hold + '»), а «' + n + '» относится к «' + hk + '».'; return; }
+        const next = Object.assign({}, gmSettleOv()); next[n] = Object.assign({ hold: hk }, gmPosOf(gmMapSel));
+        db.collection('sessions').doc(currentCode).update({ mapSettle: gmClean(next) }).then(() => {
+            res.innerHTML = `<span style="color:#2ecc71;">🏘 «${escapeHtml(n)}» теперь стоит на выбранной точке (карта, маршруты и у игроков).</span>`;
+            gmMapSel = null; gmMapShowSel();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmMapResetSettle = function (n) {
+        if (!currentCode) return;
+        const next = Object.assign({}, gmSettleOv()); delete next[n];
+        db.collection('sessions').doc(currentCode).update({ mapSettle: gmClean(next) }).then(() => {
+            el('gm-map-result').textContent = '«' + n + '» снова стоит по условной схеме.';
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    function gmMapRenderSettleOv() {
+        const b = el('gm-map-settle-ov'); if (!b) return;
+        const ov = gmSettleOv(), names = Object.keys(ov);
+        b.innerHTML = names.length ? '<div style="font-size:13px; margin-bottom:2px;"><b>🏘 Поселения с назначенным положением (' + names.length + '):</b></div>' + names.map(n => `<div style="display:flex; gap:6px; align-items:center; font-size:13px; margin-bottom:2px;">
+            <span style="flex:1;">🏘 ${escapeHtml(n)} <span style="opacity:.6;">(${escapeHtml(ov[n].hold || '')})</span></span>
+            <button style="font-size:11px; padding:1px 6px;" onclick="gmMapResetSettle('${jsq(n)}')" title="Вернуть условное положение">↺</button></div>`).join('') : '';
+    }
 
     window.renderGmMap = function (force) {
         const box = el('gm-map');
@@ -4758,7 +5429,7 @@
         const party = gmMapParty();
         const marks = gmMapMarks();
         const fogS = gmFog();
-        const sig = JSON.stringify([gmMapHold, party, gmMapSel, marks, fogS, gmRoute && gmRoute.pts, lastData && lastData.travelRoute && lastData.travelRoute.ts, lastData && lastData.mapCfg]);
+        const sig = JSON.stringify([gmMapHold, party, gmMapSel, marks, fogS, gmRoute && gmRoute.pts, lastData && lastData.travelRoute && lastData.travelRoute.ts, lastData && lastData.mapCfg, lastData && lastData.openPlaces, lastData && lastData.mapSettle]);
         if (!force && sig === gmMapSig) return;
         gmMapSig = sig;
         const sel = el('gm-map-hold');
@@ -4766,6 +5437,11 @@
             sel.innerHTML = '<option value="">— вся карта —</option>' + Object.keys(window.HoldsMap.HOLDS).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
         }
         if (sel) sel.value = gmMapHold;
+        const ss2 = el('gm-map-settle-set');
+        if (ss2 && ss2.options.length < 2) {
+            const S2 = window.HoldsMap.SETTLE;
+            ss2.innerHTML = '<option value="">— поселение, которому назначить выбранную точку —</option>' + Object.keys(S2).map(h => `<optgroup label="${escapeHtml(h)}">` + Object.keys(S2[h]).map(n => `<option value="${escapeHtml(h + '|' + n)}">${escapeHtml(n)}</option>`).join('') + '</optgroup>').join('');
+        }
         const ss = el('gm-map-settle');
         if (ss && ss.options.length < 2) {
             const S = window.HoldsMap.SETTLE;
@@ -4781,9 +5457,18 @@
             if (pins[hk][key] && pins[hk][key].cat !== 'Метка для игроков') key += ' ★';
             pins[hk][key] = { x: m.x, y: m.y, u: m.u, v: m.v, cat: 'Метка для игроков' };
         });
+        // места, открытые игрокам (в т.ч. лично) — зелёным: мастер видит, ГДЕ именно привязано каждое
+        (Array.isArray(lastData && lastData.openPlaces) ? lastData.openPlaces : []).forEach(p => {
+            if (!p || typeof p.x !== 'number') return;
+            const hk = p.hold || '';
+            pins[hk] = pins[hk] || {};
+            let key = p.name || 'Место';
+            if (pins[hk][key] && pins[hk][key].cat !== 'Открыто игрокам') key += ' ✔';
+            pins[hk][key] = { x: p.x, y: p.y, u: p.u, v: p.v, cat: 'Открыто игрокам' + (Array.isArray(p.toUids) && p.toUids.length ? ' · лично: ' + gmUidsText(p.toUids) : '') };
+        });
         const pubRoute = lastData && lastData.travelRoute && Array.isArray(lastData.travelRoute.pts) ? lastData.travelRoute : null;
         window.HoldsMap.render(box, {
-            hold: gmMapHold || null, hl: (lastData && lastData.currentHold) || null, party, pins, sel: gmMapSel,
+            hold: gmMapHold || null, hl: (lastData && lastData.currentHold) || null, party, pins, sel: gmMapSel, settleOv: gmSettleOv(),
             fog: fogS.on ? window.HoldsMap.fogFromSession(lastData, true) : null,
             route: gmRoute ? { pts: gmRoute.pts } : (pubRoute ? { pts: pubRoute.pts } : null),
             onHold: h => { gmMapHold = h; gmMapSel = null; window.renderGmMap(true); },
@@ -4793,6 +5478,7 @@
         });
         gmMapShowSel();
         gmMapRenderMarks();
+        gmMapRenderSettleOv();
         gmFogShowInfo();
         gmCfgFill();
     };
@@ -4802,8 +5488,8 @@
         const marks = gmMapMarks();
         b.innerHTML = marks.length
             ? '<div style="font-size:13px; margin-bottom:2px;"><b>📌 Метки, видимые игрокам (' + marks.length + '):</b></div>' + marks.map(m => `<div style="display:flex; gap:6px; align-items:center; font-size:13px; margin-bottom:2px;">
-                <span style="flex:1;">📌 ${escapeHtml(m.name || 'Метка')} <span style="opacity:.6;">${m.hold ? '(' + escapeHtml(m.hold) + ')' : ''}</span></span>
-                <button style="font-size:11px; padding:1px 6px;" onclick="gmMapRemoveMark('${escapeHtml(m.id)}')" title="Убрать метку у игроков">🗑</button></div>`).join('')
+                <span style="flex:1;">📌 ${escapeHtml(m.name || 'Метка')} <span style="opacity:.6;">${m.hold ? '(' + escapeHtml(m.hold) + ')' : ''}</span>${Array.isArray(m.toUids) && m.toUids.length ? ' <span style="color:#e6b800;">🔒 ' + escapeHtml(gmUidsText(m.toUids)) + '</span>' : ''}</span>
+                <button style="font-size:11px; padding:1px 6px;" onclick="gmMapRemoveMark('${jsq(m.id)}')" title="Убрать метку у игроков">🗑</button></div>`).join('')
             : '<div style="font-size:12px; opacity:.6;">Игрокам пока не выставлено ни одной своей метки.</div>';
     }
     // координаты точки для записи в сессию: x,y — схема, u,v — доли картинки владения (если есть)
@@ -4818,9 +5504,11 @@
         if (!currentCode) { res.textContent = 'Нет активной сессии.'; return; }
         const name = ((el('gm-map-label').value || '').trim() || gmMapSel.name || 'Метка').slice(0, 60);
         const mark = Object.assign({ id: 'm' + Date.now().toString(36) + Math.floor(Math.random() * 1000), name, hold: gmMapSel.hold || gmMapHold || '', ts: Date.now() }, gmPosOf(gmMapSel));
+        const tUids = gmTargetUids();
+        if (tUids) mark.toUids = tUids;   // метка только для этих игроков (без поля — для всех)
         const next = gmMapMarks().concat([mark]);
         db.collection('sessions').doc(currentCode).update({ mapMarks: next }).then(() => {
-            res.innerHTML = `<span style="color:#2ecc71;">📌 Метка «${escapeHtml(name)}» теперь видна игрокам.</span>`;
+            res.innerHTML = `<span style="color:#2ecc71;">📌 Метка «${escapeHtml(name)}» теперь видна ${tUids ? 'только: ' + escapeHtml(gmUidsText(tUids)) : 'игрокам'}.</span>`;
             gmMapSel = null; el('gm-map-label').value = '';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -4843,7 +5531,8 @@
         if (!v) return;
         const [h, n] = v.split('|'), c = window.HoldsMap.SETTLE[h] && window.HoldsMap.SETTLE[h][n];
         if (!c) return;
-        gmMapSel = gmSettleSel(h, n, c[0], c[1]);
+        const ovS = window.HoldsMap.settleOvOf(gmSettleOv(), h, n);   // назначенное мастером положение важнее условного
+        gmMapSel = ovS ? gmSettleSel(h, n, ovS.x, ovS.y, ovS.u, ovS.v) : gmSettleSel(h, n, c[0], c[1]);
         const s = el('gm-map-settle'); if (s) s.value = '';
         gmMapShowSel(); window.renderGmMap(true);
     };
@@ -4861,6 +5550,7 @@
             el('gm-map-result').innerHTML = `<span style="color:#2ecc71;">✅ Партия: ${escapeHtml(pos.name || 'точка на карте')}${pos.hold ? ' (' + escapeHtml(pos.hold) + ')' : ''}.</span>`;
             gmPostLogEntryText(`🗺️ Партия прибывает: ${pos.name || 'новое место'}${pos.hold ? ' (' + pos.hold + ')' : ''}.`);
             gmMapSel = null;
+            if ((el('travel-encounter-on') || {}).checked) window.gmRollTravelEncounter();
         }).catch(e => alert('Ошибка: ' + e.message));
     };
     window.gmMapClearParty = function () {
@@ -4933,7 +5623,7 @@
         if (!party) { out.textContent = 'Сначала поставь метку партии («📍 Партия здесь»).'; return; }
         if (!gmMapSel || typeof gmMapSel.x !== 'number') { out.textContent = 'Выбери на карте город или точку назначения.'; return; }
         const nm = n => (n && window.HoldsMap.NODES[n]) ? n : '';
-        const r = window.HoldsMap.planRoute(Object.assign({ name: nm(party.name) }, party), Object.assign({ name: nm(gmMapSel.name) }, gmMapSel), lastData && lastData.mapCfg);
+        const r = window.HoldsMap.planRoute(Object.assign({ name: nm(party.name) }, party), Object.assign({ name: nm(gmMapSel.name) }, gmMapSel), lastData && lastData.mapCfg, gmSettleOv());
         gmRoute = { pts: r.pts, r, from: party.name || 'партия', to: gmMapSel.name || 'выбранная точка' };
         out.innerHTML = `<b>${escapeHtml(gmRoute.from)} → ${escapeHtml(gmRoute.to)}</b>` + gmRouteText(r);
         window.renderGmMap(true);
@@ -5104,7 +5794,7 @@
         if (idx === -1) { alert('Цель уже не найдена.'); return; }
         const newHp = Math.max(0, (enemies[idx].curHp || 0) - dmg);
         enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
-        db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
+        gmUpdateEnemies(enemies).then(() => {
             gmPostLogEntryText(`⚔️ ${name1} + ${name2} совместно бьют «${targetName}»: −${dmg} урона.`);
             el('coop-attack-result').innerHTML = '';
             pendingCoopAttack = null;
@@ -5159,6 +5849,293 @@
         body.style.display = isOpen ? 'none' : 'block';
         if (chev) chev.textContent = isOpen ? '▸' : '▾';
     };
+
+
+    // ========================================================================
+    // ЭПИК 3: пульт (3.1), сетка врагов (3.2), заготовки (3.6), таймеры (3.7), шаблоны NPC (3.8), сюжет (3.9)
+    // Всё хранится в localStorage мастера (кроме самой сессии) — это его личные заготовки.
+    // ========================================================================
+    function lsGet(key, def) { try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? def : v; } catch (e) { return def; } }
+    function lsSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { alert('Не удалось сохранить в браузере: ' + e.message); } }
+
+    // ---- 3.1 пульт: группы панелей по заголовку ----
+    const GM_GROUPS = {
+        prep: ['Подготовка сессии', 'Журнал сессии', 'Молва', 'Сюжет', 'Справочник гильдии', 'Справочник зачарований', 'Все погодные явления'],
+        scene: ['Время суток и погода', 'Карта и положение', 'Живые торговцы', 'Запустить праздник', 'Походный лагерь', 'Шёпот', 'Чат партии', 'Опрос', 'Гильдии', 'Сверхъестественное', 'Репутация', 'Штрафы и тюрьма', 'Выдать квест'],
+        combat: ['Отряд', 'Противники', 'Разрешить атаку', 'Порядок ходов', 'Боевой журнал', 'Кооперативная атака', 'Активный блок', 'Турниры', 'Шаблоны NPC'],
+        rewards: ['Награда на всю группу', 'Сундук отряда', 'Запросы на крафт', 'Инвентарь и деньги', 'Создать предмет', 'База предметов', 'Открыть рецепты', 'Проверить зелье', 'Проверить зачарование'],
+        randoms: ['Случайное событие', 'Групповой бросок', 'Генератор']
+    };
+    function gmApplyGroups() {
+        document.querySelectorAll('.panel[data-sec-id]').forEach(p => {
+            if (p.dataset.group) return;
+            const t = (p.querySelector(':scope > h2') || {}).textContent || '';
+            let g = 'other';
+            Object.keys(GM_GROUPS).some(k => { if (GM_GROUPS[k].some(s => t.indexOf(s) !== -1)) { g = k; return true; } return false; });
+            p.dataset.group = g;
+        });
+    }
+    function gmShowGroup(group) {
+        gmApplyGroups();
+        document.querySelectorAll('.panel[data-sec-id]').forEach(p => {
+            const open = p.dataset.group === group;
+            const body = el(p.dataset.secId + '-body'); const chev = p.querySelector('.section-chevron');
+            if (body) body.style.display = open ? 'block' : 'none';
+            if (chev) chev.textContent = open ? '▾' : '▸';
+        });
+        document.querySelectorAll('#gm-dashboard .dash-btn[data-group]').forEach(b => b.classList.toggle('active', b.dataset.group === group));
+        lsSet('skyrim_gm_dash_group', group);
+    }
+    window.gmShowGroup = gmShowGroup;
+    const GM_CHECKLIST_LABELS = 5;
+    function gmChecklistInit() {
+        const box = el('gm-first-checklist'); if (!box) return;
+        const done = localStorage.getItem('gmFirstSessionDone');
+        const state = lsGet('gmFirstChecklist', []);
+        box.style.display = done ? 'none' : 'block';
+        box.querySelectorAll('input[data-ck]').forEach(cb => {
+            cb.checked = !!state[+cb.dataset.ck];
+            cb.onchange = () => {
+                const st = []; box.querySelectorAll('input[data-ck]').forEach(c => { st[+c.dataset.ck] = c.checked; });
+                lsSet('gmFirstChecklist', st);
+                if (st.filter(Boolean).length >= GM_CHECKLIST_LABELS) { try { localStorage.setItem('gmFirstSessionDone', '1'); } catch (e) { } box.style.display = 'none'; }
+            };
+        });
+    }
+    function gmDashboardInit() {
+        document.querySelectorAll('#gm-dashboard .dash-btn[data-group]').forEach(b => { b.onclick = () => gmShowGroup(b.dataset.group); });
+        const r = el('gm-checklist-reset');
+        if (r) r.onclick = () => { try { localStorage.removeItem('gmFirstSessionDone'); localStorage.removeItem('gmFirstChecklist'); } catch (e) { } gmChecklistInit(); };
+        gmChecklistInit();
+        gmApplyGroups();
+    }
+    document.addEventListener('DOMContentLoaded', () => setTimeout(gmDashboardInit, 0));
+    if (document.readyState !== 'loading') setTimeout(gmDashboardInit, 0);
+
+    // ---- 3.2 мини-сетка врагов ----
+    function renderEnemyGrid(enemies) {
+        const g = el('gm-enemy-grid'); if (!g) return;
+        g.innerHTML = (enemies || []).map(e => {
+            const dead = (e.curHp || 0) <= 0;
+            const pct = Math.max(0, Math.min(100, (e.curHp || 0) / (e.maxHp || 1) * 100));
+            const st = (e.statusEffects || []).length;
+            const marked = lastData && lastData.markedTarget === e.id;
+            // TODO(эпик 3.2): маленький серый кружок у «уже ходивших» — пока в данных сессии нет отметки ходов по врагам.
+            return `<div class="enemy-tile${dead ? ' st-dead' : ''}${marked ? ' st-marked' : ''}" data-id="${escapeHtml(e.id)}" onclick="gmScrollToEnemy('${jsq(e.id)}')" title="${escapeHtml(e.name || '')} — ${e.curHp || 0}/${e.maxHp || 0}">
+                <img src="${enemyAvatarData(e)}" alt=""><div class="st-tile-name">${escapeHtml(String(e.name || '?').slice(0, 15))}</div>
+                <div class="st-tile-bar"><div style="width:${pct}%"></div></div>
+                <div class="st-tile-st">${dead ? '☠' : ''}${marked ? '🎯' : ''}${st ? '🌀' + st : ''}</div></div>`;
+        }).join('');
+    }
+    window.gmScrollToEnemy = function (id) {
+        const row = document.querySelector('.enemy-row[data-enemy-id="' + String(id).replace(/"/g, '') + '"]'); if (!row) return;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.style.outline = '2px solid var(--accent-color, #c8a566)'; setTimeout(() => { row.style.outline = ''; }, 1400);
+    };
+
+    // ---- 3.6 заготовки энкаунтеров ----
+    const ENC_KEY = 'skyrim_gm_encounters';
+    function renderEncounterSelect() {
+        const sel = el('gm-encounter-select'); if (!sel) return;
+        const encs = lsGet(ENC_KEY, {}); const cur = sel.value;
+        sel.innerHTML = '<option value="">— заготовки (' + Object.keys(encs).length + ') —</option>' + Object.keys(encs).map(id => `<option value="${escapeHtml(id)}">${escapeHtml(encs[id].name)} (${encs[id].enemies.length})</option>`).join('');
+        if (encs[cur]) sel.value = cur;
+    }
+    window.gmSaveEncounter = function () {
+        const enemies = lastData.enemies || [];
+        if (!enemies.length) { alert('Врагов нет — нечего сохранять.'); return; }
+        const name = (prompt('Название заготовки:', enemies.length + ' врагов') || '').trim(); if (!name) return;
+        // Сохраняем «свежими»: полное здоровье, без статусов/меток трупа — заготовка описывает встречу, а не её ход.
+        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; return e; });
+        const encs = lsGet(ENC_KEY, {}); encs['enc_' + Date.now()] = { name, enemies: copy };
+        lsSet(ENC_KEY, encs); renderEncounterSelect();
+    };
+    window.gmLoadEncounter = function () {
+        const id = el('gm-encounter-select').value; const enc = lsGet(ENC_KEY, {})[id];
+        if (!enc) { alert('Выбери заготовку.'); return; }
+        const enemies = (lastData.enemies || []).slice();
+        enc.enemies.forEach(e => enemies.push(Object.assign({}, JSON.parse(JSON.stringify(e)), { id: genId('e') })));
+        gmUpdateEnemies(enemies).then(() => gmPostLogEntryText('⚔ Мастер выставляет встречу «' + enc.name + '».')).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmDeleteEncounter = function () {
+        const id = el('gm-encounter-select').value; const encs = lsGet(ENC_KEY, {});
+        if (!encs[id] || !confirm('Удалить заготовку «' + encs[id].name + '»?')) return;
+        delete encs[id]; lsSet(ENC_KEY, encs); renderEncounterSelect();
+    };
+
+    // ---- 3.7 отложенные события ----
+    const TIMER_KEY = 'skyrim_gm_timers';
+    function renderGmTimers() {
+        const box = el('gm-timers-list'); if (!box) return;
+        const mine = lsGet(TIMER_KEY, []).filter(t => t.sessionCode === currentCode);
+        box.innerHTML = mine.length ? mine.map(t => `<div class="stat-block" style="align-items:center;"><span>⏳ через <strong>${t.turnsLeft}</strong> х.: ${escapeHtml(t.label)}</span><button type="button" style="width:auto; padding:1px 7px; font-size:12px;" onclick="gmRemoveTimer('${jsq(t.id)}')">✕</button></div>`).join('') : '<span style="opacity:.6; font-size:13px;">Таймеров нет.</span>';
+    }
+    window.gmAddTimer = function () {
+        const label = (el('gm-timer-label').value || '').trim(); const n = Math.max(1, parseInt(el('gm-timer-turns').value) || 1);
+        if (!label || !currentCode) return;
+        const all = lsGet(TIMER_KEY, []); all.push({ id: 't' + Date.now() + Math.random().toString(36).slice(2, 4), label, turnsLeft: n, sessionCode: currentCode });
+        lsSet(TIMER_KEY, all); el('gm-timer-label').value = ''; renderGmTimers();
+    };
+    window.gmRemoveTimer = function (id) { lsSet(TIMER_KEY, lsGet(TIMER_KEY, []).filter(t => t.id !== id)); renderGmTimers(); };
+    // Вызывается из gmAdvanceTurn: уменьшает таймеры текущей сессии, возвращает подписи сработавших.
+    function gmTickTimers() {
+        const all = lsGet(TIMER_KEY, []); const fired = [];
+        const rest = all.filter(t => {
+            if (t.sessionCode !== currentCode) return true;
+            t.turnsLeft--;
+            if (t.turnsLeft <= 0) { fired.push(t.label); return false; }
+            return true;
+        });
+        lsSet(TIMER_KEY, rest); renderGmTimers();
+        if (fired.length) setTimeout(() => alert('⏰ Сработало отложенное событие:\n' + fired.join('\n')), 50);
+        return fired;
+    }
+    function gmDropTimersFor(code) { lsSet(TIMER_KEY, lsGet(TIMER_KEY, []).filter(t => t.sessionCode !== code)); }
+
+    // ---- 3.8 шаблоны NPC ----
+    const TPL_KEY = 'skyrim_gm_npc_templates';
+    function renderNpcTemplateSelect() {
+        const sel = el('gm-npc-template-select'); if (!sel) return;
+        const t = lsGet(TPL_KEY, []);
+        sel.innerHTML = '<option value="">— шаблоны (' + t.length + '/20) —</option>' + t.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)} [${escapeHtml(x.kind)}]</option>`).join('');
+    }
+    window.gmSaveNpcTemplate = function (kind) {
+        const src = { bandit: () => lastGeneratedBandit && banditEnemyObj(lastGeneratedBandit), mage: () => lastGeneratedMageBandit && mageBanditEnemyObj(lastGeneratedMageBandit), draugr: () => lastGeneratedDraugr && enemyFromGenerated(lastGeneratedDraugr), forsworn: () => lastGeneratedForsworn && enemyFromGenerated(lastGeneratedForsworn) }[kind];
+        const data = src && src();
+        if (!data) { alert('Сначала сгенерируй NPC (после «Добавить в бой» генератор очищается).'); return; }
+        const list = lsGet(TPL_KEY, []);
+        if (list.length >= 20) { alert('Шаблонов уже 20 — удали один.'); return; }
+        const name = (prompt('Название шаблона:', data.name) || '').trim(); if (!name) return;
+        delete data.id;
+        list.push({ id: 'tpl' + Date.now(), name, kind, data: JSON.parse(JSON.stringify(data)) });
+        lsSet(TPL_KEY, list); renderNpcTemplateSelect();
+        alert('Шаблон «' + name + '» сохранён.');
+    };
+    window.gmLoadNpcTemplate = function () {
+        const id = el('gm-npc-template-select').value; const t = lsGet(TPL_KEY, []).find(x => x.id === id);
+        if (!t) { alert('Выбери шаблон.'); return; }
+        const enemies = (lastData.enemies || []).slice();
+        enemies.push(Object.assign(JSON.parse(JSON.stringify(t.data)), { id: genId('e') }));
+        gmUpdateEnemies(enemies).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmDeleteNpcTemplate = function () {
+        const id = el('gm-npc-template-select').value; const list = lsGet(TPL_KEY, []); const t = list.find(x => x.id === id);
+        if (!t || !confirm('Удалить шаблон «' + t.name + '»?')) return;
+        lsSet(TPL_KEY, list.filter(x => x.id !== id)); renderNpcTemplateSelect();
+    };
+
+    // ---- 3.9 дерево сюжета ----
+    const PLOT_KEY = 'skyrim_gm_plot';
+    function plotGet() { const p = lsGet(PLOT_KEY, null); return p && Array.isArray(p.nodes) ? p : { nodes: [] }; }
+    const PLOT_COLORS = { active: '#2ecc71', done: '#8a8171', failed: '#e74c3c' };
+    function renderPlot() {
+        const svg = el('gm-plot-svg'); if (!svg) return;
+        const nodes = plotGet().nodes;
+        // Раскладка вручную: колонка = глубина от узлов без входящих связей, строки — по порядку внутри колонки.
+        const incoming = {}; nodes.forEach(n => (n.links || []).forEach(l => { incoming[l] = true; }));
+        const depth = {}; const byId = {}; nodes.forEach(n => { byId[n.id] = n; });
+        let frontier = nodes.filter(n => !incoming[n.id]).map(n => n.id); frontier.forEach(id => { depth[id] = 0; });
+        for (let guard = 0; guard < 50 && frontier.length; guard++) {
+            const next = [];
+            frontier.forEach(id => (byId[id].links || []).forEach(l => { if (byId[l] && (depth[l] === undefined || depth[l] < depth[id] + 1) && depth[id] + 1 < 20) { depth[l] = depth[id] + 1; next.push(l); } }));
+            frontier = next;
+        }
+        nodes.forEach(n => { if (depth[n.id] === undefined) depth[n.id] = 0; }); // циклы/сироты
+        const cols = {}; nodes.forEach(n => { (cols[depth[n.id]] = cols[depth[n.id]] || []).push(n); });
+        const maxCol = Math.max(0, ...Object.keys(cols).map(Number));
+        const pos = {};
+        Object.keys(cols).forEach(c => cols[c].forEach((n, i) => { pos[n.id] = { x: 60 + (maxCol ? c / maxCol : 0.5) * 480, y: 30 + (i + 0.5) * (200 / cols[c].length) }; }));
+        let out = '<defs><marker id="st-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c8a566"/></marker></defs>';
+        nodes.forEach(n => (n.links || []).forEach(l => { if (pos[l]) out += `<line x1="${pos[n.id].x}" y1="${pos[n.id].y}" x2="${pos[l].x}" y2="${pos[l].y}" stroke="#c8a566" stroke-width="1.5" marker-end="url(#st-arrow)" data-link="${escapeHtml(n.id)}-${escapeHtml(l)}"/>`; }));
+        nodes.forEach(n => { const p = pos[n.id]; out += `<g data-node="${escapeHtml(n.id)}"><circle cx="${p.x}" cy="${p.y}" r="16" fill="${PLOT_COLORS[n.status] || '#c8a566'}" stroke="#17130e" stroke-width="2"/><text x="${p.x}" y="${p.y + 30}">${escapeHtml(String(n.title).slice(0, 22))}</text></g>`; });
+        svg.innerHTML = out;
+        const list = el('gm-plot-list');
+        list.innerHTML = nodes.map(n => {
+            const others = nodes.filter(o => o.id !== n.id && (n.links || []).indexOf(o.id) === -1);
+            return `<div class="stat-block" style="align-items:center; flex-wrap:wrap; gap:4px;"><span style="color:${PLOT_COLORS[n.status]}">●</span> <strong>${escapeHtml(n.title)}</strong>
+              <select style="width:auto; margin:0; padding:1px;" onchange="gmPlotSetStatus('${jsq(n.id)}', this.value)">${['active', 'done', 'failed'].map(s => `<option value="${s}"${n.status === s ? ' selected' : ''}>${{ active: 'идёт', done: 'закрыт', failed: 'провален' }[s]}</option>`).join('')}</select>
+              <span style="font-size:12px; opacity:.8;">→ ${(n.links || []).map(l => escapeHtml((byId[l] || {}).title || '?') + ' <a href="#" onclick="gmPlotUnlink(\'' + jsq(n.id) + '\',\'' + jsq(l) + '\');return false;">✕</a>').join(', ') || '—'}</span>
+              <select style="width:auto; margin:0; padding:1px;" onchange="gmPlotLink('${jsq(n.id)}', this.value); this.value='';"><option value="">+ связь →</option>${others.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.title)}</option>`).join('')}</select>
+              <button type="button" class="btn-danger" style="width:auto; padding:1px 7px; font-size:12px;" onclick="gmPlotDelete('${jsq(n.id)}')">🗑</button></div>`;
+        }).join('') || '<span style="opacity:.6; font-size:13px;">Узлов пока нет.</span>';
+    }
+    window.gmPlotAdd = function () {
+        const title = (el('gm-plot-title').value || '').trim(); if (!title) return;
+        const p = plotGet(); p.nodes.push({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 4), title, status: el('gm-plot-status').value, links: [] });
+        lsSet(PLOT_KEY, p); el('gm-plot-title').value = ''; renderPlot();
+    };
+    window.gmPlotSetStatus = function (id, s) { const p = plotGet(); const n = p.nodes.find(x => x.id === id); if (n) { n.status = s; lsSet(PLOT_KEY, p); renderPlot(); } };
+    window.gmPlotLink = function (id, to) { if (!to) return; const p = plotGet(); const n = p.nodes.find(x => x.id === id); if (n) { n.links = n.links || []; if (n.links.indexOf(to) === -1) n.links.push(to); lsSet(PLOT_KEY, p); renderPlot(); } };
+    window.gmPlotUnlink = function (id, to) { const p = plotGet(); const n = p.nodes.find(x => x.id === id); if (n) { n.links = (n.links || []).filter(l => l !== to); lsSet(PLOT_KEY, p); renderPlot(); } };
+    window.gmPlotDelete = function (id) { const p = plotGet(); p.nodes = p.nodes.filter(n => n.id !== id); p.nodes.forEach(n => { n.links = (n.links || []).filter(l => l !== id); }); lsSet(PLOT_KEY, p); renderPlot(); };
+    // ---- 3.10 экспорт сессии: окно с печатным HTML + window.print() (без библиотек) ----
+    window.gmExportSessionPdf = function () {
+        const d = lastData || {};
+        const log = d.combatLog || [];
+        const parts = d.participants || {};
+        const dead = (d.enemies || []).filter(e => (e.curHp || 0) <= 0);
+        const killsInLog = log.filter(l => /☠|погиб|убит/i.test(l.text || '')).length;
+        const rolls = log.filter(l => /🎲|бросок|кубик|d20|проверк/i.test(l.text || ''));
+        const loot = log.filter(l => /🎁|лут|добыч|обыск|нашёл|нашел|выдал/i.test(l.text || ''));
+        const rumors = ((d.journal || {}).rumors || []);
+        const li = arr => arr.length ? '<ul>' + arr.map(x => '<li>' + x + '</li>').join('') + '</ul>' : '<p><em>нет</em></p>';
+        const t = l => escapeHtml((l.author ? l.author + ': ' : '') + (l.text || ''));
+        const html = '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Сессия ' + escapeHtml(currentCode || '') + '</title><style>' +
+            'body{font-family:Georgia,serif;color:#000;background:#fff;margin:24px;line-height:1.4}h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;border-bottom:1px solid #999;margin:16px 0 4px}ul{margin:4px 0 4px 18px;padding:0}li{font-size:13px}' +
+            '@media print{body{margin:0}button{display:none}}</style></head><body>' +
+            '<h1>Отчёт о сессии «Скурим» — код ' + escapeHtml(currentCode || '') + '</h1><div>' + new Date().toLocaleString('ru-RU') + '</div>' +
+            '<h2>Участники</h2>' + li(Object.keys(parts).map(u => escapeHtml((parts[u].name || '?') + ' — HP ' + (parts[u].curHp || 0) + '/' + (parts[u].maxHp || 0) + (parts[u].fallen ? ' (пал)' : '')))) +
+            '<h2>Враги</h2><p>Павших сейчас в списке: ' + dead.length + '; записей о гибели в журнале: ' + killsInLog + '.</p>' + li(dead.map(e => escapeHtml(e.name || '?'))) +
+            '<h2>Ключевые броски</h2>' + li(rolls.slice(-25).map(t)) +
+            '<h2>Лут и награды</h2>' + li(loot.slice(-25).map(t)) +
+            '<h2>Слухи</h2>' + li(rumors.map(r => escapeHtml(r.text || ''))) +
+            '<button onclick="window.print()">Печать / Сохранить как PDF</button></body></html>';
+        const w = window.open('', '_blank');
+        if (!w) { alert('Браузер заблокировал новое окно — разреши всплывающие окна для этой страницы.'); return; }
+        w.document.open(); w.document.write(html); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { } }, 400);
+    };
+
+    // ---- 3.3 OOC ----
+    function renderGmOoc(log) {
+        const t = el('gm-ooc-log'); if (!t) return;
+        t.innerHTML = (log || []).map(m => '<div class="log-entry"><span class="log-time">' + (m.ts ? new Date(m.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '') + '</span><span class="log-author">' + escapeHtml(m.author || '?') + ':</span> ' + escapeHtml(m.text || '') + '</div>').join('');
+        t.scrollTop = t.scrollHeight;
+    }
+    window.gmSendOoc = function () {
+        const i = el('gm-ooc-input'); const text = (i.value || '').trim(); if (!text || !currentCode) return;
+        db.collection('sessions').doc(currentCode).update({ oocChat: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: text.slice(0, 500) }) }).then(() => { i.value = ''; }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    // ---- 3.4 опросы ----
+    window.gmCreatePoll = function () {
+        const q = (el('gm-poll-question').value || '').trim();
+        const opts = (el('gm-poll-options').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+        if (!q || opts.length < 2 || opts.length > 5) { alert('Нужен вопрос и от 2 до 5 вариантов (каждый в новой строке).'); return; }
+        const id = 'p' + Date.now();
+        db.collection('sessions').doc(currentCode).update({ ['polls.' + id]: { question: q, options: opts, votes: {}, ts: Date.now(), closed: false } })
+            .then(() => { el('gm-poll-question').value = ''; el('gm-poll-options').value = ''; }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.gmClosePoll = function (id) {
+        const poll = (lastData.polls || {})[id]; if (!poll) return;
+        const counts = (poll.options || []).map((o, i) => o + ': ' + Object.values(poll.votes || {}).filter(v => v === i).length);
+        db.collection('sessions').doc(currentCode).update({ ['polls.' + id + '.closed']: true, combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '📊 Опрос закрыт: «' + poll.question + '» — ' + counts.join(', ') }) }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    function renderGmPolls(polls) {
+        const box = el('gm-polls-list'); if (!box) return;
+        const total = Object.keys(lastData.participants || {}).length;
+        const ids = Object.keys(polls || {}).sort((a, b) => (polls[b].ts || 0) - (polls[a].ts || 0)).slice(0, 5);
+        box.innerHTML = ids.map(id => {
+            const p = polls[id]; const votes = Object.values(p.votes || {});
+            return `<div style="border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; margin-bottom:6px;${p.closed ? ' opacity:.7;' : ''}">
+              <strong>${escapeHtml(p.question)}</strong> <span style="font-size:12px; opacity:.7;">(${votes.length}/${total} проголосовали${p.closed ? ', закрыт' : ''})</span>
+              ${(p.options || []).map((o, i) => { const n = votes.filter(v => v === i).length; return `<div style="font-size:14px;">${escapeHtml(o)}: <strong>${n}</strong> <span style="display:inline-block;height:6px;width:${votes.length ? Math.round(n / votes.length * 100) : 0}px;background:var(--accent-color,#c8a566);"></span></div>`; }).join('')}
+              ${p.closed ? '' : `<button type="button" class="btn-danger" style="width:auto; padding:2px 10px; font-size:12px; margin-top:4px;" onclick="gmClosePoll('${jsq(id)}')">Закрыть опрос</button>`}</div>`;
+        }).join('') || '<span style="opacity:.6; font-size:13px;">Опросов нет.</span>';
+    }
+    window.renderEpic3Session = function (d) { renderGmOoc(d.oocChat); renderGmPolls(d.polls); };
+    function gmEpic3Init() { renderEncounterSelect(); renderNpcTemplateSelect(); renderPlot(); renderGmTimers(); }
+    document.addEventListener('DOMContentLoaded', gmEpic3Init);
+    if (document.readyState !== 'loading') gmEpic3Init();
 
     document.addEventListener('DOMContentLoaded', initGmSectionAccordions);
     if (document.readyState !== 'loading') initGmSectionAccordions();

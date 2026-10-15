@@ -35,7 +35,7 @@
     }
 
     // ---------- пулы предметов из базы ----------
-    function isUnique(i) { return !!i.unique || /^Уникальн/.test(i.category || '') || /Даэдрическ|Азидал|Маски жрецов/.test(i.category || ''); }
+    function isUnique(i) { return !!i.unique || /^Уникальн/.test(i.category || '') || /Даэдрическ|Азидал|Маски жрецов|Мораг/.test(i.category || ''); }
     function byCat(pool, re) { return pool.filter(i => re.test(i.category || '')); }
     function isAmmoName(n) { return /стрел|болт/i.test(n); }
     function weaponsOf(pool, nameRe) {
@@ -54,7 +54,8 @@
     }
 
     // ---------- зачарование: тот же формат, что у игрока (index.html → enchantItem) ----------
-    const ENCH_SLOT = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' };
+    // обруч (circlet) носят на голове — в enchant-data для него нет своих эффектов, берём эффекты для шлема
+    const ENCH_SLOT = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
     function makeEnchantment(slot, level, prefer) {
         const isWeapon = slot === 'melee' || slot === 'ranged';
         let effects = isWeapon ? (root.enchantWeaponEffects || []) : (root.enchantArmorEffects || []).filter(e => e.slots.includes(ENCH_SLOT[slot] || slot));
@@ -76,7 +77,9 @@
     }
     // prefer — список имён эффектов; ближе к началу списка = вероятнее (первый ~60%)
     function pickWeighted(effects, prefer) {
-        const sorted = effects.slice().sort((a, b) => prefer.indexOf(a.name) - prefer.indexOf(b.name));
+        // indexOf даёт -1 для «непредпочитаемых» — их надо отправлять В КОНЕЦ, а не в начало
+        const rank = n => { const i = prefer.indexOf(n); return i === -1 ? 9999 : i; };
+        const sorted = effects.slice().sort((a, b) => rank(a.name) - rank(b.name));
         return Math.random() < 0.6 ? sorted[0] : pick(sorted);
     }
     // Превращает обычный предмет-добычу в зачарованный: «Имя [Эффект]», цена как у игрока (×1.5 + 50).
@@ -104,7 +107,7 @@
         let k = 0; while (k < m && a[k] === b[k]) k++;
         return k >= Math.max(3, m - 2);
     }
-    function findByName(pool, token) {
+    function findByName(pool, token, includeUnique) {
         const tw = wordsOf(token);
         if (!tw.length) return null;
         let best = null, bestScore = 0;
@@ -115,7 +118,8 @@
             let common = 0;
             tw.forEach(w => { if (iw.some(x => wordMatch(w, x))) common++; });
             const score = common / Math.max(tw.length, iw.length);
-            if (isUnique(it) && score < 1) continue;   // уникальное — только при полном совпадении названия
+            if (isUnique(it) && !includeUnique) continue;   // уникальное в автолут не попадает (мастер выдаёт его вручную)
+            if (isUnique(it) && score < 1) continue;
             if (score > bestScore || (score === bestScore && best && it.name.length < best.name.length)) { best = it; bestScore = score; }
         }
         return bestScore >= 0.67 ? best : null;
@@ -287,6 +291,10 @@
             if (n > 1) g.it.qty = n;
             return { chance: p, items: [g.it] };
         }
+        // Название уникальной вещи в тексте дропа (маска жреца и т.п.) — не автолут: пропускаем, мастер выдаст её вручную.
+        if (/^маск\S*\s+жрец/.test(norm(tok))) return null;   // маски жрецов Солстхейма — уникальные, в базе названы иначе; не заглушка, а пропуск
+        const anyMatch = findByName(ctx.pool || [], tok, true);
+        if (anyMatch && isUnique(anyMatch)) return null;
         const found = findByName(ctx.pool || [], tok);
         let item;
         if (found) item = toLoot(found);

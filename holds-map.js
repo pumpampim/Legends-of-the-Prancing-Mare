@@ -40,7 +40,7 @@
         'Схолстейм': { 'Рейвен-Рок (Бастион)': [1002, 272], 'Деревня Скаалов': [1040, 218], 'Тель-Митрин': [1060, 262] }
     };
     const CAT_COLORS = [
-        [/метка для игроков/i, '#e74c3c'],
+        [/метка для игроков/i, '#e74c3c'], [/открыто игрокам/i, '#2ecc71'], [/моя точка/i, '#1abc9c'],
         [/пещер/i, '#b08968'], [/логов.*дракон|дракон/i, '#c0392b'], [/форт/i, '#d35400'], [/шахт/i, '#f1c40f'],
         [/руин|башн|гробниц|захорон|храм/i, '#aab7c4'], [/камн/i, '#3498db'], [/лагер/i, '#6ab04c'],
         [/даэдр/i, '#a569bd'], [/корабл|доки|пристан|маяк/i, '#48c9b0']
@@ -100,6 +100,10 @@
     function toLocal(hold, x, y) { const f = frame(hold); return { u: 0.5 + (x - f.cx) / (f.s * f.im.w), v: 0.5 + (y - f.cy) / (f.s * f.im.h) }; }
     function toGlobal(hold, u, v) { const f = frame(hold); return { x: f.cx + (u - 0.5) * f.s * f.im.w, y: f.cy + (v - 0.5) * f.s * f.im.h }; }
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    // Видимость «лично игроку»: у метки/места может быть toUids (список uid). Нет списка — видно всем.
+    function visibleTo(item, uid) { const t = item && item.toUids; return !Array.isArray(t) || !t.length || (uid != null && t.indexOf(uid) !== -1); }
+    // Положение поселения, назначенное мастером (session.mapSettle[name] = {hold,x,y,u?,v?}). Без него — условные схемные координаты.
+    function settleOvOf(ov, hold, name) { const s = ov && ov[name]; return (s && typeof s.x === 'number' && typeof s.y === 'number' && (!s.hold || s.hold === hold)) ? s : null; }
     // положение объекта p (с x,y и, возможно, u,v,hold) на картинке владения zoom
     function localOf(zoom, p) {
         if (p.u != null && p.v != null && (!p.hold || p.hold === zoom)) return { u: p.u, v: p.v };
@@ -107,8 +111,14 @@
         if (p.name && im && im.settle && im.settle[p.name] && (!p.hold || p.hold === zoom)) return { u: im.settle[p.name][0], v: im.settle[p.name][1] };
         return toLocal(zoom, p.x, p.y);
     }
-    function settleLocal(hold, name) {
+    function settleLocal(hold, name, ov) {
         const im = IMG[hold];
+        const s = settleOvOf(ov, hold, name);
+        if (s) {
+            if (typeof s.u === 'number' && typeof s.v === 'number') return { u: s.u, v: s.v, exact: true, custom: true };
+            const l = toLocal(hold, s.x, s.y);
+            return { u: clamp(l.u, 0.02, 0.98), v: clamp(l.v, 0.02, 0.98), exact: true, custom: true };
+        }
         if (im && im.settle && im.settle[name]) return { u: im.settle[name][0], v: im.settle[name][1], exact: true };
         const c = SETTLE[hold][name], l = toLocal(hold, c[0], c[1]);
         return { u: clamp(l.u, 0.03, 0.97), v: clamp(l.v, 0.03, 0.97), approx: true };
@@ -128,14 +138,14 @@
         return (fog.circles || []).some(c => (x - c.x) * (x - c.x) + (y - c.y) * (y - c.y) <= c.r * c.r);
     }
     // Круги тумана из документа сессии: сохранённые + вокруг партии, открытых мест и меток мастера
-    function fogFromSession(session, preview) {
+    function fogFromSession(session, preview, uid) {
         const f = session && session.mapFog;
         if (!f || !f.on) return null;
         const R = f.r || 35, circles = (f.circles || []).slice();
         const party = partyFromSession(session);
         if (party) circles.push({ x: party.x, y: party.y, u: party.u, v: party.v, hold: party.hold, r: R * 1.2 });
         [].concat(session.openPlaces || [], session.mapMarks || []).forEach(p => {
-            if (p && typeof p.x === 'number' && typeof p.y === 'number') circles.push({ x: p.x, y: p.y, u: p.u, v: p.v, hold: p.hold, r: R * 0.5 });
+            if (p && (preview || visibleTo(p, uid)) && typeof p.x === 'number' && typeof p.y === 'number') circles.push({ x: p.x, y: p.y, u: p.u, v: p.v, hold: p.hold, r: R * 0.5 });
         });
         return { on: true, holds: f.holds || [], circles, current: (session.currentHold || (party && party.hold) || null), preview: !!preview };
     }
@@ -154,9 +164,9 @@
     ROADS.forEach(([a, b]) => { ROADSET[a + '|' + b] = ROADSET[b + '|' + a] = 1; });
     SEA.forEach(([a, b]) => { SEASET[a + '|' + b] = SEASET[b + '|' + a] = 1; });
     // Маршрут из точки a в точку b ({x,y,name?}). Дороги предпочтительны, между остальными точками — бездорожье.
-    function planRoute(a, b, cfg) {
+    function planRoute(a, b, cfg, ov) {
         cfg = travelCfg(cfg);
-        const nodes = Object.keys(NODES).map(n => NODES[n]);
+        const nodes = Object.keys(NODES).map(n => { const s = settleOvOf(ov, NODES[n].hold, n); return s ? Object.assign({}, NODES[n], { x: s.x, y: s.y }) : NODES[n]; });
         const A = { name: a.name || '', x: a.x, y: a.y, id: 'A', hold: a.hold, u: a.u, v: a.v }, B = { name: b.name || '', x: b.x, y: b.y, id: 'B', hold: b.hold, u: b.u, v: b.v };
         const all = nodes.concat([A, B]);
         const speedFoot = t => t === 'road' ? cfg.foot : t === 'sea' ? cfg.ship : cfg.foot * cfg.offSpeed;
@@ -252,6 +262,7 @@
 .lbl{font-family:'Cinzel','EB Garamond',serif;fill:#f2e9d0;paint-order:stroke;stroke:#14100a;stroke-linejoin:round;pointer-events:none}
 @keyframes pr{0%{r:${9 * u}px;opacity:.9}100%{r:${26 * u}px;opacity:0}}
 .pulse{animation:pr 1.8s ease-out infinite;fill:none;stroke:#f1c40f;stroke-width:${2 * u}}
+.pulse2{animation:pr 1.2s ease-out infinite;fill:none;stroke:#1abc9c;stroke-width:${3 * u}}
 </style>
 <rect x="${vb.x - 5}" y="${vb.y - 5}" width="${vb.w + 10}" height="${vb.h + 10}" fill="#0e1820" data-bg="1"/>`;
         if (img) {
@@ -283,9 +294,11 @@
             const names = Object.keys(SETTLE[hk]);
             names.forEach((n, i) => {
                 let [x, y] = SETTLE[hk][n], px = x, py = y, lu, lv, approx = false;
-                if (img) { const l = settleLocal(hk, n); lu = l.u; lv = l.v; approx = !!l.approx; px = l.u * vb.w; py = l.v * vb.h; if (approx && !o.showApprox) return; }
+                const ovs = settleOvOf(o.settleOv, hk, n);   // положение, назначенное мастером
+                if (ovs) { x = ovs.x; y = ovs.y; px = x; py = y; }
+                if (img) { const l = settleLocal(hk, n, o.settleOv); lu = l.u; lv = l.v; approx = !!l.approx; px = l.u * vb.w; py = l.v * vb.h; if (approx && !o.showApprox) return; }
                 if (hide) {
-                    const gp = img && IMG[hk].settle && IMG[hk].settle[n] ? toGlobal(hk, lu, lv) : { x, y };
+                    const gp = img && !ovs && IMG[hk].settle && IMG[hk].settle[n] ? toGlobal(hk, lu, lv) : { x, y };
                     if (!revealedAt(fog, gp.x, gp.y, hk) && !revealedAt(fog, x, y, hk)) return;
                 }
                 const showName = zoom || i === 0;
@@ -330,7 +343,7 @@ ${showName ? `<text class="lbl" x="${px}" y="${py + 17 * u}" text-anchor="middle
         // маршрут
         if (o.route && o.route.pts && o.route.pts.length > 1) {
             const RP = q => {
-                if (img && q.name && NODES[q.name] && NODES[q.name].hold === zoom && q.u == null) { const l = settleLocal(zoom, q.name); return [l.u * vb.w, l.v * vb.h]; }
+                if (img && q.name && NODES[q.name] && NODES[q.name].hold === zoom && q.u == null) { const l = settleLocal(zoom, q.name, o.settleOv); return [l.u * vb.w, l.v * vb.h]; }
                 return P(q);
             };
             const pts = o.route.pts.map(q => RP(q).map(v => v.toFixed(1)).join(',')).join(' ');
@@ -339,6 +352,13 @@ ${showName ? `<text class="lbl" x="${px}" y="${py + 17 * u}" text-anchor="middle
         if (o.sel && typeof o.sel.x === 'number') {
             const [sx, sy] = P(o.sel);
             s += `<g pointer-events="none"><circle cx="${sx}" cy="${sy}" r="${10 * u}" fill="none" stroke="#2ecc71" stroke-width="${2.5 * u}"/><circle cx="${sx}" cy="${sy}" r="${2.5 * u}" fill="#2ecc71"/></g>`;
+        }
+        // «пинг» выбранного места (focus): бирюзовое пульсирующее кольцо и подпись — отличается от жёлтой метки партии
+        if (o.focus && typeof o.focus.x === 'number' && (!zoom || !o.focus.hold || o.focus.hold === zoom)) {
+            const [fx, fy] = P(o.focus);
+            s += `<g pointer-events="none"><circle class="pulse2" cx="${fx}" cy="${fy}" r="${9 * u}"/><circle class="pulse2" style="animation-delay:.6s" cx="${fx}" cy="${fy}" r="${9 * u}"/>
+<circle cx="${fx}" cy="${fy}" r="${6 * u}" fill="#1abc9c" stroke="#14100a" stroke-width="${2 * u}"/>
+<text class="lbl" x="${fx}" y="${fy + 22 * u}" text-anchor="middle" font-size="${14 * u}" font-weight="700" stroke-width="${3.5 * u}" style="fill:#8ff0dc">📍 ${esc(o.focus.name || 'Место')}</text></g>`;
         }
         if (o.party && typeof o.party.x === 'number') {
             const p = o.party, [px, py] = P(p);
@@ -409,5 +429,5 @@ ${showName ? `<text class="lbl" x="${px}" y="${py + 17 * u}" text-anchor="middle
     function loadPins() { try { return JSON.parse(localStorage.getItem('holdsMapPins') || '{}') || {}; } catch (e) { return {}; } }
     function savePins(p) { try { localStorage.setItem('holdsMapPins', JSON.stringify(p)); } catch (e) { } }
 
-    window.HoldsMap = { W, H, HOLDS, SETTLE, IMG, ROADS, NODES, render, holdAt, partyFromSession, loadPins, savePins, catColor, frame, toLocal, toGlobal, localOf, settleLocal, holdKnown, revealedAt, fogFromSession, planRoute, describeRoute, fmtDays, travelCfg, TRAVEL_DEFAULTS };
+    window.HoldsMap = { W, H, HOLDS, SETTLE, IMG, ROADS, NODES, render, holdAt, partyFromSession, loadPins, savePins, catColor, frame, toLocal, toGlobal, localOf, settleLocal, holdKnown, revealedAt, fogFromSession, planRoute, describeRoute, fmtDays, travelCfg, TRAVEL_DEFAULTS, visibleTo, settleOvOf };
 })();

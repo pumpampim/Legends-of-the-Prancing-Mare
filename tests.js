@@ -323,6 +323,139 @@
     ok(/замок/.test(spellText('Стук 3')) && !/Изгоняет/.test(spellText('Стук 3')), 'Заклинания: «Стук 3» — про замок, а не про изгнание даэдра');
     ok(!/Ставит под контроль/.test(spellText('Луч огня')), 'Заклинания: у «Луча огня» нет текста от «Приказа даэдра»');
 
+    // ---------- ЛУТ ВРАГОВ И ГЕНЕРАТОРЫ (enemy-loot.js) ----------
+    if (W.EnemyLoot && W.EnemyGear) {
+        // Пул — как у мастера: база предметов + то, что куётся/лутится
+        const lootPool = (W.allItems || []).slice()
+            .concat((W.armorRecipes || []).map(r => ({ name: r.name, category: r.armorType, weight: r.weight, price: r.price, armor: r.resistance, dmg: null, slot: ({ 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' })[r.slot] || r.slot })))
+            .concat((W.armorNonCraftable || []).map(a => ({ name: a.name, category: a.armorType + ' (лут)', weight: a.weight, price: a.price, armor: a.resistance, dmg: null, slot: a.slot })))
+            .concat((W.weaponRecipes || []).map(r => ({ name: r.name, category: r.category, weight: r.weight, price: r.price, armor: null, dmg: r.damage, slot: r.isAmmo ? null : r.slot })))
+            .concat((W.weaponsNonCraftable || []).map(w => ({ name: w.name, category: w.category + ' (лут)', weight: w.weight, price: w.price, armor: null, dmg: w.damage, slot: w.isAmmo ? null : w.slot })));
+        const roll = (txt, lvl) => W.EnemyLoot.rollFromText(txt, { pool: lootPool, level: lvl || 5 });
+        const many = (txt, n) => { const out = []; for (let i = 0; i < (n || 60); i++) out.push(roll(txt)); return out; };
+
+        ok(many('Костная мука 1-2').every(r => r.items.length === 1 && r.items[0].name === 'Костная мука' && (r.items[0].qty || 1) >= 1 && (r.items[0].qty || 1) <= 2), 'Лут: «Костная мука 1-2» — один стек 1-2 штуки');
+        ok(many('золото (до 10)').every(r => r.gold >= 1 && r.gold <= 10 && !r.items.length), 'Лут: «золото (до 10)» — золото 1-10, без предметов');
+        ok(many('Волчья шкура, маленький шанс на до 15 монет').every(r => !r.items.some(i => /монет/i.test(i.name)) && r.gold <= 15), 'Лут: «маленький шанс на до 15 монет» — это золото с шансом, а не предмет «До 15 монет»');
+        ok(many('Волчья шкура, маленький шанс на до 15 монет', 300).some(r => r.gold === 0) && many('Волчья шкура, маленький шанс на до 15 монет', 300).some(r => r.gold > 0), 'Лут: «маленький шанс» — золото выпадает не всегда, но иногда выпадает');
+        ok(many('драг камень').every(r => r.items.length === 1 && r.items[0].category === 'Драгоценные камни'), 'Лут: «драг камень» — случайный драгоценный камень из базы');
+        ok(many('крохотный/маленький камень душ').every(r => r.items.length === 1 && /^(Крохотный|Маленький) камень душ$/.test(r.items[0].name)), 'Лут: «крохотный/маленький камень душ» — один из двух размеров');
+        ok(many('1 зачарованное ожерелье, кольцо или обруч', 20).every(r => r.items.length === 1 && r.items[0].enchantment && r.items[0].enchantment.name && /\[/.test(r.items[0].name)), 'Лут: «1 зачарованное ожерелье/кольцо/обруч» — украшение с зачарованием');
+        ok(many('Фалмерские уши,золото,яды,фалмерское оружие', 30).every(r => r.items.some(i => /фалмер/i.test(i.name) && i.slot) && r.items.some(i => /^Яд/.test(i.name))), 'Лут: «фалмерское оружие» и «яды» заменяются реальными предметами');
+        ok(many('Древне нордское оружие, Костная мука 1-2, золото (до 10), драг камень, свитки заклинаний', 30).every(r => r.items.some(i => /древн/i.test(i.name) && typeof i.dmg === 'number') && r.items.some(i => /^Свиток/.test(i.name))), 'Лут: текст драугра даёт древненордское оружие и свиток');
+        ok(many('Зубы ледяного привидения эссенция ледяного привидения.Нейтрализует 20% урона от холода, действует 10 ходов', 20).every(r => r.items.every(i => !/нейтрализ/i.test(i.name))), 'Лут: описание эффекта после точки не превращается в предмет');
+
+        // Уникальное (таблица «Уникальная броня и оружие», Азидал, даэдрические артефакты, маски жрецов) в автолут не попадает
+        const uniqNames = new Set((W.allItems || []).filter(i => /^Уникальн|Азидал|Даэдрическ|Маски жрецов|Мораг/.test(i.category || '')).map(i => i.name).concat((W.uniqueWeaponsData || []).map(i => i.name)));
+        const priest = many('Маска жреца-дракона, древнее нордское оружие, золото, драг. камни', 40);
+        ok(priest.every(r => r.items.every(i => !uniqNames.has(i.name) && !/Маска жреца/.test(i.name))), 'Лут: «Маска жреца-дракона» из текста дропа не выдаётся автоматически (уникальное — только руками мастера)');
+        ok(many('Оружие с тела, броня, золото, отмычки, драг. камни', 60).every(r => r.items.every(i => !uniqNames.has(i.name))), 'Лут: «оружие с тела / броня» не выбирает уникальные вещи');
+
+        // Приоритет предпочитаемых зачарований (pickWeighted раньше инвертировал порядок: -1 у «непредпочитаемых» шёл первым)
+        let frost = 0; const N = 400;
+        for (let i = 0; i < N; i++) { const e = W.EnemyLoot.makeEnchantment('melee', 18, ['Урон холодом', 'Урон огнем']); if (e && e.name === 'Урон холодом') frost++; }
+        ok(frost / N > 0.5, 'Лут: предпочитаемое зачарование («Урон холодом») выпадает чаще остальных', 'доля: ' + (frost / N).toFixed(2));
+
+        // Драугры и изгои: правильная фракция, зачарование как у игрока, входные данные не мутируют
+        const frozen = JSON.stringify(W.enemiesData);
+        const fam = W.enemiesData.filter(e => W.EnemyGear.familyOf(e.name));
+        ok(fam.length >= 10, 'Генератор: в базе найдены драугры и изгои (' + fam.length + ')');
+        let famBad = [];
+        fam.forEach(e => {
+            for (let k = 0; k < 25; k++) {
+                const g = W.EnemyGear.generate(e, { pool: lootPool, level: e.level });
+                const isDr = /драугр/i.test(e.name);
+                const gearOk = g.lootItems.filter(i => i.slot && (typeof i.dmg === 'number' || typeof i.armor === 'number') && !/Железный щит|Стрела|стрела/.test(i.name))
+                    .every(i => (isDr ? /древн|Древн/.test(i.name) : /изгое|Изгое/i.test(i.name)));
+                if (!gearOk) famBad.push(e.name + ': ' + g.lootItems.map(i => i.name).join(', '));
+                g.lootItems.forEach(i => { if (i.enchantment && (!i.enchantment.name || !/\[/.test(i.name))) famBad.push(e.name + ': плохое зачарование ' + i.name); });
+            }
+        });
+        ok(famBad.length === 0, 'Генератор: у драугров только древненордская экипировка, у изгоев — изгоев; зачарования в формате игрока', famBad.slice(0, 3).join(' | '));
+        ok(JSON.stringify(W.enemiesData) === frozen, 'Генератор: generate() не меняет записи базы врагов');
+        const palach = W.enemiesData.find(e => e.name === 'Драугр-главный палач');
+        ok(palach && Array.from({ length: 30 }, () => W.EnemyGear.generate(palach, { pool: lootPool, level: 18 })).every(g => /\[/.test(g.gear.weapon || '')), 'Генератор: у «Главного палача» оружие зачаровано всегда (по записи в базе)');
+        const unarmed = W.enemiesData.find(e => e.name === 'Неуклюжий драугр');
+        ok(unarmed && W.EnemyGear.generate(unarmed, { pool: lootPool, level: 22 }).gear.weapon === null, 'Генератор: «Неуклюжий драугр» безоружен (только крики)');
+    }
+
+    // ---------- Разрыв характеристик обычной экипировки (balance_gear.py) ----------
+    // У каждой группы (слот брони / тип оружия) порядок предметов по силе сохраняется — расширение не должно их переставлять.
+    (function () {
+        const bySlotRu = { 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' };
+        const armor = (W.armorRecipes || []).concat(W.armorNonCraftable || []);
+        const chest = armor.filter(a => (bySlotRu[a.slot] || a.slot) === 'chest').map(a => a.resistance);
+        ok(Math.min(...chest) === 22 && Math.max(...chest) >= 55, 'Баланс: нагрудники — минимум прежний (22), максимум вырос (≥55)', Math.min(...chest) + '..' + Math.max(...chest));
+    })();
+
+    // ---------- Дубли в данных оружия и брони ----------
+    // Раньше 12 кастетов лежали и в weaponRecipes, и в weaponsNonCraftable (с разным уроном) — в списках всё было по два раза.
+    (function () {
+        const dupNames = list => { const seen = {}, d = []; list.forEach(x => { const k = String(x.name).toLowerCase(); if (seen[k]) d.push(x.name); seen[k] = 1; }); return d; };
+        const weapons = (W.weaponRecipes || []).concat(W.weaponsNonCraftable || []);
+        const armor = (W.armorRecipes || []).concat(W.armorNonCraftable || []);
+        ok(dupNames(weapons).length === 0, 'Данные: названия оружия (ковка + лут) не повторяются', dupNames(weapons).join(', '));
+        ok(dupNames(armor).length === 0, 'Данные: названия брони (ковка + лут) не повторяются', dupNames(armor).join(', '));
+        ok((W.weaponRecipes || []).filter(r => /Кастет/.test(r.subcat || '')).length === 12, 'Данные: кастетов ровно 12 (по одному на название)');
+    })();
+
+    // ---------- Уникальная броня: свои названия из таблицы ----------
+    (function () {
+        const regular = new Set((W.armorRecipes || []).concat(W.armorNonCraftable || []).map(a => a.name.toLowerCase()));
+        const unique = (W.allItems || []).filter(i => /^Уникальн/.test(i.category || ''));
+        const clash = unique.filter(i => regular.has(i.name.toLowerCase())).map(i => i.name);
+        ok(clash.length === 0, 'Уникальная броня: названия не совпадают с названиями обычной брони', clash.join(', '));
+        const names = (W.allItems || []).map(i => i.name);
+        ['Шлем дезертира Стражи Рассвета', 'Броня дезертира Стражи Рассвета', 'Перчатки дезертира Стражи Рассвета', 'Сапоги дезертира Стражи Рассвета',
+         'Шлем инквизитора', 'Броня инквизитора', 'Перчатки инквизитора', 'Сапоги инквизитора', 'Бастион', 'Щит налетчика'].forEach(n =>
+            eq(names.filter(x => x === n).length, 1, 'Уникальная броня: «' + n + '» есть ровно один раз'));
+        ok(!names.includes('Ламеллярный щит') && names.filter(n => n === 'Прочный железный щит').length === 0, 'Уникальная броня: лишние «Ламеллярный щит» и уникальный «Прочный железный щит» удалены');
+        eq((W.allItems || []).filter(i => i.name === 'Походный рюкзак').length, 1, 'Предметы: «Походный рюкзак» ровно один (лагерный вариант удалён)');
+    })();
+
+    // Эффекты удалённых дублей объединены с оставшимися записями
+    (function () {
+        const eff = n => ((W.allItems || []).find(i => i.name === n) || {}).effect || '';
+        ok(/холоду \+20%/.test(eff('Броня дезертира Стражи Рассвета')) && /\+15%/.test(eff('Броня дезертира Стражи Рассвета')) && /\+10 ХП/.test(eff('Броня дезертира Стражи Рассвета')) && /\+25 брони/.test(eff('Броня дезертира Стражи Рассвета')), 'Уникальная броня: эффекты «Брони дезертира Стражи Рассвета» объединены с ламеллярным нагрудником');
+        ok(/кровотечением/.test(eff('Щит налетчика')) && /\+10 ХП/.test(eff('Щит налетчика')) && /\+25 брони/.test(eff('Щит налетчика')), 'Уникальная броня: эффекты «Щита налетчика» объединены с ламеллярным щитом');
+        ok(/\+10% урона оружием/.test(eff('Бастион')) && /\+20 ХП/.test(eff('Бастион')) && /отражения/.test(eff('Бастион')), 'Уникальная броня: эффекты «Бастиона» объединены с прочным железным щитом');
+    })();
+
+    // ---------- Карта: адресная видимость, положение поселений (holds-map.js) ----------
+    if (W.HoldsMap) {
+        const HM = W.HoldsMap;
+        ok(HM.visibleTo({}, 'a') && HM.visibleTo({ toUids: [] }, 'a'), 'Карта: метка без адресата видна всем');
+        ok(HM.visibleTo({ toUids: ['a'] }, 'a') && !HM.visibleTo({ toUids: ['a'] }, 'b') && !HM.visibleTo({ toUids: ['a'] }, undefined), 'Карта: личная метка видна только адресату');
+        const sess = { mapFog: { on: true, r: 35 }, openPlaces: [{ x: 100, y: 100 }, { x: 300, y: 300, toUids: ['a'] }], mapMarks: [{ x: 500, y: 500, toUids: ['b'] }] };
+        eq([HM.fogFromSession(sess, false, 'a').circles.length, HM.fogFromSession(sess, false, 'b').circles.length, HM.fogFromSession(sess, false, 'c').circles.length], [2, 2, 1], 'Карта: туман войны открывается только вокруг того, что видно игроку');
+        eq(HM.fogFromSession(sess, true).circles.length, 3, 'Карта: предпросмотр мастера (с туманом) видит всё');
+        const ovp = { 'Драконий Мост': { hold: 'Солитьюд (Хаафингар)', x: 250, y: 200, u: 0.3, v: 0.45 } };
+        const sl = HM.settleLocal('Солитьюд (Хаафингар)', 'Драконий Мост', ovp);
+        ok(sl.u === 0.3 && sl.v === 0.45 && sl.custom && !sl.approx, 'Карта: назначенное мастером положение поселения важнее условного');
+        ok(HM.settleLocal('Солитьюд (Хаафингар)', 'Драконий Мост').approx === true, 'Карта: без назначения положение условное (approx)');
+        ok(HM.settleOvOf(ovp, 'Рифт', 'Драконий Мост') === null, 'Карта: положение, назначенное в другом владении, не применяется');
+        const base = HM.planRoute({ name: 'Солитьюд', x: 190, y: 168 }, { name: 'Морфал', x: 385, y: 248 });
+        const moved = HM.planRoute({ name: 'Солитьюд', x: 190, y: 168 }, { name: 'Морфал', x: 385, y: 248 }, null, { 'Драконий Мост': { hold: 'Солитьюд (Хаафингар)', x: 900, y: 700 } });
+        ok(moved.km > base.km, 'Карта: маршрут учитывает назначенное положение поселения (дорога через сдвинутый «Драконий Мост» длиннее)', base.km + ' → ' + moved.km);
+    }
+
+    // «Соль» одна (раньше три записи с разными категориями — у торговцев она вела себя по-разному); мусорной «Сырая» нет
+    eq((W.allItems || []).filter(i => i.name === 'Соль').map(i => i.category), ['Ингредиенты для алхимии'], 'Данные: «Соль» — одна запись (ингредиент алхимии)');
+    ok(!Object.prototype.hasOwnProperty.call(W.cookingIngredients || {}, 'Сырая'), 'Данные: в кулинарии нет мусорной записи «Сырая»');
+
+    // ---------- Расчёт урона по врагу (combat-calc.js) — один на предпросмотр и на реальное применение ----------
+    if (W.StCombat) {
+        const pd = W.StCombat.previewDamage;
+        eq(pd({ resist: { physical: 25 } }, 34, 'physical', 0).finalDmg, 26, 'Урон: резист 25% и урон 34 → 26');
+        eq(pd({ resist: { fire: -50 } }, 20, 'fire', 0).finalDmg, 30, 'Урон: уязвимость к огню −50% → ×1.5');
+        eq(pd({ resist: { physical: 40 } }, 100, 'physical', 15).finalDmg, 75, 'Урон: пробитие 15% снижает резист 40% → 25%');
+        eq(pd({ resist: { fire: -50 } }, 20, 'fire', 30).finalDmg, 30, 'Урон: пробитие не «лечит» уязвимость');
+        eq(pd({ resist: { fire: 10 }, statusEffects: [{ res: { fire: 10, magic: 20 } }] }, 100, 'fire', 0).finalDmg, 60, 'Урон: статусы на цели добавляют резист (огонь + магия)');
+        eq(pd({}, 50, undefined, 0).finalDmg, 50, 'Урон: без типа резисты не применяются');
+        ok(pd({ resist: { physical: 200 } }, 10, 'physical', 0).finalDmg === 0, 'Урон: не уходит в минус');
+        ok(/физический 25%/.test(W.StCombat.resistSummary({ resist: { physical: 25 } })) && /огонь −50%/.test(W.StCombat.resistSummary({ resist: { fire: -50 } })), 'Урон: подпись резистов для списка целей');
+    }
+
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;
     if (typeof document !== 'undefined') {

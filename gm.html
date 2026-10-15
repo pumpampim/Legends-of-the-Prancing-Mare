@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=11">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -78,6 +78,25 @@
         <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти</button>
     </div>
 
+    <!-- ===== ПУЛЬТ СЕССИИ (эпик 3.1) ===== -->
+    <div id="gm-dashboard" class="st-dashboard">
+        <button type="button" class="dash-btn st-dash-btn" data-group="prep">📖 Подготовка</button>
+        <button type="button" class="dash-btn st-dash-btn" data-group="scene">🎭 Сцена</button>
+        <button type="button" class="dash-btn st-dash-btn" data-group="combat">⚔️ Бой</button>
+        <button type="button" class="dash-btn st-dash-btn" data-group="rewards">🎁 Награды</button>
+        <button type="button" class="dash-btn st-dash-btn" data-group="randoms">🎲 Случайности</button>
+        <button type="button" class="dash-btn st-dash-btn" data-group="other">🗂 Прочее</button>
+        <button type="button" class="dash-btn st-dash-btn st-dash-reset" id="gm-checklist-reset" title="Показать чеклист первой сессии снова">↺ Чеклист</button>
+    </div>
+    <details id="gm-first-checklist" class="panel st-checklist" open style="display:none;">
+        <summary style="cursor:pointer; font-weight:bold;">✅ Чеклист первой сессии</summary>
+        <label><input type="checkbox" data-ck="0"> Создал сессию</label>
+        <label><input type="checkbox" data-ck="1"> Передал код игрокам</label>
+        <label><input type="checkbox" data-ck="2"> Проверил, что все вошли</label>
+        <label><input type="checkbox" data-ck="3"> Задал время/погоду/регион</label>
+        <label><input type="checkbox" data-ck="4"> Поставил партию на карту</label>
+    </details>
+
     <h1><span class="skyrim-icon icon-dice" aria-hidden="true"></span> ЭКРАН МАСТЕРА — «СКУРИМ»</h1>
     <p style="margin-top:-8px;"><a href="holds.html" target="_blank" style="color:var(--accent-color); font-size:16px;">🏰 Открыть справочник Владений (города, жители, подземелья)</a></p>
 
@@ -91,7 +110,11 @@
         <div class="panel">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>Код для игроков: <span class="session-code-badge" id="gm-session-code">-</span></div>
-                <button class="btn-danger" onclick="closeSession()">Закрыть сессию</button>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button class="btn-success" style="width:auto;" onclick="gmCallPlayers()" title="Всем игрокам придёт сигнал: окно, вибрация, уведомление">📣 Позвать</button>
+                    <button id="gm-btn-notify" style="width:auto;" onclick="gmEnableNotifications()">🔔 Разрешить уведомления</button>
+                    <button class="btn-danger" onclick="closeSession()">Закрыть сессию</button>
+                </div>
             </div>
         </div>
 
@@ -104,7 +127,36 @@
 
             <div class="panel">
                 <h2><span class="skyrim-icon icon-skull" aria-hidden="true"></span> Противники</h2>
+                <div id="gm-enemy-bulk" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                    <button type="button" style="width:auto; margin:0;" onclick="gmEnemySelectAll(true)">Выделить всех</button>
+                    <button type="button" style="width:auto; margin:0;" onclick="gmEnemySelectAll(false)">Снять выделение</button>
+                    <button type="button" style="width:auto; margin:0;" onclick="gmBulkToggleMenu()">⚙ Действия с выделенными (<span id="gm-bulk-count">0</span>)</button>
+                </div>
+                <div id="gm-bulk-menu" style="display:none; border:1px solid var(--border-color); border-radius:6px; padding:8px; margin-bottom:8px;">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <input type="number" id="gm-bulk-n" value="10" min="0" style="width:80px; margin:0;">
+                        <select id="gm-bulk-type" style="width:auto; margin:0;">
+                            <option value="physical">физический</option><option value="fire">огонь</option><option value="frost">холод</option>
+                            <option value="shock">электричество</option><option value="poison">яд</option><option value="magic">магия</option>
+                        </select>
+                        <button type="button" style="width:auto; margin:0;" onclick="gmBulkDamage()">💥 Нанести урон</button>
+                        <button type="button" style="width:auto; margin:0;" onclick="gmBulkHeal()">💚 Лечить</button>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+                        <select id="gm-bulk-status" style="width:auto; margin:0;"></select>
+                        <input type="number" id="gm-bulk-turns" value="1" min="1" style="width:70px; margin:0;" title="Длительность, ходов">
+                        <button type="button" style="width:auto; margin:0;" onclick="gmBulkStatus()">🌀 Наложить статус</button>
+                        <button type="button" class="btn-danger" style="width:auto; margin:0;" onclick="gmBulkRemove()">🗑 Убрать выделенных</button>
+                    </div>
+                </div>
+                <div id="gm-enemy-grid" class="st-enemy-grid"></div>
                 <div id="gm-enemies-list"></div>
+                <div class="st-encounters" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <select id="gm-encounter-select" style="flex:1; min-width:140px; margin:0;"></select>
+                    <button type="button" style="width:auto; margin:0;" onclick="gmLoadEncounter()" title="Добавит всех врагов заготовки к текущим (с новыми id)">📂 Загрузить заготовку</button>
+                    <button type="button" style="width:auto; margin:0;" onclick="gmSaveEncounter()" title="Сохранит текущих врагов как заготовку (в этом браузере)">💾 Сохранить текущих</button>
+                    <button type="button" class="btn-danger" style="width:auto; margin:0;" onclick="gmDeleteEncounter()">🗑</button>
+                </div>
                 <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
                     <label>Быстро из базы (Враги.xlsx)</label>
                     <select id="enemy-db-select" onchange="onEnemyDbPicked()">
@@ -124,6 +176,20 @@
                     </div>
                     <label>Лут (текстом, необязательно — можно поправить и потом)</label>
                     <input type="text" id="enemy-loot-input" placeholder="Например: 20 золота, шкура, кинжал">
+                    <details id="enemy-gear-box" style="margin-top:8px;">
+                        <summary style="cursor:pointer; font-weight:bold;">⚔️ Снаряжение и добыча по выбору мастера (в т.ч. уникальные вещи)</summary>
+                        <p style="font-size:13px; opacity:.75; margin:4px 0;">Выбери предметы из базы: самое сильное оружие задаёт урон врага, броня — физ. резист (если поля выше пустые), а всё выбранное выпадает при обыске (с указанным шансом). Так делаются уникальные враги. Если список не пуст, он заменяет автоматическое снаряжение и лут из базы врагов.</p>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <input type="text" list="enemy-gear-datalist" id="enemy-gear-name" placeholder="Название предмета…" style="flex:3; min-width:160px; margin:0;">
+                            <input type="number" id="enemy-gear-qty" value="1" min="1" style="width:60px; margin:0;" title="Количество">
+                            <input type="number" id="enemy-gear-chance" value="100" min="1" max="100" style="width:70px; margin:0;" title="Шанс выпадения при обыске, %">
+                            <button type="button" style="width:auto; margin:0;" onclick="addEnemyGearItem()">+ Добавить</button>
+                        </div>
+                        <datalist id="enemy-gear-datalist"></datalist>
+                        <div id="enemy-gear-list" style="margin:6px 0;"></div>
+                        <label>Золото при обыске</label>
+                        <input type="number" id="enemy-gear-gold" value="0" min="0">
+                    </details>
                     <button class="btn-success" style="margin-top:8px; width:100%;" onclick="addEnemy()">Добавить противника</button>
                 </div>
             </div>
@@ -135,6 +201,7 @@
             <div id="prep-now" style="margin-bottom:8px; padding:6px 8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
                 <select id="prep-hold" style="flex:1 1 200px;" onchange="prepPickHold(this.value)"></select>
+                <select id="prep-target" onchange="gmSetOpenTarget(this.value)" title="Кому открывать места (кнопка «Открыть игрокам»)" style="flex:0 1 200px;"><option value="">Открывать: всем игрокам</option></select>
                 <input type="text" id="prep-search" placeholder="🔍 Фильтр: имя, роль, место, враг" style="flex:1 1 200px;" oninput="renderPrep(true)">
                 <label style="display:flex; align-items:center; gap:4px; font-size:12px; margin:0;"><input type="checkbox" id="prep-all-people" onchange="renderPrep(true)"> показывать всех жителей</label>
             </div>
@@ -230,7 +297,11 @@
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
             <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
                 <div id="gm-attack-roll-text"></div>
-                <button class="btn-success" style="width:100%; margin-top:8px;" onclick="applyGmAttackDamage()">✅ Применить к игроку</button>
+                <div id="gm-attack-preview" style="font-size:13px; margin-top:6px; opacity:.9;"></div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button type="button" style="flex:0 0 auto; width:auto;" onclick="previewGmAttack()" title="Посчитать урон с учётом резистов игрока — ничего не записывает">🎯 Предпросмотр</button>
+                    <button class="btn-success" style="flex:1;" onclick="applyGmAttackDamage()">✅ Применить к игроку</button>
+                </div>
             </div>
         </div>
 
@@ -248,6 +319,15 @@
                     <button onclick="addTurnOrderCustom()">+</button>
                 </div>
                 <button style="margin-top:6px; width:100%;" onclick="clearTurnOrder()">Очистить порядок ходов</button>
+                <div id="gm-timers-box" style="margin-top:8px; border-top:1px solid var(--border-color); padding-top:8px;">
+                    <label>⏳ Отложенные события (таймеры)</label>
+                    <div id="gm-timers-list"></div>
+                    <div style="display:flex; gap:6px; margin-top:4px;">
+                        <input type="number" id="gm-timer-turns" value="3" min="1" style="width:64px; margin:0;" title="Через сколько ходов">
+                        <input type="text" id="gm-timer-label" placeholder="Что произойдёт: появление второй волны" style="flex:1; margin:0;">
+                        <button type="button" style="width:auto; margin:0;" onclick="gmAddTimer()">+</button>
+                    </div>
+                </div>
                 <button class="btn-success" style="margin-top:6px; width:100%;" onclick="gmAdvanceTurn()">⏭️ Объявить следующий ход (вся группа)</button>
                 <button class="btn-danger" style="margin-top:4px; width:100%;" onclick="resetSessionTurnCounter()" title="Обнуляет общий счётчик ходов сессии — окно 'поднять труп' и т.п. тоже сбросится">↺ Обнулить общий счётчик ходов</button>
                 <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Тикает статус-эффекты и кулдауны криков у врагов, напоминает игрокам в журнале прокрутить свои эффекты. Личные баффы/дебаффы на листах игроков эта кнопка не трогает — каждый игрок всё ещё крутит их у себя сам.</p>
@@ -265,7 +345,8 @@
             </div>
 
             <div class="panel">
-                <h2><span class="skyrim-icon icon-book" aria-hidden="true"></span> Боевой журнал</h2>
+                <h2><span class="skyrim-icon icon-book" aria-hidden="true"></span> Боевой журнал
+                    <button type="button" id="gm-undo-btn" class="st-undo-btn" onclick="gmUndoLast()" title="Отменяет последнее изменение врагов (доступно 30 секунд)" disabled>↶ Отменить</button></h2>
                 <div id="gm-combat-log" class="combat-log"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <input type="text" id="gm-log-input" placeholder="Записать событие...">
@@ -273,6 +354,7 @@
                 </div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button style="flex:1;" onclick="exportCombatLogToFile()">💾 Экспорт в текст</button>
+                    <button style="flex:1;" onclick="gmExportSessionPdf()" title="Откроет печатную версию — выбери «Сохранить как PDF»">💾 Экспорт сессии (PDF)</button>
                     <button style="flex:1;" onclick="clearLog()">Очистить журнал</button>
                 </div>
             </div>
@@ -321,6 +403,9 @@
                     <button class="btn-success" style="flex:1;" onclick="rollWeatherForRegion()">🎲 Погода по региону</button>
                     <button style="flex:1;" onclick="setSessionTimeWeather()">Применить</button>
                 </div>
+                <label style="display:flex; gap:6px; align-items:center; margin-top:8px;"><input type="checkbox" id="weather-auto-day" style="width:auto; margin:0;"> 🌦 Автосмена при новом игровом дне (предложу погоду по региону и сезону)</label>
+                <label style="display:flex; gap:6px; align-items:center; margin-top:4px;"><input type="checkbox" id="travel-encounter-on" style="width:auto; margin:0;"> 🎲 Бросать встречу при движении партии (d6: 5–6 — событие)</label>
+                <button type="button" style="margin-top:6px; width:100%;" onclick="gmNewGameDay()" title="Увеличивает счётчик игровых дней сессии (так же, как «Следующий день» у игрока)">☀ Новый игровой день</button>
                 <div id="weather-gm-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
 
@@ -336,14 +421,20 @@
                 <div id="gm-map-selected" style="margin-top:6px; font-size:14px;"></div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center;">
                     <select id="gm-map-settle" style="flex:1 1 220px;" onchange="gmMapPickSettle(this.value)"><option value="">— выбрать поселение из списка —</option></select>
-                    <span style="font-size:12px; opacity:.7; flex:1 1 220px;">Точное положение на картинке есть только у столиц; остальные поселения выбирай здесь или на общей схеме.</span>
+                    <span style="font-size:12px; opacity:.7; flex:1 1 220px;">Точное положение на картинке изначально есть только у столиц; остальные стоят по условной схеме. Чтобы поставить поселение туда, где оно на картинке: кликни точку на карте владения → выбери поселение ниже → «Назначить».</span>
                 </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center;">
+                    <select id="gm-map-settle-set" style="flex:1 1 220px;"><option value="">— поселение, которому назначить выбранную точку —</option></select>
+                    <button style="flex:0 0 auto;" onclick="gmMapAssignSettle()" title="Поселение встанет ровно на выбранную точку (на карте, в маршрутах и у игроков)">🏘 Назначить выбранную точку</button>
+                </div>
+                <div id="gm-map-settle-ov" style="margin-top:4px;"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn-success" style="flex:1;" onclick="gmMapSetParty()">📍 Партия здесь</button>
                     <button style="flex:1;" onclick="gmMapClearParty()">Убрать метку партии</button>
                 </div>
-                <div style="display:flex; gap:6px; margin-top:6px;">
-                    <button class="btn-success" style="flex:1;" onclick="gmMapAddMark()" title="Выбранная точка или метка места появится на карте у всех игроков">📌 Метка для игроков (на выбранную точку)</button>
+                <div style="display:flex; gap:6px; margin-top:6px; align-items:center; flex-wrap:wrap;">
+                    <select id="gm-map-target" onchange="gmSetOpenTarget(this.value)" title="Кому видна метка / открытое место" style="flex:0 1 200px;"><option value="">Кому: всем игрокам</option></select>
+                    <button class="btn-success" style="flex:1 1 220px;" onclick="gmMapAddMark()" title="Выбранная точка появится на карте у выбранных игроков">📌 Метка (на выбранную точку)</button>
                 </div>
                 <div id="gm-map-marks" style="margin-top:6px;"></div>
 
@@ -800,6 +891,18 @@
             <h2>⚖️ Репутация по владениям</h2>
             <p style="font-size:12px; opacity:.75;">Видно только мастеру — игрок свою репутацию не видит. Может быть отрицательной.</p>
             <div id="reputation-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
+            <div id="reputation-warn" style="margin-top:6px; font-size:13px;"></div>
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer; font-weight:bold;">Репутация и последствия</summary>
+                <div style="font-size:13px; line-height:1.5; margin-top:4px;">
+                    <div><strong>+5 и выше</strong> — уважают: скидка ×0.9 у торговцев владения.</div>
+                    <div><strong>+1…+4</strong> — доброжелательны: скидка ×0.95.</div>
+                    <div><strong>0</strong> — нейтрально.</div>
+                    <div><strong>−1…−2</strong> — прохладно: наценка ×1.05.</div>
+                    <div><strong>−3 и ниже</strong> — подозревают: наценка ×1.25, торговцы могут отказать в дорогих товарах (решаешь ты).</div>
+                    <div><strong>−10 и ниже</strong> — стража пытается арестовать.</div>
+                </div>
+            </details>
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="saveReputation()">Сохранить</button>
         </div>
 
@@ -868,8 +971,83 @@
             </select>
             <label>Количество предмета каждому</label>
             <input type="number" id="party-reward-item-qty" value="1" min="1">
+            <label style="display:flex; gap:6px; align-items:center; margin-top:8px;"><input type="checkbox" id="party-reward-to-stash" checked style="width:auto; margin:0;"> Положить в общий сундук отряда (золото — общей суммой, предмет — общим количеством). Снять галочку — выдать каждому напрямую, как раньше.</label>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="grantPartyReward()">Выдать всей группе</button>
             <div id="party-reward-result" style="margin-top:8px; font-size:14px;"></div>
+        </div>
+
+        <!-- ===== ЧАТ ПАРТИИ OOC (эпик 3.3) ===== -->
+        <div class="panel">
+            <h2>💬 Чат партии (вне игры)</h2>
+            <div id="gm-ooc-log" class="combat-log" style="max-height:200px;"></div>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <input type="text" id="gm-ooc-input" maxlength="500" placeholder="Написать игрокам (OOC)..." style="flex:1;" onkeydown="if(event.key==='Enter')gmSendOoc()">
+                <button onclick="gmSendOoc()">Отправить</button>
+            </div>
+        </div>
+
+        <!-- ===== ОПРОС ПАРТИИ (эпик 3.4) ===== -->
+        <div class="panel">
+            <h2>📊 Опрос партии</h2>
+            <input type="text" id="gm-poll-question" placeholder="Вопрос: идём через перевал или в обход?">
+            <textarea id="gm-poll-options" rows="3" placeholder="Варианты — по одному в строке (от 2 до 5)"></textarea>
+            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="gmCreatePoll()">Запустить опрос</button>
+            <div id="gm-polls-list" style="margin-top:8px;"></div>
+        </div>
+
+        <!-- ===== ШАБЛОНЫ NPC (эпик 3.8) ===== -->
+        <div class="panel">
+            <h2>💾 Шаблоны NPC</h2>
+            <p style="font-size:13px; opacity:.75;">Сохранённые из генераторов враги (до 20, хранятся в этом браузере). «Загрузить в бой» добавляет точную копию без случайности.</p>
+            <select id="gm-npc-template-select"></select>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button class="btn-success" style="flex:1;" onclick="gmLoadNpcTemplate()">⚔ Загрузить в бой</button>
+                <button class="btn-danger" style="width:auto;" onclick="gmDeleteNpcTemplate()">🗑</button>
+            </div>
+        </div>
+
+        <!-- ===== ДЕРЕВО СЮЖЕТА (эпик 3.9) ===== -->
+        <div class="panel">
+            <h2>🧭 Сюжет</h2>
+            <p style="font-size:13px; opacity:.75;">Узлы сюжета и связи между ними. Зелёный — идёт, серый — закрыт, красный — провален. Хранится в этом браузере.</p>
+            <svg id="gm-plot-svg" class="st-plot-svg" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid meet"></svg>
+            <div id="gm-plot-list"></div>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <input type="text" id="gm-plot-title" placeholder="Название узла" style="flex:1; margin:0;">
+                <select id="gm-plot-status" style="width:auto; margin:0;"><option value="active">идёт</option><option value="done">закрыт</option><option value="failed">провален</option></select>
+                <button type="button" style="width:auto; margin:0;" onclick="gmPlotAdd()">+ Узел</button>
+            </div>
+        </div>
+
+        <!-- ===== ЗАПРОСЫ НА КРАФТ (эпик 2.8) ===== -->
+        <div class="panel">
+            <h2>📋 Запросы на крафт</h2>
+            <p style="font-size:13px; opacity:.75;">NPC просит изготовить предмет. Игрок увидит заказ на вкладке инвентаря и сдаст его, когда принесёт нужное — награда начислится сама.</p>
+            <label>Кто просит (NPC)</label>
+            <input type="text" id="craft-order-npc" placeholder="Например: Кузнец Бейранд">
+            <label>Владение (необязательно)</label>
+            <select id="craft-order-hold"><option value="">—</option></select>
+            <label>Предмет (ищи по названию)</label>
+            <input type="text" id="craft-order-item-search" placeholder="Начни печатать название..." oninput="filterCraftOrderItems()">
+            <select id="craft-order-item-select"><option value="">— выбери предмет —</option></select>
+            <label>Количество</label>
+            <input type="number" id="craft-order-qty" value="1" min="1">
+            <label>Награда (золото)</label>
+            <input type="number" id="craft-order-reward" value="0" min="0">
+            <label>Кому</label>
+            <select id="craft-order-target"><option value="all">Всем игрокам</option></select>
+            <button class="btn-success" style="width:100%; margin-top:8px;" onclick="sendCraftOrder()">Отправить заказ</button>
+            <div id="craft-order-result" style="margin-top:8px; font-size:14px;"></div>
+        </div>
+
+        <!-- ===== СУНДУК ОТРЯДА (эпик 2.1) ===== -->
+        <div class="panel">
+            <h2>🎒 Сундук отряда</h2>
+            <p style="font-size:13px; opacity:.75;">Общий склад группы. Игроки сами кладут и берут; в журнале видно кто что взял.</p>
+            <div style="margin-bottom:6px;">💰 Золото: <strong id="gm-stash-gold">0</strong></div>
+            <div id="gm-stash-list" style="margin-bottom:8px;"></div>
+            <button class="btn-success" style="width:100%;" onclick="gmStashDistribute()">⚖ Раздать всем поровну (остаток останется в сундуке)</button>
+            <div id="gm-stash-result" style="margin-top:8px; font-size:14px;"></div>
         </div>
 
         <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
@@ -914,6 +1092,7 @@
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
             <div id="bandit-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
+            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('bandit')">💾 Сохранить как шаблон</button>
         </div>
 
         <!-- ===== ГЕНЕРАТОР МАГОВ-БАНДИТОВ ===== -->
@@ -924,6 +1103,7 @@
             <input type="number" id="bandit-mage-avg-level" value="10" min="1" max="60">
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateMageBandit()">🎲 Сгенерировать мага-бандита</button>
             <div id="bandit-mage-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('mage')">💾 Сохранить как шаблон</button>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedMageBanditToCombat()">Добавить в бой</button>
         </div>
 
@@ -938,6 +1118,7 @@
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateDraugr()">🎲 Сгенерировать драугра</button>
             <div id="draugr-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedDraugrToCombat()">Добавить в бой</button>
+            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('draugr')">💾 Сохранить как шаблон</button>
         </div>
 
         <!-- ===== ГЕНЕРАТОР ИЗГОЕВ ===== -->
@@ -951,13 +1132,14 @@
             <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateForsworn()">🎲 Сгенерировать изгоя</button>
             <div id="forsworn-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
             <button style="width:100%; margin-top:6px;" onclick="addGeneratedForswornToCombat()">Добавить в бой</button>
+            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('forsworn')">💾 Сохранить как шаблон</button>
         </div>
     </div>
 </div>
 
 <script src="firebase-config.js?v=3"></script>
-<script src="items-data.js?v=4"></script>
-<script src="smithing-data.js?v=4"></script>
+<script src="items-data.js?v=9"></script>
+<script src="smithing-data.js?v=5"></script>
 <script src="enchant-data.js?v=3"></script>
 <script src="holidays-data.js?v=3"></script>
 <script src="random-events-data.js?v=3"></script>
@@ -965,14 +1147,15 @@
 <script src="unique-weapons-data.js?v=3"></script>
 <script src="holds-data.js?v=3"></script>
 <script src="rumors-data.js?v=3"></script>
-<script src="holds-map.js?v=3"></script>
+<script src="holds-map.js?v=4"></script>
 <script src="spell-tomes-data.js?v=3"></script>
-<script src="cooking-data.js?v=4"></script>
+<script src="cooking-data.js?v=5"></script>
 <script src="alchemy-data.js?v=3"></script>
 <script src="fish-data.js?v=3"></script>
 <script src="spell-data.js?v=3"></script>
 <script src="enemies-data.js?v=3"></script>
-<script src="enemy-loot.js?v=1"></script>
-<script src="gm.js?v=4"></script>
+<script src="combat-calc.js?v=1"></script>
+<script src="enemy-loot.js?v=3"></script>
+<script src="gm.js?v=15"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@
     let unsubSession = null;
     let unsubWatchedCharacter = null;
     let saveTimer = null;
+    let pendingSave = null; // отложенная запись, ещё не ушедшая в облако (для flushSave)
     let cloudDataReady = false; // true только после того, как персонаж загружен из облака хотя бы раз —
                                  // защищает от перезаписи реальных данных дефолтными при входе с нового устройства.
     const SESSION_KEY = 'ttrpg_session_code';
@@ -99,7 +100,11 @@
         if (!window.FIREBASE_CONFIGURED) { showAuthError('Firebase ещё не настроен — см. README-FIREBASE.md'); return; }
         showAuthError('');
         const provider = new firebase.auth.GoogleAuthProvider();
-        applyAuthPersistence().then(() => auth.signInWithPopup(provider)).catch(e => {
+        // Эпик 3.11: доступ к файлам, созданным самим сайтом (scope drive.file — не видит остальной Drive). Токен держим ТОЛЬКО в памяти страницы.
+        if (typeof provider.addScope === 'function') provider.addScope('https://www.googleapis.com/auth/drive.file');
+        applyAuthPersistence().then(() => auth.signInWithPopup(provider)).then(res => {
+            window.__driveToken = (res && res.credential && res.credential.accessToken) || null;
+        }).catch(e => {
             if (e.code === 'auth/popup-closed-by-user') return;
             showAuthError(translateAuthError(e));
         });
@@ -110,8 +115,20 @@
     };
 
     window.cloudLogout = function () {
-        if (currentSessionCode) window.leaveSession();
-        if (auth) auth.signOut();
+        // Сначала дописываем правки, которые ещё ждут таймера: после signOut currentUser = null и saveCharacter молча ничего не сохранит.
+        try { if (typeof window.saveLocalStorage === 'function') window.saveLocalStorage(true); } catch (e) { console.warn('Сохранение перед выходом:', e); }
+        if (window.CloudSync && typeof window.CloudSync.flushSave === 'function') window.CloudSync.flushSave();
+        const finish = () => {
+            if (currentSessionCode) window.leaveSession();
+            if (auth) auth.signOut();
+        };
+        // Ждём, пока Firestore подтвердит отправленные записи (но не дольше 3 с, чтобы выход не зависал без сети).
+        if (db && typeof db.waitForPendingWrites === 'function') {
+            let done = false;
+            const once = () => { if (!done) { done = true; finish(); } };
+            db.waitForPendingWrites().then(once, once);
+            setTimeout(once, 3000);
+        } else finish();
     };
 
     function initAuth() {
@@ -175,6 +192,18 @@
 
     let lastSessionData = null;
 
+    // Эпик 5.3. Пересёк ли счёт порог ранга? Только напоминание мастеру в журнал — никаких автоначислений.
+    function announceGuildRank(guildName, before, after) {
+        try {
+            if (typeof GUILD_RANK_TIERS === 'undefined' || !currentSessionCode) return;
+            const tiers = GUILD_RANK_TIERS[guildName]; if (!tiers) return;
+            const crossed = tiers.filter(t => t.at > 0 && t.at > before && t.at <= after).pop();
+            if (!crossed) return;
+            const nm = (el('char-name') || {}).value || 'Игрок';
+            window.CloudSync.postCombatLog('🏅 ' + nm + ' достиг ранга «' + crossed.name + '» в гильдии «' + guildName + '» — мастеру нужно выдать награду/броню', nm);
+        } catch (e) { console.error(e); }
+    }
+
     function stripUndefinedForCloud(v) {
         if (v === undefined) return undefined;
         if (v === null || typeof v !== 'object') return v;
@@ -210,6 +239,7 @@
                     patch['participants.' + currentUser.uid + '.maxMp'] = Number(vitals[3]) || 0;
                     // Свободные жизни и состояние «пал» — для панели «Отряд» у мастера
                     patch['participants.' + currentUser.uid + '.lives'] = Number(data.lives) || 0;
+                    patch['participants.' + currentUser.uid + '.portraitThumb'] = (typeof data.portraitThumb === 'string' ? data.portraitThumb : '');
                     patch['participants.' + currentUser.uid + '.fallen'] = !!(data.deathState && data.deathState.fallen);
                     // Задача "порядок ходов": лёгкий список имён призванных/поднятых существ игрока,
                     // чтобы мастер видел их и мог включить в порядок ходов, не зная деталей.
@@ -227,8 +257,16 @@
                 }
             };
             clearTimeout(saveTimer);
-            if (immediate) doSave();
-            else saveTimer = setTimeout(doSave, 800);
+            if (immediate) { pendingSave = null; doSave(); }
+            else { pendingSave = doSave; saveTimer = setTimeout(() => { pendingSave = null; doSave(); }, 800); }
+        },
+
+        // Немедленно отправить отложенную запись (закрытие вкладки, выход из аккаунта).
+        flushSave: function () {
+            if (!pendingSave) return;
+            clearTimeout(saveTimer);
+            const f = pendingSave; pendingSave = null;
+            f();
         },
 
         // "Сброс персонажа" раньше чистил только localStorage — Firebase-авторизация переживает
@@ -246,6 +284,8 @@
         getSessionData: function () {
             return lastSessionData;
         },
+        // Игрок сейчас в сессии (код есть). lastSessionData после выхода НЕ обнуляется, поэтому «в сессии?» надёжнее проверять по коду.
+        isInSession: function () { return !!currentSessionCode; },
 
         // Списывает урон с конкретного противника в сессии и пишет запись в общий боевой журнал.
         // Возвращает Promise. isPlayerAction=true подписывает запись именем игрока, а не "Мастер".
@@ -262,22 +302,29 @@
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 const wasAlive = (enemies[idx].curHp || 0) > 0;
-                let resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
-                // Пробитие брони/магической защиты (Боевые искусства/богиня Малакат/Азура) —
-                // снижает эффективный резист цели именно для этого удара, не трогает сам объект врага.
-                // Уязвимость (отрицательный резист) пробитием не «лечится».
-                if (penetrationPct && resist > 0) resist = Math.max(0, resist - penetrationPct);
-                // Статус-эффекты на враге с резистами/уязвимостями (яды и зелья: «Уязвимость к огню», «Увеличение получаемого физ.урона»...).
-                // Для огня/холода/электричества/магии дополнительно действует общий «магический» резист.
-                if (dmgType && Array.isArray(enemies[idx].statusEffects)) {
-                    const magicTypes = ['fire', 'frost', 'shock', 'magic'];
-                    enemies[idx].statusEffects.forEach(st => {
-                        if (!st || !st.res) return;
-                        resist += (st.res[dmgType] || 0);
-                        if (magicTypes.indexOf(dmgType) !== -1 && dmgType !== 'magic') resist += (st.res.magic || 0);
-                    });
+                // Раньше формула была записана здесь; теперь — единый StCombat.previewDamage (combat-calc.js), тот же расчёт использует «🎯 Предпросмотр».
+                let resist, finalDmg;
+                if (window.StCombat) {
+                    const pv = window.StCombat.previewDamage(enemies[idx], dmgAmount, dmgType, penetrationPct);
+                    resist = pv.resist; finalDmg = pv.finalDmg;
+                } else {
+                    let resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
+                    // Пробитие брони/магической защиты (Боевые искусства/богиня Малакат/Азура) —
+                    // снижает эффективный резист цели именно для этого удара, не трогает сам объект врага.
+                    // Уязвимость (отрицательный резист) пробитием не «лечится».
+                    if (penetrationPct && resist > 0) resist = Math.max(0, resist - penetrationPct);
+                    // Статус-эффекты на враге с резистами/уязвимостями (яды и зелья: «Уязвимость к огню», «Увеличение получаемого физ.урона»...).
+                    // Для огня/холода/электричества/магии дополнительно действует общий «магический» резист.
+                    if (dmgType && Array.isArray(enemies[idx].statusEffects)) {
+                        const magicTypes = ['fire', 'frost', 'shock', 'magic'];
+                        enemies[idx].statusEffects.forEach(st => {
+                            if (!st || !st.res) return;
+                            resist += (st.res[dmgType] || 0);
+                            if (magicTypes.indexOf(dmgType) !== -1 && dmgType !== 'magic') resist += (st.res.magic || 0);
+                        });
+                    }
+                    const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
                 }
-                const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
                 const newHp = Math.max(0, (enemies[idx].curHp || 0) - finalDmg);
                 const patch = { curHp: newHp };
                 // Штампуем момент смерти (номер общего счётчика ходов сессии) — труп поднимаемый
@@ -636,9 +683,15 @@
 
         incrementGuildProgress: function (guildName) {
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
+            const ref = db.collection('characters').doc(currentUser.uid);
             const patch = {};
             patch['guildsData.' + guildName + '.orders'] = firebase.firestore.FieldValue.increment(1);
-            return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
+            // Эпик 5.3: узнаём счёт ДО прибавления, чтобы понять, не пересечён ли порог ранга (само прибавление по-прежнему атомарное).
+            return ref.get().then(doc => {
+                const gd = ((doc.exists ? doc.data() : {}).guildsData || {})[guildName];
+                const before = typeof gd === 'number' ? gd : (gd && parseInt(gd.orders)) || 0;
+                return ref.set(patch, { merge: true }).then(() => announceGuildRank(guildName, before, before + 1));
+            });
         },
 
         // Сдача артефакта в музей коллегии бардов — +1 легендарная песня (orders), +1 к
@@ -671,6 +724,82 @@
             return db.collection('characters').doc(currentUser.uid).set({ supernaturalState: state }, { merge: true });
         },
 
+        // ---------- Сундук отряда (sessions/{code}.partyStash / partyGold) ----------
+        // Всё меняется ТРАНЗАКЦИЕЙ над документом сессии: если двое берут одно и то же одновременно, успевает один (второй получит «уже забрали»).
+        // Предмет/золото убираются у отправителя ТОЛЬКО после успеха (вызывающий код), а у получателя добавляются по результату транзакции.
+        stashItem: function (item, qty, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            qty = Math.max(1, parseInt(qty) || 1);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
+                const ex = stash.find(s => s.itemId === item.itemId);
+                if (ex) ex.count = (ex.count || 0) + qty;
+                else stash.push(Object.assign({}, stripUndefinedForCloud(item), { count: qty }));
+                tx.update(ref, {
+                    partyStash: stash,
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: '🎒 ' + (authorName || 'Игрок') + ' кладёт в сундук отряда: ' + item.name + (qty > 1 ? ' ×' + qty : '') + '.' })
+                });
+            }));
+        },
+        takeFromStash: function (itemId, qty, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            qty = Math.max(1, parseInt(qty) || 1);
+            let taken = null;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
+                const idx = stash.findIndex(s => s.itemId === itemId);
+                if (idx === -1 || (stash[idx].count || 0) < qty) throw new Error('Этого уже нет в сундуке (кто-то успел раньше).');
+                taken = Object.assign({}, stash[idx], { count: qty });
+                if (stash[idx].count - qty <= 0) stash.splice(idx, 1); else stash[idx] = Object.assign({}, stash[idx], { count: stash[idx].count - qty });
+                tx.update(ref, {
+                    partyStash: stash,
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: '🎒 ' + (authorName || 'Игрок') + ' берёт из сундука: ' + taken.name + (qty > 1 ? ' ×' + qty : '') + '.' })
+                });
+            })).then(() => taken);
+        },
+        // delta > 0 — положить золото, delta < 0 — взять (нельзя взять больше, чем есть)
+        changeStashGold: function (delta, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            delta = parseInt(delta) || 0;
+            if (!delta) return Promise.resolve(0);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const cur = parseInt((doc.data() || {}).partyGold) || 0;
+                if (cur + delta < 0) throw new Error('В сундуке только ' + cur + ' золота.');
+                tx.update(ref, {
+                    partyGold: cur + delta,
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: '💰 ' + (authorName || 'Игрок') + (delta > 0 ? ' кладёт в сундук ' : ' берёт из сундука ') + Math.abs(delta) + ' зол.' })
+                });
+            })).then(() => delta);
+        },
+
+        // ---------- OOC-чат (эпик 3.3): отдельное поле oocChat, с боевым журналом не смешивается ----------
+        postOOC: function (text, author) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            text = String(text || '').trim().slice(0, 500);
+            if (!text) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                oocChat: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: author || 'Игрок', text: text })
+            });
+        },
+        // ---------- Опросы (эпик 3.4): polls.{id}.votes.{uid} = индекс варианта ----------
+        votePoll: function (pollId, optionIndex) {
+            if (!currentSessionCode || !db || !currentUser) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                const poll = ((doc.data() || {}).polls || {})[pollId];
+                if (!poll) throw new Error('Опрос не найден.');
+                if (poll.closed) throw new Error('Опрос уже закрыт.');
+                if (!(optionIndex >= 0 && optionIndex < (poll.options || []).length)) throw new Error('Нет такого варианта.');
+                tx.update(ref, { ['polls.' + pollId + '.votes.' + currentUser.uid]: optionIndex });
+            }));
+        },
+
         // Пишет произвольную запись в общий боевой журнал сессии от имени игрока.
         postCombatLog: function (text, authorName) {
             if (!currentSessionCode || !db || !text) return Promise.resolve();
@@ -690,6 +819,20 @@
         setCampState: function (state) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             return db.collection('sessions').doc(currentSessionCode).update({ campState: state });
+        },
+
+        // Шёпот другому игроку: sessions/{code}.playerWhispers {id, ts, fromUid, fromName, toUid, toName, text}.
+        // Отправитель и адресат видят запись у себя; панель мастера её не показывает. Это интерфейсное разделение —
+        // документ сессии технически читаем всеми участниками (как и шёпот мастеру).
+        sendWhisperToPlayer: function (toUid, toName, text, fromName) {
+            if (!currentSessionCode || !db || !text || !toUid || !currentUser) return Promise.resolve();
+            return db.collection('sessions').doc(currentSessionCode).update({
+                playerWhispers: firebase.firestore.FieldValue.arrayUnion({
+                    id: 'pw-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                    ts: Date.now(), fromUid: currentUser.uid, fromName: fromName || 'Игрок',
+                    toUid: toUid, toName: toName || 'Игрок', text: String(text).slice(0, 500)
+                })
+            });
         },
 
         sendWhisperToGm: function (text, authorName) {
@@ -872,7 +1015,9 @@
         }).catch(() => {});
         if (unsubSession) { unsubSession(); unsubSession = null; }
         currentSessionCode = null;
+        lastSessionData = null;   // раньше после выхода «старая» сессия оставалась в getSessionData()
         localStorage.removeItem(SESSION_KEY);
+        if (typeof window.updateCombatDock === 'function') window.updateCombatDock();
         el('session-active-block').style.display = 'none';
         el('session-join-block').style.display = 'block';
         el('session-code-input').value = '';
@@ -950,6 +1095,8 @@
         let seen = 0;
         try { seen = parseInt(localStorage.getItem(gmWhisperSeenKey())) || 0; } catch (e) {}
         const unread = mine.filter(w => (w.ts || 0) > seen);
+        if (window._gmWhisperUnreadPrev !== undefined && unread.length > window._gmWhisperUnreadPrev) window.stNotify('Шёпот от мастера', unread[unread.length - 1].text || '');
+        window._gmWhisperUnreadPrev = unread.length;
 
         const box = el('gm-whispers-inbox');
         if (box) {
@@ -982,8 +1129,106 @@
         }
     }
 
+    // ---------- Шёпот между игроками ----------
+    let _lastPlayerWhisperToastTs = 0;
+    function playerWhisperSeenKey() { return 'skyrim_pl_whisper_seen_' + (currentSessionCode || ''); }
+    function myPlayerWhispers(all) {
+        return (all || []).filter(w => currentUser && (w.toUid === currentUser.uid || w.fromUid === currentUser.uid)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    }
+    window.markPlayerWhispersSeen = function () {
+        const incoming = myPlayerWhispers(lastSessionData && lastSessionData.playerWhispers).filter(w => w.toUid === currentUser.uid);
+        try { localStorage.setItem(playerWhisperSeenKey(), String(incoming.reduce((m, w) => Math.max(m, w.ts || 0), 0))); } catch (e) {}
+        const toast = document.getElementById('pl-whisper-toast'); if (toast) toast.style.display = 'none';
+        renderPlayerWhispers((lastSessionData && lastSessionData.playerWhispers) || [], (lastSessionData && lastSessionData.participants) || {});
+    };
+    function renderPlayerWhispers(all, participants) {
+        if (!currentUser) return;
+        // список адресатов — остальные участники сессии (выбор сохраняется между обновлениями)
+        const sel = el('pwhisper-target');
+        if (sel) {
+            const others = Object.keys(participants || {}).filter(uid => uid !== currentUser.uid);
+            const sig = others.map(u => u + ':' + ((participants[u] || {}).name || '')).join('|');
+            if (sel.getAttribute('data-sig') !== sig) {
+                const prev = sel.value;
+                sel.innerHTML = '<option value="">Кому…</option>' + others.map(u => `<option value="${escapeHtml(u)}">${escapeHtml((participants[u] || {}).name || 'Игрок')}</option>`).join('');
+                if (others.includes(prev)) sel.value = prev;
+                sel.setAttribute('data-sig', sig);
+            }
+        }
+        const mine = myPlayerWhispers(all);
+        let seen = 0;
+        try { seen = parseInt(localStorage.getItem(playerWhisperSeenKey())) || 0; } catch (e) {}
+        const unread = mine.filter(w => w.toUid === currentUser.uid && (w.ts || 0) > seen);
+        const box = el('player-whispers-inbox');
+        if (box) {
+            box.innerHTML = !mine.length ? '' :
+                '<div style="font-size:13px; opacity:.8; margin-bottom:2px;">🤫 Шёпот между игроками' +
+                (unread.length ? ` — <strong style="color:var(--accent-color);">новых: ${unread.length}</strong> <button style="width:auto; padding:1px 8px; font-size:12px;" onclick="markPlayerWhispersSeen()">Прочитано</button>` : '') + '</div>' +
+                mine.slice(-10).map(w => {
+                    const incoming = w.toUid === currentUser.uid;
+                    const isNew = incoming && (w.ts || 0) > seen;
+                    const time = w.ts ? new Date(w.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const who = incoming ? escapeHtml(w.fromName || 'Игрок') + ' → вам' : 'вы → ' + escapeHtml(w.toName || 'Игрок');
+                    return `<div class="log-entry" style="${isNew ? 'border-left:3px solid var(--accent-color); padding-left:6px;' : ''}"><span class="log-time">${time}</span><span class="log-author">${who}:</span> ${escapeHtml(w.text || '')}</div>`;
+                }).join('');
+        }
+        const newest = unread.length ? unread[unread.length - 1] : null;
+        if (newest && (newest.ts || 0) > _lastPlayerWhisperToastTs) {
+            _lastPlayerWhisperToastTs = newest.ts || 0;
+            let toast = document.getElementById('pl-whisper-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'pl-whisper-toast';
+                toast.style.cssText = 'position:fixed; top:70px; right:12px; max-width:320px; z-index:9500; background:#241c10; border:1px solid #765d35; border-radius:6px; padding:10px 12px; color:#f0e6d2; font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.5); cursor:pointer;';
+                toast.onclick = window.markPlayerWhispersSeen;
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = '🤫 <strong>' + escapeHtml(newest.fromName || 'Игрок') + ' шепчет вам</strong>' + (unread.length > 1 ? ` (новых: ${unread.length})` : '') + '<br>' + escapeHtml(newest.text || '');
+            toast.style.display = 'block';
+        }
+    }
+
+    // 6.2: «мастер что-то сделал». Раньше новая запись журнала проходила незаметно, если смотришь в другую вкладку.
+    // Сравниваем длину combatLog с прошлой отрисовкой ТОЙ ЖЕ сессии: выросла — короткий звук + вибро. Первая
+    // отрисовка после входа и перерисовка без изменений молчат. Свои же записи не пикают (иначе бы пикало на каждое действие).
+    const ST_BEEP = 'data:audio/wav;base64,UklGRtQEAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YbAEAACAudjOoGQ0J0N6tNXPpWo5KEB1rtLQqW89KT1vqc/RrXVCKztqo8zRsXpGLTlmnsjRtH9LLzhhmcTQt4VQMTZdk8DPuopVNDZZjrzOvI5aNzVWibjNvpNfOjVThLTLwJdkPTZQgK/JwZtpQTZNe6vHwp9tRTdLdqbEwqJySDhJcqLBw6V3TDpHbp2+wqh7UDtGapm7wquAVT1FZ5S4wa2EWUBEZJC0wK+IXUJEYYyxv7GLYUVEXoetvrKPZUhEW4OpvLOSaUtEWYCmurSVbU5FV3yiuLSYcVFGVnietrSbdVRHVHWas7SdeVdJU3KXsbSffFtKUm+TrrOhf15MUmyPq7Ojg2JOUmqMqLKkhmVQUmiJpbCliWhTUmaFoq+mi2xVUmSCn62mjm9YU2N/nKunkHJaVGJ9mamnknVdVWF6lqemlHhgVmB4k6WmlXpiWF92kKOlln1lWV90jqGll4BoW19yi56kmIJqXV9wiJyjmYRtX2BvhpqhmYZvYWBuhJegmodyY2FtgZWemol0ZWJsgJOdmYp2Z2NsfpCbmYt5aWRrfI6ZmIx7a2Vre4yXmI18bWdreYqVl45+b2hseIiUlo5/cWpsd4aSlY6Bc2ttd4WQlI6CdW1udoOOko6Dd29udoKMkY2EeHBvdoGLj42EenJwdoCJjoyFe3Rydn+HjIuFfHVzdn6Gi4uFfXd0d32FiYmFfnh2eH2EiIiFf3p3eH2ChoeEf3t4eX2ChYaEgHx6en2BhIWDgH17e32Ag4OCgH59fX6AgYKBgH9+fn+AgIGAgH9/f3+/2atcKTuDyNSdTidGks/NjUMpU6HUxH46LWKu1bhvMzRxudSsYS48gMLQnlQtR47JypBJLlOczsKBQDFhqNC3czk3brPPrGY0P3y8zJ9ZMkiKw8eSTjJUl8i/hEY1YKPKtnc/Om2uyqtqOkF6t8igXjhKh73Dk1Q4VJPCvIZLOl+exbR6RT5rqMWqbkBEd7HDoGM9TIO4v5RZPVWPvLmJUT5fmr+yfUpCaqPAqXJFR3arvp9nQ06BsruVXkJXi7e2ilZDYJa6r4BQRmqfuqh1S0t0prqfa0hRfqy3lWNHWIixsotbSGGStK2CVUpqmrWmeFFOc6G1nm9OVHynspVnTVqGrK+MYE1ijq+qg1pPapawo3tWUnKdsJxzU1d7oq6Va1Jdg6arjWVSY4uppoVfVGuSqqF9W1dymKqbdllbep2plG9XYIGhpo1pV2WIpKOGZFhsjqWef2BbcpSlmXheXnmZpJNyXWN/nKKMbVxohp+fhmldbYugm4BlX3OQoJZ6Y2J5lJ+RdWJmfpedjHFiaoSZm4ZtYm+Im5eBamR0jZuTfGhneZCaj3hnan2TmYt0Z22ClJaGcWhxhpWTgm9pdYmWkH5ta3mMlY16bG59jpSJd2xwgZCShXVtdISQj4JzbneHkI1/cnB6iZCKfHFyfYqPh3pxdICLjYR4cnaCjIuCd3N5hIuJgHZ0e4WLh352dn2GioV8dnh/h4iDe3d6gYeHgXp4e4KGhYB6eX2DhoR/e3p+g4WCfnt8f4ODgX58fYCCgoB+fX6AgYGAfn5/gIGAf39/f4A=';
+    let stLogSession = null, stLogLen = null;
+    function stSoundOn() { try { return localStorage.getItem('skyrim_session_sound') === '1'; } catch (e) { return false; } }
+    window.stToggleSound = function () {
+        try { localStorage.setItem('skyrim_session_sound', stSoundOn() ? '0' : '1'); } catch (e) { }
+        stUpdateSoundBtn();
+        if (stSoundOn()) stPlayBeep(); // клик — это жест пользователя: заодно «разблокируем» автовоспроизведение звука
+    };
+    function stUpdateSoundBtn() { const b = el('btn-sound'); if (b) b.textContent = stSoundOn() ? '🔔 Звук при изменении в сессии: вкл' : '🔕 Звук при изменении в сессии'; }
+    function stPlayBeep() {
+        try { const a = new Audio(ST_BEEP); const p = a.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { }
+        try { if (navigator.vibrate) navigator.vibrate([80]); } catch (e) { }
+    }
+    window.stPlayBeep = stPlayBeep;
+    function stCheckLogGrowth(log) {
+        if (stLogSession !== currentSessionCode) { stLogSession = currentSessionCode; stLogLen = null; }
+        const len = log.length;
+        const prev = stLogLen;
+        stLogLen = len;
+        if (prev === null || len <= prev || !stSoundOn()) return;
+        const me = ((el('char-name') || {}).value || '').trim();
+        const fresh = log.slice(prev);
+        if (me && fresh.every(e => (e.author || '') === me)) return;
+        stPlayBeep();
+    }
+    document.addEventListener('DOMContentLoaded', stUpdateSoundBtn);
+    setTimeout(stUpdateSoundBtn, 0);
+
     function renderSession(data) {
         lastSessionData = data;
+        stCheckLogGrowth(data.combatLog || []);
+        if (typeof window.updateCombatDock === 'function') window.updateCombatDock();
+        renderPlayerWhispers(data.playerWhispers || [], data.participants || {});
+        if (typeof window.renderPartyStash === 'function') window.renderPartyStash(data);
+        renderOoc(data.oocChat || []);
+        updateNotifyButton();
+        if (typeof window.onPartyPosChanged === 'function') window.onPartyPosChanged(data.partyPos, currentSessionCode);
+        renderPollModal(data.polls || {});
         renderGmOnlineIndicator(data.gmLastSeen);
         renderCampStatus(data.campState);
         renderGmWhispersInbox(data.gmWhispers || []);
@@ -1111,11 +1356,13 @@
             ? (near.length ? '<div style="font-weight:bold; margin:2px 0 4px;">🗣 Сейчас здесь говорят (' + escapeHtml(here) + ')</div>' + near.map(r => rumorHtml(r, marks)).join('') : '')
               + (far.length ? (near.length ? '<div style="font-weight:bold; margin:8px 0 4px; opacity:.85;">Слышали раньше и в других местах</div>' : '') + far.map(r => rumorHtml(r, marks)).join('') : '')
             : '<span style="opacity:.6;">Слухов пока нет.</span>';
-        const entries = (j.entries || []);
+        const onlyDecisions = window._journalFilter === 'decision';
+        const entries = (j.entries || []).filter(e => !onlyDecisions || e.type === 'decision');
         entEl.innerHTML = entries.length ? entries.map(e => {
             const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-            return '<div class="log-entry"><span class="log-time">' + t + '</span><span class="log-author">' + escapeHtml(e.author || '?') + ':</span> ' + escapeHtml(e.text || '') + '</div>';
-        }).join('') : '<span style="opacity:.6;">Записей пока нет.</span>';
+            return '<div class="log-entry"><span class="log-time">' + t + '</span><span class="log-author">' + (e.type === 'decision' ? '⚖ ' : '') + escapeHtml(e.author || '?') + ':</span> ' + escapeHtml(e.text || '') + '</div>';
+        }).join('') : '<span style="opacity:.6;">' + (onlyDecisions ? 'Решений пока нет.' : 'Записей пока нет.') + '</span>';
+        ['journal-filter-all', 'journal-filter-decision'].forEach(id => { const b = el(id); if (b) b.classList.toggle('active', (id === 'journal-filter-decision') === onlyDecisions); });
         // Метка «есть новое» на вкладке
         window._journalSig = journalSignature(j);
         let seen = ''; try { seen = localStorage.getItem('journalSeen:' + currentSessionCode) || ''; } catch (e) { }
@@ -1124,18 +1371,74 @@
         if (btn && btn.classList.contains('active')) { window.markJournalSeen(); return; }
         if (btn) btn.textContent = (!empty && seen !== window._journalSig) ? '📖 Дневник ●' : '📖 Дневник';
     }
+    window.setJournalFilter = function (f) { window._journalFilter = f; if (window._lastJournal) renderJournal(window._lastJournal, window._lastJournalCtx); };
     window.markJournalSeen = function () {
         try { localStorage.setItem('journalSeen:' + currentSessionCode, window._journalSig || ''); } catch (e) { }
         const btn = el('tab14-btn'); if (btn) btn.textContent = '📖 Дневник';
     };
-    window.postJournalEntry = function () {
+    // ----- Уведомления (эпик 5.5). Показываются, когда вкладка скрыта (иначе игрок и так видит). -----
+    window.stNotify = function (title, body) {
+        try {
+            if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+            if (!document.hidden && !window.__stNotifyAlways) return;
+            new Notification(title, { body: body || '', icon: 'skyrim-bg.jpg' });
+        } catch (e) { }
+    };
+    window.stEnableNotifications = function () {
+        if (typeof Notification === 'undefined') { alert('Этот браузер не поддерживает уведомления.'); return; }
+        Notification.requestPermission().then(p => {
+            const b = el('btn-notify'); if (b) b.textContent = p === 'granted' ? '🔔 Уведомления включены' : '🔕 Уведомления запрещены';
+        });
+    };
+    function updateNotifyButton() {
+        const b = el('btn-notify'); if (!b || typeof Notification === 'undefined') return;
+        b.textContent = Notification.permission === 'granted' ? '🔔 Уведомления включены' : Notification.permission === 'denied' ? '🔕 Уведомления запрещены' : '🔔 Разрешить уведомления';
+    }
+
+    // ----- OOC-чат (3.3) -----
+    function renderOoc(log) {
+        const t = el('ooc-log'); if (!t) return;
+        t.innerHTML = log.map(m => {
+            const time = m.ts ? new Date(m.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+            return '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-author">' + escapeHtml(m.author || '?') + ':</span> ' + escapeHtml(m.text || '') + '</div>';
+        }).join('');
+        t.scrollTop = t.scrollHeight;
+    }
+    window.sendOoc = function () {
+        const input = el('ooc-input'); const text = (input.value || '').trim(); if (!text) return;
+        window.CloudSync.postOOC(text, (el('char-name') || {}).value || 'Игрок').then(() => { input.value = ''; }).catch(e => alert('Не удалось отправить: ' + e.message));
+    };
+
+    // ----- Опросы (3.4): модалка появляется при новом открытом опросе, за который игрок ещё не голосовал -----
+    const pollDismissed = {};
+    function renderPollModal(polls) {
+        const modal = el('poll-modal'); if (!modal) return;
+        const uid = currentUser && currentUser.uid;
+        const ids = Object.keys(polls || {}).filter(id => !polls[id].closed && !((polls[id].votes || {})[uid] >= 0) && !pollDismissed[id]).sort((a, b) => (polls[a].ts || 0) - (polls[b].ts || 0));
+        if (!ids.length) { modal.style.display = 'none'; return; }
+        const id = ids[0], p = polls[id];
+        if (modal.dataset.pollId !== id || modal.style.display === 'none') window.stNotify('Опрос партии', p.question || '');
+        modal.dataset.pollId = id;
+        el('poll-question').textContent = p.question || '';
+        el('poll-options').innerHTML = (p.options || []).map((o, i) => '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;font-size:16px;"><input type="radio" name="poll-opt" value="' + i + '" style="width:auto;margin:0;"> ' + escapeHtml(o) + '</label>').join('');
+        modal.style.display = 'flex';
+    }
+    window.submitPollVote = function () {
+        const modal = el('poll-modal'); const sel = document.querySelector('input[name="poll-opt"]:checked');
+        if (!sel) { alert('Выбери вариант.'); return; }
+        window.CloudSync.votePoll(modal.dataset.pollId, parseInt(sel.value)).then(() => { modal.style.display = 'none'; }).catch(e => alert(e.message));
+    };
+    window.dismissPoll = function () { const modal = el('poll-modal'); pollDismissed[modal.dataset.pollId] = true; modal.style.display = 'none'; };
+
+    window.postJournalEntry = function (type) {
+        type = (type === 'decision') ? 'decision' : 'note'; // эпик 3.5; 'rumor-log' зарезервирован под записи слухов
         const input = el('journal-new');
         const text = (input.value || '').trim();
         if (!text) return;
         if (!currentSessionCode || !currentUser) { alert('Запись партии доступна только внутри сессии.'); return; }
         const author = (el('char-name') || {}).value || currentUser.email || 'Игрок';
         db.collection('sessions').doc(currentSessionCode).update({
-            'journal.entries': firebase.firestore.FieldValue.arrayUnion({ id: 'j' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), author: author, text: text })
+            'journal.entries': firebase.firestore.FieldValue.arrayUnion({ id: 'j' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), author: author, text: text, type: type })
         }).then(() => { input.value = ''; }).catch(e => alert('Не удалось записать: ' + e.message));
     };
 
@@ -1198,6 +1501,20 @@
     el('log-input') && el('log-input').addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') window.postLogEntry();
     });
+
+    window.sendWhisperToPlayer = function () {
+        const input = el('pwhisper-input'), sel = el('pwhisper-target');
+        const text = (input.value || '').trim();
+        if (!currentSessionCode || !currentUser) { alert('Сначала войди в сессию.'); return; }
+        if (!sel.value) { alert('Выбери, кому шепнуть.'); return; }
+        if (!text) return;
+        const toName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : 'Игрок';
+        const fromName = (el('char-name') || {}).value || currentUser.email;
+        window.CloudSync.sendWhisperToPlayer(sel.value, toName, text, fromName)
+            .then(() => { input.value = ''; })
+            .catch(e => console.error('Ошибка шёпота игроку:', e));
+    };
+    el('pwhisper-input') && el('pwhisper-input').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') window.sendWhisperToPlayer(); });
 
     window.sendWhisperToGm = function () {
         const input = el('whisper-input');
