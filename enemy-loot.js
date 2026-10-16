@@ -29,6 +29,7 @@
         if (typeof db.armor === 'number') o.armor = db.armor; else if (typeof db.resistance === 'number') o.armor = db.resistance;
         if (db.slot) o.slot = db.slot;
         if (db.effect) o.effect = db.effect;
+        if (Array.isArray(db.alchemyEffects)) o.alchemyEffects = JSON.parse(JSON.stringify(db.alchemyEffects)); // зелья с трупа сохраняют настоящий эффект
         if (db.enchantment) o.enchantment = JSON.parse(JSON.stringify(db.enchantment));
         if (qty && qty > 1) o.qty = qty;
         return o;
@@ -474,6 +475,14 @@
         // сверху не прибавляем. У остальных бонус от случайного зачарования ограничен 30% базового урона.
         if (enchBonus) enchBonus = forceEnchant ? 0 : Math.min(enchBonus, Math.max(1, Math.round((enemy.weaponDmg || 0) * 0.3)));
         dmg += enchBonus;
+        // Баланс: урон драугров ×2, обычных Изгоев ×3 (шаман и Вересковое сердце — без множителя).
+        const dmgMult = isDraugr ? 2 : (enemy.name === 'Изгой' ? 3 : 1);
+        dmg = Math.round(dmg * dmgMult);
+        // Характеристики как у бандитов (gm.js generateBandit): урон оружием = база + СИЛ/ЛОВ.
+        const jit = () => Math.floor(Math.random() * 3);
+        const con = 14 + Math.floor(level * 0.3) + jit();
+        const str = 12 + Math.floor(level * 0.24) + jit();
+        const dex = 11 + Math.floor(level * 0.2) + jit();
 
         const gearNames = [];
         if (weapon) gearNames.push((weaponLoot ? weaponLoot.name : weapon.name));
@@ -493,7 +502,8 @@
             name: enemy.name, level, hp: enemy.hp || 0, mp: enemy.mana || 0,
             weaponDmg: dmg, weaponNote, isRanged: !!(weapon && weapon.slot === 'ranged'),
             armor: totalArmor, resist,
-            spells: (enemy.spells || []).map(s => Object.assign({}, s)),
+            str, dex, con,
+            spells: (enemy.spells || []).map(s => { const c = Object.assign({}, s); if (isDraugr && typeof c.dmg === 'number') c.dmg = Math.round(c.dmg * 2); return c; }),
             shouts: (enemy.shouts || []).map(s => Object.assign({}, s)),
             soul: enemy.soul || null, kind: enemy.kind || (isDraugr ? 'undead' : 'people'),
             gold: rest.gold, lootItems,

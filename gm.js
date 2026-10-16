@@ -1540,7 +1540,7 @@
             if (window.EnemyGear && window.EnemyGear.familyOf(currentEnemyDbPick.name)) {
                 const gen = window.EnemyGear.generate(currentEnemyDbPick, enemyLootCtx(currentEnemyDbPick.level));
                 if (gen) {
-                    extra.weaponDmg = gen.weaponDmg; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
+                    extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
                     extra.corpseLoot = { gold: gen.gold, items: gen.lootItems };
                     extra.loot = genLootText(gen);
                 }
@@ -5171,7 +5171,8 @@
     function renderGeneratedEnemy(gen, resultEl) {
         const ench = gen.lootItems.filter(l => l.enchantment);
         let html = `<strong>${escapeHtml(gen.name)} · ур. ${gen.level}</strong><br>`;
-        html += `ХП: ${gen.hp}${gen.mp ? ' · МП: ' + gen.mp : ''} · Урон: ${gen.weaponDmg}${gen.isRanged ? ' (дальний бой)' : ''} · Броня: ${gen.armor} (физ. резист ${gen.resist.physical || 0}%)<br>`;
+        html += `СИЛ ${gen.str} · ЛОВ ${gen.dex} · ТЕЛ ${gen.con}<br>`;
+        html += `ХП: ${gen.hp}${gen.mp ? ' · МП: ' + gen.mp : ''} · Урон: ${gen.weaponDmg}${gen.isRanged ? '+ЛОВ' : '+СИЛ'}${gen.isRanged ? ' (дальний бой)' : ''} · Броня: ${gen.armor} (физ. резист ${gen.resist.physical || 0}%)<br>`;
         html += `Снаряжение: ${escapeHtml(gen.weaponNote || '—')}${gen.gear.worn.length ? ' · надето: ' + gen.gear.worn.map(escapeHtml).join(', ') : ''}<br>`;
         if (gen.spells.length) html += `Заклинания: ${gen.spells.map(s => escapeHtml(s.name) + ' (' + (s.dmg || 0) + '/' + (s.cost || 0) + ')').join(', ')}<br>`;
         if (gen.shouts.length) html += `Крики: ${gen.shouts.map(s => escapeHtml(s.name)).join(', ')}<br>`;
@@ -5183,6 +5184,7 @@
     function enemyFromGenerated(gen) {
         return stripUndefinedDeep({
             id: genId('e'), name: gen.name + ' (ур.' + gen.level + ')', maxHp: gen.hp, curHp: gen.hp, maxMp: gen.mp || 0, curMp: gen.mp || 0,
+            str: gen.str, dex: gen.dex, con: gen.con,
             weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist,
             spells: gen.spells, shouts: gen.shouts, soul: gen.soul, level: gen.level, kind: gen.kind,
             loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }

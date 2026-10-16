@@ -543,8 +543,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
     <script src="perks.js?v=3"></script>
-    <script src="items-data.js?v=9"></script>
-    <script src="cooking-data.js?v=5"></script>
+    <script src="items-data.js?v=10"></script>
+    <script src="cooking-data.js?v=8"></script>
     <script src="smithing-data.js?v=5"></script>
     <script src="enchant-data.js?v=3"></script>
     <script src="spell-data.js?v=3"></script>
@@ -2136,15 +2136,30 @@
     // Стакинг баффов: повторный каст ТОГО ЖЕ заклинания/эффекта (по имени) не добавляет вторую
     // копию — просто обновляет оставшееся время до нового значения (и остальные числа, на случай
     // усиленного каста поверх обычного). Разные эффекты — разные записи, как раньше.
+    // Раньше «+N к здоровью» от зелья/еды/заклинания поднимало только МАКСИМУМ хп, а текущие оставались прежними — игрок получал
+    // пустую полоску вместо лечения. Теперь прирост максимума сразу добавляется и к текущим хп (но не выше нового максимума;
+    // при ручной блокировке максимума — не выше заблокированного). Когда бафф спадает, лишнее срезается в updateAll().
+    function stGrantBuffHp(delta) {
+        if (!(delta > 0)) return;
+        const cur = document.getElementById('cur-hp'), max = document.getElementById('max-hp'), lock = document.getElementById('manual-hp-lock');
+        if (!cur || !max) return;
+        const c = parseInt(cur.value) || 0, m = parseInt(max.value) || 0;
+        const newMax = (lock && lock.checked) ? m : m + delta;
+        cur.value = Math.max(c, Math.min(newMax, c + delta));
+        if (typeof scheduleUpdateAll === 'function') scheduleUpdateAll();
+    }
     function pushOrRefreshTimedEffect(entry) {
         const key = entry.effectName || entry.name;
         const existing = activeTimedEffects.find(e => (e.effectName || e.name) === key);
         if (existing) {
             const keepId = existing.id;
+            const hpGain = (entry.hp || 0) - (existing.hp || 0);
             Object.assign(existing, entry, { id: keepId });
+            stGrantBuffHp(hpGain);
             return existing;
         }
         activeTimedEffects.push(entry);
+        stGrantBuffHp(entry.hp || 0);
         return entry;
     }
     let gameTurn = 0, gameRound = 0;
@@ -5262,7 +5277,9 @@ window.toggleSkillPanel = function (idx) {
             el.innerHTML = '<p style="opacity:.6; font-size:14px;">В инвентаре пока нет продуктов для готовки.</p>';
             return;
         }
-        el.innerHTML = cookable.map(item => {
+        const capU = (window.COOK_IMPROV && window.COOK_IMPROV.maxUnits) || 9;
+        const used = Object.keys(potSelections).reduce((a, k) => a + (potSelections[k] || 0), 0);
+        el.innerHTML = `<div style="opacity:.75; font-size:13px; margin-bottom:4px;">В котле: ${used} / ${capU}</div>` + cookable.map(item => {
             const sel = potSelections[item.itemId] || 0;
             return `
             <div class="stat-block">
@@ -5277,6 +5294,10 @@ window.toggleSkillPanel = function (idx) {
         let qty = parseInt(value) || 0;
         if (qty < 0) qty = 0;
         if (qty > maxCount) qty = maxCount;
+        // Потолок котла — не больше N единиц продуктов суммарно (COOK_IMPROV.maxUnits).
+        const capU = (window.COOK_IMPROV && window.COOK_IMPROV.maxUnits) || 9;
+        let others = 0; Object.keys(potSelections).forEach(k => { if (k !== itemId) others += potSelections[k] || 0; });
+        if (qty > capU - others) qty = Math.max(0, capU - others);
         if (qty === 0) delete potSelections[itemId];
         else potSelections[itemId] = qty;
         renderKitchenPot();
@@ -5312,6 +5333,11 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
 
+        const capU = (window.COOK_IMPROV && window.COOK_IMPROV.maxUnits) || 9;
+        if (potNames.reduce((a, n) => a + potMap[n], 0) > capU) {
+            resultEl.innerHTML = `<span style="color:#e74c3c;">В котёл помещается не больше ${capU} единиц продуктов.</span>`;
+            return;
+        }
         const perks = window.perkBonuses || {};
         const canSubstitute = !!perks.cookingIngredientSubstitution;
 
@@ -5347,15 +5373,36 @@ window.toggleSkillPanel = function (idx) {
             if (note) alchemyNote = ' + ' + note;
         }
 
-        const dish = matchedRecipe || window.failedDish;
-        const finalEffect = scaleEffectText(dish.effect, powerBonus, durBonus) + alchemyNote;
+        // Нет рецепта → блюдо считается по цене/типу ингредиентов (cooking-data.js: improvisedDish), перки усиливают его так же.
+        let dish = matchedRecipe || window.failedDish, improvEffects = null, improvInfo = null;
+        if (!matchedRecipe && typeof window.improvisedDish === 'function') {
+            const im = window.improvisedDish(potMap);
+            const hpV = Math.round(im.hp * (1 + powerBonus)), mpV = Math.round(im.mp * (1 + powerBonus));
+            const dur = Math.max(1, Math.round(window.COOK_IMPROV.duration * (1 + durBonus)));
+            improvEffects = [];
+            const cookSkill = (typeof getEffectiveSkillValue === 'function') ? getEffectiveSkillValue('Кулинария') : 100;
+            if (cookSkill < window.COOK_IMPROV.minSkill) { improvInfo = { tooLow: true }; dish = { name: 'Невнятное варево', weight: 0.5, price: 1, effect: '' }; improvEffects = null; } else {
+            if (hpV > 0) improvEffects.push({ name: 'Запас здоровья', magnitude: hpV, duration: dur, unit: '', kind: 'max_hp' });
+            if (mpV > 0) improvEffects.push({ name: 'Запас магии', magnitude: mpV, duration: dur, unit: '', kind: 'max_mp' });
+            if (improvEffects.length) {
+                const parts = [];
+                if (hpV > 0) parts.push('+' + hpV + ' хп');
+                if (mpV > 0) parts.push('+' + mpV + ' мп');
+                let txt = parts.join(', ');
+                if (txt) txt += ' на ' + dur + ' ходов';
+                dish = { name: 'Импровизированное блюдо', weight: 0.5, price: im.price, effect: txt };
+                improvInfo = im;
+            } else { improvEffects = null; }
+            }
+        }
+        const finalEffect = (improvEffects ? dish.effect : scaleEffectText(dish.effect, powerBonus, durBonus)) + alchemyNote;
         // Цена блюда растёт вместе с его силой: перки Кулинарии усиливают эффект (×(1+сила)) и длительность (×(1+длит.)) — цена масштабируется так же.
         const strengthMult = (1 + powerBonus) * (1 + durBonus);
         const dishPrice = Math.max(dish.price || 0, Math.round((dish.price || 0) * strengthMult));
         // Блюда разной силы — отдельные стопки (раньше новое блюдо затирало эффект и цену ВСЕЙ стопки такого же названия).
         const effHash = s => { let h = 0; for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) | 0; return Math.abs(h).toString(36); };
         const dishId = finalEffect === dish.effect ? dish.name : dish.name + '#' + effHash(finalEffect);
-        addToInventory(dishId, dish.name, 1, dish.weight || 1, matchedRecipe ? 'Блюдо' : 'Провал готовки', finalEffect, { price: dishPrice });
+        addToInventory(dishId, dish.name, 1, dish.weight || 1, (matchedRecipe || improvEffects) ? 'Блюдо' : 'Провал готовки', finalEffect, improvEffects ? { price: dishPrice, alchemyEffects: improvEffects } : { price: dishPrice });
         // Удачное блюдо — полный успех кулинарии; провал (похлёбка) тоже чему-то учит, но слабее: четверть успеха.
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария', matchedRecipe ? 1 : COOKING_FAIL_PROGRESS);
         if (matchedRecipe) {
@@ -5375,11 +5422,16 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: ${escHtml(matchedRecipe.name)}${usedSubstitution ? ' <span style="font-weight:normal;">(с заменой ингредиента — «Сочетание вкуса»)</span>' : ''}</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>` + extraNote;
         } else {
-            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышла Похлёбка</div><div style="font-size:13px; opacity:.75;">Провал тоже чему-то учит: +¼ успеха к Кулинарии (удачное блюдо даёт целый).</div>` +
+            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышло: ${escHtml(dish.name)}</div>${improvInfo && improvInfo.tooLow ? `<div style="font-size:13px;">Навык Кулинарии ниже ${window.COOK_IMPROV.minSkill} — блюдо без рецепта пока получается пустым (без эффекта).</div>` : ''}<div style="font-size:13px; opacity:.75;">Провал тоже чему-то учит: +¼ успеха к Кулинарии (удачное блюдо даёт целый).</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>`;
         }
 
-        potSelections = {};
+        // Раньше котёл очищался целиком — чтобы приготовить ещё порцию, приходилось заново выбирать все продукты, даже если их хватало.
+        // Теперь выбор остаётся, пока количества в инвентаре хватает на ту же порцию; продукты, которых не хватает, из выбора убираются.
+        const keepSel = {};
+        potNames.forEach(n => { if (countInInventory(n) >= potMap[n]) keepSel[n] = potMap[n]; });
+        potSelections = keepSel;
+        renderKitchenPot();
         saveLocalStorage();
     }
 
@@ -7158,7 +7210,7 @@ window.toggleSkillPanel = function (idx) {
                 }
                 case 'dmg_hp': {
                     const cur = parseInt(hpEl.value) || 0;
-                    hpEl.value = Math.max(0, cur - (mag || 0)); notes.push(`−${mag || 0} хп (яд)`); break;
+                    hpEl.value = Math.max(opts.fromFood ? Math.min(1, cur) : 0, cur - (mag || 0)); notes.push(opts.fromFood ? `−${mag || 0} хп (сырое)` : `−${mag || 0} хп (яд)`); break;
                 }
                 case 'dmg_mp': {
                     const cur = parseInt(mpEl.value) || 0;
@@ -7228,6 +7280,7 @@ window.toggleSkillPanel = function (idx) {
         return notes;
     }
     window.applyAlchemyEffectsToSelf = applyAlchemyEffectsToSelf;
+    window.alchToast = alchToast;
 
     function activateTimedEffectFromItem(item, opts) {
         if (item.alchemyEffects && item.alchemyEffects.length) {
@@ -10465,6 +10518,12 @@ window.eatAnyFood = function (itemId) {
     // хил, из-за чего "+N хп на M ходов" терял и M (длительность), и любые мана/другие бонусы.
     if ((item.alchemyEffects && item.alchemyEffects.length) || item.effect) {
         activateTimedEffectFromItem(item, { fromFood: true });
+    } else if (typeof window.isRawMeat === 'function' && window.isRawMeat(item.itemId)) {
+        // Сырое мясо/рыба, съеденное без котла, вредит: −10 хп сразу (в котле то же самое даёт плюс).
+        const hpEl = document.getElementById('cur-hp');
+        const cur = parseInt(hpEl.value) || 0, loss = window.COOK_IMPROV.eatRawLoss;
+        hpEl.value = Math.max(Math.min(1, cur), cur - loss);
+        if (typeof window.alchToast === 'function') window.alchToast(`🥩 Сырое: <strong>${escHtml(item.name)}</strong> — −${cur - parseInt(hpEl.value)} хп`);
     }
 
     removeFromInventoryByName(itemId, 1);
@@ -10967,8 +11026,8 @@ function updateHungerPenalty() {
         if (!window.CloudSync) return;
         window.CloudSync.lootCorpseForSelf(enemyId).then(corpseLoot => {
             (corpseLoot.items || []).forEach(it => {
-                addToInventory(it.name, it.name, 1, it.weight || 0, it.category || '', it.effect || '', {
-                    slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price
+                addToInventory(it.name, it.name, 1, it.weight || 0, /^Зель/i.test(it.category || '') ? 'Зелье' : (it.category || ''), it.effect || '', {
+                    slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price, alchemyEffects: it.alchemyEffects
                 });
             });
             if (corpseLoot.gold) {
@@ -11166,6 +11225,11 @@ function updateHungerPenalty() {
                 baseHp += hearts >= 27 ? 100 : 50;
             }
             document.getElementById('max-hp').value = Math.round(baseHp);
+            // бафф здоровья спал — текущие хп не могут остаться выше нового максимума
+            if (activeEffectBonuses.hp < (window._stLastHpBonus || 0)) {
+                const ch = document.getElementById('cur-hp'); if (ch && (parseInt(ch.value) || 0) > Math.round(baseHp)) ch.value = Math.round(baseHp);
+            }
+            window._stLastHpBonus = activeEffectBonuses.hp;
         }
 
         if (!document.getElementById('manual-mp-lock').checked) {

@@ -439,6 +439,44 @@ const recipes = [
 // Источник: свод правил, раздел "Кулинария и еда".
 const failedDish = { name: "Похлёбка", weight: 0.5, price: 10, effect: "+10 хп на 75 ходов" };
 
+// ---------------------------------------------------------------------------
+// Блюдо без рецепта («импровизация»). Сила считается от ЦЕНЫ ингредиентов:
+//  • овощи/фрукты, готовые продукты, бытовое (соль, мука, масло) → бафф макс. ХП;
+//  • алхимия для готовки (травы, грибы, ягоды) и напитки → бафф макс. МП;
+//  • сырое мясо/рыба/яйца → тоже бафф ХП (в котле они идут на пользу). А вот съесть их СЫРЫМИ, без котла, — минус ХП (eatAnyFood).
+// Потолок блюда (hpCap/mpCap) слабее лучших рецептов (+20 хп / +30 мп на 75 ходов), короче по времени (50), до 9 единиц в котле;
+// пока навык Кулинария < minSkill, блюдо без рецепта вообще не даёт эффекта —
+// чтобы достичь потолка, нужны дорогие продукты. Все числа — в COOK_IMPROV, подкручивай тут.
+// ---------------------------------------------------------------------------
+const COOK_IMPROV = { maxUnits: 9, duration: 50, minSkill: 20, hpCap: 15, mpCap: 15, eatRawLoss: 10 };
+const COOK_VEG = ["Капуста", "Морковь", "Тыква", "Зелёное яблоко", "Лук-порей", "Картофель", "Красное яблоко", "Помидор", "Пепельный батат"];
+function improvisedDish(potMap) {
+    const CK = window.cookingIngredients || {};
+    let hp = 0, mp = 0, price = 0, units = 0;
+    Object.keys(potMap || {}).forEach(name => {
+        const q = potMap[name] || 0, ing = CK[name];
+        if (!ing || q <= 0) return;
+        const pr = ing.price || 0, cat = ing.category || '';
+        units += q; price += pr * q;
+        let h = 0, m = 0;
+        if (cat === 'Еда (сырое)') { if (COOK_VEG.includes(name)) h = Math.max(1, Math.round(pr)); else h = Math.max(1, Math.round(pr)); }
+        else if (cat === 'Готовый продукт') h = Math.max(1, Math.round(pr * 0.8));
+        else if (cat === 'Бытовое (для готовки)') h = Math.max(1, Math.round(pr * 0.5));
+        else if (cat.indexOf('Алхимия') === 0) m = Math.max(1, Math.round(pr * 0.6));
+        else if (cat === 'Напиток') m = Math.max(1, Math.round(pr * 0.2));
+        hp += h * q; mp += m * q;
+    });
+    return {
+        hp: Math.min(COOK_IMPROV.hpCap, hp), mp: Math.min(COOK_IMPROV.mpCap, mp),
+        price: Math.max(1, Math.round(price)), units
+    };
+}
+// Сырое мясо/рыба/яйцо (не овощ и не фрукт): в котле — плюс к ХП, просто съеденное — минус.
+function isRawMeat(name) { const ing = (window.cookingIngredients || {})[name]; return !!ing && ing.category === 'Еда (сырое)' && !COOK_VEG.includes(name); }
+window.isRawMeat = isRawMeat;
+window.COOK_IMPROV = COOK_IMPROV;
+window.improvisedDish = improvisedDish;
+
 window.cookingIngredients = cookingIngredients;
 window.recipes = recipes;
 window.failedDish = failedDish;
