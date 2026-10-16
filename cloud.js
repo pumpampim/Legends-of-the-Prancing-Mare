@@ -1306,7 +1306,7 @@
     function journalSignature(j) {
         const s = (j.summary && j.summary.ts) || 0;
         const r = (j.rumors || []).map(x => x.id + (x.verdict || '')).join(',');
-        const e = (j.entries || []).length;
+        const e = (Array.isArray(j.entries) ? j.entries : []).length;
         return s + '|' + r + '|' + e;
     }
     function rumorHere(r, hold) {
@@ -1357,7 +1357,7 @@
               + (far.length ? (near.length ? '<div style="font-weight:bold; margin:8px 0 4px; opacity:.85;">Слышали раньше и в других местах</div>' : '') + far.map(r => rumorHtml(r, marks)).join('') : '')
             : '<span style="opacity:.6;">Слухов пока нет.</span>';
         const onlyDecisions = window._journalFilter === 'decision';
-        const entries = (j.entries || []).filter(e => !onlyDecisions || e.type === 'decision');
+        const entries = (Array.isArray(j.entries) ? j.entries : []).filter(e => !onlyDecisions || e.type === 'decision');
         entEl.innerHTML = entries.length ? entries.map(e => {
             const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
             return '<div class="log-entry"><span class="log-time">' + t + '</span><span class="log-author">' + (e.type === 'decision' ? '⚖ ' : '') + escapeHtml(e.author || '?') + ':</span> ' + escapeHtml(e.text || '') + '</div>';

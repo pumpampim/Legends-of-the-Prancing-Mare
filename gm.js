@@ -489,6 +489,36 @@
         });
     };
 
+    // Раньше gm.js вызывал parseSpellDamageFromDesc под проверкой typeof, но сама функция живёт только в index.html (у игрока),
+    // на странице мастера её нет — урон заклинаний мага-бандита всегда выходил 0. Теперь копия разбора описания здесь же
+    // (без кэша: вызывается один раз на заклинание при генерации врага).
+    function parseSpellDamageFromDesc(desc, enhanced) { return desc ? _parseSpellDamageFromDescImpl(desc, enhanced) : null; }
+    function _parseSpellDamageFromDescImpl(desc, enhanced) {
+        let text = desc;
+        const splitIdx = desc.search(/усилен[а-яёА-ЯЁ]*\s+эффект/i);
+        if (enhanced && splitIdx !== -1) {
+            const after = desc.slice(splitIdx).replace(/усилен[а-яёА-ЯЁ]*\s+эффект/i, '');
+            if (after.trim()) text = after; // если после "Усиленный эффект" пусто — падаем на базовый текст
+        } else if (!enhanced && splitIdx !== -1) {
+            text = desc.slice(0, splitIdx);
+        }
+        // [а-яёА-ЯЁ] вместо \w — \w не матчит кириллицу. "нанос[а-яёА-ЯЁ]*" покрывает наносит/наносящий/
+        // нанося и т.п. одним паттерном. (ед.?|единиц) — раньше "N единиц урона" не понималось,
+        // только сокращённое "ед.". Опциональное слово перед "урон" — "физ/огненн/ледян/..." —
+        // раньше "наносит 40 физ урона" не матчилось, т.к. между числом и "урон" было слово.
+        const m = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+|огненн[а-яёА-ЯЁ]*\s+|ледян[а-яёА-ЯЁ]*\s+|электрич[а-яёА-ЯЁ]*\s+|яд[а-яёА-ЯЁ]*\s+)?урон/i) ||
+                  text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
+        if (m) return parseInt(m[1]);
+        // Урон кубиками («наносит 4д6», «9д6») — для списка берём среднее; при броске кидаются настоящие кубы (getSpellDice).
+        const dm = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*[дd]\s*(\d+)/i);
+        if (dm) return Math.round(parseInt(dm[1]) * (parseInt(dm[2]) + 1) / 2);
+        // Ничего не нашли в усиленном тексте (напр. "Усиленный эффект" пустой) — пробуем базовый.
+        // Через _parseSpellDamageFromDescImpl напрямую (не через кэш-обёртку), чтобы не плодить
+        // двойную запись в кэш за один исходный вызов — внешняя parseSpellDamageFromDesc всё равно
+        // закэширует именно ЭТОТ (enhanced) результат по своему исходному ключу.
+        return enhanced ? _parseSpellDamageFromDescImpl(desc, false) : null;
+    }
+
     // ---------- Журнал сессии (вкладка «Дневник» у игроков) ----------
     function renderJournalGm() {
         const j = lastData.journal || {};
@@ -2172,12 +2202,12 @@
             const itemId = item.id || item.name;
             html += `
                 <tr>
-                    <td>${item.name}</td>
-                    <td>${item.category || '-'}</td>
+                    <td>${escapeHtml(item.name)}</td>
+                    <td>${escapeHtml(item.category || '-')}</td>
                     <td>${item.weight || 0}</td>
                     <td>${item.price || 0}</td>
                     <td>
-                        <button class="btn btn-sm" onclick="window.gmGiveItemFromTable('${itemId}')">Передать</button>
+                        <button class="btn btn-sm" onclick="window.gmGiveItemFromTable('${jsq(itemId)}')">Передать</button>
                     </td>
                 </tr>
             `;
@@ -4407,7 +4437,7 @@
 
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
-        const { targetUid, dmg, dmgType, statusKey, logTextBase } = pendingGmAttack;
+        const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         if (!dmg && !statusKey) {
             gmPostLogEntryText(logTextBase + '.');
             pendingGmAttack = null;

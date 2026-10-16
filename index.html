@@ -17,7 +17,7 @@
         window.stSetFontSize = function (v) { try { localStorage.setItem('skyrim_fontSize', v); } catch (e) { } window.stApplyFontSize(v); };
         try { window.stApplyFontSize(localStorage.getItem('skyrim_fontSize') || 'normal'); } catch (e) { }
         /* 6.6: состояние «грязного» сейва читаем ДО того, как старт страницы сам что-нибудь сохранит и сбросит флаг */
-        try { window.__stWasDirty = localStorage.getItem('skyrim_dirty') === '1'; window.__stRecovery = localStorage.getItem('skyrim_recovery'); } catch (e) { }
+        try { window.__stWasDirty = localStorage.getItem('skyrim_dirty') === '1'; window.__stRecovery = localStorage.getItem('skyrim_recovery'); window.__stRecoveryTs = parseInt(localStorage.getItem('skyrim_recovery_ts')) || 0; window.__stSaveTs = parseInt(localStorage.getItem('skyrim_save_ts')) || 0; } catch (e) { }
     </script>
     <title>Лист персонажа: Скурим TTRPG v3.6 (исправленный)</title>
 
@@ -536,7 +536,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=13">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -605,6 +605,42 @@
     </div>
 </div>
 
+
+<!-- Главное меню в стиле Skyrim (st-hub): четыре направления + центр. Настоящие кнопки вкладок .nav-tabs остались в DOM
+     скрытыми — на них завязаны openTab, значки «●», цифры 1–9 и поиск Ctrl+K. -->
+<div id="st-hub" class="st-hub" aria-hidden="true">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+        <linearGradient id="st-g-w" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#e6ecf0" stop-opacity="0"/><stop offset="1" stop-color="#e6ecf0" stop-opacity=".95"/></linearGradient>
+        <linearGradient id="st-g-e" x1="1" x2="0" y1="0" y2="0"><stop offset="0" stop-color="#e6ecf0" stop-opacity="0"/><stop offset="1" stop-color="#e6ecf0" stop-opacity=".95"/></linearGradient>
+        <linearGradient id="st-g-n" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e6ecf0" stop-opacity="0"/><stop offset="1" stop-color="#e6ecf0" stop-opacity=".95"/></linearGradient>
+        <linearGradient id="st-g-s" x1="0" x2="0" y1="1" y2="0"><stop offset="0" stop-color="#e6ecf0" stop-opacity="0"/><stop offset="1" stop-color="#e6ecf0" stop-opacity=".95"/></linearGradient>
+    </defs></svg>
+    <div class="st-cross" role="menu">
+        <button type="button" class="st-dir st-dir-n" data-group="skills" role="menuitem"><span class="st-dir-label">Навыки</span><svg class="st-blade-v" viewBox="0 0 14 90" preserveAspectRatio="none"><polygon points="7,0 0,90 14,90" fill="url(#st-g-n)"/></svg></button>
+        <button type="button" class="st-dir st-dir-w" data-group="magic" role="menuitem"><span class="st-dir-label">Магия</span><svg class="st-blade-h" viewBox="0 0 300 14" preserveAspectRatio="none"><polygon points="0,7 300,0 300,14" fill="url(#st-g-w)"/></svg></button>
+        <button type="button" class="st-dir st-dir-c" data-group="hero" role="menuitem" aria-label="Герой: главная, бой, сессия">
+            <svg viewBox="-70 -70 140 140" class="st-emblem" aria-hidden="true">
+                <circle r="62" fill="none" stroke="#dfe6ea" stroke-width="1.2" opacity=".55"/>
+                <circle r="54" fill="#05080c" fill-opacity=".55" stroke="#dfe6ea" stroke-width="1.6"/>
+                <g fill="none" stroke="#e6ecf0" stroke-width="3" stroke-linecap="round">
+                    <ellipse rx="40" ry="15"/><ellipse rx="40" ry="15" transform="rotate(45)"/><ellipse rx="40" ry="15" transform="rotate(90)"/><ellipse rx="40" ry="15" transform="rotate(135)"/>
+                </g>
+                <circle r="17" fill="#05080c" stroke="#e6ecf0" stroke-width="2.4"/><circle r="6" fill="#e6ecf0"/>
+            </svg>
+            <span class="st-dir-dot" data-dot="hero" hidden></span>
+        </button>
+        <button type="button" class="st-dir st-dir-e" data-group="items" role="menuitem"><svg class="st-blade-h" viewBox="0 0 300 14" preserveAspectRatio="none"><polygon points="300,7 0,0 0,14" fill="url(#st-g-e)"/></svg><span class="st-dir-label">Предметы</span></button>
+        <button type="button" class="st-dir st-dir-s" data-group="map" role="menuitem"><svg class="st-blade-v" viewBox="0 0 14 90" preserveAspectRatio="none"><polygon points="7,90 0,0 14,0" fill="url(#st-g-s)"/></svg><span class="st-dir-label">Карта</span></button>
+    </div>
+    <div id="st-hub-hint" class="st-hub-hint"></div>
+    <div class="st-hub-bar">
+        <span class="st-hub-lvl">Уровень <b id="st-hub-level">1</b></span>
+        <span class="st-hub-xp" title="Очки навыков до следующего уровня"><i></i><b id="st-hub-xp-fill"></b><i></i></span>
+        <span id="st-hub-date" class="st-hub-date"></span>
+    </div>
+    <div class="st-hub-keys">стрелки — выбор · Enter — открыть · Esc — закрыть · Ctrl+K — поиск</div>
+</div>
+
 <div class="container">
     <div id="cloud-status-bar" class="cloud-status-bar">
         <span id="cloud-user-info">⚠ Офлайн-режим (данные только в этом браузере)</span>
@@ -621,8 +657,14 @@
     <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
     
     <!-- Навигационные вкладки -->
-    <div id="st-tab-hint" class="st-tab-hint"></div>
-    <div class="nav-tabs">
+    <div id="st-topbar" class="st-topbar">
+        <button type="button" class="st-menu-btn" onclick="stHubOpen()" title="Главное меню (Esc)"><svg viewBox="-70 -70 140 140" width="22" height="22" aria-hidden="true"><circle r="58" fill="none" stroke="currentColor" stroke-width="7"/><g fill="none" stroke="currentColor" stroke-width="9"><ellipse rx="40" ry="15"/><ellipse rx="40" ry="15" transform="rotate(90)"/><ellipse rx="40" ry="15" transform="rotate(45)"/><ellipse rx="40" ry="15" transform="rotate(135)"/></g></svg><span>Меню</span><span class="st-dir-dot" id="st-menu-dot" hidden></span></button>
+        <span id="st-topbar-title" class="st-topbar-title"></span>
+        <span id="st-topbar-pills" class="st-topbar-pills"></span>
+        <span id="st-topbar-lvl" class="st-topbar-lvl"></span>
+    </div>
+    <div id="st-tab-hint" class="st-tab-hint" style="display:none"></div>
+    <div class="nav-tabs st-nav-hidden">
         <button class="tab-link active" onclick="openTab(event, 'tab1')">Главная и Статы</button>
         <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
@@ -6652,7 +6694,7 @@ window.toggleSkillPanel = function (idx) {
 
     window.markQuestDone = function (id) {
         const q = playerQuests.find(x => x.id === id);
-        if (!q || q.status === 'abandoned') return;
+        if (!q || q.status === 'abandoned' || q.status === 'done') return; // раньше повторный вызов начислял прогресс гильдии и награду второй раз
         q.status = 'done';
         renderQuestList();
         saveLocalStorage();
@@ -12046,10 +12088,11 @@ function updateHungerPenalty() {
             resistances: computeTotalResistances()
         };
         const json = JSON.stringify(data);
-        if (recoveryOnly) { try { localStorage.setItem('skyrim_recovery', json); } catch (e) { } return; }
+        if (recoveryOnly) { try { localStorage.setItem('skyrim_recovery', json); localStorage.setItem('skyrim_recovery_ts', String(Date.now())); } catch (e) { } return; }
         if (json === _lastLocalSaveHash) { stSetDirty(false); return; } // ничего не изменилось с прошлого сохранения
         _lastLocalSaveHash = json;
         localStorage.setItem('skyrim_ttrpg_save_v3_6', json);
+        try { localStorage.setItem('skyrim_save_ts', String(Date.now())); } catch (e) { }
         stSetDirty(false);
         if (window.CloudSync) window.CloudSync.saveCharacter(data, immediate);
     }
@@ -12235,8 +12278,24 @@ function updateHungerPenalty() {
         return data;
     }
 
+    // Защита от порченых сейвов: в массивах-списках оставляем только объекты (null/числа/строки внутри роняли применение
+    // сейва целиком), а в словарях рецептов — только записи-объекты. Для здоровых сейвов ничего не меняется.
+    function sanitizeSaveShape(data) {
+        ['diary', 'inventory', 'playerQuests', 'activeSummons', 'activeTimedEffects', 'craftQueue', 'craftOrders'].forEach(k => {
+            if (Array.isArray(data[k]) && data[k].some(x => !x || typeof x !== 'object')) data[k] = data[k].filter(x => x && typeof x === 'object');
+        });
+        ['knownCookRecipes', 'knownBrewRecipes'].forEach(k => {
+            if (data[k] && typeof data[k] === 'object') {
+                if (Array.isArray(data[k])) { data[k] = {}; return; }
+                Object.keys(data[k]).forEach(r => { if (!data[k][r] || typeof data[k][r] !== 'object') delete data[k][r]; });
+            }
+        });
+        return data;
+    }
+
     function migrateSaveData(data) {
         if (!data) return data;
+        data = sanitizeSaveShape(data);
         data = applyItemRenames(data);
         // Таблица алхимии сменилась (другие свойства ингредиентов) — один раз сбрасываем изученные свойства и рецепты:
         // старые знания относились к другой таблице. Предметы, зелья и яды в инвентаре остаются.
@@ -12795,7 +12854,7 @@ function updateHungerPenalty() {
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=1"></script>
-<script src="cloud.js?v=12"></script>
+<script src="cloud.js?v=13"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
@@ -12970,12 +13029,131 @@ function updateHungerPenalty() {
     function checkRecovery() {
         if (!window.__stWasDirty || !window.__stRecovery) return;
         var cur = null; try { cur = localStorage.getItem('skyrim_ttrpg_save_v3_6'); } catch (e) { }
+        // копия старше последнего реального сохранения — предлагать её нельзя: «Да» откатило бы свежие данные на старое состояние
+        if (window.__stRecoveryTs && window.__stSaveTs && window.__stRecoveryTs <= window.__stSaveTs) { try { localStorage.removeItem('skyrim_recovery'); localStorage.removeItem('skyrim_dirty'); } catch (e) { } return; }
         if (cur === window.__stRecovery) { try { localStorage.removeItem('skyrim_recovery'); } catch (e) { } return; }
         showRecovery();
     }
     renderHint();
     window.stApplyFontSize(localStorage.getItem('skyrim_fontSize') || 'normal');
     if (document.readyState === 'complete') setTimeout(checkRecovery, 400); else window.addEventListener('load', function () { setTimeout(checkRecovery, 400); });
+})();
+</script>
+
+<script>
+/* ===== Главное меню в стиле Skyrim =====
+   Раньше: 12 вкладок в ряд. Теперь: меню-«компас» из четырёх направлений + центр, внутри раздела — полоса «пилюль» с его вкладками.
+   Сами вкладки (.tab-content) и их кнопки (.nav-tabs, теперь скрытые) не тронуты: openTab, значки «●», цифры 1–9, поиск Ctrl+K работают как раньше. */
+(function () {
+    var GROUPS = {
+        skills: { title: 'Навыки', tabs: ['tab2', 'tab7', 'tab10'], hint: 'Ветки перков · Профессии · Проверка' },
+        magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
+        items: { title: 'Предметы', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
+        map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14'], hint: 'Карта · Календарь · Дневник' },
+        hero: { title: 'Герой', tabs: ['tab1', 'tab3', 'tab6'], hint: 'Главная и статы · Боевой пост · Сессия' }
+    };
+    var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь и квесты', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
+    var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
+    var hub = document.getElementById('st-hub'), cur = 'hero', curTab = 'tab1';
+    function btnFor(tabId) { return document.querySelector('.nav-tabs .tab-link[onclick*="\'' + tabId + '\'"]'); }
+    function groupOf(tabId) { for (var g in GROUPS) if (GROUPS[g].tabs.indexOf(tabId) >= 0) return g; return 'hero'; }
+    function hasDot(g) { return GROUPS[g].tabs.some(function (t) { var b = btnFor(t); return b && /●/.test(b.textContent); }); }
+
+    function renderTop() {
+        var g = GROUPS[cur], pills = document.getElementById('st-topbar-pills');
+        document.getElementById('st-topbar-title').textContent = g.title;
+        pills.innerHTML = '';
+        if (g.tabs.length > 1) g.tabs.forEach(function (t) {
+            var b = btnFor(t), p = document.createElement('button'); p.type = 'button'; p.className = 'st-pill' + (t === curTab ? ' active' : '');
+            p.textContent = PILL[t] + (b && /●/.test(b.textContent) ? ' ●' : '');
+            p.onclick = function () { if (b) b.click(); };
+            pills.appendChild(p);
+        });
+        var dot = false; for (var k in GROUPS) if (hasDot(k)) dot = true;
+        var md = document.getElementById('st-menu-dot'); if (md) md.hidden = !dot;
+        var lv = document.getElementById('st-topbar-lvl'); try { lv.textContent = 'Ур. ' + characterLevel; } catch (e) { }
+    }
+    function renderHubDots() {
+        Object.keys(GROUPS).forEach(function (g) {
+            var btn = hub.querySelector('.st-dir[data-group="' + g + '"]'); if (!btn) return;
+            var d = btn.querySelector('.st-dir-dot');
+            if (!d) { d = document.createElement('span'); d.className = 'st-dir-dot'; btn.appendChild(d); }
+            d.hidden = !hasDot(g);
+        });
+    }
+    function renderBar() {
+        try {
+            document.getElementById('st-hub-level').textContent = characterLevel;
+            var need = getSkillUpsNeededForLevel(characterLevel), pct = need > 0 ? Math.max(0, Math.min(100, levelUpProgress / need * 100)) : 0;
+            document.getElementById('st-hub-xp-fill').style.width = pct + '%';
+        } catch (e) { }
+        var dd = document.getElementById('date-display');
+        document.getElementById('st-hub-date').textContent = dd ? dd.textContent.replace(/^\s*📅\s*/, '') : '';
+    }
+    // вызывается после каждого openTab
+    window.stNavSync = function (tabId) {
+        curTab = tabId; cur = groupOf(tabId); last[cur] = tabId;
+        try { localStorage.setItem('skyrim_nav_last', JSON.stringify(last)); } catch (e) { }
+        renderTop(); renderHubDots();
+    };
+    var origOpenTab = window.openTab;
+    window.openTab = function (ev, tabId) { origOpenTab.call(this, ev, tabId); window.stNavSync(tabId); };
+
+    var timer = null;
+    window.stHubOpen = function () {
+        renderBar(); renderHubDots();
+        hub.classList.add('open'); hub.setAttribute('aria-hidden', 'false'); document.body.classList.add('st-hub-open');
+        var f = hub.querySelector('.st-dir[data-group="' + cur + '"]') || hub.querySelector('.st-dir'); if (f) f.focus();
+        setHint(cur);
+        clearInterval(timer); timer = setInterval(function () { renderBar(); renderHubDots(); }, 1500);
+    };
+    window.stHubClose = function () {
+        hub.classList.remove('open'); hub.setAttribute('aria-hidden', 'true'); document.body.classList.remove('st-hub-open'); clearInterval(timer);
+    };
+    function setHint(g) { var el = document.getElementById('st-hub-hint'); el.textContent = g ? GROUPS[g].title + ': ' + GROUPS[g].hint : ''; }
+    hub.querySelectorAll('.st-dir').forEach(function (b) {
+        var g = b.getAttribute('data-group');
+        b.addEventListener('mouseenter', function () { setHint(g); });
+        b.addEventListener('focus', function () { setHint(g); });
+        b.addEventListener('click', function () {
+            var tab = last[g] && GROUPS[g].tabs.indexOf(last[g]) >= 0 ? last[g] : GROUPS[g].tabs[0];
+            var tb = btnFor(tab); if (tb) tb.click();
+            window.stHubClose();
+        });
+    });
+    hub.addEventListener('mousedown', function (e) { if (e.target === hub) window.stHubClose(); });
+
+    // клавиатура: Esc открывает/закрывает меню, стрелки/WASD выбирают направление внутри меню
+    var ARROWS = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e', ц: 'n', ы: 's', ф: 'w', в: 'e' };
+    function foreignModalOpen() {
+        if (document.querySelector('.st-modal.open')) return true;
+        var pm = document.getElementById('poll-modal'); return !!(pm && pm.style.display && pm.style.display !== 'none');
+    }
+    document.addEventListener('keydown', function (e) {
+        var open = hub.classList.contains('open');
+        if (e.key === 'Escape') {
+            if (foreignModalOpen()) return;
+            var t = e.target, tag = t && t.tagName;
+            if (open) { e.preventDefault(); window.stHubClose(); return; }
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            e.preventDefault(); window.stHubOpen(); return;
+        }
+        if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
+        var dir = ARROWS[e.key]; if (!dir) return;
+        e.preventDefault();
+        var target = hub.querySelector('.st-dir-' + dir); var c = hub.querySelector('.st-dir-c');
+        var focused = document.activeElement;
+        // из центра — в сторону; из стороны — назад в центр, если нажали противоположную
+        var opp = { n: 's', s: 'n', w: 'e', e: 'w' };
+        if (focused && focused !== c && focused.classList && focused.classList.contains('st-dir-' + opp[dir])) { c.focus(); return; }
+        if (target) target.focus();
+    });
+    // перерисовать «пилюли»/точки, когда кнопки вкладок меняют подпись (●) или дата/уровень меняются
+    var mo = new MutationObserver(function () { renderTop(); if (hub.classList.contains('open')) renderHubDots(); });
+    var nav = document.querySelector('.nav-tabs'); if (nav) mo.observe(nav, { childList: true, subtree: true, characterData: true });
+    var dd = document.getElementById('date-display'); if (dd) new MutationObserver(function () { if (hub.classList.contains('open')) renderBar(); }).observe(dd, { childList: true, characterData: true, subtree: true });
+    setInterval(function () { try { document.getElementById('st-topbar-lvl').textContent = 'Ур. ' + characterLevel; } catch (e) { } }, 3000);
+    renderTop();
 })();
 </script>
 
