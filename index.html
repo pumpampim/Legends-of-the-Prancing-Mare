@@ -448,15 +448,15 @@
             powerAttackDmg: { label: 'Урон силовых атак', suffix: '%', auto: true },
             smithing: { label: 'Кузнечное дело (эффективность)', suffix: '%', auto: true },
             prices: { label: 'Цены у торговцев выгоднее', suffix: '%', auto: true },
-            armorSpell: { label: 'Заклинания «плоти»', suffix: '%' },
+            armorSpell: { label: 'Заклинания «плоти»', suffix: '%', auto: true },
             arrowResist: { label: 'Резист стрелам', suffix: '%', auto: true },
             alterationCost: { label: 'Стоимость каста: Изменение', suffix: '% дешевле', auto: true },
-            spellAbsorb: { label: 'Поглощение маны при попадании по врагу заклинанием', suffix: '%' },
+            spellAbsorb: { label: 'Поглощение маны при попадании по врагу заклинанием', suffix: '%', auto: true },
             poisonDiseaseResist: { label: 'Резист яду/болезням', suffix: '%', auto: true },
             armorPenetration: { label: 'Пробитие брони', suffix: '%', auto: true },
             spellPower: { label: 'Сила заклинаний', suffix: '%', auto: true },
             restorationLivingDmg: { label: 'Заклинания Восстановления по живым целям', suffix: '%', auto: true },
-            daedraUndeadResist: { label: 'Резист урону от даэдра/нежити', suffix: '%' },
+            daedraUndeadResist: { label: 'Резист урону от даэдра/нежити', suffix: '%', auto: true },
             daedraUndeadDmg: { label: 'Урон по даэдра/нежити', suffix: '%', auto: true },
             meleeDmg: { label: 'Урон ближним оружием', suffix: '%', auto: true },
             magicResist: { label: 'Сопротивление магии', suffix: '%', auto: true },
@@ -475,8 +475,8 @@
             rangedDmg: { label: 'Урон дальним оружием', suffix: '%', auto: true },
             poisonDmg: { label: 'Урон ядом', suffix: '%', auto: true },
             poisonLifeSteal: { label: 'Похищение здоровья через яд', suffix: '%', auto: true },
-            poisonVulnerability: { label: 'Уязвимость к яду (у тебя самого)', suffix: '%' },
-            diseaseBuff: { label: 'Сила баффа от болезни (Периайт превращает болезнь в мощь)', suffix: '%' },
+            poisonVulnerability: { label: 'Уязвимость к яду (у тебя самого)', suffix: '%', auto: true },
+            diseaseBuff: { label: 'Сила баффа от болезни (Периайт превращает болезнь в мощь)', suffix: '%', auto: true },
             spellVampire: { label: 'Похищение здоровья заклинаниями', suffix: '%', auto: true },
             allSchoolsBonus: { label: 'Сила заклинаний всех школ', suffix: '%', auto: true },
             sneakSpeed: { label: 'Скорость в скрытности', suffix: '%', auto: true },
@@ -485,7 +485,7 @@
             powerAttackHeal: { label: 'Лечение при силовой атаке', suffix: '%', auto: true },
             enchantingPower: { label: 'Сила зачарования', suffix: '%', auto: true },
             elementalResist: { label: 'Резист стихиям (огонь/холод/электро)', suffix: '%', auto: true },
-            elementalWeaponDmg: { label: 'Урон стихийным оружием', suffix: '%' },
+            elementalWeaponDmg: { label: 'Урон стихийным оружием', suffix: '%', auto: true },
             ignoreMagicDmg: { label: 'Игнорирование магической защиты цели', suffix: '%', auto: true },
             undeadDmg: { label: 'Урон по нежити', suffix: '%', auto: true },
             undeadAuraBonus: { label: 'Аура урона по нежити рядом', suffix: '' },
@@ -496,8 +496,8 @@
             poisonResist: { label: 'Резист яду/болезням при опьянении', suffix: '%', auto: true },
             physMagicVamp: { label: 'Похищение здоровья физ./магической атакой', suffix: '%', auto: true },
             potionPower: { label: 'Сила зелий', suffix: '%', auto: true },
-            pureDmg: { label: 'Чистый (нестихийный) урон', suffix: '%' },
-            cannibalBuff: { label: 'Бафф от поедания тел', suffix: '%' },
+            pureDmg: { label: 'Чистый (нестихийный) урон', suffix: '%', auto: true },
+            cannibalBuff: { label: 'Бафф от поедания тел', suffix: '%', auto: true },
             silentIllusion: { label: 'Заклинания Иллюзии бесшумны', suffix: '', bool: true },
             illusionCost: { label: 'Стоимость каста: Иллюзия', suffix: '% дешевле', auto: true },
             fearChance: { label: 'Доп. шанс обратить врага в бегство страхом', suffix: '%', auto: true },
@@ -2477,6 +2477,18 @@
         blizzard: { name: '🌬️ Метель', effect: '−10 фт. скорости, −4 к дальнему бою, видимость почти нулевая' },
         fog: { name: '🌫️ Туман', effect: '+4 к Скрытности, −4 к дальнему бою — плохая видимость' }
     };
+    // Погода → числа (раньше это была только подпись). Гроза: штраф к скрытности от молний — условный, оставлен текстом.
+    const WEATHER_MODS = {
+        rain: { ranged: -2, stealth: 2, speed: 0 }, storm: { ranged: -4, stealth: 0, speed: 0 },
+        snow: { ranged: 0, stealth: 2, speed: -5 }, blizzard: { ranged: -4, stealth: 0, speed: -10 },
+        fog: { ranged: -4, stealth: 4, speed: 0 }
+    };
+    function weatherMods() {
+        try {
+            const sess = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
+            return WEATHER_MODS[(sess && sess.currentWeather) || 'clear'] || { ranged: 0, stealth: 0, speed: 0 };
+        } catch (e) { return { ranged: 0, stealth: 0, speed: 0 }; }
+    }
     const GAME_REGIONS = ['Лес', 'Болото', 'Горы', 'Побережье', 'Равнина', 'Подземелье'];
     const GAME_HOLDS = ['Вайтран', 'Винтерхолд', 'Рифт', 'Фолкрит', 'Солитьюд (Хаафингар)', 'Хьялмарк (Морфал)',
         'Истмарк (Виндхельм)', 'Белый берег (Данстар)', 'Маркарт (Предел)', 'Схолстейм'];
@@ -3042,6 +3054,7 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function saveSpellsAndRefresh() {
+        try { refreshEnhancedButtons(); } catch (e) { }
         // Кэш урона заклинаний (ключ — текст описания) корректен и без этого, т.к. функция чистая,
         // но при долгой правке описаний старые ключи копились бы бесконечно — чистим при каждом
         // сохранении книги (пересчёт дешёвый, ~2 вызова на заклинание).
@@ -3241,7 +3254,7 @@ window.toggleSkillPanel = function (idx) {
     function getActiveSkillRollBonus(skillLabel) {
         const k = canonSkillKey(skillLabel);
         if (!k) return 0;
-        return diseaseSkillMod(k) + (activeTimedEffects || []).reduce((s, e) => s + (((e.turnsRemaining > 0 || e.turnsRemaining === Infinity) && e.skillRollBonus && canonSkillKey(e.skillRollBonus.skill) === k) ? (e.skillRollBonus.value || 0) : 0), 0);
+        return diseaseSkillMod(k) + gearSkillRoll(k) + (k === 'скрытность' ? weatherMods().stealth : 0) + (activeTimedEffects || []).reduce((s, e) => s + (((e.turnsRemaining > 0 || e.turnsRemaining === Infinity) && e.skillRollBonus && canonSkillKey(e.skillRollBonus.skill) === k) ? (e.skillRollBonus.value || 0) : 0), 0);
     }
     // Болезни работают механически: −2 к броскам своих навыков (у последователей Периайта — бафф +1/+2/+3 вместо штрафа);
     // Кровавая лихорадка — −10 к макс. здоровью (у Периайта +10/+20/+30).
@@ -3251,6 +3264,7 @@ window.toggleSkillPanel = function (idx) {
         'Заумь': ['разрушение', 'восстановление', 'колдовство', 'иллюзия', 'изменение'],
         'Насморк Пелиниала': ['скрытность', 'карманные кражи']
     };
+    function gearSkillRoll(k) { try { const t = getGearTextBonuses().skill; return t[k] || 0; } catch (e) { return 0; } }
     function activeDiseaseNames() {
         return (activeTimedEffects || []).filter(e => e && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity) && /^Болезнь:/.test(e.effectName || '')).map(e => e.effectName.replace(/^Болезнь:\s*/, '').trim());
     }
@@ -4007,6 +4021,7 @@ window.toggleSkillPanel = function (idx) {
             // длящийся баф/усиление (активный эффект, как у зелий) — хп/мп ИЛИ процентный
             // (сила/стоимость заклинаний, сопротивления, скорость).
             const heal = parseInstantHealBonus(desc);
+            if (heal && heal.key === 'hp' && school === 'restor' && (window.perkBonuses || {}).regenPerk) heal.value = Math.round(heal.value * 1.5); // перк «Регенерация»: лечение +50%
             if (heal && sb.pct && school === 'restor' && heal.key === 'hp') {
                 heal.value = Math.round(heal.value * sb.mult);
                 boostNote = ` ✨ «${sb.skill}» +${sb.pct}%: лечение сильнее на ${sb.pct}%.`;
@@ -4057,6 +4072,7 @@ window.toggleSkillPanel = function (idx) {
             // (у игрока нет живого листенера на чужой документ персонажа, только на сессию;
             // цель подхватит эффект сама через уже существующий механизм applyIncomingStatusEffects).
             const heal = parseInstantHealBonus(desc);
+            if (heal && heal.key === 'hp' && school === 'restor' && (window.perkBonuses || {}).regenPerk) heal.value = Math.round(heal.value * 1.5); // перк «Регенерация»: лечение +50%
             if (heal && sb.pct && school === 'restor' && heal.key === 'hp') {
                 heal.value = Math.round(heal.value * sb.mult);
                 boostNote = ` ✨ «${sb.skill}» +${sb.pct}%: лечение сильнее на ${sb.pct}%.`;
@@ -4166,7 +4182,56 @@ window.toggleSkillPanel = function (idx) {
         const target = (card.querySelector('.spell-target-select') || {}).value || 'self';
         return { school, name, target };
     }
+    // ===== Усиленный каст: только с перком «Двойное <школа>» и только у заклинаний, у которых усиленная версия есть =====
+    const DUAL_PERK_BY_SCHOOL = { destr: 'dualDestr', restor: 'dualRestor', conj: 'dualConj', illus: 'dualIllus', alter: 'dualAlter' };
+    const DUAL_PERK_NAME = { destr: 'Двойное разрушение', restor: 'Двойное восстановление', conj: 'Двойное колдовство', illus: 'Двойная иллюзия', alter: 'Двойное изменение' };
+    // '' — можно; иначе причина запрета.
+    function enhancedBlockReason(school, desc, name) {
+        const liveDesc = desc || (name && typeof findSpellDescByName === 'function' ? findSpellDescByName(name) : '') || '';
+        if (!hasEnhancedDesc(liveDesc)) return 'У этого заклинания нет усиленной версии.';
+        const flag = DUAL_PERK_BY_SCHOOL[school];
+        if (flag && !(window.perkBonuses || {})[flag]) return `Усиленный каст доступен с перком «${DUAL_PERK_NAME[school]}».`;
+        return '';
+    }
+    function cardEnhancedReason(id) {
+        const info = spellCardInfo(id); if (!info) return 'Заклинание не найдено.';
+        const card = document.getElementById('card-' + id), d = card && card.querySelector('.spell-desc');
+        return enhancedBlockReason(info.school, d ? d.value : '', info.name);
+    }
+    function refreshEnhancedButtons() {
+        document.querySelectorAll('.spell-card').forEach(card => {
+            const btn = card.querySelector('button[onclick*="castCustomSpell"][onclick$="true)"]');
+            if (!btn) return;
+            const id = card.id.replace('card-', '');
+            let reason = ''; try { reason = cardEnhancedReason(id); } catch (e) { }
+            btn.style.display = reason ? 'none' : '';
+        });
+        const chk = document.getElementById('chk-enhanced-cast');
+        if (chk) {
+            const val = (document.getElementById('attack-action-select') || {}).value || '';
+            let reason = '';
+            if (val.indexOf('spell:') === 0 || val.indexOf('control:') === 0) { const sp = (customSpells || []).find(s => s.id === val.slice(val.indexOf(':') + 1)); if (sp) reason = enhancedBlockReason(sp.school, liveSpellDesc(sp), sp.name); } else reason = 'не заклинание';
+            chk.disabled = !!reason; if (reason) chk.checked = false;
+            chk.parentElement.style.opacity = reason ? '.45' : '1';
+            chk.parentElement.title = reason && reason !== 'не заклинание' ? reason : '';
+        }
+        const sc = document.getElementById('summon-enhanced-check');
+        if (sc) {
+            const t = summonTemplates[parseInt((document.getElementById('summon-template-select') || {}).value)];
+            let reason = 'нет';
+            if (t) {
+                const school = t.spellName ? findSpellSchoolByName(t.spellName) : 'conj';
+                const hasEnh = (t.durEnh && t.durEnh !== t.durBase) || t.enhCount || (t.hpEnh && t.hpEnh !== t.hpBase) || (t.dmgEnh && t.dmgEnh !== t.dmgBase);
+                reason = !hasEnh ? 'нет усиленной версии' : ((DUAL_PERK_BY_SCHOOL[school] && !(window.perkBonuses || {})[DUAL_PERK_BY_SCHOOL[school]]) ? 'перк «' + DUAL_PERK_NAME[school] + '»' : '');
+            }
+            sc.disabled = !!reason; if (reason) sc.checked = false;
+            sc.parentElement.style.opacity = reason ? '.45' : '1';
+            sc.parentElement.title = reason ? 'Усиленный вариант недоступен: ' + reason : '';
+        }
+    }
+    window.refreshEnhancedButtons = refreshEnhancedButtons;
     function castCustomSpell(id, enhanced) {
+        if (enhanced) { const why = cardEnhancedReason(id); if (why) { alert(why); return; } }
         const info = spellCardInfo(id);
         const conc = !!(info && CONC_SCHOOLS.indexOf(info.school) !== -1 && info.target === 'self');
         const prev = conc ? activeConcentrationEffects() : [];
@@ -7318,10 +7383,83 @@ window.toggleSkillPanel = function (idx) {
     // ====================== Тренировки гильдий (Фракции.xlsx) ======================
     // Гильдия воров: раз в неделю можно потренировать Скрытность / Карманные кражи / Взлом — каждый навык на +3.
     // Соратники: каждый день одна тренировка навыка воина: один — +1, с соратником — +2.
-    let trainState = { thief: {}, comp: -1 }; // thief: { навык: номер дня последней тренировки }, comp: день последней тренировки у Соратников
+    let trainState = { thief: {}, comp: -1, mageLib: -1, mageLesson: -1, mageLessons: {}, mageStudy: null, mageStudyLast: -99 }; // thief: { навык: номер дня последней тренировки }, comp: день последней тренировки у Соратников
     const THIEF_TRAIN_SKILLS = ['Скрытность', 'Карманные кражи', 'Взлом'];
     const COMP_TRAIN_SKILLS = ['Одноручное оружие', 'Двуручное оружие', 'Стрельба', 'Блокирование', 'Тяжелая броня', 'Легкая броня'];
     function gameDayIndex() { return gameYear * 360 + gameMonth * 30 + gameDayNum; } // в календаре 12 месяцев по 30 дней
+    // Коллегия магов Винтерхолда (Фракции.xlsx): помощь библиотекарю за целый день — +1 к случайной школе магии или Зачарованию;
+    // доп. урок у преподавателя — 50 септимов, 1 урок в день, каждые 2 урока +1 к выбранному навыку.
+    const MAGE_TRAIN_SKILLS = ['Разрушение', 'Восстановление', 'Колдовство', 'Иллюзия', 'Изменение', 'Зачарование'];
+    function mageIsMember() { return normalizePlayerGuildEntry((playerGuildsData || {})['Коллегия магов']).member; }
+    // Платное обучение у учителя школы: заклинание Адепта — 100 септимов, неделя лекций; Эксперта — 200, две недели.
+    // Начать можно раз в неделю. По окончании заклинание само появляется в книге.
+    const MAGE_SCHOOL_CODES = { 'Разрушение': 'destr', 'Восстановление': 'restor', 'Колдовство': 'conj', 'Иллюзия': 'illus', 'Изменение': 'alter' };
+    function learnSpellIntoBook(school, name) {
+        const cont = document.getElementById(`spells-${school}-list`);
+        if (!cont) return false;
+        if (Array.from(cont.querySelectorAll('.spell-name-select')).some(sel => sel.value === name)) return 'known';
+        addCustomSpell(school);
+        const cards = cont.querySelectorAll('.spell-card'), card = cards[cards.length - 1];
+        const sel = card.querySelector('.spell-name-select');
+        sel.value = name;
+        window.onSpellPicked(card.id.replace('card-', ''), school);
+        return true;
+    }
+    function mageStudyTick() {
+        const st = trainState.mageStudy;
+        if (!st || gameDayIndex() < st.startDay + st.days) return;
+        trainState.mageStudy = null;
+        const r = learnSpellIntoBook(st.school, st.name);
+        setTimeout(() => alert(r === 'known' ? `Обучение закончено, но «${st.name}» уже есть в книге.` : `🎓 Обучение у учителя закончено: заклинание «${st.name}» добавлено в книгу.`), 50);
+        saveLocalStorage(true);
+    }
+    window.mageStartStudy = function () {
+        if (!mageIsMember() || trainState.mageStudy) return;
+        const today = gameDayIndex();
+        if (today - (trainState.mageStudyLast === undefined ? -99 : trainState.mageStudyLast) < 7) { alert('Учитель обучает раз в неделю — рано.'); return; }
+        const val = (document.getElementById('train-mage-spell') || {}).value || '';
+        const [school, tierS, ...rest] = val.split('|'), name = rest.join('|'), tier = parseInt(tierS);
+        if (!school || !name || (tier !== 3 && tier !== 4)) return;
+        const price = tier === 4 ? 200 : 100, days = tier === 4 ? 14 : 7;
+        const goldEl = document.getElementById('char-gold'), gold = parseInt(goldEl.value) || 0;
+        if (gold < price) { alert(`Обучение стоит ${price} септимов.`); return; }
+        goldEl.value = gold - price;
+        trainState.mageStudy = { school: school, name: name, startDay: today, days: days };
+        trainState.mageStudyLast = today;
+        renderTrainSection(); updateAll(); saveLocalStorage(true);
+        alert(`Учитель начал обучать «${name}» (−${price}). Лекции: ${days === 14 ? '2 недели' : 'неделя'}.`);
+    };
+    window.mageHelpLibrarian = function () {
+        if (!mageIsMember()) return;
+        const today = gameDayIndex();
+        if (trainState.mageLib === today) { alert('Сегодня ты уже помогал(а) библиотекарю.'); return; }
+        trainState.mageLib = today;
+        const sk = MAGE_TRAIN_SKILLS[Math.floor(Math.random() * MAGE_TRAIN_SKILLS.length)];
+        const g = trainSkillUp(sk, 1);
+        alert(`Целый день у библиотекаря Урага гро-Шуба: «${sk}» +${g}.`);
+    };
+    window.mageExtraLesson = function () {
+        if (!mageIsMember()) return;
+        const today = gameDayIndex();
+        if (trainState.mageLesson === today) { alert('Доп. урок — не чаще одного в день.'); return; }
+        const sk = (document.getElementById('train-mage-skill') || {}).value;
+        if (MAGE_TRAIN_SKILLS.indexOf(sk) === -1) return;
+        const goldEl = document.getElementById('char-gold'), gold = parseInt(goldEl.value) || 0;
+        if (gold < 50) { alert('Урок стоит 50 септимов.'); return; }
+        goldEl.value = gold - 50;
+        trainState.mageLesson = today;
+        if (!trainState.mageLessons) trainState.mageLessons = {};
+        const n = (trainState.mageLessons[sk] || 0) + 1;
+        if (n >= 2) {
+            trainState.mageLessons[sk] = 0;
+            const g = trainSkillUp(sk, 1);
+            alert(`Доп. урок (−50 септимов): второй урок по «${sk}» — навык +${g}.`);
+        } else {
+            trainState.mageLessons[sk] = n;
+            updateAll(); renderTrainSection(); saveLocalStorage(true);
+            alert(`Доп. урок (−50 септимов): «${sk}» — 1 из 2, ещё один урок до +1.`);
+        }
+    };
     function thiefIsMember() { return normalizePlayerGuildEntry((playerGuildsData || {})['Гильдия воров']).member; }
     function trainSkillUp(skillName, pts) {
         const idx = skillNames.indexOf(skillName), inp = document.getElementById('skill-' + idx);
@@ -7335,9 +7473,9 @@ window.toggleSkillPanel = function (idx) {
     function renderTrainSection() {
         const wrap = document.getElementById('prof-train-wrap'), body = document.getElementById('train-body');
         if (!wrap || !body) return;
-        const th = thiefIsMember(), co = companionsMember();
-        wrap.style.display = (th || co) ? '' : 'none';
-        if (!th && !co) { body.innerHTML = ''; return; }
+        const th = thiefIsMember(), co = companionsMember(), mg = mageIsMember();
+        wrap.style.display = (th || co || mg) ? '' : 'none';
+        if (!th && !co && !mg) { body.innerHTML = ''; return; }
         const today = gameDayIndex();
         let html = '';
         if (th) {
@@ -7353,6 +7491,26 @@ window.toggleSkillPanel = function (idx) {
                 <div style="display:flex; gap:6px; flex-wrap:wrap;"><select id="train-comp-skill" style="flex:1; min-width:140px;">${COMP_TRAIN_SKILLS.map(sk => `<option value="${escHtml(sk)}">${escHtml(sk)}</option>`).join('')}</select>
                 <select id="train-comp-mode" style="width:auto;"><option value="1">Один (+1)</option><option value="2">С соратником (+2)</option></select></div>
                 <button class="btn-success" style="width:100%; margin-top:4px;" ${done ? 'disabled' : ''} onclick="trainCompanions()">${done ? 'Сегодня уже тренировался(лась)' : 'Потренироваться'}</button>`;
+        }
+        if (mg) mageStudyTick();
+        if (mg) {
+            const doneL = trainState.mageLib === today, doneS = trainState.mageLesson === today, ml = trainState.mageLessons || {};
+            const prevMs = document.getElementById('train-mage-skill'), pms = prevMs && prevMs.value;
+            html += '<h3 style="margin-top:12px;">🔮 Коллегия магов Винтерхолда</h3>' +
+                `<p style="font-size:12px; opacity:.75;">Помощь библиотекарю (целый день, раз в день): +1 к случайной школе магии или Зачарованию.</p>
+                <button class="btn-success" style="width:100%;" ${doneL ? 'disabled' : ''} onclick="mageHelpLibrarian()">${doneL ? 'Сегодня уже помогал(а) библиотекарю' : '📚 Помочь библиотекарю'}</button>
+                <p style="font-size:12px; opacity:.75; margin-top:8px;">Доп. урок у преподавателя: 50 септимов, 1 в день, каждые 2 урока по навыку = +1.</p>
+                <div style="display:flex; gap:6px;"><select id="train-mage-skill" style="flex:1;">${MAGE_TRAIN_SKILLS.map(sk => `<option value="${escHtml(sk)}" ${pms === sk ? 'selected' : ''}>${escHtml(sk)} (${ml[sk] || 0}/2)</option>`).join('')}</select></div>
+                <button class="btn-success" style="width:100%; margin-top:4px;" ${doneS ? 'disabled' : ''} onclick="mageExtraLesson()">${doneS ? 'Сегодня урок уже был' : '🎓 Взять доп. урок (−50)'}</button>`;
+            const stdy = trainState.mageStudy, wait = Math.max(0, 7 - (today - (trainState.mageStudyLast === undefined ? -99 : trainState.mageStudyLast)));
+            const known = {};
+            ['destr', 'restor', 'conj', 'illus', 'alter'].forEach(sc => document.querySelectorAll(`#spells-${sc}-list .spell-name-select`).forEach(sl => { known[sc + '|' + sl.value] = 1; }));
+            const opts = [];
+            Object.keys(MAGE_SCHOOL_CODES).forEach(sk => { const sc = MAGE_SCHOOL_CODES[sk]; [3, 4].forEach(t => ((window.spellsData && spellsData[sc] && spellsData[sc][t]) || []).forEach(sp => { if (!known[sc + '|' + sp.name]) opts.push(`<option value="${escHtml(sc + '|' + t + '|' + sp.name)}">${escHtml(sk)} · ${t === 4 ? 'Эксперт' : 'Адепт'} · ${escHtml(sp.name)} (${t === 4 ? 200 : 100})</option>`); })); });
+            html += '<p style="font-size:12px; opacity:.75; margin-top:8px;">Платное обучение заклинанию у учителя школы: Адепт — 100 септимов, неделя лекций; Эксперт — 200, две недели. Начать можно раз в неделю.</p>' +
+                (stdy ? `<div class="party-row">🎓 Изучаешь «${escHtml(stdy.name)}» — осталось ${Math.max(0, stdy.startDay + stdy.days - today)} дн.</div>` :
+                `<select id="train-mage-spell">${opts.join('') || '<option value="">Нет доступных заклинаний</option>'}</select>
+                <button class="btn-success" style="width:100%; margin-top:4px;" ${wait > 0 || !opts.length ? 'disabled' : ''} onclick="mageStartStudy()">${wait > 0 ? 'Учитель свободен через ' + wait + ' дн.' : '📖 Записаться на обучение'}</button>`);
         }
         const prevC = document.getElementById('train-comp-skill'), prevM = document.getElementById('train-comp-mode');
         const pc = prevC && prevC.value, pm = prevM && prevM.value;
@@ -7444,6 +7602,7 @@ window.toggleSkillPanel = function (idx) {
     }
 
     window.updateSummonTemplateInfo = function () {
+        try { refreshEnhancedButtons(); } catch (e) { }
         const idx = parseInt(document.getElementById('summon-template-select').value) || 0;
         const t = summonTemplates[idx];
         const infoEl = document.getElementById('summon-template-info');
@@ -7612,7 +7771,7 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = `<span style="color:#e74c3c;">Нужно знать заклинание «${escHtml(t.spellName)}» (выучено или есть свиток).</span>`;
             return;
         }
-        const enhanced = document.getElementById('summon-enhanced-check') && document.getElementById('summon-enhanced-check').checked;
+        const enhanced = !!(document.getElementById('summon-enhanced-check') && document.getElementById('summon-enhanced-check').checked && !document.getElementById('summon-enhanced-check').disabled);
         const res = t.category === 'armor' ? castFleshSpell(t, enhanced) : performSummon(t, enhanced);
         resultEl.innerHTML = res.ok ? `<span style="color:#2ecc71;">✅ ${escHtml(res.message)}</span>` : `<span style="color:#e74c3c;">${escHtml(res.message)}</span>`;
     };
@@ -8435,6 +8594,13 @@ window.toggleSkillPanel = function (idx) {
         ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
             const item = equippedSlots[slotKey] ? invById.get(equippedSlots[slotKey]) : null;
             if (!item || !item.effect) return;
+            // «-15% стоимости Иллюзии» (комплекты Линви и т.п.)
+            (String(item.effect).match(/[\-−]\s*\d+\s*%\s*стоимости\s+[а-яё]+/gi) || []).forEach(t => {
+                const mm = t.match(/(\d+)\s*%\s*стоимости\s+([а-яё]+)/i); if (!mm) return;
+                const w = mm[2].toLowerCase(), v = parseInt(mm[1]);
+                const code = /^разруш/.test(w) ? 'destr' : /^изменен/.test(w) ? 'alter' : /^иллюз/.test(w) ? 'illus' : /^колдов/.test(w) ? 'conj' : /^восстанов/.test(w) ? 'restor' : null;
+                if (code) cut[code] += v;
+            });
             String(item.effect).split(/\.\s*/).forEach(sent => {
                 sent = sent.trim();
                 if (!sent || /^усилен/i.test(sent)) return;
@@ -8450,8 +8616,80 @@ window.toggleSkillPanel = function (idx) {
         return cut;
     }
 
+    // ===== Текстовые эффекты экипировки → числа =====
+    // Уникальная броня/артефакты описаны текстом через запятую: «+25 МП, +10% сопр. магии, +15% урона». Раньше учитывался
+    // только ОДИН простой бонус (хп/мп/броня), остальное было подписью. Здесь разбираем каждую часть; условные части
+    // («при сете», «в бою с животными», «раз в день», «за каждую»…) остаются текстом.
+    const GEAR_RES_WORDS = [[/огн/, 'fire'], [/холод|мороз/, 'frost'], [/электр/, 'shock'], [/яд/, 'poison'], [/болезн/, 'disease'], [/магии|магич/, 'magic'], [/стрел/, 'arrow'], [/крик/, 'shout']];
+    function parseGearEffects(text) {
+        const o = { speed: 0, hp: 0, mp: 0, weight: 0, armor: 0, fire: 0, frost: 0, shock: 0, poison: 0, disease: 0, magic: 0, shout: 0, arrow: 0, dmg: 0, melee: 0, ranged: 0, atk: 0, skill: {}, any: false };
+        if (!text) return o;
+        String(text).split(/\s*[,;]\s*|\.\s+(?=[А-ЯЁ«])/).forEach(raw => {
+            const c = raw.trim().toLowerCase().replace(/ё/g, 'е');
+            if (!c || /(^|[^а-я])при([^а-я]|$)|в бою с|если|без полного|раз в|за кажд|шанс|на \d+ ход|уровн/.test(c)) return;
+            let m;
+            const num = x => parseFloat(x);
+            // Повышения максимумов
+            if ((m = c.match(/^\+?\s*(\d+(?:\.\d+)?)\s*(?:хп|здоровья)(?![а-яa-z])/)) || (m = c.match(/^повышение здоровья:\s*(\d+(?:\.\d+)?)/))) { o.hp += Math.round(num(m[1])); o.any = true; return; }
+            if ((m = c.match(/^\+?\s*(\d+(?:\.\d+)?)\s*(?:мп|mp|маны|магии)(?![а-яa-z])/)) || (m = c.match(/^повышение магии:\s*(\d+(?:\.\d+)?)/))) { o.mp += Math.round(num(m[1])); o.any = true; return; }
+            if ((m = c.match(/^\+\s*(\d+)\s*(?:к\s+)?скорости/))) { o.speed += parseInt(m[1]); o.any = true; return; }
+            if ((m = c.match(/^\+\s*(\d+)\s*(?:к\s+)?переносимого веса/))) { o.weight += parseInt(m[1]); o.any = true; return; }
+            if ((m = c.match(/^\+\s*(\d+)\s*(?:к\s+)?брони$/))) { o.armor += parseInt(m[1]); o.any = true; return; }
+            if ((m = c.match(/^\+\s*(\d+)\s*%\s*(?:сопр\.?|сопротивлени[а-я]*|защиты от)\s+стихи[а-я]*$/))) { const v = parseInt(m[1]); o.fire += v; o.frost += v; o.shock += v; o.any = true; return; }
+            if ((m = c.match(/^повышение переносимого веса:\s*(\d+(?:\.\d+)?)/))) { o.weight += Math.round(num(m[1])); o.any = true; return; }
+            // Сопротивления: «+25% сопр. огню», «сопротивление магии: 12.5%», «25% резист магии», «+15% защиты от стрел»
+            if ((m = c.match(/^([+\-]?\d+(?:\.\d+)?)\s*%\s*(?:сопр\.?|сопротивлени[а-я]*|резист[а-я]*|защиты от)\s+(.+)$/)) || (m = c.match(/^(?:сопротивлени[а-я]*|резист[а-я]*)\s+(.+?)[:\s]\s*\+?\s*(\d+(?:\.\d+)?)\s*%$/))) {
+                const val = m.length === 3 && /^[+\-]?\d/.test(m[1]) ? num(m[1]) : num(m[2]);
+                const what = (/^[+\-]?\d/.test(m[1]) ? m[2] : m[1]);
+                const hit = GEAR_RES_WORDS.find(w => w[0].test(what));
+                if (hit) { o[hit[1]] += val; o.any = true; return; }
+            }
+            // Урон: «+15% урона оружием», «+15% урона одноручным и двуручным», «+10% урона стрелками», «+10% физ. урона»
+            if ((m = c.match(/^\+\s*(\d+(?:\.\d+)?)\s*%\s*(?:физ\.?\s*)?урона(?:\s+(.+))?$/))) {
+                const v = num(m[1]), w = m[2] || '';
+                if (/огн|холод|электр|яд/.test(w)) return;
+                if (/стрелк|лучник|дальн/.test(w)) o.ranged += v; else if (/одноруч|двуруч|ближн/.test(w)) o.melee += v; else o.dmg += v;
+                o.any = true; return;
+            }
+            // Бонус к кубам атаки
+            if ((m = c.match(/^\+\s*(\d+)\s*к кубам атаки/))) { o.atk += parseInt(m[1]); o.any = true; return; }
+            // Бонус к броскам навыка: «+1 к скрытности», «+2 к кубам на скрытность», «+3 куба на скрытность»
+            if ((m = c.match(/^\+\s*(\d+)\s*(?:к кубам на|куб\w* на|к)\s+([а-я ]+)$/))) {
+                const sk = m[2].trim();
+                if (/скрытност|взлом|карманн|красноречи|алхими|кузнечн|зачарован|разрушен|восстановлен|колдовств|иллюзи|изменен|кулинар|блокиров|стрельб/.test(sk)) {
+                    const key = sk.replace(/^на\s+/, '');
+                    const map = { 'скрытности': 'скрытность', 'скрытность': 'скрытность', 'взлому': 'взлом', 'красноречию': 'красноречие' };
+                    const k = map[key] || key;
+                    o.skill[k] = (o.skill[k] || 0) + parseInt(m[1]); o.any = true; return;
+                }
+            }
+        });
+        return o;
+    }
+    // Суммарные боевые бонусы надетой экипировки из текста (урон, атака, броски навыков).
+    function getGearTextBonuses() {
+        const t = { dmg: 0, melee: 0, ranged: 0, atk: 0, skill: {} };
+        const invById = new Map(playerInventory.map(i => [i.itemId, i]));
+        ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
+            const item = equippedSlots[slotKey] ? invById.get(equippedSlots[slotKey]) : null;
+            if (!item || !item.effect) return;
+            const g = parseGearEffects(item.effect);
+            t.dmg += g.dmg; t.melee += g.melee; t.ranged += g.ranged; t.atk += g.atk;
+            Object.keys(g.skill).forEach(k => { t.skill[k] = (t.skill[k] || 0) + g.skill[k]; });
+        });
+        return t;
+    }
+    function mergeGearIntoGod(godB) {
+        const t = getGearTextBonuses();
+        const r = Object.assign({}, godB);
+        if (t.dmg) r.weaponDmg = (r.weaponDmg || 0) + t.dmg;
+        if (t.melee) r.meleeDmg = (r.meleeDmg || 0) + t.melee;
+        if (t.ranged) r.rangedDmg = (r.rangedDmg || 0) + t.ranged;
+        return r;
+    }
+
     function getEquipmentEnchantBonuses() {
-        const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0, resistFire: 0, resistFrost: 0, resistShock: 0, resistPoison: 0, resistDisease: 0, resistMagic: 0, resistShout: 0 };
+        const bonuses = { hp: 0, mp: 0, weight: 0, armor: 0, resistFire: 0, resistFrost: 0, resistShock: 0, resistPoison: 0, resistDisease: 0, resistMagic: 0, resistShout: 0, resistPhys: 0, speed: 0 };
         // Раньше 9 отдельных playerInventory.find() — O(9×N). Локальная Map строится один раз
         // за вызов из ТЕКУЩЕГО playerInventory, так что не может устареть/рассинхронизироваться
         // между вызовами (в отличие от долгоживущего кэша — тот был бы рискованно трогать в
@@ -8471,8 +8709,11 @@ window.toggleSkillPanel = function (idx) {
                 }
             }
             // Уникальные предметы без структурированного зачарования (просто текст-эффект)
-            const plain = parsePlainEffectBonus(item.effect);
-            if (plain) bonuses[plain.key] += plain.value;
+            const g = parseGearEffects(item.effect);
+            bonuses.speed += g.speed; bonuses.hp += g.hp; bonuses.mp += g.mp; bonuses.weight += g.weight; bonuses.armor += g.armor;
+            bonuses.resistFire += g.fire; bonuses.resistFrost += g.frost; bonuses.resistShock += g.shock; bonuses.resistPoison += g.poison;
+            bonuses.resistDisease += g.disease; bonuses.resistMagic += g.magic; bonuses.resistShout += g.shout; bonuses.resistPhys += g.arrow;
+            if (!g.any) { const plain = parsePlainEffectBonus(item.effect); if (plain) bonuses[plain.key] += plain.value; }
         });
         return bonuses;
     }
@@ -8495,7 +8736,7 @@ window.toggleSkillPanel = function (idx) {
         };
         // "Аура" и подобные заклинания дают сопротивление стихиям (огонь/холод/электричество)
         // ИЛИ сразу трём "прочим" типам (яд/болезни/крики) одним числом.
-        res.physical += percentBonuses.resistPhysical || 0;
+        res.physical += (percentBonuses.resistPhysical || 0) + gear.resistPhys;
         res.fire += percentBonuses.resistElemental;
         res.frost += percentBonuses.resistElemental;
         res.shock += percentBonuses.resistElemental;
@@ -10245,7 +10486,8 @@ window.toggleSkillPanel = function (idx) {
         const mk = document.getElementById('dock-marked-btn'), mt = dockMarkedAlive();
         if (mk) { mk.style.display = mt ? '' : 'none'; if (mt) mk.textContent = '🎯 Атаковать: ' + String(mt.name).slice(0, 18); }
         const fav = document.getElementById('dock-fav-spells');
-        if (fav) fav.innerHTML = (customSpells || []).filter(s => s.favorite && s.name).slice(0, 3).map(s => `<button type="button" class="btn-success" onclick="castCustomSpell('${jsq(s.id)}', false)" title="Избранное: ${escHtml(s.name)}">★ ${escHtml(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</button>`).join('');
+        const enhOkFav = sp => { try { return !cardEnhancedReason(sp.id); } catch (e) { return false; } };
+        if (fav) fav.innerHTML = (customSpells || []).filter(s => s.favorite && s.name).slice(0, 3).map(s => `<button type="button" class="btn-success" onclick="castCustomSpell('${jsq(s.id)}', false)" title="Избранное: ${escHtml(s.name)}">★ ${escHtml(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</button>` + (enhOkFav(s) ? `<button type="button" class="btn-success" style="background:#7a4e2c;" onclick="castCustomSpell('${jsq(s.id)}', true)" title="Усиленный каст «${escHtml(s.name)}» (х2 маны)">⚡</button>` : '')).join('');
         // чтобы док не перекрывал нижние элементы страницы — отступ равен его реальной высоте
         document.body.style.setProperty('--st-dock-h', dock.offsetHeight + 'px');
     };
@@ -10289,7 +10531,14 @@ window.toggleSkillPanel = function (idx) {
         const all = (customSpells || []).filter(s => s.name);
         // «боевые» — те, у кого считается урон или есть управляющий эффект; избранные показываем всегда и первыми
         const isCombat = s => { let d = null; try { d = parseSpellDamageFromDesc(s.desc, false); } catch (e) { } return !!d || !!(typeof PLAYER_CONTROL_SPELLS !== 'undefined' && PLAYER_CONTROL_SPELLS[s.name]); };
-        const btn = (s, big) => `<button type="button" class="st-dock-pick${big ? ' btn-success' : ''}" onclick="dockPickSpell('${jsq(s.id)}')">${s.favorite ? '★ ' : ''}${escHtml(s.name)} <span style="opacity:.7; font-size:12px;">— ${escHtml((((document.getElementById('card-' + s.id) || {}).querySelector && document.getElementById('card-' + s.id).querySelector('.spell-final-cost')) || {}).value || s.baseCost || 0)} МП</span></button>`;
+        const costOf = s => { const c = document.getElementById('card-' + s.id), f = c && c.querySelector('.spell-final-cost'); return (f && f.value) || s.baseCost || 0; };
+        const enhOk = s => { try { return !cardEnhancedReason(s.id); } catch (e) { return false; } };
+        const btn = (s, big) => {
+            const base = `<button type="button" class="st-dock-pick${big ? ' btn-success' : ''}" style="flex:1; margin:0;" onclick="dockPickSpell('${jsq(s.id)}', false)">${s.favorite ? '★ ' : ''}${escHtml(s.name)} <span style="opacity:.7; font-size:12px;">— ${escHtml(costOf(s))} МП</span></button>`;
+            if (!enhOk(s)) return `<div style="display:flex; gap:6px; margin-bottom:6px;">${base}</div>`;
+            const c2 = Math.round((parseFloat(costOf(s)) || 0) * 2);
+            return `<div style="display:flex; gap:6px; margin-bottom:6px;">${base}<button type="button" class="st-dock-pick" style="flex:0 0 auto; margin:0; background:#7a4e2c; color:#fff;" onclick="dockPickSpell('${jsq(s.id)}', true)" title="Усиленный каст: х2 маны, «Усиленный эффект» из описания">⚡ Усилен. <span style="font-size:12px; opacity:.85;">${c2} МП</span></button></div>`;
+        };
         const fav = all.filter(s => s.favorite), combat = all.filter(s => !s.favorite && isCombat(s)), rest = all.filter(s => !s.favorite && !isCombat(s));
         let html = '';
         if (fav.length) html += '<div class="st-dock-sub">★ Избранные</div>' + fav.map(s => btn(s, true)).join('');
@@ -10297,7 +10546,7 @@ window.toggleSkillPanel = function (idx) {
         if (rest.length) html += `<details><summary class="st-dock-sub" style="cursor:pointer;">Остальные (${rest.length})</summary>${rest.map(s => btn(s)).join('')}</details>`;
         dockOpenModal('dock-spell-modal', '✨ Заклинание', html || '<p style="opacity:.7;">Заклинаний нет — выучи их на вкладке «Магия».</p>');
     };
-    window.dockPickSpell = function (id) { dockCloseModal(); castCustomSpell(id, false); };
+    window.dockPickSpell = function (id, enhanced) { dockCloseModal(); castCustomSpell(id, !!enhanced); };
     function dockLog(text) {
         const nm = (document.getElementById('char-name') || {}).value || 'Игрок';
         if (window.CloudSync && window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(text.replace('{n}', nm), nm);
@@ -11472,7 +11721,7 @@ window.deployCampSite = function (useMagic) {
     if (useMagic) {
         const spell = (customSpells || []).find(s => s.name === 'Создание предмета');
         if (!spell) { alert('Не знаешь заклинание «Создание предмета».'); return; }
-        const enhancedCast = confirm('Скастовать усиленно (х2 маны)? Усиленный каст делает лагерь магически безопасным от засад (замена «Великого созидателя» — такого перка в этой системе нет). Отмена = обычный каст.');
+        const enhancedCast = !enhancedBlockReason('alter', spell.desc, spell.name) && confirm('Скастовать усиленно (х2 маны)? Усиленный каст делает лагерь магически безопасным от засад (замена «Великого созидателя» — такого перка в этой системе нет). Отмена = обычный каст.');
         const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
         const baseCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
         const finalCost = enhancedCast ? Math.round(baseCost * getEnhancedCostFactor(spell.school, spell.name)) : baseCost;
@@ -11605,6 +11854,7 @@ window.nextDay = function () {
 
     // Голод: если сегодня не ели — счётчик растёт
     daysWithoutFood += 1;
+    try { if (typeof renderTrainSection === 'function') renderTrainSection(); } catch (e) { }
 
     renderStaffList();
     renderWeaponChargeSelect();
@@ -11670,6 +11920,7 @@ function updateHungerPenalty() {
     updateDateDisplay();
 }    
     window.updateAttackActionInfo = function () {
+        try { refreshEnhancedButtons(); } catch (e) { }
         const val = document.getElementById('attack-action-select').value;
         const infoEl = document.getElementById('attack-action-info');
         if (!infoEl) return;
@@ -11795,7 +12046,7 @@ function updateHungerPenalty() {
         } else if (actionVal.indexOf('spell:') === 0) {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
-            const enhancedCast = document.getElementById('chk-enhanced-cast').checked;
+            const enhancedCast = document.getElementById('chk-enhanced-cast').checked && !enhancedBlockReason(spell.school, liveSpellDesc(spell), spell.name);
             let baseDmg = parseSpellDamageFromDesc(spell.desc, enhancedCast) || 0;
             let rangeNote = '';
             const diceS = getSpellDice(liveSpellDesc(spell), enhancedCast);
@@ -11879,7 +12130,7 @@ function updateHungerPenalty() {
             const ctrl = spell ? PLAYER_CONTROL_SPELLS[spell.name] : null;
             if (!spell || !ctrl) { alert('Заклинание не найдено.'); return; }
             const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
-            const enhCtl = !!(document.getElementById('chk-enhanced-cast') && document.getElementById('chk-enhanced-cast').checked && (ctrl.enh || hasEnhancedDesc(liveSpellDesc(spell))));
+            const enhCtl = !!(document.getElementById('chk-enhanced-cast') && document.getElementById('chk-enhanced-cast').checked && !enhancedBlockReason(spell.school, liveSpellDesc(spell), spell.name));
             const ctrlUse0 = (enhCtl && ctrl.enh) ? Object.assign({}, ctrl, ctrl.enh) : Object.assign({}, ctrl);
             // Проверка уровня и типа цели («до N уровня», «только нежить», «только даэдра») — до траты маны.
             const chk = checkControlTarget(spell, target, enhCtl);
@@ -11945,6 +12196,8 @@ function updateHungerPenalty() {
             if (pct) dmg = Math.round(dmg * (1 + pct / 100));
         }
 
+        if (actionVal === 'ranged') { const wr = weatherMods().ranged; if (wr) { mod += wr; actionLabel += ` (погода ${wr})`; } }
+        if (actionVal === 'melee' || actionVal === 'ranged') { const gta = getGearTextBonuses().atk; if (gta) { mod += gta; actionLabel += ` (экипировка +${gta} к кубам атаки)`; } }
         { const dsm = skillNameForProgress ? diseaseSkillMod(canonSkillKey(skillNameForProgress)) : 0; if (dsm) { mod += dsm; actionLabel += ` (🦠 болезнь ${dsm > 0 ? '+' : ''}${dsm})`; } }
         { const atkPen = getActiveRollPenalty(); if (atkPen) { mod += atkPen; actionLabel += ` (${atkPen} ошеломление/ослабление)`; } }
         { const sb = getSessionRollBonus(true); if (sb.value) { mod += sb.value; actionLabel += ` (${sb.notes.join(', ')})`; } }
@@ -12448,7 +12701,7 @@ function updateHungerPenalty() {
         if (sign === 'shadow') { intel += 1; cha += 1; wis += 1; } // «Тень»: Инт, Хар и Муд +1
         if (snVampire()) { const vhp = vampHungerStatPenalty(); str += 2 - vhp; dex += 2 - vhp; con += 3 - vhp; cha += 3 - vhp; intel -= vhp; wis -= vhp; } // Вампиризм: +2 Сил, +2 Лов, +3 Тел, +3 Хар (пока стоит флаг)
 
-        const godB = getGodBonuses(god, rnk);
+        const godB = mergeGearIntoGod(getGodBonuses(god, rnk));
         window.activeGodBonuses = godB;
         const godDescEl = document.getElementById('god-bonus-description');
         if (godDescEl) {
@@ -12497,6 +12750,7 @@ function updateHungerPenalty() {
         // === ПРИМЕНЯЕМ ПЕРКИ (пока закомментировано, чтобы не мешало) ===
         if (typeof window.applyPerks === 'function') {
              window.applyPerks();
+             try { refreshEnhancedButtons(); } catch (e) { }
          }
          const perks = window.perkBonuses || {};
 
@@ -12667,6 +12921,8 @@ function updateHungerPenalty() {
             // «Повышение навыка: Лёгкая броня»: скорость +N/2 (только в лёгкой броне).
             if (armorType === 'light') speed += Math.floor(getSkillBoostPercent('Легкая броня') / 2);
             if (godB.speed) speed += godB.speed;
+            speed += weatherMods().speed;
+            speed += equipBonuses.speed || 0; // скорость от экипировки (текстовые эффекты)
             // Скорость в скрытности (Ноктюрнал) — условно, пока нет отдельного тумблера "крадусь
             // прямо сейчас", используем чекбокс скрытной атаки как показатель этого состояния.
             if (gb('sneakSpeed') && document.getElementById('chk-sneak-attack').checked) {
@@ -13990,7 +14246,7 @@ function updateHungerPenalty() {
             powersUsedToday = (data.powersUsedToday && typeof data.powersUsedToday === 'object') ? data.powersUsedToday : {};
             companionRewards = (data.companionRewards && typeof data.companionRewards === 'object') ? data.companionRewards : {};
             soulEaterKills = parseInt(data.soulEaterKills) || 0;
-            trainState = (data.trainState && typeof data.trainState === 'object') ? Object.assign({ thief: {}, comp: -1 }, data.trainState) : { thief: {}, comp: -1 };
+            trainState = (data.trainState && typeof data.trainState === 'object') ? Object.assign({ thief: {}, comp: -1, mageLib: -1, mageLesson: -1, mageLessons: {}, mageStudy: null, mageStudyLast: -99 }, data.trainState) : { thief: {}, comp: -1, mageLib: -1, mageLesson: -1, mageLessons: {}, mageStudy: null, mageStudyLast: -99 };
             if (!trainState.thief || typeof trainState.thief !== 'object') trainState.thief = {};
             bardSongs = (Array.isArray(data.bardSongs) ? data.bardSongs : []).filter(x => x && typeof x.title === 'string').slice(0, 50)
                 .map(x => ({ id: String(x.id || ('song-' + Math.random().toString(36).slice(2, 8))), title: x.title.slice(0, 60), text: String(x.text || '').slice(0, 2000) }));

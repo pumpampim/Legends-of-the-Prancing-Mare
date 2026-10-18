@@ -111,6 +111,7 @@
         "6-2": () => ({ backstabUnlocked: true }),
         "6-4": () => ({ assassinBladeUnlocked: true }),
         "6-5": () => ({ sneakBowTriple: true }),
+        "11-2": () => ({ regenPerk: true }),
 
         // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
         "8-4": () => ({ extraCarryWeight: 50 }),
@@ -171,6 +172,8 @@
         "11-7": () => ({ wardAbsorbMana: true }),
         "11-8": () => ({ necromage: true }),
         // Колдовство
+        "10-1": () => ({ dualDestr: true }),
+        "11-1": () => ({ dualRestor: true }),
         "12-1": () => ({ dualConj: true }),
         "12-2": () => ({ summonWeaponBonus: 0.5 }),
         "12-3": () => ({ raisedExtraTurns: 3 }),
@@ -256,7 +259,7 @@
             shieldArmorBonus: 0,
             heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
             lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
-            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false, sneakBowTriple: false,
+            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false, sneakBowTriple: false, dualDestr: false, dualRestor: false, dualConj: false, dualIllus: false, dualAlter: false, regenPerk: false,
             extraCarryWeight: 0,
             enchantGeneralBonus: 0, enchantSoulEconomy: 0, enchantFireBonus: 0,
             enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,
