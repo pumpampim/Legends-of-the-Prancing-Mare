@@ -324,6 +324,7 @@
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
         try { gmNotifyWatch(lastData); } catch (e) { console.error(e); }
+        try { renderMuseumRequests(); renderQuestClaims(); renderPlayerLimits(); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
@@ -402,7 +403,13 @@
             else if (diff <= 4) { outcome = 'partial'; outcomeLabel = '🟡 Частичный блок'; }
             else { outcome = 'broken'; outcomeLabel = '❌ Блок пробит'; }
 
-            pendingBlockResult = { enemy, targetUid, outcome, blockReductionPct, enemyTotal, playerTotal };
+            const hasBlkPerk = (pi) => !!(data.perkStates || {})['skill3-perk' + pi + '-step1'];
+            const arrowNoDmg = hasBlkPerk(1) && !!enemy.isRanged && outcome !== 'broken';
+            const blkNotes = [];
+            if (arrowNoDmg) blkNotes.push('🏹 «Отбивание стрел»: стрела попала в щит — урона нет.');
+            if (hasBlkPerk(4) && outcome !== 'broken') blkNotes.push('🛡 «Защита от стихий»: пока блок держится — 50% сопротивление огню, холоду и электричеству (для стихийной атаки срежь урон вдвое).');
+            if (hasBlkPerk(3) && outcome === 'success') blkNotes.push('⏱ «Быстрые рефлексы»: при блоке силовой атаки игрок получает дополнительное действие.');
+            pendingBlockResult = { enemy, targetUid, outcome, blockReductionPct, enemyTotal, playerTotal, arrowNoDmg };
             const resBox = el('block-result');
             resBox.style.display = 'block';
             resBox.innerHTML = `<div style="font-size:13px;">Враг: 1d20(${enemyRoll})+${atkMod}+${progressiveBonus}(прогресс.) = <strong>${enemyTotal}</strong><br>` +
@@ -410,18 +417,22 @@
                 `<strong style="font-size:15px;">${outcomeLabel}</strong> (разница ${diff})<br>` +
                 (outcome === 'success' ? `Урон срезан на ${blockReductionPct}% (перк «Щитоносец»), враг получает −2 к следующему броску.` :
                  outcome === 'partial' ? `Урон снижается только на сопротивление щита/брони самого по себе — примени как обычный урон с резистом.` :
-                 `Игрок получает ПОЛНЫЙ урон (только бронёй) + статус «Ошеломление» (−3 к следующему броску).`);
+                 `Игрок получает ПОЛНЫЙ урон (только бронёй) + статус «Ошеломление» (−3 к следующему броску).`) +
+                (blkNotes.length ? '<br><span style="color:#6cc;">' + blkNotes.join('<br>') + '</span>' : '');
             el('block-apply-btn').style.display = 'block';
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
     window.applyActiveBlockResult = function () {
         if (!pendingBlockResult) return;
-        const { enemy, targetUid, outcome, blockReductionPct } = pendingBlockResult;
+        const { enemy, targetUid, outcome, blockReductionPct, arrowNoDmg } = pendingBlockResult;
         const baseDmg = enemyWeaponDamage(enemy).total;
         let finalDmgNote = '';
         const patch = {};
-        if (outcome === 'success') {
+        if (arrowNoDmg) {
+            finalDmgNote = 'Перк «Отбивание стрел»: стрела попала в щит — урон 0.';
+            if (outcome === 'success') patch.enemies = (lastData.enemies || []).map(e => e.id === enemy.id ? { ...e, statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску (блок щитом)', turns: 1 }] } : e);
+        } else if (outcome === 'success') {
             const dmg = Math.round(baseDmg * (1 - blockReductionPct / 100));
             finalDmgNote = `Урон после среза блоком: ${dmg} (из ${baseDmg}, срез ${blockReductionPct}%) — резист/броня цели по обычным правилам применяются сверху вручную.`;
             // Дебафф врагу — через statusEffects на самом враге (та же структура, что у управляющих заклинаний игрока).
@@ -1702,6 +1713,8 @@
             if ((e.curHp || 0) <= 0) return e;
             const st = { id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: def.name, desc: def.desc, turns };
             if (def.rollPenalty) st.rollPenalty = def.rollPenalty;
+            if (def.dotHp) { st.dotHp = def.dotHp; if (def.dotNoResist) st.dotNoResist = true; }
+            Object.assign(st, window.StCombat.statusRule(def.name), def.rollPenalty ? { rollPenalty: def.rollPenalty } : {});
             e.statusEffects = (Array.isArray(e.statusEffects) ? e.statusEffects : []).concat([st]);
             notes.push(e.name);
             return e;
@@ -2457,14 +2470,14 @@
     const HIRCINE_TOTEMS = ['— нет —', 'Тотем Охоты', 'Тотем Братства', 'Тотем Страха'];
     // Из Фракции.xlsx, лист "Соратники" — настоящие пороги по количеству съеденных сердец,
     // раньше был примитивный ручной счётчик "ранг" без всякой связи со способностями.
-    const WEREWOLF_BASE_INFO = 'Раз в сутки на 4 часа: +50 хп, +100 переносимого веса, когти 20 урона (+5 каждые 4 ур. персонажа), +20 скорости';
+    const WEREWOLF_BASE_INFO = 'До 2 раз в сутки: +50 хп, +100 переносимого веса, +20 скорости, когти 20 урона (+5 каждые 4 ур. персонажа), броня 0 на 1 ур. и +50 каждые 5 уровней (всё — пока игрок в форме зверя)';
     const WEREWOLF_ABILITIES = [
         { name: 'Звериная сила I', threshold: 5, desc: '+25% урона в форме зверя' },
         { name: 'Звериная сила II', threshold: 7, desc: '+50% урона в форме зверя' },
         { name: 'Звериная сила III', threshold: 11, desc: '+75% урона в форме зверя' },
         { name: 'Звериная сила IV', threshold: 21, desc: '+100% урона в форме зверя' },
         { name: 'Тотем ледяных братьев', threshold: 15, desc: 'Тотем Братства воем созывает снежных волков' },
-        { name: 'Тотем ужаса', threshold: 15, desc: 'Жуткий вой действует даже на существ выше уровнем (до 18 lvl)' },
+        { name: 'Тотем ужаса', threshold: 15, desc: 'Жуткий вой действует даже на существ выше уровнем (до 16 lvl)' },
         { name: 'Вечный голод', threshold: 15, desc: 'Время превращения увеличено вдвое (8 часов)' },
         { name: 'Тотем хищника', threshold: 20, desc: 'Тотем Охоты охватывает весь данж/200 футов, показывает состояние врагов' },
         { name: 'Жадность в еде', threshold: 20, desc: 'Пожирание трупа восстанавливает вдвое больше здоровья' },
@@ -2477,12 +2490,12 @@
     // (5хп/ход) и бесплатное "Подъём сильного трупа" (160хп, 30 урона). Ниже — уже отдельная,
     // куда более редкая ступень "Вампир-лорд" (F20-F30), которая открывается не всем — только
     // с помощью Харкона/Караны/Валерики при высоких значениях определённых навыков.
-    const VAMPIRE_BASE_INFO = '+2 харизма, +1 ловкость, +1 сила · бесплатное заклинание высасывания здоровья (5 хп/ход) · бесплатное "Подъём сильного трупа" (160 хп, 30 урона)';
+    const VAMPIRE_BASE_INFO = '+3 харизма, +3 телосложение, +2 ловкость, +2 сила · бесплатное заклинание высасывания здоровья (5 хп/ход) · бесплатное "Подъём сильного трупа" (160 хп, 30 урона)';
     const VAMPIRE_ABILITIES = [
         { name: 'Сила Могилы', desc: '+50 к здоровью и магии в форме вампира-лорда', prereq: null },
         { name: 'Хватка вампира', desc: 'Магия крови — притянуть и придушить живое существо с < 10% здоровья', prereq: 'Сила Могилы' },
         { name: 'Вызов гаргульи', desc: 'Магия крови — призвать гаргулью-союзника', prereq: 'Сила Могилы, Хватка вампира' },
-        { name: 'Трупное проклятье', desc: 'Магия крови — парализовать противника на 4 его хода (Сл. спасброска 17+мудрость)', prereq: 'Сила Могилы, Вызов гаргульи' },
+        { name: 'Трупное проклятье', desc: 'Магия крови — парализовать противника на 4 его хода (Сл. спасброска 14+мудрость)', prereq: 'Сила Могилы, Вызов гаргульи' },
         { name: 'Обнаружение существ', desc: 'Сила ночи — обнаружение всех существ, включая двемерских автоматонов', prereq: 'Сила Могилы' },
         { name: 'Туманная форма', desc: 'Сила ночи — неуязвимое туманное облако на 3 ваших хода (нельзя наносить/получать урон)', prereq: 'Сила Могилы, Обнаружение существ' },
         { name: 'Сверхъестественные рефлексы', desc: 'Сила ночи — следующие 4 атаки получают +4 к кубам', prereq: 'Сила Могилы, Туманная форма' },
@@ -2560,9 +2573,9 @@
         },
         'Коллегия бардов': {
             givers: [{ name: 'Музей коллегии', note: 'Сдать историческое/мифическое оружие или броню = 1 легендарная песня + 800 септимов. За 25 сданных предметов — 5000 септимов + титул тана Солитьюда + возможность купить дом.' }],
-            perks: 'Оплата выступления: 30 септимов база + 10×к10 + (Красноречие×0.1), зависит от репутации. За 4 легендарные песни — "Бардовская баллада" (+1 к кубам всем живым союзникам, пока играешь). За 12 — "Сила слова" (+1 убеждение, +1 к попытке скидки). За 18 (+2 исторических артефакта) — "Воодушевление" (+3 к кубам цели 2 раза в день).',
+            perks: 'Кнопка «Выступить» в профессиях (для членов): 10 × 2к10 × (0.1 + 0.005 × репутация во владении) × Красноречие, округление вверх, минимум 30 септимов; лимит выступлений в день задаётся в «Лимитах игроков» (по умолч. 3). За 4 легендарные песни — «Бардовская баллада» (Особые способности: пока бард играет, остальные игроки +1 к кубам — атака, защита, проверки; бард не атакует). За 12 — «Сила слова» (+2 к проверке убеждения, цены продажи выгоднее на 10%). За 18 — «Воодушевление» (Особые способности: 3 раза в день на себя/союзника, один раз +4 к кубам на любое действие).',
             armorRewards: [],
-            note: 'Прогресс этой гильдии считается ЛЕГЕНДАРНЫМИ ПЕСНЯМИ, не заказами — использует то же поле orders (не отдельный счётчик, но пороги рангов пересчитаны на реальные 4/12/18). Сдача в музей — кнопка на листе игрока (donateToBardMuseum, +1 orders +1 artifacts +800 золота атомарно через CloudSync.donateBardArtifact). "Сила слова" подключена механически (+1 красноречие при orders>=12).'
+            note: 'Прогресс этой гильдии считается ЛЕГЕНДАРНЫМИ ПЕСНЯМИ, не заказами — использует то же поле orders (не отдельный счётчик, но пороги рангов пересчитаны на реальные 4/12/18). Сдача в музей — кнопка на листе игрока (donateToBardMuseum, +1 orders +1 artifacts +800 золота атомарно через CloudSync.donateBardArtifact). Баллада, Сила слова и Воодушевление подключены механически.'
         }
     };
 
@@ -2778,8 +2791,8 @@
     function defaultSupernaturalState() {
         return {
             lycanthropy: false, vampirism: false,
-            werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, isTransformed: false },
-            vampire: { hungerStage: 0, rank: 0, abilities: {} }
+            werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, transformsToday: 0, isTransformed: false },
+            vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {} }
         };
     }
 
@@ -3362,6 +3375,79 @@
             .then(renderGuildsPanel).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Заявки на сдачу артефакта в музей Коллегии бардов: игрок сам награду начислить не может (раньше кнопка давала +800 золота бесконечно).
+    function renderMuseumRequests() {
+        const box = el('museum-requests'); if (!box) return;
+        const list = Array.isArray(lastData.museumRequests) ? lastData.museumRequests : [];
+        box.innerHTML = list.length ? '<div style="margin-bottom:8px;"><strong>🎼 Заявки в музей коллегии бардов</strong>' + list.map(r =>
+            `<div class="party-row" style="display:flex; gap:6px; align-items:center; justify-content:space-between;"><span>${escapeHtml(r.name || '?')}</span><span style="display:flex; gap:4px;">` +
+            `<button style="width:auto; padding:2px 8px;" onclick="approveMuseumRequest('${jsq(r.id)}', true)">Принять (+800, +1 песня)</button>` +
+            `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="approveMuseumRequest('${jsq(r.id)}', false)">Отклонить</button></span></div>`).join('') + '</div>' : '';
+    }
+    window.approveMuseumRequest = function (reqId, ok) {
+        const ref = db.collection('sessions').doc(currentCode);
+        let req = null;
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const list = Array.isArray((doc.data() || {}).museumRequests) ? doc.data().museumRequests.slice() : [];
+            const i = list.findIndex(r => r.id === reqId);
+            if (i < 0) throw new Error('Заявка уже обработана.');
+            req = list[i]; list.splice(i, 1);
+            tx.update(ref, { museumRequests: list });
+        })).then(() => {
+            if (!ok) return;
+            const patch = {};
+            patch['guildsData.Коллегия бардов.orders'] = firebase.firestore.FieldValue.increment(1);
+            patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
+            patch['gold'] = firebase.firestore.FieldValue.increment(800);
+            return db.collection('characters').doc(req.uid).set(patch, { merge: true });
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Лимиты, которые мастер задаёт игрокам (sessions.playerLimits). Пустое поле = поле не хранится = умолчание на стороне игрока.
+    const LIMIT_KEYS = ['forageRolls', 'practice', 'nextDay', 'perform'];
+    function renderPlayerLimits() {
+        const lim = lastData.playerLimits || {};
+        LIMIT_KEYS.forEach(k => {
+            const inp = el('lim-' + k); if (!inp || document.activeElement === inp) return;
+            inp.value = typeof lim[k] === 'number' ? lim[k] : '';
+        });
+        const bs = el('bard-song-gm');
+        if (bs) bs.innerHTML = lastData.bardSong ? `🎵 Играет «Бардовская баллада»: <strong>${escapeHtml(lastData.bardSong.name || 'бард')}</strong> (союзникам +1 к кубам) <button style="width:auto; padding:2px 10px;" onclick="stopBardSongGm()">Остановить</button>` : '';
+    }
+    window.stopBardSongGm = function () {
+        db.collection('sessions').doc(currentCode).update({ bardSong: firebase.firestore.FieldValue.delete() }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    window.savePlayerLimits = function () {
+        const out = {};
+        LIMIT_KEYS.forEach(k => { const v = el('lim-' + k).value; if (v !== '' && !isNaN(parseInt(v)) && parseInt(v) >= 0) out[k] = parseInt(v); });
+        db.collection('sessions').doc(currentCode).update({ playerLimits: out })
+            .then(() => { el('player-limits-result').innerHTML = '<span style="color:#2ecc71;">✅ Сохранено — игроки подхватят сразу.</span>'; })
+            .catch(e => { el('player-limits-result').innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+    };
+
+    // Заявки игроков на выполнение квестов гильдий: начисление заказа и наград идёт только после решения мастера.
+    function renderQuestClaims() {
+        const box = el('quest-claims'); if (!box) return;
+        const list = Array.isArray(lastData.questClaims) ? lastData.questClaims : [];
+        box.innerHTML = list.length ? '<div style="margin-bottom:8px;"><strong>📜 Квесты гильдий — ждут подтверждения</strong>' + list.map(c =>
+            `<div class="party-row" style="display:flex; gap:6px; align-items:center; justify-content:space-between;"><span>${escapeHtml(c.name || '?')}: «${escapeHtml(c.title || '?')}» <span style="opacity:.7;">(${escapeHtml(c.guild || '')})</span></span><span style="display:flex; gap:4px;">` +
+            `<button style="width:auto; padding:2px 8px;" onclick="resolveQuestClaim('${jsq(c.id)}', true)">Подтвердить</button>` +
+            `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resolveQuestClaim('${jsq(c.id)}', false)">Не выполнен</button></span></div>`).join('') + '</div>' : '';
+    }
+    window.resolveQuestClaim = function (claimId, ok) {
+        const ref = db.collection('sessions').doc(currentCode);
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const d = doc.data() || {};
+            const claims = Array.isArray(d.questClaims) ? d.questClaims.slice() : [];
+            const i = claims.findIndex(c => c.id === claimId);
+            if (i < 0) throw new Error('Заявка уже обработана.');
+            const c = claims[i]; claims.splice(i, 1);
+            const decisions = Array.isArray(d.questDecisions) ? d.questDecisions.slice() : [];
+            decisions.push({ uid: c.uid, questId: c.questId, ok: !!ok, ts: Date.now() });
+            tx.update(ref, { questClaims: claims, questDecisions: decisions });
+        })).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     window.adjustGuildOrders = function (guildName, delta) {
         if (!currentInvPlayerUid) return;
         const gd = currentGuildsData[guildName] || { member: false, orders: 0 };
@@ -3409,18 +3495,15 @@
             <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp" ${s.vampirism ? 'checked' : ''} onchange="toggleSupernaturalFlag('vampirism', this.checked)"><label for="sn-vamp">Вампиризм</label></div>
             <div id="sn-vampire-block" style="display:${s.vampirism ? 'block' : 'none'}; padding:6px 0 6px 12px; border-left:2px solid var(--border-color); margin:4px 0;">
                 <p style="font-size:12px; opacity:.75;">Базовое заражение (даётся автоматически): ${escapeHtml(VAMPIRE_BASE_INFO)}</p>
-                <label>Стадия голода (0-3)</label>
+                <label>Стадия голода (0-4, = дней без крови)</label>
                 <select id="sn-hunger" onchange="setVampireHunger(this.value)">
-                    ${[0, 1, 2, 3].map(n => `<option value="${n}" ${s.vampire.hungerStage === n ? 'selected' : ''}>${n}${n === 0 ? ' (сыт)' : ''}${n === 3 ? ' (истощён)' : ''}</option>`).join('')}
+                    ${[0, 1, 2, 3, 4].map(n => `<option value="${n}" ${s.vampire.hungerStage === n ? 'selected' : ''}>${n}${n === 0 ? ' (сыт)' : ''}${n === 4 ? ' (стража нападает!)' : ''}</option>`).join('')}
                 </select>
+                <p style="font-size:12px; opacity:.85; margin:4px 0;">Голод: обычный вампир −2 ко всем хар-кам и холод +10% / огонь −10% за каждый день; вампир-лорд только −1 ко всем хар-кам за день. ${s.vampire.hungerStage >= 4 ? '<strong style="color:#e74c3c;">🚨 4-й день: стража нападает, жители бегут или нападают.</strong>' : ''}</p>
                 <button class="btn-success" style="width:100%; margin-top:4px;" onclick="feedVampire()">🩸 Покормить (стадия → 0)</button>
-                <label style="margin-top:6px;">Ранг вампира: <input type="number" id="sn-vamp-rank" value="${s.vampire.rank}" min="0" style="width:70px; display:inline;" onchange="setVampireRank(this.value)"></label>
-                <button style="width:100%; margin-top:4px;" onclick="setVampireRank(${s.vampire.rank + 1})">+1 ранг вампира</button>
-                <label style="margin-top:8px;">Способности вампира-лорда (редкая ступень — не у всех вампиров)</label>
-                ${VAMPIRE_ABILITIES.map(a => `<div class="checkbox-group" style="align-items:flex-start;">
-                    <input type="checkbox" ${s.vampire.abilities[a.name] ? 'checked' : ''} onchange="toggleVampireAbility('${jsq(a.name)}', this.checked)">
-                    <label><strong>${escapeHtml(a.name)}</strong> — ${escapeHtml(a.desc)}${a.prereq ? `<br><span style="opacity:.6; font-size:11px;">Требует: ${escapeHtml(a.prereq)}</span>` : ''}</label>
-                </div>`).join('')}
+                <p style="font-size:12px; opacity:.75; margin-top:6px;">Пока стоит галочка «Вампиризм»: +3 Хар, +3 Тел, +2 Лов, +2 Сил, холод +50%, яды/болезни — иммунитет, огонь −50%, ×2 урон днём; бесплатные заклинания «Вампирское высасывание» и «Подъём сильного трупа». Рангов у обычных вампиров нет.</p>
+                <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp-lord" ${s.vampire.isLord ? 'checked' : ''} onchange="toggleVampireLord(this.checked)"><label for="sn-vamp-lord"><strong>Вампир-лорд</strong> (открывает игроку ветку перков вампира-лорда и форму лорда)</label></div>
+                ${s.vampire.isLord ? `<div style="font-size:12px; margin-top:4px;">Форма лорда: <strong>${s.vampire.lordForm ? 'включена' : 'выключена'}</strong> · Взято перков: ${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length}/11${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length ? '<br>' + Object.keys(s.vampire.lordPerks).filter(k => s.vampire.lordPerks[k]).map(escapeHtml).join(', ') : ''}</div>` : ''}
             </div>`;
     }
 
@@ -3440,20 +3523,17 @@
         gmPostLogEntryText(`🐺 ${(lastData.participants[currentInvPlayerUid] || {}).name || 'Игрок'} обращается в зверя!`);
     };
     window.setVampireHunger = function (val) {
-        currentSupernaturalState.vampire.hungerStage = Math.max(0, Math.min(3, parseInt(val) || 0));
-        saveSupernaturalState();
+        currentSupernaturalState.vampire.hungerStage = Math.max(0, Math.min(4, parseInt(val) || 0));
+        saveSupernaturalState().then(renderSupernaturalPanel);
     };
     window.feedVampire = function () {
         currentSupernaturalState.vampire.hungerStage = 0;
         saveSupernaturalState().then(renderSupernaturalPanel);
     };
-    window.setVampireRank = function (val) {
-        currentSupernaturalState.vampire.rank = Math.max(0, parseInt(val) || 0);
+    window.toggleVampireLord = function (checked) {
+        currentSupernaturalState.vampire.isLord = !!checked;
+        if (!checked) currentSupernaturalState.vampire.lordForm = false;
         saveSupernaturalState().then(renderSupernaturalPanel);
-    };
-    window.toggleVampireAbility = function (name, checked) {
-        currentSupernaturalState.vampire.abilities[name] = checked;
-        saveSupernaturalState();
     };
 
     window.loadPlayerInventoryForGm = function () {
@@ -3513,7 +3593,7 @@
                 lycanthropy: !!data.supernaturalState.lycanthropy,
                 vampirism: !!data.supernaturalState.vampirism,
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
-                vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { abilities: (data.supernaturalState.vampire || {}).abilities || {} })
+                vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} })
             } : defaultSn;
             renderGuildsPanel();
             renderSupernaturalPanel();
@@ -3826,7 +3906,12 @@
         fear: { name: 'Страх', desc: 'Вынужден отступать/убегать 1 ход.', turns: 1 },
         frenzy: { name: 'Бешенство', desc: 'Атакует ближайшую цель без разбора 1 ход.', turns: 1 },
         slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3 },
-        weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2, rollPenalty: -2 }
+        weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2, rollPenalty: -2 },
+        // Ниже — только для врагов (массовая кнопка «Статус»): работают сами — блок атаки, штраф к кубам, урон по ходам.
+        stun: { name: 'Оглушение', desc: 'Оглушён — не действует.', turns: 1 },
+        burning: { name: 'Горение', desc: 'Горит: 5 урона огнём в начале каждого хода.', turns: 3, dotHp: 5, dotNoResist: true },
+        bleeding: { name: 'Кровотечение', desc: 'Истекает кровью: 5 урона в начале каждого хода.', turns: 3, dotHp: 5, dotNoResist: true },
+        blind: { name: 'Ошеломление', desc: '−3 к кубам.', turns: 1, rollPenalty: -3 }
     };
 
     const RACE_SKILL_BONUSES = {
@@ -4359,6 +4444,9 @@
         const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
         const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
+        const enemyFlags = window.StCombat.statusFlags(enemy);
+        { const blk = enemyFlags.noAttack;
+          if (blk) { alert('«' + enemy.name + '» не может атаковать: ' + blk.name + (blk.turns ? ' (ещё ' + blk.turns + ' х.)' : '') + '. Сними статус, если нужно разрешить атаку.'); return; } }
 
         let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
         let isSpellAttack = false, spellCost = 0, statusNote = '';
@@ -4395,29 +4483,35 @@
         // защищающийся (игрок) — голый 1д20, ничья не считается ни попаданием ни промахом (перекид
         // обеих костей). Раньше тут был просто один голый d20 без всякого сравнения — по сути,
         // "бросок ради галочки", не влиявший ни на что.
+        // «Бардовская баллада» (играет другой игрок): защищающемуся +1 к кубам.
+        const defBonus = (lastData.bardSong && lastData.bardSong.uid && lastData.bardSong.uid !== targetUid) ? 1 : 0;
+        if (enemyFlags.rollPenalty) { atkMod += enemyFlags.rollPenalty; actionLabel += ` (статусы на враге: ${enemyFlags.rollPenalty} к кубам)`; }
+        if (enemyFlags.frenzy) actionLabel += ` (🌀 «${enemyFlags.frenzy.name}»: бьёт любую цель, включая своих)`;
         let enemyRoll, enemyTotal, playerRoll, rerolls = 0;
         do {
             enemyRoll = Math.floor(Math.random() * 20) + 1;
             enemyTotal = enemyRoll + atkMod;
             playerRoll = Math.floor(Math.random() * 20) + 1;
-            if (enemyTotal !== playerRoll) break;
+            if (enemyTotal !== playerRoll + defBonus) break;
             rerolls++;
         } while (rerolls < 20);
-        const hit = enemyTotal > playerRoll;
+        const hit = enemyTotal > playerRoll + defBonus;
+        const playerRollShown = playerRoll + (defBonus ? ' +1 (🎵 баллада) = ' + (playerRoll + defBonus) : '');
 
         const statusKey = el('gm-attack-status-select') ? el('gm-attack-status-select').value : '';
 
         pendingGmAttack = {
             targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
             isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
+            enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
             carrierOfDisease: hit ? enemy.carrierOfDisease : null, diseaseChance: hit ? (enemy.diseaseChance || 0) : 0,
-            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRoll}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
+            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRollShown}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
-            `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRoll}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
+            `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRollShown}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
             (!hit ? `<strong style="color:#7a7a7a;">❌ Промах — урона нет.</strong>` :
                 dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед.${dmgBreakdown} (резист цели вычтется автоматически при применении)` :
                     '<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
@@ -4449,6 +4543,19 @@
             const resist = (data.resistances && data.resistances[dmgType]) || 0;
             let finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
             const defNotes = [];
+            { // Бонусы богов игрока: Стендарр — резист урону от даэдра/нежити; Мефала — уязвимость к яду
+                const gg = data.godGM || {};
+                if (finalDmg && gg.daedraUndeadResist && pendingGmAttack.enemyUndeadDaedra) {
+                    const cutG = Math.round(finalDmg * gg.daedraUndeadResist / 100);
+                    finalDmg = Math.max(0, finalDmg - cutG);
+                    defNotes.push('🕊 Бог: резист урону от даэдра/нежити ' + gg.daedraUndeadResist + '% (−' + cutG + ')');
+                }
+                if (finalDmg && dmgType === 'poison' && gg.poisonVulnerability) {
+                    const plusG = Math.round(finalDmg * gg.poisonVulnerability / 100);
+                    finalDmg += plusG;
+                    defNotes.push('☠ Бог: уязвимость к яду +' + gg.poisonVulnerability + '% (+' + plusG + ')');
+                }
+            }
             { // «Вихревой плащ»: часть урона стрел и болтов игнорируется
                 const cloakEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.rangedResist && x.turnsRemaining !== 0);
                 if (finalDmg && dmgType === 'physical' && pendingGmAttack.isRangedAtk && cloakEff) {
@@ -4490,6 +4597,10 @@
             }
             // Задача L: вампир получает удвоенный урон, если сейчас "День" в сессии — раньше
             // это было только текстовым предупреждением в интерфейсе, урон не менялся.
+            let mistNote = '';
+            if (finalDmg && (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).some(x => x && x.powerFlag === 'mist' && x.turnsRemaining !== 0)) {
+                finalDmg = 0; mistNote = ' (🌫 туманная форма — урон не проходит)';
+            }
             let sunNote = '';
             if (finalDmg && data.supernaturalState && data.supernaturalState.vampirism && lastData.timePeriod === 'День') {
                 finalDmg *= 2;
@@ -4553,7 +4664,7 @@
                 }));
                 // Игроку с концентрационным заклинанием (Иллюзия/Колдовство) нужна проверка при каждом попадании — шлём команду в его очередь
                 if (fdmg > 0) chores.push(db.collection('characters').doc(targetUid).update({ pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({ cmd: 'damaged', dmg: fdmg, ts: Date.now() }) }).catch(() => { }));
-                if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}`;
+                if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}${mistNote}`;
             }
             if (defNotes.length) logExtra += '. ' + defNotes.join('. ');
             // Автоматический бросок на заражение болезнью — раньше этого не было вообще, болезни
@@ -5952,7 +6063,6 @@
             const pct = Math.max(0, Math.min(100, (e.curHp || 0) / (e.maxHp || 1) * 100));
             const st = (e.statusEffects || []).length;
             const marked = lastData && lastData.markedTarget === e.id;
-            // TODO(эпик 3.2): маленький серый кружок у «уже ходивших» — пока в данных сессии нет отметки ходов по врагам.
             return `<div class="enemy-tile${dead ? ' st-dead' : ''}${marked ? ' st-marked' : ''}" data-id="${escapeHtml(e.id)}" onclick="gmScrollToEnemy('${jsq(e.id)}')" title="${escapeHtml(e.name || '')} — ${e.curHp || 0}/${e.maxHp || 0}">
                 <img src="${enemyAvatarData(e)}" alt=""><div class="st-tile-name">${escapeHtml(String(e.name || '?').slice(0, 15))}</div>
                 <div class="st-tile-bar"><div style="width:${pct}%"></div></div>

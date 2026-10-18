@@ -1430,3 +1430,15 @@ window.smeltingRecipes = [
     { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура белого медведя", qty: 1 }], yieldCount: 3 },
     { name: "Полоски кожи", place: "tanning", ingredients: [{ name: "Кожа", qty: 1 }], yieldCount: 2 }
 ];
+
+// Цены «боеприпасов с эффектом» (огненные/морозные/… стрелы и болты: 100–400) в таблице указаны ЗА ПАЧКУ из 20,
+// а не за штуку (обычная железная стрела — 1 за штуку). При ковке цена записывалась на КАЖДУЮ из 20 штук,
+// и пачка 20 огненных стрел продавалась за 5600 вместо 280 — дыра в экономике. Приводим к цене за штуку.
+(function () {
+    (window.weaponRecipes || []).forEach(r => {
+        if (r && r.isAmmo && r.price >= 50 && (r.yieldCount || 1) > 1 && !r._pricePerPiece) {
+            r.price = Math.max(1, Math.round(r.price / r.yieldCount));
+            r._pricePerPiece = true;
+        }
+    });
+})();

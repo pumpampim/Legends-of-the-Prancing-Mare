@@ -232,7 +232,7 @@
     ok(PW.filter(p => p.source === 'werewolf').every(p => p.requiresTransformed), 'Оборотень: умения только в облике зверя');
     // Вампир-лорд — только способности из VAMPIRE_ABILITIES (gm.js), без выдуманных
     const VAMP_OK = ['Хватка вампира', 'Вызов гаргульи', 'Трупное проклятье', 'Обнаружение существ', 'Туманная форма', 'Сверхъестественные рефлексы'];
-    ok(PW.filter(p => p.source === 'vampire').every(p => VAMP_OK.indexOf(p.requiresAbility) !== -1 && p.name === p.requiresAbility), 'Вампир-лорд: только способности из вашей таблицы');
+    ok(PW.filter(p => p.source === 'vampire' && p.perk).every(p => VAMP_OK.indexOf(p.perk) !== -1 && p.name === p.perk) && PW.filter(p => p.source === 'vampire' && p.base).length === 2, 'Вампир/лорд: способности лорда из таблицы + 2 бесплатных заклинания вампира')
     ok(PW.filter(p => p.perDay).every(p => p.desc && p.desc.length > 20), 'Способности: у каждой «раз за отдых» есть описание');
 
     // ---------- РЫБЫ AE (fish-data.js) и рецепты кухни ----------
@@ -277,6 +277,9 @@
     const rkeys = (W.recipes || []).map(r => r.ingredients.map(i => i.name + 'x' + i.qty).sort().join('|'));
     ok(new Set(rkeys).size === rkeys.length, 'Кухня: нет двух рецептов с одинаковым составом (второй никогда бы не сработал)');
     ok(new Set((W.recipes || []).map(r => r.name)).size === (W.recipes || []).length, 'Кухня: названия блюд уникальны');
+    // Кузня: цена боеприпасов с эффектом — за ШТУКУ (в таблице была за пачку из 20: пачка стрел продавалась за 5600)
+    const badAmmo = (W.weaponRecipes || []).filter(r => r.isAmmo && (r.yieldCount || 1) > 1 && r.price * r.yieldCount > 400).map(r => r.name);
+    ok(badAmmo.length === 0, 'Кузня: цены боеприпасов за штуку, пачка не дороже 400', badAmmo.join('; '));
     ok((W.recipes || []).length === 44, `Кухня: 44 рецепта (21 прежний + 23 новых), сейчас ${(W.recipes || []).length}`);
     // Эффекты блюд на «+N хп»/«Запас магии/здоровья увеличен на N» срабатывают автоматически — таких среди новых рецептов должно быть не меньше 4
     const autoRe = /^(\+\s*\d+\s*(хп|мп)|Запас (магии|здоровья) увеличен на \d+)/i;

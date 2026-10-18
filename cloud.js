@@ -330,6 +330,9 @@
                 // Штампуем момент смерти (номер общего счётчика ходов сессии) — труп поднимаемый
                 // заклинанием только первые 5 ходов после этого.
                 if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
+                if (finalDmg > 0 && Array.isArray(enemies[idx].statusEffects) && enemies[idx].statusEffects.some(st => st && st.breakOnDamage)) {
+                    patch.statusEffects = enemies[idx].statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
+                }
                 enemies[idx] = Object.assign({}, enemies[idx], patch);
                 const update = { enemies: enemies };
                 const finalLogText = (logText && resist) ? logText.replace(/урон (\d+)/, `урон ${finalDmg} (резист ${resist}%, было бы $1)`) : logText;
@@ -355,13 +358,31 @@
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 let statuses = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects.slice() : [];
                 if (extra && (typeof extra.dmgPct === 'number' || extra.unique)) statuses = statuses.filter(x => x.name !== statusName); // не складывается само с собой
-                statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, extra || {}));
+                statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });
                 const logText = `✨ ${authorName || 'Игрок'} накладывает на «${enemies[idx].name}»: ${statusName}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}`;
                 return ref.update({
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText })
                 }).then(() => ({ enemyName: enemies[idx].name }));
+            });
+        },
+
+        // Снимает со статусов врага одноразовый флаг (напр. 'advantage' после атаки с преимуществом): статус целиком убирается, если у него нет других эффектов.
+        clearEnemyStatusFlag: function (enemyId, flag) {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return ref.get().then(doc => {
+                if (!doc.exists) return;
+                const data = doc.data();
+                const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) return;
+                const before = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects : [];
+                const after = before.filter(st => !(st && ((window.StCombat ? Object.assign(window.StCombat.statusRule(st.name), st) : st)[flag])));
+                if (after.length === before.length) return;
+                enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: after });
+                return ref.update({ enemies: enemies });
             });
         },
 
@@ -396,7 +417,7 @@
                     if ((e.curHp || 0) <= 0 || !predicate(e)) return e;
                     names.push(e.name);
                     const statuses = (Array.isArray(e.statusEffects) ? e.statusEffects : []).filter(x => x.name !== statusName);
-                    statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, extra || {}));
+                    statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                     return Object.assign({}, e, { statusEffects: statuses });
                 });
                 if (!names.length) return { count: 0, names: [] };
@@ -420,7 +441,7 @@
                     if (!re.test(e.name || '') || (e.curHp || 0) <= 0) return e;
                     names.push(e.name);
                     const statuses = (Array.isArray(e.statusEffects) ? e.statusEffects : []).filter(x => x.name !== statusName);
-                    statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, extra || {}));
+                    statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                     return Object.assign({}, e, { statusEffects: statuses });
                 });
                 if (!names.length) return { count: 0, names: [] };
@@ -564,10 +585,28 @@
 
         // Обыскивает труп самим игроком (раньше это умел делать только мастер) — забирает
         // добычу себе и помечает труп обысканным в сессии, чтобы никто не забрал её дважды.
+        // Каннибализм (Намира): помечает труп съеденным (транзакция — один труп едят один раз).
+        eatCorpseForSelf: function (enemyId) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const enemies = Array.isArray(doc.data().enemies) ? doc.data().enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) throw new Error('Противник не найден.');
+                if (enemies[idx].eaten) throw new Error('Труп уже съеден.');
+                enemies[idx] = Object.assign({}, enemies[idx], { eaten: true });
+                tx.update(ref, { enemies: enemies });
+            }));
+        },
+
         lootCorpseForSelf: function (enemyId) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let got = null;
+            // ТРАНЗАКЦИЯ: раньше get()+update() — двое игроков, нажавших «Обыскать» одновременно,
+            // оба видели добычу и оба её забирали (дубль золота и вещей).
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -576,8 +615,9 @@
                 const corpseLoot = enemies[idx].corpseLoot;
                 if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
                 enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
-                return ref.update({ enemies: enemies }).then(() => corpseLoot);
-            });
+                tx.update(ref, { enemies: enemies });
+                got = corpseLoot;
+            })).then(() => got);
         },
 
         // Задача K: +1 к прогрессу гильдии на СВОЁМ ЖЕ документе персонажа при выполнении квеста
@@ -588,22 +628,22 @@
         buyFromMerchantStock: function (key, itemIdx, price, qty) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            // ТРАНЗАКЦИЯ: иначе два одновременных покупателя (или двойной клик) получали одну и ту же вещь дважды.
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const stocks = Object.assign({}, data.merchantStocks || {});
                 const stock = stocks[key];
                 if (!stock || !stock.items[itemIdx]) throw new Error('Товар уже не в наличии.');
                 const items = stock.items.slice();
-                // Покупка забирает ровно qty штук (по умолчанию одну) — не всю позицию целиком.
                 const want = Math.max(1, parseInt(qty) || 1);
                 const have = items[itemIdx].qty || 1;
                 if (have < want) throw new Error('У торговца осталось только ' + have + ' шт.');
                 if (have > want) items[itemIdx] = Object.assign({}, items[itemIdx], { qty: have - want });
                 else items.splice(itemIdx, 1);
                 stocks[key] = Object.assign({}, stock, { items: items, gold: (stock.gold || 0) + (price || 0) });
-                return ref.update({ merchantStocks: stocks });
-            });
+                tx.update(ref, { merchantStocks: stocks });
+            }));
         },
 
         // Продажа ЖИВОМУ торговцу: вещь попадает в его общий ассортимент (её можно сразу выкупить),
@@ -611,7 +651,7 @@
         sellToMerchantStock: function (key, entry, qty, total) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const stocks = Object.assign({}, data.merchantStocks || {});
@@ -624,8 +664,8 @@
                 if (idx >= 0) items[idx] = Object.assign({}, items[idx], { qty: (items[idx].qty || 1) + qty });
                 else items.push(Object.assign({}, entry, { qty: qty }));
                 stocks[key] = Object.assign({}, stock, { items: items, gold: (stock.gold || 0) - total });
-                return ref.update({ merchantStocks: stripUndefinedForCloud(stocks) });
-            });
+                tx.update(ref, { merchantStocks: stripUndefinedForCloud(stocks) });
+            }));
         },
 
         // Задача I.1: игрок пишет свой результат группового броска — прямо в сессию, чтобы
@@ -681,6 +721,36 @@
             return db.collection('sessions').doc(currentSessionCode).update(patch).catch(() => {});
         },
 
+        // Коллегия бардов. «Бардовская баллада»: пока бард играет, в sessions/{code}.bardSong лежит его uid —
+        // остальные игроки получают +1 к кубам (атака, проверки; защиту считает мастер), сам бард атаковать не может.
+        setBardSong: function (on, name) {
+            if (!currentSessionCode || !db || !currentUser) return Promise.reject(new Error('Не в сессии.'));
+            const patch = {};
+            patch['bardSong'] = on ? { uid: currentUser.uid, name: String(name || 'Бард').slice(0, 40), since: Date.now() } : firebase.firestore.FieldValue.delete();
+            return db.collection('sessions').doc(currentSessionCode).update(patch);
+        },
+        // «Воодушевление»: один заряд +4 на ближайший бросок цели. Нельзя поверх уже висящего заряда.
+        giveInspire: function (targetUid, fromName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(function (tx) {
+                return tx.get(ref).then(function (doc) {
+                    const d = doc.data() || {};
+                    if (!d.participants || !d.participants[targetUid]) throw new Error('Цели нет в сессии.');
+                    if (d.inspire && d.inspire[targetUid]) throw new Error('Эта цель уже воодушевлена.');
+                    const patch = {};
+                    patch['inspire.' + targetUid] = { value: 4, fromName: String(fromName || 'Бард').slice(0, 40), grantedAt: Date.now() };
+                    tx.update(ref, patch);
+                });
+            });
+        },
+        clearInspire: function (uid) {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            const patch = {};
+            patch['inspire.' + uid] = firebase.firestore.FieldValue.delete();
+            return db.collection('sessions').doc(currentSessionCode).update(patch).catch(() => {});
+        },
+
         incrementGuildProgress: function (guildName) {
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
             const ref = db.collection('characters').doc(currentUser.uid);
@@ -699,12 +769,47 @@
         // защита от гонки с debounced-автосохранением, что и у обычного золота/заказов — не
         // читает "старое" значение вообще, что бы игрок ни делал параллельно на своём листе).
         donateBardArtifact: function () {
+            // Больше не начисляет награду само: раньше кнопку можно было жать бесконечно (+800 золота и +1 песня каждый раз).
+            // Теперь это ЗАЯВКА мастеру; награду начисляет мастер, приняв заявку (gm.js: approveMuseumRequest).
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
-            const patch = {};
-            patch['guildsData.Коллегия бардов.orders'] = firebase.firestore.FieldValue.increment(1);
-            patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
-            patch['gold'] = firebase.firestore.FieldValue.increment(800);
-            return db.collection('characters').doc(currentUser.uid).set(patch, { merge: true });
+            if (!currentSessionCode) return Promise.reject(new Error('Сдать предмет можно только в активной сессии — мастер должен увидеть заявку.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const list = Array.isArray((doc.data() || {}).museumRequests) ? doc.data().museumRequests.slice() : [];
+                if (list.some(r => r.uid === uid)) throw new Error('Твоя заявка уже ждёт мастера.');
+                const p = ((doc.data() || {}).participants || {})[uid] || {};
+                list.push({ id: 'm' + Date.now() + Math.random().toString(36).slice(2, 5), uid: uid, name: p.name || 'Игрок', ts: Date.now() });
+                tx.update(ref, { museumRequests: list });
+            }));
+        },
+
+        // Квесты гильдий: игрок подаёт ЗАЯВКУ, +1 заказ и награды начисляются только после решения мастера (gm.js: resolveQuestClaim).
+        requestQuestClaim: function (q) {
+            if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Квест гильдии подтверждает мастер — нужна активная сессия.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const d = doc.data() || {};
+                const list = Array.isArray(d.questClaims) ? d.questClaims.slice() : [];
+                if (list.some(c => c.uid === uid && c.questId === q.questId)) return;
+                const p = (d.participants || {})[uid] || {};
+                list.push({ id: 'qc' + Date.now() + Math.random().toString(36).slice(2, 5), uid: uid, name: p.name || 'Игрок', questId: q.questId, title: q.title || '', guild: q.guild || '', ts: Date.now() });
+                tx.update(ref, { questClaims: list });
+            }));
+        },
+        // Игрок применил решение мастера — убираем его из очереди решений.
+        ackQuestDecision: function (questId) {
+            if (!currentUser || !db || !currentSessionCode) return Promise.resolve();
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) return;
+                const list = Array.isArray((doc.data() || {}).questDecisions) ? doc.data().questDecisions.filter(x => !(x.uid === uid && x.questId === questId)) : [];
+                tx.update(ref, { questDecisions: list });
+            })).catch(() => { });
         },
 
         // Задача K: читает одно поле СВОЕГО ЖЕ документа персонажа (например guildsData) —
@@ -1235,6 +1340,7 @@
         renderParty(data.participants || {});
         renderJournal(data.journal || {}, { hold: (data.partyPos && data.partyPos.hold) || data.currentHold || '' });
         if (typeof window.processTrades === 'function') window.processTrades(data.trades || {});
+        if (typeof window.processQuestDecisions === 'function') { try { window.processQuestDecisions(data.questDecisions || []); } catch (e) { console.error(e); } }
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
         renderLog(data.combatLog || []);
@@ -1245,6 +1351,10 @@
         if (typeof window.renderSellList === 'function') window.renderSellList();
         if (typeof window.renderGroupCheckPlayerPanel === 'function') window.renderGroupCheckPlayerPanel();
         if (typeof window.renderHelpAllySelect === 'function') window.renderHelpAllySelect();
+        { // Коллегия бардов: панель «Особые способности» зависит от того, кто играет / кто воодушевлён / кто в сессии
+            const sig = JSON.stringify([data.bardSong && data.bardSong.uid, Object.keys(data.inspire || {}), Object.keys(data.participants || {}), (data.enemies || []).map(e => e.id + ':' + ((e.curHp || 0) > 0 ? 1 : 0) + (e.raised ? 'r' : '')), data.sessionTurnCounter || 0]);
+            if (sig !== window._bardSig) { window._bardSig = sig; if (typeof window.renderPowersPanel === 'function') window.renderPowersPanel(); }
+        }
         if (typeof window.renderTradeSelects === 'function') window.renderTradeSelects();
 
         // Мастер мог наложить статус-эффект (паралич/страх и т.п.) атакой — он приходит через
@@ -1461,6 +1571,10 @@
                 extra = e.corpseLoot
                     ? '<button style="width:100%; margin-top:2px; font-size:12px;" onclick="window.playerLootCorpse(\'' + e.id + '\')">💰 Обыскать труп</button>'
                     : '<div style="font-size:12px; opacity:.6; margin-top:2px;">Труп уже обыскан.</div>';
+            }
+            // Последователям Намиры: съесть труп человека/мера (кнопка рядом с «Обыскать»)
+            if ((e.curHp || 0) <= 0 && !e.eaten && typeof window.playerCanEatCorpse === 'function' && window.playerCanEatCorpse(e)) {
+                extra += '<button style="width:100%; margin-top:2px; font-size:12px;" onclick="window.playerEatCorpse(\'' + e.id + '\')">🍖 Съесть труп</button>';
             }
             return barRow(e.name || '?', e.curHp || 0, e.maxHp || 0, e.curMp || 0, e.maxMp || 0, enemyAvatarData(e)) + extra;
         }).join('');

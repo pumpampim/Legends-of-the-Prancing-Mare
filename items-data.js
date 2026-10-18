@@ -441,6 +441,15 @@ const allItems = [
     { name: "Броня Мораг Тонг", category: "Броня Мораг Тонг", type: "armor", slot: "chest", armor: 26, weight: 3, price: 150, material: "Кожа" },
     { name: "Сапоги Мораг Тонг", category: "Броня Мораг Тонг", type: "armor", slot: "boots", armor: 8, weight: 1, price: 35, material: "Кожа" },
 
+    // --- Броня Соратников (Фракции.xlsx → Соратники): волчья (сталь) и лунная (очищенный лунный камень) ---
+    { name: "Волчий шлем", category: "Броня Соратников", type: "armor", slot: "helmet", armor: 19, weight: 2, price: 200, material: "Стальной слиток" },
+    { name: "Волчья броня", category: "Броня Соратников", type: "armor", slot: "chest", armor: 33, weight: 10, price: 450, material: "Стальной слиток" },
+    { name: "Волчьи перчатки", category: "Броня Соратников", type: "armor", slot: "gloves", armor: 13, weight: 2, price: 150, material: "Стальной слиток" },
+    { name: "Волчьи сапоги", category: "Броня Соратников", type: "armor", slot: "boots", armor: 13, weight: 2, price: 150, material: "Стальной слиток" },
+    { name: "Лунный шлем", category: "Броня Соратников", type: "armor", slot: "helmet", armor: 29, weight: 3, price: 450, material: "Очищенный лунный камень" },
+    { name: "Лунная броня", category: "Броня Соратников", type: "armor", slot: "chest", armor: 60, weight: 12, price: 1000, material: "Очищенный лунный камень" },
+    { name: "Лунные перчатки", category: "Броня Соратников", type: "armor", slot: "gloves", armor: 20, weight: 3, price: 330, material: "Очищенный лунный камень" },
+    { name: "Лунные сапоги", category: "Броня Соратников", type: "armor", slot: "boots", armor: 20, weight: 3, price: 330, material: "Очищенный лунный камень" },
     // --- 16. Уникальная броня (все сеты, уже готовые) ---
     { name: "Шлем Брурида", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 23, weight: 3, price: 1200, material: "Сталь", location: "Тревская застава", effect: "+25 МП, +5 навыка Разрушения" },
     { name: "Броня Брурида", category: "Уникальная броня", type: "armor", slot: "chest", armor: 32, weight: 3, price: 1500, material: "Сталь", location: "Тревская застава", effect: "+25 МП, +5 навыка Разрушения" },

@@ -810,7 +810,24 @@
         <div class="panel">
             <h2>🏛️ Гильдии</h2>
             <p style="font-size:12px; opacity:.75;">Счётчик выполненных заказов по каждой гильдии — использует того же игрока, что выбран выше в панели инвентаря.</p>
+            <div id="museum-requests"></div>
+            <div id="quest-claims"></div>
             <div id="guilds-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
+        </div>
+
+        <!-- ===== ЛИМИТЫ ИГРОКОВ ===== -->
+        <div class="panel">
+            <h2>⚙️ Лимиты игроков</h2>
+            <p style="font-size:12px; opacity:.75;">Пустое поле — значение по умолчанию. 0 — без ограничения. Лимиты считаются на игровой день игрока.</p>
+            <div id="player-limits-form" style="display:grid; grid-template-columns:1fr 90px; gap:6px; align-items:center;">
+                <label>🎲 Добыча (рыбалка/охота/сбор): бросков 1к12 в день <span style="opacity:.6;">(по умолч. 3; 0 — без ограничения)</span></label><input type="number" min="0" id="lim-forageRolls" placeholder="3">
+                <label>📈 Опыт за проверки/взлом, на навык в день <span style="opacity:.6;">(по умолч. 5)</span></label><input type="number" min="0" id="lim-practice" placeholder="5">
+                <label>📅 «Следующий день» у игрока, раз в час <span style="opacity:.6;">(по умолч. 20)</span></label><input type="number" min="0" id="lim-nextDay" placeholder="20">
+                <label>🎤 Выступления барда, раз в день <span style="opacity:.6;">(по умолч. 3)</span></label><input type="number" min="0" id="lim-perform" placeholder="3">
+            </div>
+            <button style="margin-top:8px;" onclick="savePlayerLimits()">Сохранить лимиты</button>
+            <div id="player-limits-result" style="font-size:13px; margin-top:4px;"></div>
+            <div id="bard-song-gm" style="font-size:13px; margin-top:8px;"></div>
         </div>
 
         <!-- ===== СПРАВОЧНИК ПО ГИЛЬДИИ (только мастер, одна гильдия за раз) ===== -->
@@ -1138,8 +1155,8 @@
 </div>
 
 <script src="firebase-config.js?v=3"></script>
-<script src="items-data.js?v=10"></script>
-<script src="smithing-data.js?v=5"></script>
+<script src="items-data.js?v=11"></script>
+<script src="smithing-data.js?v=6"></script>
 <script src="enchant-data.js?v=3"></script>
 <script src="holidays-data.js?v=3"></script>
 <script src="random-events-data.js?v=3"></script>
@@ -1154,8 +1171,8 @@
 <script src="fish-data.js?v=3"></script>
 <script src="spell-data.js?v=3"></script>
 <script src="enemies-data.js?v=4"></script>
-<script src="combat-calc.js?v=1"></script>
+<script src="combat-calc.js?v=2"></script>
 <script src="enemy-loot.js?v=4"></script>
-<script src="gm.js?v=17"></script>
+<script src="gm.js?v=25"></script>
 </body>
 </html>

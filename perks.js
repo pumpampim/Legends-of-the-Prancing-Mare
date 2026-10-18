@@ -28,7 +28,7 @@
         "1-2": (step) => ({ spearBleedDamage: 8 * step, spearResistDamage: 8 * step }),
         "1-3": (step) => ({ greatAxeBleedDamage: 10 * step }),
         "1-4": (step) => ({ greatswordPowerAttackHitBonus: step }),
-        "1-5": (step) => ({ staffEnchantPower: 0.15 * step, staffArmorPenetration: 0.05 * step }),
+        "1-5": (step) => ({ staffEnchantPower: 0.15 * step, staffArmorPenetration: [5, 10, 20][step - 1] || 0 }),
         "1-6": () => ({ sprintPowerAttackDouble: true }),
         "1-7": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.10 }),
         "1-8": () => ({ sweepingSideAttack: true }),
@@ -110,6 +110,7 @@
         "6-0": (step) => ({ sneakDetectBonus: step }),
         "6-2": () => ({ backstabUnlocked: true }),
         "6-4": () => ({ assassinBladeUnlocked: true }),
+        "6-5": () => ({ sneakBowTriple: true }),
 
         // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
         "8-4": () => ({ extraCarryWeight: 50 }),
@@ -131,7 +132,63 @@
         "7-4": () => ({ lockpickAdeptUnlocked: true }),
         "7-5": () => ({ lockpickGoldBonus: true }),
         "7-6": () => ({ lockpickTreasureBonus: true }),
-        "7-7": () => ({ lockpickExpertUnlocked: true })
+        "7-7": () => ({ lockpickExpertUnlocked: true }),
+
+        // ==================== ДОПОЛНЕНИЕ: перки, ранее бывшие только текстом ====================
+        // Стрельба
+        "2-4": () => ({ powerShotEvery3: true }),
+        "2-5": () => ({ arrowRecoverDouble: true }),
+        // Блокирование
+        "3-1": () => ({ shieldBlocksArrows: true }),
+        "3-2": () => ({ shieldBash: true }),
+        "3-4": () => ({ shieldElemResist50: true }),
+        "3-5": () => ({ shieldBashX5: true }),
+        "3-7": () => ({ shieldBashDisarm: true }),
+        // Броня
+        "4-1": () => ({ steelFists: true }),
+        "4-5": () => ({ heavyArmorWeightless: true }),
+        "5-2": () => ({ lightArmorWeightless: true }),
+        // Карманные кражи / Красноречие
+        "8-0": (step) => ({ pickpocketBonus: step }),
+        "8-1": () => ({ sleepTheftBonus: 2 }),
+        "8-3": () => ({ pickpocketBonus: 1 }),
+        "8-5": () => ({ keyThiefAuto: true }),
+        "8-6": () => ({ lockpickGoldBonus: true }),
+        "9-3": () => ({ sellAnything: true }),
+        "9-5": () => ({ intimidateBonus: 2 }),
+        // Зачарование
+        "17-3": () => ({ soulEater: true }),
+        // Разрушение
+        "10-3": (step) => ({ fireSpellBonus: [25, 50][step - 1] || 0 }),
+        "10-4": (step) => ({ frostSpellBonus: [25, 50][step - 1] || 0 }),
+        "10-5": (step) => ({ shockSpellBonus: [25, 50][step - 1] || 0 }),
+        "10-6": () => ({ staggerWave: true }),
+        "10-9": () => ({ fireLowHpFlee: true }),
+        "10-10": () => ({ frostLowHpParalyze: true }),
+        "10-11": () => ({ shockLowHpDisintegrate: true }),
+        // Восстановление
+        "11-5": () => ({ restorePhysBuff: true }),
+        "11-7": () => ({ wardAbsorbMana: true }),
+        "11-8": () => ({ necromage: true }),
+        // Колдовство
+        "12-1": () => ({ dualConj: true }),
+        "12-2": () => ({ summonWeaponBonus: 0.5 }),
+        "12-3": () => ({ raisedExtraTurns: 3 }),
+        "12-7": () => ({ atronachDurationDouble: true }),
+        "12-10": () => ({ raisedExtraHp: 100 }),
+        "12-12": () => ({ atronachPower: 0.5 }),
+        "12-13": () => ({ extraSkeletons: 1 }),
+        "12-15": (step) => ({ skeletonExtraHp: [35, 50][step - 1] || 0 }),
+        "12-16": () => ({ extraSkeletons: 2 }),
+        // Иллюзия
+        "13-1": () => ({ dualIllus: true }),
+        "13-4": () => ({ peopleLevelBonus: 5 }),
+        "13-7": () => ({ fearLevelBonus: 5 }),
+        "13-9": () => ({ furyLevelBonus: 6 }),
+        "13-11": () => ({ illusionMindMaster: true }),
+        // Изменение
+        "14-1": () => ({ dualAlter: true }),
+        "14-6": () => ({ alterDurationDouble: true })
     };
 
     window.applyPerks = function() {
@@ -199,7 +256,7 @@
             shieldArmorBonus: 0,
             heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
             lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
-            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false,
+            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false, sneakBowTriple: false,
             extraCarryWeight: 0,
             enchantGeneralBonus: 0, enchantSoulEconomy: 0, enchantFireBonus: 0,
             enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,

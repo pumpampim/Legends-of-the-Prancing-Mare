@@ -47,5 +47,43 @@
         return parts.length ? '(резист: ' + parts.join(', ') + ')' : '';
     }
 
-    root.StCombat = { previewDamage, resistSummary, TYPE_LABEL };
+    // ---- Статусы на врагах: что они реально делают ----
+    // noAttack — не может атаковать (мастер не бросит атаку); helpless — любая атака по нему попадает;
+    // advantage — следующая атака по нему с преимуществом (снимается после броска); breakOnDamage — спадает от урона;
+    // rollPenalty — штраф к его кубам (и атаке, и защите); frenzy — бьёт любую цель; slow — замедлен.
+    const STATUS_RULES = {
+        'Страх': { noAttack: true }, 'Бегство': { noAttack: true },
+        'Успокоение': { noAttack: true }, 'Умиротворение': { noAttack: true },
+        'Паралич': { noAttack: true, helpless: true },
+        'Полиморф': { noAttack: true, helpless: true, breakOnDamage: true },
+        'Оглушение': { noAttack: true },
+        'Под контролем': { noAttack: true },
+        'Потеря равновесия': { rollPenalty: -2 }, 'Шатается': { advantage: true },
+        'Ярость': { frenzy: true }, 'Бешенство': { frenzy: true },
+        'Ошеломление': { rollPenalty: -3 }, 'Ослабление': { rollPenalty: -2 },
+        'Гравитационная клетка': { immobile: true }
+    };
+    function statusRule(name) {
+        const n = String(name || '');
+        if (STATUS_RULES[n]) return Object.assign({}, STATUS_RULES[n]);
+        if (/^Замедление/.test(n)) return { slow: true };
+        return {};
+    }
+    // Сводка по всем статусам врага: флаги из самих статусов + правила по имени (старые записи без флагов тоже работают).
+    function statusFlags(enemy) {
+        const out = { noAttack: null, helpless: false, helplessName: '', advantage: false, rollPenalty: 0, frenzy: null, slow: false };
+        ((enemy && enemy.statusEffects) || []).forEach(function (st) {
+            if (!st) return;
+            const r = Object.assign(statusRule(st.name), st);
+            if (r.noAttack && !out.noAttack) out.noAttack = st;
+            if (r.helpless) { out.helpless = true; out.helplessName = st.name; }
+            if (r.advantage) out.advantage = true;
+            if (typeof r.rollPenalty === 'number') out.rollPenalty += r.rollPenalty;
+            if (r.frenzy) out.frenzy = st;
+            if (r.slow) out.slow = true;
+        });
+        return out;
+    }
+
+    root.StCombat = { previewDamage, resistSummary, TYPE_LABEL, statusRule, statusFlags, STATUS_RULES };
 })(typeof window !== 'undefined' ? window : globalThis);
