@@ -23,6 +23,9 @@
         clear: '☀️ Ясно', cloudy: '☁️ Облачно', rain: '🌧️ Дождь', storm: '⛈️ Гроза',
         snow: '🌨️ Снегопад', blizzard: '🌬️ Метель', fog: '🌫️ Туман'
     };
+    // Погода → штраф к дальнему бою врагов-лучников (те же числа, что у игроков: index.html WEATHER_MODS)
+    const GM_WEATHER_RANGED = { rain: -2, storm: -4, blizzard: -4, fog: -4 };
+    function gmWeatherRanged() { return GM_WEATHER_RANGED[(lastData && lastData.currentWeather) || 'clear'] || 0; }
     const WEATHER_EFFECTS = {
         clear: '', cloudy: '',
         rain: '−2 к дальнему бою (Стрельба), +2 к Скрытности — дождь маскирует шаги',
@@ -231,6 +234,8 @@
             snap.forEach(doc => {
                 const d = doc.data();
                 if (d.status !== 'closed' || !d.closedAt) return;
+                // сундук отряда ещё не перенесён в новую сессию — не удаляем, иначе вещи пропадут
+                if (!d.stashInherited && ((Array.isArray(d.partyStash) && d.partyStash.length) || (parseInt(d.partyGold) || 0) > 0)) return;
                 const closedMs = d.closedAt.toMillis ? d.closedAt.toMillis() : 0;
                 if (closedMs && closedMs < weekAgo) {
                     doc.ref.delete().catch(e => console.error('Ошибка чистки старой сессии:', e));
@@ -239,23 +244,51 @@
         }).catch(e => console.error('Ошибка поиска старых сессий для чистки:', e));
     }
 
+    // Собирает сундук отряда из закрытых сессий этого мастера, которые ещё не были перенесены (фильтр на клиенте — без составного индекса).
+    function gmCollectInheritedStash() {
+        const out = { stash: [], gold: 0, refs: [] };
+        if (!currentUser) return Promise.resolve(out);
+        return db.collection('sessions').where('gmUid', '==', currentUser.uid).get().then(snap => {
+            snap.forEach(doc => {
+                const d = doc.data();
+                if (d.status !== 'closed' || d.stashInherited) return;
+                const items = Array.isArray(d.partyStash) ? d.partyStash : [], gold = parseInt(d.partyGold) || 0;
+                if (!items.length && gold <= 0) return;
+                items.forEach(it => {
+                    const ex = out.stash.find(x => x.itemId === it.itemId);
+                    if (ex) ex.count = (ex.count || 0) + (it.count || 0); else out.stash.push(Object.assign({}, it));
+                });
+                out.gold += gold; out.refs.push(doc.ref);
+            });
+            return out;
+        }).catch(e => { console.error('Перенос сундука:', e); return out; });
+    }
+
     function attemptCreate(tries) {
         if (tries > 5) { alert('Не удалось сгенерировать свободный код, попробуй ещё раз.'); return; }
         let code = '';
         for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
         db.collection('sessions').doc(code).get().then(doc => {
             if (doc.exists) { attemptCreate(tries + 1); return; }
-            db.collection('sessions').doc(code).set({
-                gmUid: currentUser.uid,
-                status: 'active',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                participants: {},
-                enemies: [],
-                initiative: [],
-                combatLog: []
-            }).then(() => {
-                localStorage.setItem(GM_SESSION_KEY, code);
-                enterSessionView(code);
+            // Сундук отряда переживает закрытие сессии: переносим вещи и золото из закрытых сессий этого мастера в новую.
+            gmCollectInheritedStash().then(inh => {
+                const base = {
+                    gmUid: currentUser.uid,
+                    status: 'active',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    participants: {},
+                    enemies: [],
+                    initiative: [],
+                    combatLog: []
+                };
+                if (inh.stash.length) base.partyStash = inh.stash;
+                if (inh.gold > 0) base.partyGold = inh.gold;
+                return db.collection('sessions').doc(code).set(base).then(() => {
+                    inh.refs.forEach(r => r.update({ stashInherited: true, stashInheritedTo: code }).catch(() => {}));
+                    localStorage.setItem(GM_SESSION_KEY, code);
+                    enterSessionView(code);
+                    if (inh.stash.length || inh.gold > 0) setTimeout(() => alert('🎒 Сундук отряда перенесён из прошлой сессии: ' + inh.stash.length + ' предм. и ' + inh.gold + ' зол.'), 300);
+                });
             });
         });
     }
@@ -324,6 +357,8 @@
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
         try { gmNotifyWatch(lastData); } catch (e) { console.error(e); }
+        try { gmEnemyTickWatch(lastData); } catch (e) { console.error(e); }
+        try { if (window.GmGrid) window.GmGrid.onSnapshot(lastData); } catch (e) { console.error(e); }
         try { renderMuseumRequests(); renderQuestClaims(); renderPlayerLimits(); } catch (e) { console.error(e); }
         renderAll();
     });
@@ -389,7 +424,7 @@
 
             // Атака врага: 1д20 + атакующий мод (СИЛ/ЛОВ, как у обычной атаки) + прогрессирующий
             // бонус от урона оружия — floor((урон-10)/10), по прямой формуле из документа.
-            const atkMod = calcAbilityMod(enemy.isRanged ? (enemy.dex || 10) : (enemy.str || 10));
+            const atkMod = calcAbilityMod(enemy.isRanged ? (enemy.dex || 10) : (enemy.str || 10)) + (enemy.isRanged ? gmWeatherRanged() : 0); // погода мешает стрелкам
             const progressiveBonus = Math.max(0, Math.floor(((enemy.weaponDmg || 0) - 10) / 10));
             const enemyRoll = Math.floor(Math.random() * 20) + 1;
             const enemyTotal = enemyRoll + atkMod + progressiveBonus;
@@ -1518,6 +1553,18 @@
         };
     }
 
+    // Болезнь врага: из самого врага, а если её там нет (враги, добавленные до исправления, из встреч/шаблонов, «Злокрыс 2») —
+    // из базы по имени (точное совпадение после отбрасывания номера и пометок в скобках).
+    function gmEnemyDisease(enemy) {
+        if (!enemy) return { name: null, chance: 0 };
+        if (enemy.carrierOfDisease) return { name: enemy.carrierOfDisease, chance: enemy.diseaseChance || 0 };
+        if (enemy.summoned) return { name: null, chance: 0 };
+        const base = String(enemy.name || '').replace(/\s*\(.*\)\s*$/, '').replace(/\s*#?\d+\s*$/, '').trim().toLowerCase();
+        const t = (window.enemiesData || []).find(x => String(x.name).toLowerCase() === base);
+        return t && t.carrierOfDisease ? { name: t.carrierOfDisease, chance: t.diseaseChance || 0 } : { name: null, chance: 0 };
+    }
+    window.gmEnemyDisease = gmEnemyDisease;
+
     window.addEnemy = function () {
         const name = el('enemy-name-input').value.trim();
         if (!name) return;
@@ -1556,6 +1603,8 @@
                     extra.loot = genLootText(gen);
                 }
             }
+            // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
+            if (currentEnemyDbPick.carrierOfDisease) { extra.carrierOfDisease = currentEnemyDbPick.carrierOfDisease; extra.diseaseChance = currentEnemyDbPick.diseaseChance || 0; }
             if (currentEnemyDbPick.soul) extra.soul = currentEnemyDbPick.soul; // размер души для захвата душ
             if (currentEnemyDbPick.level) extra.level = currentEnemyDbPick.level; // уровень и тип — для заклинаний «до N уровня»
             if (currentEnemyDbPick.kind) extra.kind = currentEnemyDbPick.kind;
@@ -1853,12 +1902,12 @@
     // завязано на этот счётчик — обнуление может повлиять на расчёт для уже лежащих трупов.
     window.resetSessionTurnCounter = function () {
         if (!confirm('Обнулить общий счётчик ходов сессии до 0? Это также повлияет на расчёт "труп поднимаемый только первые 5 ходов после смерти" для уже умерших врагов.')) return;
-        db.collection('sessions').doc(currentCode).update({ sessionTurnCounter: 0 }).catch(e => alert('Ошибка: ' + e.message));
+        db.collection('sessions').doc(currentCode).update({ sessionTurnCounter: 0, sessionRoundCounter: 0 }).catch(e => alert('Ошибка: ' + e.message));
     };
 
-    window.gmAdvanceTurn = function () {
-        const tickLog = [];
-        const enemies = (lastData.enemies || []).map(e => {
+    // Один «тик» хода для врагов: яды/регенерация, длительность статусов, кулдауны криков.
+    function gmEnemyTickOnce(enemiesIn, turnNow, tickLog) {
+        const out = (enemiesIn || []).map(e => {
             const copy = { ...e };
             // Яды и зелья на враге: затяжной урон/снятие маны и регенерация тикают КАЖДЫЙ ход (до уменьшения длительности).
             if (Array.isArray(copy.statusEffects) && copy.statusEffects.length && (copy.curHp || 0) > 0) {
@@ -1875,7 +1924,7 @@
                     const oldHp = copy.curHp || 0, oldMp = copy.curMp || 0;
                     copy.curHp = Math.max(0, Math.min(copy.maxHp || oldHp, oldHp + dHp));
                     copy.curMp = Math.max(0, Math.min(copy.maxMp || oldMp, oldMp + dMp));
-                    if (oldHp > 0 && copy.curHp <= 0) copy.diedAtTurn = lastData.sessionTurnCounter || 0;
+                    if (oldHp > 0 && copy.curHp <= 0) copy.diedAtTurn = turnNow || 0;
                     const parts = [];
                     if (copy.curHp !== oldHp) parts.push(`${copy.curHp - oldHp > 0 ? '+' : ''}${copy.curHp - oldHp} хп`);
                     if (copy.curMp !== oldMp) parts.push(`${copy.curMp - oldMp > 0 ? '+' : ''}${copy.curMp - oldMp} маны`);
@@ -1892,18 +1941,72 @@
             });
             return copy;
         });
-        const firedTimers = gmTickTimers(); // эпик 3.7
-        const logEntries = [{
-            ts: Date.now(), author: 'Мастер',
-            text: '⏭️ Новый ход! Не забудьте прокрутить длительность своих активных эффектов на листе.'
-        }].concat(tickLog.map((t, i) => ({ ts: Date.now() + i + 1, author: 'Мастер', text: t })))
-          .concat(firedTimers.map((t, i) => ({ ts: Date.now() + 100 + i, author: 'Мастер', text: '⏰ Сработало событие: ' + t })));
-        db.collection('sessions').doc(currentCode).update({
-            enemies: stripUndefinedDeep(enemies),
-            sessionTurnCounter: firebase.firestore.FieldValue.increment(1),
-            combatLog: firebase.firestore.FieldValue.arrayUnion(...logEntries)
-        }).catch(e => alert('Ошибка: ' + e.message));
+        return out;
+    }
+
+    // Следующий ход/круг — общий для мастера и игроков (тот же механизм, что у кнопок игроков).
+    // Повтор в течение 3 секунд игнорируется: если игрок только что переключил ход, второй раз не листаем.
+    window.gmAdvanceTurn = function (kind) {
+        if (!currentCode) return;
+        kind = kind === 'round' ? 'round' : 'turn';
+        const ref = db.collection('sessions').doc(currentCode);
+        const now = Date.now(); let res = null;
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            if (!doc.exists) throw new Error('Сессия не найдена.');
+            const d = doc.data() || {};
+            const la = d.lastAdvance || {};
+            if (la.at && now - la.at < 3000 && now >= la.at) { res = { skipped: true, by: la.by }; return; }
+            const turn = (parseInt(d.sessionTurnCounter) || 0) + (kind === 'round' ? 0 : 1);
+            const round = (parseInt(d.sessionRoundCounter) || 0) + (kind === 'round' ? 1 : 0);
+            tx.update(ref, {
+                sessionTurnCounter: turn, sessionRoundCounter: round,
+                sessionTickCounter: (parseInt(d.sessionTickCounter) || 0) + 1,
+                lastAdvance: { at: now, by: 'Мастер', kind },
+                combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: now, author: 'Мастер', text: kind === 'round' ? '🔄 Новый круг (круг ' + round + '). Эффекты у всех прокручиваются сами.' : '⏭️ Новый ход (ход ' + turn + '). Эффекты у всех прокручиваются сами.' })
+            });
+        })).then(() => { if (res && res.skipped) alert((kind === 'round' ? 'Круг' : 'Ход') + ' только что переключил(а) ' + (res.by || 'кто-то') + ' — повторно не листаю.'); })
+          .catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // Тик врагов догоняет общий счётчик (кто бы ни переключил ход — мастер или игрок). Транзакция: две вкладки мастера не протикают дважды.
+    let _gmTickBusy = false;
+    function gmEnemyTickWatch(data) {
+        { const st = el('gm-turn-status'); if (st && data) { const la = data.lastAdvance || {}; st.textContent = 'Ход ' + (parseInt(data.sessionTurnCounter) || 0) + ' · Круг ' + (parseInt(data.sessionRoundCounter) || 0) + (la.by ? ' · последним переключил(а): ' + la.by : ''); } }
+        if (!currentCode || _gmTickBusy || !data) return;
+        const total = parseInt(data.sessionTickCounter) || 0, done = parseInt(data.enemyTickDone) || 0;
+        if (total <= done) { if (total < done) db.collection('sessions').doc(currentCode).update({ enemyTickDone: total }).catch(() => { }); return; }
+        _gmTickBusy = true;
+        const ref = db.collection('sessions').doc(currentCode);
+        let ticks = 0;
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            ticks = 0;
+            if (!doc.exists) return;
+            const d = doc.data() || {};
+            const t = parseInt(d.sessionTickCounter) || 0, dn = parseInt(d.enemyTickDone) || 0;
+            if (t <= dn) return;
+            ticks = Math.min(10, t - dn);
+            const tickLog = [];
+            let en = d.enemies || [];
+            let gridNow = d.grid || null; const zoneHits = [];
+            for (let i = 0; i < ticks; i++) {
+                en = gmEnemyTickOnce(en, parseInt(d.sessionTurnCounter) || 0, tickLog);
+                // длительные зоны на боевой сетке (плащи, ауры, стены, круги): бьют тех, кто внутри
+                if (gridNow && window.GmGrid && window.GmGrid.zoneTick && Object.keys(gridNow.zones || {}).length) {
+                    const zt = window.GmGrid.zoneTick(Object.assign({}, d, { grid: gridNow }), en);
+                    en = zt.enemies; gridNow = zt.grid; tickLog.push(...zt.logs); zoneHits.push(...zt.hits);
+                }
+            }
+            const patch = { enemies: stripUndefinedDeep(en), enemyTickDone: t };
+            if (gridNow && gridNow !== d.grid) patch.grid = stripUndefinedDeep(gridNow);
+            if (zoneHits.length && window.GmGrid) Object.assign(patch, window.GmGrid.hitsPatch(zoneHits));
+            if (tickLog.length) patch.combatLog = firebase.firestore.FieldValue.arrayUnion(...tickLog.map((x, i) => ({ ts: Date.now() + i + 1, author: 'Мастер', text: x })));
+            tx.update(ref, patch);
+        })).then(() => {
+            const fired = [];
+            for (let i = 0; i < ticks; i++) fired.push(...gmTickTimers());
+            if (fired.length) gmPostLogEntryText('⏰ Сработало событие: ' + fired.join('; '));
+        }).catch(e => console.error('Тик врагов:', e)).finally(() => { _gmTickBusy = false; });
+    }
 
     // ---------- Боевой журнал ----------
 
@@ -1988,6 +2091,15 @@
         target.scrollTop = target.scrollHeight;
     }
 
+    // Мост для модуля боевой сетки (gm-grid.js): доступ к базе, текущей сессии и готовым функциям мастера.
+    window.GmBridge = {
+        db: () => db, code: () => currentCode, data: () => lastData,
+        log: t => gmPostLogEntryText(t),
+        updateEnemies: list => gmUpdateEnemies(list),
+        updateVitals: (uid, fn) => updateCharacterVitals(uid, fn),
+        enemyDmg: e => { try { return enemyWeaponDamage(e).total; } catch (x) { return e && e.weaponDmg || 0; } },
+        strip: o => stripUndefinedDeep(o)
+    };
     function gmPostLogEntryText(text) {
         if (!text || !currentCode) return;
         db.collection('sessions').doc(currentCode).update({
@@ -4448,6 +4560,17 @@
         { const blk = enemyFlags.noAttack;
           if (blk) { alert('«' + enemy.name + '» не может атаковать: ' + blk.name + (blk.turns ? ' (ещё ' + blk.turns + ' х.)' : '') + '. Сними статус, если нужно разрешить атаку.'); return; } }
 
+        // Боевая сетка: досягаемость/видимость врага и штраф за дальность (если оба стоят на сетке)
+        let gridChk = null;
+        if (window.GridCore && lastData.grid) {
+            const Gc = window.GridCore;
+            const mode = actionVal === 'weapon' ? (enemy.isRanged ? 'ranged' : 'melee') : actionVal.indexOf('spell:') === 0 ? 'spell' : null;
+            if (mode) {
+                const reach = /копь|пик[аи]|посох|молот|алебард/i.test(String(enemy.weaponNote || '') + ' ' + enemy.name) ? 10 : 5;
+                gridChk = Gc.attackCheck(lastData.grid, Gc.tokenOf(lastData.grid, 'e', enemy.id), Gc.tokenOf(lastData.grid, 'p', targetUid), mode, reach);
+                if (gridChk.onGrid && !gridChk.ok && !confirm('«' + enemy.name + '» не достаёт «' + targetName + '»: ' + gridChk.reason + '.\n\nВсё равно атаковать?')) return;
+            }
+        }
         let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
         let isSpellAttack = false, spellCost = 0, statusNote = '';
         if (actionVal === 'weapon') {
@@ -4466,6 +4589,7 @@
             // тогда 0). Тот же принцип, что у самого игрока: атакующий с модификатором против
             // ГОЛОГО броска защищающегося.
             atkMod = enemy.isRanged ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.str || 10);
+            if (enemy.isRanged && gmWeatherRanged()) { atkMod += gmWeatherRanged(); actionLabel += ` (погода ${gmWeatherRanged()})`; } // дождь/гроза/метель/туман мешают и вражеским стрелкам
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             dmg = s ? s.dmg : 0;
@@ -4485,6 +4609,8 @@
         // "бросок ради галочки", не влиявший ни на что.
         // «Бардовская баллада» (играет другой игрок): защищающемуся +1 к кубам.
         const defBonus = (lastData.bardSong && lastData.bardSong.uid && lastData.bardSong.uid !== targetUid) ? 1 : 0;
+        if (gridChk && gridChk.onGrid && gridChk.penalty) { atkMod += gridChk.penalty; actionLabel += ` (дальность ${gridChk.feet} фт: ${gridChk.penalty})`; }
+        else if (gridChk && gridChk.onGrid) actionLabel += ` (${gridChk.feet} фт)`;
         if (enemyFlags.rollPenalty) { atkMod += enemyFlags.rollPenalty; actionLabel += ` (статусы на враге: ${enemyFlags.rollPenalty} к кубам)`; }
         if (enemyFlags.frenzy) actionLabel += ` (🌀 «${enemyFlags.frenzy.name}»: бьёт любую цель, включая своих)`;
         let enemyRoll, enemyTotal, playerRoll, rerolls = 0;
@@ -4507,7 +4633,7 @@
             isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
-            carrierOfDisease: hit ? enemy.carrierOfDisease : null, diseaseChance: hit ? (enemy.diseaseChance || 0) : 0,
+            carrierOfDisease: hit ? gmEnemyDisease(enemy).name : null, diseaseChance: hit ? gmEnemyDisease(enemy).chance : 0,
             logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRollShown}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
@@ -4663,7 +4789,9 @@
                     if (bmp) v[1] = Math.max(0, (parseInt(v[1]) || 0) - bmp);
                 }));
                 // Игроку с концентрационным заклинанием (Иллюзия/Колдовство) нужна проверка при каждом попадании — шлём команду в его очередь
-                if (fdmg > 0) chores.push(db.collection('characters').doc(targetUid).update({ pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({ cmd: 'damaged', dmg: fdmg, ts: Date.now() }) }).catch(() => { }));
+                // Сигнал «по тебе попали»: проверка концентрации + прокачка брони (как в Скайриме — за каждое попадание).
+                // Раньше уходил в документ персонажа, который сайт игрока не читает, — не работало ни то, ни другое.
+                if (fdmg > 0) { const pd = {}; pd['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'dmg-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'damaged', dmg: fdmg, dmgType: dmgType, ts: Date.now() }); chores.push(db.collection('sessions').doc(currentCode).update(pd).catch(() => { })); }
                 if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}${mistNote}`;
             }
             if (defNotes.length) logExtra += '. ' + defNotes.join('. ');
@@ -4680,7 +4808,7 @@
                     const patch2 = {};
                     patch2['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
                         id: 'dis-' + Date.now() + Math.random().toString(36).slice(2, 8),
-                        name: pendingGmAttack.enemyName, effectName: 'Болезнь: ' + diseaseName, description: diseaseInfo.desc, turnsRemaining: Infinity
+                        name: pendingGmAttack.enemyName, effectName: 'Болезнь: ' + diseaseName, description: diseaseInfo.desc, turnsRemaining: 9999, permanent: true
                     });
                     chores.push(db.collection('sessions').doc(currentCode).update(patch2));
                     logExtra += `. 🚨 Заражение! ${targetName} подхватил(а) болезнь «${diseaseName}» (бросок ${roll} ≤ ${effectiveChance.toFixed(0)}%)`;
@@ -6005,7 +6133,7 @@
     const GM_GROUPS = {
         prep: ['Подготовка сессии', 'Журнал сессии', 'Молва', 'Сюжет', 'Справочник гильдии', 'Справочник зачарований', 'Все погодные явления'],
         scene: ['Время суток и погода', 'Карта и положение', 'Живые торговцы', 'Запустить праздник', 'Походный лагерь', 'Шёпот', 'Чат партии', 'Опрос', 'Гильдии', 'Сверхъестественное', 'Репутация', 'Штрафы и тюрьма', 'Выдать квест'],
-        combat: ['Отряд', 'Противники', 'Разрешить атаку', 'Порядок ходов', 'Боевой журнал', 'Кооперативная атака', 'Активный блок', 'Турниры', 'Шаблоны NPC'],
+        combat: ['Боевая сетка', 'Отряд', 'Противники', 'Разрешить атаку', 'Порядок ходов', 'Боевой журнал', 'Кооперативная атака', 'Активный блок', 'Турниры', 'Шаблоны NPC'],
         rewards: ['Награда на всю группу', 'Сундук отряда', 'Запросы на крафт', 'Инвентарь и деньги', 'Создать предмет', 'База предметов', 'Открыть рецепты', 'Проверить зелье', 'Проверить зачарование'],
         randoms: ['Случайное событие', 'Групповой бросок', 'Генератор']
     };

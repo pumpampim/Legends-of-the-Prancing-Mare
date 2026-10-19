@@ -164,6 +164,7 @@
         "10-4": (step) => ({ frostSpellBonus: [25, 50][step - 1] || 0 }),
         "10-5": (step) => ({ shockSpellBonus: [25, 50][step - 1] || 0 }),
         "10-6": () => ({ staggerWave: true }),
+        "10-7": () => ({ runeMaster: true }), // «Мастер рун»: руны на вдвое большее расстояние
         "10-9": () => ({ fireLowHpFlee: true }),
         "10-10": () => ({ frostLowHpParalyze: true }),
         "10-11": () => ({ shockLowHpDisintegrate: true }),
@@ -259,7 +260,7 @@
             shieldArmorBonus: 0,
             heavyArmorBonus: 0, heavyFullSetBonus1: 0, heavyFullSetBonus2: 0,
             lightArmorBonus: 0, lightFullSetBonus1: 0, lightFullSetBonus2: 0, lightFullSetSpeedBonus: 0, lightArmorMageRobe: false,
-            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false, sneakBowTriple: false, dualDestr: false, dualRestor: false, dualConj: false, dualIllus: false, dualAlter: false, regenPerk: false,
+            sneakDetectBonus: 0, backstabUnlocked: false, assassinBladeUnlocked: false, sneakBowTriple: false, dualDestr: false, dualRestor: false, dualConj: false, dualIllus: false, dualAlter: false, regenPerk: false, runeMaster: false,
             extraCarryWeight: 0,
             enchantGeneralBonus: 0, enchantSoulEconomy: 0, enchantFireBonus: 0,
             enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,

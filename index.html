@@ -537,13 +537,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=15">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-    <script src="perks.js?v=5"></script>
+    <script src="perks.js?v=6"></script>
     <script src="items-data.js?v=11"></script>
     <script src="cooking-data.js?v=8"></script>
     <script src="smithing-data.js?v=6"></script>
@@ -652,7 +652,7 @@
                     <option value="normal">Обычный</option><option value="large">Крупный</option><option value="huge">Огромный</option>
                 </select></label>
             <button id="btn-sound" type="button" class="st-sound-btn" onclick="stToggleSound()" title="Короткий звук и вибрация, когда в журнале сессии появилась новая запись">🔕 Звук при изменении в сессии</button>
-            <button type="button" class="st-sound-btn" onclick="stOpenSearch()" title="Поиск по листу: Ctrl+K / Cmd+K">🔍 Поиск (Ctrl+K)</button>
+            <button type="button" class="st-sound-btn" onclick="window.stOpenSearch && stOpenSearch()" title="Поиск по листу: Ctrl+K / Cmd+K">🔍 Поиск (Ctrl+K)</button>
         </span>
     </div>
     <h1>ИГРОВАЯ СИСТЕМА «СКУРИМ» — ЦИФРОВОЙ ПУЛЬТ УПРАВЛЕНИЯ</h1>
@@ -1201,7 +1201,22 @@
                         <input type="number" id="party-stash-gold-input" min="1" value="10" style="width:80px; display:inline; margin:0 4px;">
                         <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(1)">+ Положить</button>
                         <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(-1)">− Взять</button></div>
-                    <div id="party-stash-list"></div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
+                        <input type="text" id="stash-search" placeholder="Поиск по названию…" oninput="renderPartyStash()" style="flex:2; min-width:140px; margin:0;">
+                        <select id="stash-category-filter" onchange="renderPartyStash()" style="flex:1; min-width:130px; margin:0;">
+                            <option value="all">Всё</option>
+                            <option value="weapon">Оружие</option>
+                            <option value="armor">Броня/одежда</option>
+                            <option value="potion">Зелья и яды</option>
+                            <option value="ingredient">Ингредиенты</option>
+                            <option value="food">Еда и напитки</option>
+                            <option value="magic">Свитки/книги/посохи/камни душ</option>
+                            <option value="jewelry">Ювелирные изделия</option>
+                            <option value="other">Прочее</option>
+                        </select>
+                    </div>
+                    <div id="stash-filter-count" style="font-size:12px; opacity:.65; margin-bottom:4px;"></div>
+                    <div id="party-stash-list" style="max-height:320px; overflow-y:auto;"></div>
                 </div>
                 <div id="price-multiplier-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
@@ -1348,7 +1363,8 @@
                     <h4 style="margin:0 0 6px;"><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку</h4>
                     <p style="font-size:13px; opacity:.75;">Атакуй противника напрямую: сайт бросит кубы, посчитает урон (оружие/заклинание/существо) и покажет результат. Применение урона — отдельная кнопка.</p>
                     <label>Цель</label>
-                    <select id="attack-target-select"></select>
+                    <select id="attack-target-select" onchange="gridAnnotateTargets()"></select>
+                    <div id="attack-grid-info" style="font-size:13px; margin:2px 0 4px;"></div>
                     <label>Чем атаковать</label>
                     <select id="attack-action-select" onchange="updateAttackActionInfo()"></select>
                     <div class="checkbox-group" style="margin-top:4px;">
@@ -1834,6 +1850,13 @@
         </div>
     </div>
     <div id="combat-dock" class="st-combat-dock">
+        <!-- Полоса сводки: деньги, броня, скорость, вес, оружие, резисты + переключатели режимов атаки (зеркало чекбоксов вкладки «Бой») -->
+        <div class="st-dock-info">
+            <div id="dock-stats" class="st-dock-stats"></div>
+            <div id="dock-toggles" class="st-dock-toggles"></div>
+            <button type="button" id="dock-info-toggle" class="st-dock-info-toggle" onclick="dockToggleInfo()" title="Свернуть/развернуть сводку">▾</button>
+        </div>
+        <div class="st-dock-main">
         <div class="st-dock-left">
             <div id="dock-portrait" class="st-dock-portrait"></div>
             <div id="dock-vitals" class="st-dock-vitals"></div>
@@ -1845,9 +1868,12 @@
             <button type="button" onclick="dockCastSpell()">✨ Заклинание</button>
             <span id="dock-fav-spells" style="display:contents;"></span>
             <button type="button" onclick="dockDefend()">🛡 Защита</button>
-            <button type="button" onclick="dockSkipTurn()" title="Явный сигнал мастеру: ход пропущен (паралич, отдых, решение мастера)">⏭ Пропустить ход</button>
+            <button type="button" onclick="dockSkipTurn()" title="Явный сигнал мастеру: ход пропущен (паралич, отдых, решение мастера)">⏸ Пропустить ход</button>
+            <button type="button" class="btn-success" onclick="nextTurn()" title="Следующий ход — у всех в сессии (эффекты прокрутятся сами)">⏭️ След. ход</button>
+            <button type="button" class="btn-success" onclick="nextRound()" title="Следующий круг — у всех в сессии">🔄 След. круг</button>
         </div>
         <div class="st-dock-right" id="dock-effects"></div>
+        </div>
     </div>
 
     <button id="death-mini" type="button" onclick="minimizeDeath(false)" style="display:none; position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:8999; background:#7a1f17; color:#fff; border:2px solid #e74c3c; padding:8px 14px;">⚰️ Персонаж пал — открыть</button>
@@ -2212,6 +2238,7 @@
         return entry;
     }
     let gameTurn = 0, gameRound = 0;
+    let sessionTurnSync = { code: '', tick: 0 }; // до какого общего «тика» сессии эффекты уже прокручены (см. syncSessionTurns)
 
     // Знак «Маг»: ОДИН бесплатный каст заклинания 1-го уровня в день. Раньше стоимость всех заклинаний
     // 1-го уровня была 0 постоянно. Флаг сохраняется в сейве и сбрасывается в nextDay().
@@ -3621,7 +3648,10 @@ window.toggleSkillPanel = function (idx) {
             }
             return ' 💨 «Передышка»: +10% физ. урона на 5 ходов.';
         };
-        if (spellName === 'Захват душ') {
+        if (GRID_ZONE_SPELLS[spellName] && gridZoneAvailable()) {
+            // Боевая сетка: длительная зона (плащ/аура/круг/стена/камень) бьёт сама каждый ход тех, кто в ней.
+            extraMsg = ' ' + castGridZone(spellName, desc, !!enhanced, isFree, (sb.pct && isStrengthCls) ? sb.mult : 1);
+        } else if (spellName === 'Захват душ') {
             const corpseS = targetVal.indexOf('corpse:') === 0 && session ? (session.enemies || []).find(e => e.id === targetVal.slice(7)) : null;
             targetLabel = corpseS ? 'на душу «' + corpseS.name + '»' : 'на душу';
             const chkS = precheckSoulTrap(corpseS);
@@ -4313,6 +4343,18 @@ window.toggleSkillPanel = function (idx) {
             if (tmplN && tmplN.permanent && tmplN.requiresItem && countInInventory(tmplN.requiresItem) <= 0) {
                 alert('Для «' + nmN + '» нужна «' + tmplN.requiresItem + '» в инвентаре (она вернётся, когда существо развеется). Мана не потрачена.'); return;
             }
+            { // Боевая сетка: каст на союзника/своё существо — не дальше 60 фт и при прямой видимости (мана не тратится)
+                const gA = sessGrid();
+                if (gA && (tvN.indexOf('ally:') === 0 || tvN.indexOf('summon:') === 0)) {
+                    const Gc = window.GridCore, meT = Gc.tokenOf(gA, 'p', myUidG());
+                    const toT = tvN.indexOf('ally:') === 0 ? Gc.tokenOf(gA, 'p', tvN.slice(5)) : Gc.tokenOf(gA, 's', tvN.slice(7), myUidG());
+                    if (meT && toT) {
+                        const fA = Gc.feet(meT, toT);
+                        if (!Gc.losFigures(gA, meT, toT)) { alert('«' + nmN + '»: цель за препятствием — нет прямой видимости. Мана не потрачена.'); return; }
+                        if (fA > 60) { alert('«' + nmN + '»: цель слишком далеко — ' + fA + ' фт (заклинание достаёт до 60 фт). Мана не потрачена.'); return; }
+                    }
+                }
+            }
             if (['Гнозис', 'Очистка камней', 'Трансмутация', 'Вихревой плащ', 'Жизнеотвод', 'Ободрение'].indexOf(nmN) !== -1 && tvN !== 'self') {
                 alert('«' + nmN + '» не требует цели — выбери «Цель: на себя». Мана не потрачена.'); return;
             }
@@ -4324,6 +4366,14 @@ window.toggleSkillPanel = function (idx) {
                 const maxMpG = parseInt(document.getElementById('max-mp').value) || 0, mpG = Math.max(0, (parseInt(document.getElementById('cur-mp').value) || 0) - finalCost);
                 if (!maxHpG || !maxMpG) { alert('Гнозис: у тебя нет максимума ХП или МП. Мана не потрачена.'); return; }
                 if (Math.round(maxHpG * Math.min(1, mpG / maxMpG)) <= 0 && !confirm('⚠ После каста у тебя останется 0 маны — ХП тоже станет 0%. Точно продолжить?')) return;
+            }
+            if (nmN === 'Управление погодой') {
+                if (!(window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && window.CloudSync.setSessionWeather)) { alert('«Управление погодой» работает в сессии — погода общая для всей группы. Мана не потрачена.'); return; }
+                if (!window._weatherSpellPick) {
+                    const opts = Object.keys(WEATHER_TYPES).map(k => `<button type="button" class="st-dock-pick" onclick="window._weatherSpellPick='${k}'; dockCloseModal(); castCustomSpellCore('${jsq(id)}', ${enhanced ? 'true' : 'false'});">${escHtml(WEATHER_TYPES[k].name)}<br><span style="font-size:12px; opacity:.7;">${escHtml(WEATHER_TYPES[k].effect || 'без штрафов и бонусов')}</span></button>`).join('');
+                    dockOpenModal('weather-spell-modal', '🌦 Какую погоду вызвать?', opts);
+                    return; // мана тратится после выбора
+                }
             }
             if (nmN === 'Очистка камней' && !SOUL_ORDER.some(k => countInInventory(soulFilledGemName(k)) > 0)) {
                 alert('В инвентаре нет заполненных камней душ — освобождать нечего. Мана не потрачена.'); return;
@@ -4366,6 +4416,16 @@ window.toggleSkillPanel = function (idx) {
             const container = card.closest('[id^="spells-"]');
             const school = container ? container.id.replace('spells-', '').replace('-list', '') : null;
 
+            if (GRID_RUNE_SPELLS[spellName]) { castGridRune(spellName, desc, !!enhanced); if (school && SCHOOL_CODE_TO_SKILL[school]) logSkillSuccessByName(SCHOOL_CODE_TO_SKILL[school]); updateAll(); saveLocalStorage(); return; }
+            if (spellName === 'Управление погодой' && window._weatherSpellPick) {
+                const wk = window._weatherSpellPick; window._weatherSpellPick = null;
+                const myNameW = document.getElementById('char-name').value || 'Игрок';
+                window.CloudSync.setSessionWeather(wk, myNameW).catch(e => alert('Погода не изменилась: ' + e.message));
+                alert('🌦 «Управление погодой»: теперь ' + WEATHER_TYPES[wk].name + (WEATHER_TYPES[wk].effect ? ' — ' + WEATHER_TYPES[wk].effect : '') + '. Видно всей группе и мастеру.');
+                if (school && SCHOOL_CODE_TO_SKILL[school]) logSkillSuccessByName(SCHOOL_CODE_TO_SKILL[school]);
+                updateAll(); saveLocalStorage();
+                return;
+            }
             const result = resolveSpellEffect(spellName, desc, school, targetVal, false, !!enhanced);
             alert((enhanced ? '⚡ Усиленный каст! ' : '') + result.message);
             if (targetVal !== 'self' && window.CloudSync) {
@@ -4396,6 +4456,8 @@ window.toggleSkillPanel = function (idx) {
         if (usesLeft <= 0) { alert(`«${item.name}» больше не действует — заряды закончились.`); return; }
         usesLeft -= 1;
         if (usesLeft <= 0) {
+            const restStack = (item.count || 1) > 1;
+            if (restStack) item.usesLeft = item.maxUses; // в стопке остались целые экземпляры
             removeFromInventoryByName(itemId, 1);
             alert(`Использовано: «${item.name}». Заряды закончились, предмет израсходован.\n${item.effect || ''}`);
             // Сообщение мастеру в общий журнал — последний заряд это заметное событие (предмет
@@ -4591,6 +4653,13 @@ window.toggleSkillPanel = function (idx) {
         if (!it || !it.name) return it;
         fixFailedDish(it);
         if (it.alchemyEffects && typeof it.effect === 'string' && window.alchemyFixRoundsText) it.effect = window.alchemyFixRoundsText(it.effect);
+        // Предметы с ограниченным числом применений (Мешочек Вазьмицы и т.п.): maxUses берём из базы, иначе кнопки «Использовать» не будет.
+        if (!it.maxUses) {
+            const pu = window.allItems && window.allItems.find(p => p.name === it.name && p.maxUses);
+            if (pu) it.maxUses = pu.maxUses;
+            else if (/^Мешочек Вазьмицы/i.test(it.name)) it.maxUses = 10;
+            if (it.maxUses && typeof it.usesLeft !== 'number') it.usesLeft = it.maxUses;
+        }
         if (!window.allItems) return it;
         if (it.enchantment !== undefined && it.carryBonus !== undefined) return it;
         const proto = window.allItems.find(p => p.name === it.name && p.category === it.category);
@@ -5268,8 +5337,12 @@ window.toggleSkillPanel = function (idx) {
         }
         const qty = Math.max(1, Math.min(maxQty, parseInt(qtyArg) || 1));
         const total = price * qty;
-        window.CloudSync.buyFromMerchantStock(key, idx, total, qty).then(() => {
-            goldInput.value = myGold - total;
+        // Золото списываем сразу (по текущему значению), при ошибке возвращаем. Раньше списание шло после ответа сервера
+        // и от устаревшего значения — двойной клик «Купить» давал две вещи за цену одной.
+        const goldNow = parseInt(goldInput.value) || 0;
+        if (total > goldNow) { alert('Не хватает золота.'); return; }
+        goldInput.value = goldNow - total; saveLocalStorage(true);
+        window.CloudSync.buyFromMerchantStock(key, idx, total, qty).catch(e => { goldInput.value = (parseInt(goldInput.value) || 0) + total; updateAll(); saveLocalStorage(true); throw e; }).then(() => {
             noteMarketBuy(it.name, qty, price);
             if (it.playerItem) { // вещь, которую игрок сам продал торговцу, — возвращается со всеми прежними свойствами (чары, улучшения)
                 const pi = Object.assign({}, it.playerItem);
@@ -5444,9 +5517,10 @@ window.toggleSkillPanel = function (idx) {
         const total = mg.total;
         const isOffProfile = (merchantType !== 'pawnbroker' && merchantType !== 'fence') && !isSellProfileMatch(item, merchantType);
 
+        let removedEarly = false;
         const finishSale = () => {
             consumeMarketBought(item, qty);
-            removeFromInventoryByName(itemId, qty);
+            if (!removedEarly) removeFromInventoryByName(itemId, qty);
             const goldInput = document.getElementById('char-gold');
             goldInput.value = (parseInt(goldInput.value) || 0) + total;
             const speechSuccesses = trackSpeechTrade(total, false, isOffProfile);
@@ -5471,7 +5545,16 @@ window.toggleSkillPanel = function (idx) {
         if (typeof item.armorValue === 'number') entry.armor = item.armorValue;
         if (item.slot) entry.slot = item.slot;
         if (typeof item.capacity === 'number') entry.capacity = item.capacity;
-        window.CloudSync.sellToMerchantStock(target.key, entry, qty, total).then(finishSale).catch(e => alert('Не удалось продать: ' + e.message));
+        // Вещь убираем у себя сразу (двойной клик раньше продавал одну вещь дважды — двойная оплата), при ошибке возвращаем.
+        const cur = playerInventory.find(i => i.itemId === itemId);
+        if (!cur || cur.count < qty) { alert('Столько у тебя уже нет.'); return; }
+        const backup = JSON.parse(JSON.stringify(cur));
+        removeFromInventoryByName(itemId, qty); removedEarly = true; renderSellList(); renderInventoryList();
+        window.CloudSync.sellToMerchantStock(target.key, entry, qty, total).then(finishSale, e => {
+            const ex = Object.assign({}, backup); ['itemId', 'name', 'count', 'weight', 'category', 'effect'].forEach(k => delete ex[k]);
+            addToInventory(backup.itemId, backup.name, qty, backup.weight, backup.category, backup.effect, ex); saveLocalStorage();
+            alert('Не удалось продать: ' + e.message);
+        });
     };
 
     function isFoodItem(item) {
@@ -5702,7 +5785,7 @@ window.toggleSkillPanel = function (idx) {
         const dishPrice = Math.max(dish.price || 0, Math.round((dish.price || 0) * strengthMult));
         // Блюда разной силы — отдельные стопки (раньше новое блюдо затирало эффект и цену ВСЕЙ стопки такого же названия).
         const effHash = s => { let h = 0; for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) | 0; return Math.abs(h).toString(36); };
-        const dishId = finalEffect === dish.effect ? dish.name : dish.name + '#' + effHash(finalEffect);
+        const dishId = (finalEffect === dish.effect && !improvEffects) ? dish.name : dish.name + '#' + effHash(finalEffect + (improvEffects ? JSON.stringify(improvEffects) : ''));
         addToInventory(dishId, dish.name, 1, dish.weight || 1, (matchedRecipe || improvEffects) ? 'Блюдо' : 'Провал готовки', finalEffect, improvEffects ? { price: dishPrice, alchemyEffects: improvEffects, craftCost: craftCostOf(potNames.map(n => ({ name: n, qty: potMap[n] })), 1), craftKind: 'cook' } : { price: dishPrice, craftCost: craftCostOf(potNames.map(n => ({ name: n, qty: potMap[n] })), 1), craftKind: 'cook' });
         // Удачное блюдо — полный успех кулинарии; провал (похлёбка) тоже чему-то учит, но слабее: четверть успеха.
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария', matchedRecipe ? 1 : COOKING_FAIL_PROGRESS);
@@ -7924,7 +8007,13 @@ window.toggleSkillPanel = function (idx) {
     window.returnFromPouch = function (idx) {
         const entry = pouchContents[idx];
         if (!entry) return;
-        addToInventory(entry.itemId, entry.name, 1, 0.25, pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
+        // Стопку могли слить с одинаковыми зельями под другим id — возвращаем в неё, а не отдельной строкой.
+        let backId = entry.itemId;
+        if (!playerInventory.some(i => i.itemId === backId)) {
+            const same = playerInventory.find(i => i.name === entry.name && (i.effect || '') === (entry.effect || '') && JSON.stringify(i.alchemyEffects || null) === JSON.stringify(entry.alchemyEffects || null));
+            if (same) backId = same.itemId;
+        }
+        addToInventory(backId, entry.name, 1, 0.25, pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
         pouchContents.splice(idx, 1);
         renderPouchPanel();
         saveLocalStorage();
@@ -8263,6 +8352,209 @@ window.toggleSkillPanel = function (idx) {
 
     // Мастер наложил статус-эффект атакой НПС (паралич/страх/замедление и т.п.) — добавляем
     // в свой собственный список активных эффектов, тикает по тем же ходам, что и баффы.
+    // ======== Боевая сетка (игрок): дальность, досягаемость, площадные удары. Сетку ведёт мастер (session.grid) ========
+    function myUidG() { return window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null; }
+    function sessGrid() { const s = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null; return s && s.grid && window.GridCore ? s.grid : null; }
+    // Досягаемость ближнего боя: 5 фт; копья, пики, боевые посохи и двуручные молоты — 10 фт.
+    function playerMeleeReachFt() {
+        const type = (document.getElementById('wep-melee-type') || {}).value;
+        const name = String((document.getElementById('wep-melee-name') || {}).value || '');
+        if (type === 'twohand_hammer' || /копь|пик[аи]|посох/i.test(name)) return 10;
+        return 5;
+    }
+    function summonIsRanged(sm) { return !!sm && (/лучник|снайпер|маг|атронах/i.test(sm.name || '') || (sm.dmgType && sm.dmgType !== 'physical' && !/физ/i.test(sm.dmgType))); }
+    // Откуда и как бьёт выбранное действие: { from, mode, reach, who }
+    function attackGeometry(actionVal) {
+        const grid = sessGrid(); if (!grid) return null;
+        const G = window.GridCore, me = myUidG();
+        if (actionVal && actionVal.indexOf('summon:') === 0) {
+            const sm = activeSummons.find(x => x.id === actionVal.slice(7));
+            if (sm && sm.category === 'weapon') return { from: G.tokenOf(grid, 'p', me), mode: sm.equipSlot === 'ranged' ? 'ranged' : 'melee', reach: 5 };
+            return { from: G.tokenOf(grid, 's', actionVal.slice(7), me), mode: summonIsRanged(sm) ? 'ranged' : 'melee', reach: 5, who: sm ? sm.name : 'существо' };
+        }
+        const mode = (actionVal === 'ranged') ? 'ranged' : (actionVal && /^(spell|scroll|control):/.test(actionVal)) ? 'spell' : 'melee';
+        const reach = mode !== 'melee' ? 0 : (['bite', 'claw', 'bash'].indexOf(actionVal) !== -1 ? 5 : playerMeleeReachFt());
+        return { from: G.tokenOf(grid, 'p', me), mode, reach };
+    }
+    function gridCheckFor(actionVal, enemyId) {
+        const grid = sessGrid(); if (!grid) return null;
+        const geo = attackGeometry(actionVal); if (!geo) return null;
+        const to = window.GridCore.tokenOf(grid, 'e', enemyId);
+        return window.GridCore.attackCheck(grid, geo.from, to, geo.mode, geo.reach);
+    }
+    window.gridCheckFor = gridCheckFor;
+    // Площадное заклинание: тот же урон всем фигурам в радиусе (враги, другие игроки, существа — и сам заклинатель, если взрыв рядом).
+    function gridApplyAoe(pa, myName) {
+        const grid = sessGrid(); const G = window.GridCore; if (!grid || !pa.area) return;
+        const me = myUidG(), myTok = G.tokenOf(grid, 'p', me), tgtTok = G.tokenOf(grid, 'e', pa.targetId);
+        const center = pa.area.center === 'self' ? myTok : tgtTok; if (!center) return;
+        const sess = window.CloudSync.getSessionData() || {};
+        const hits = [];
+        G.tokensInRadius(grid, center, pa.area.radiusFt).forEach(t => {
+            if (t.kind === 'e') {
+                if (t.ref === pa.targetId) return;
+                const en = (sess.enemies || []).find(x => x.id === t.ref); if (!en || (en.curHp || 0) <= 0) return;
+                hits.push(en.name);
+                window.CloudSync.applyDamageToEnemy(t.ref, pa.dmg, myName, `💥 «${pa.area.spell}» (${myName}) задевает «${en.name}»: урон ${pa.dmg}`, pa.dmgType, 0).catch(() => { });
+            } else if (t.kind === 'p') {
+                if (t.ref === me) { if (pa.area.center === 'self') return; gridAoeHit({ dmg: pa.dmg, dmgType: pa.dmgType, from: pa.area.spell }); hits.push('ты сам(а)'); return; }
+                const pn = ((sess.participants || {})[t.ref] || {}).name || 'союзник'; hits.push(pn);
+                window.CloudSync.pushEffectToPlayer(t.ref, { id: 'aoe' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'aoeHit', dmg: pa.dmg, dmgType: pa.dmgType, from: pa.area.spell }).catch(() => { });
+            } else if (t.kind === 's') {
+                if (t.owner === me) { gridAoeHit({ dmg: pa.dmg, dmgType: pa.dmgType, from: pa.area.spell, summonId: t.ref }); hits.push('твоё существо'); return; }
+                hits.push('существо союзника');
+                window.CloudSync.pushEffectToPlayer(t.owner, { id: 'aoe' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'aoeHit', dmg: pa.dmg, dmgType: pa.dmgType, from: pa.area.spell, summonId: t.ref }).catch(() => { });
+            }
+        });
+        if (hits.length) {
+            window.CloudSync.postCombatLog(`💥 «${pa.area.spell}» (радиус ${pa.area.radiusFt} фт) задевает ещё: ${hits.join(', ')}.`, myName);
+            alchToast('💥 Площадь «' + escHtml(pa.area.spell) + '»: задеты ' + escHtml(hits.join(', ')));
+        }
+    }
+    window.gridApplyAoe = gridApplyAoe;
+    // Подписи в списке целей: расстояние и можно ли достать выбранным действием.
+    function gridAnnotateTargets() {
+        const sel = document.getElementById('attack-target-select'); const info = document.getElementById('attack-grid-info');
+        const act = (document.getElementById('attack-action-select') || {}).value || 'melee';
+        const grid = sessGrid();
+        if (!sel) return;
+        [...sel.options].forEach(o => {
+            if (!o.value) return;
+            if (!o.dataset.base) o.dataset.base = o.textContent;
+            const chk = grid ? gridCheckFor(act, o.value) : null;
+            o.textContent = o.dataset.base + (chk && chk.onGrid ? ' · 📏 ' + chk.label : '');
+        });
+        if (info) {
+            const chk = grid && sel.value ? gridCheckFor(act, sel.value) : null;
+            const geo = grid ? attackGeometry(act) : null;
+            info.textContent = !grid ? '' : !geo || !geo.from ? '🗺 Мастер ещё не поставил тебя на боевую сетку — дальность не учитывается.' :
+                chk && chk.onGrid ? (chk.ok ? '📏 ' + chk.feet + ' фт до цели' + (chk.penalty ? ' — далеко: ' + chk.penalty + ' к попаданию' : ' — достаёшь') : '⛔ ' + chk.reason) : '🗺 Цель не на сетке — дальность не учитывается.';
+            info.style.color = chk && chk.onGrid && !chk.ok ? '#e74c3c' : '';
+        }
+    }
+    window.gridAnnotateTargets = gridAnnotateTargets;
+    // Длительные зоны на сетке. place: follow — аура вокруг заклинателя (ходит с ним), self — круг на месте каста, gm — ставит мастер.
+    const GRID_ZONE_SPELLS = {
+        'Огненный плащ': { kind: 'aura', place: 'follow', dmgType: 'fire', who: 'enemies', icon: '🔥', radius: 5 },
+        'Морозный плащ': { kind: 'aura', place: 'follow', dmgType: 'frost', who: 'enemies', icon: '❄️', radius: 5 },
+        'Плащ молний': { kind: 'aura', place: 'follow', dmgType: 'shock', who: 'enemies', icon: '⚡', radius: 5, mpHalf: true },
+        'Аура Стендарра': { kind: 'aura', place: 'follow', dmgType: 'magic', who: 'undead', icon: '☀', radius: 5, noResist: true },
+        'Вихревой плащ': { kind: 'aura', place: 'follow', dmgType: '', who: 'enemies', icon: '🌪', radius: 5, slowOnly: true },
+        'Дурман': { kind: 'aura', place: 'follow', dmgType: 'magic', who: 'enemies', icon: '🌫', radius: 10, upkeep: true },
+        'Круг огня': { kind: 'area', place: 'self', dmgType: 'magic', who: 'undead', icon: '🔆', radius: 10, noResist: true },
+        'Круг защиты': { kind: 'area', place: 'self', dmgType: '', who: 'undead', icon: '⭕', radius: 10, flee: true },
+        'Гудящий камень': { kind: 'area', place: 'gm', dmgType: 'shock', who: 'enemies', icon: '🗿', radius: 10, resistDown: 5 },
+        'Стена пламени': { kind: 'wall', place: 'gm', dmgType: 'fire', who: 'all', icon: '🔥', upkeep: true },
+        'Стена мороза': { kind: 'wall', place: 'gm', dmgType: 'frost', who: 'all', icon: '❄️', upkeep: true },
+        'Грозовая стена': { kind: 'wall', place: 'gm', dmgType: 'shock', who: 'all', icon: '⚡', upkeep: true }
+    };
+    function gridZoneAvailable() {
+        const g = sessGrid(); return !!(g && window.CloudSync && window.CloudSync.addPendingZone && window.GridCore.tokenOf(g, 'p', myUidG()));
+    }
+    function castGridZone(name, desc, enhanced, isFree, mult) {
+        const Z = GRID_ZONE_SPELLS[name]; const full = findSpellDescByName(name) || desc || '';
+        const parts = splitSpellDescByEnhancement(full);
+        const txt = (enhanced && /\d/.test(parts.enhanced) ? parts.enhanced : parts.base) || desc || '';
+        let dmg = parseInt((txt.match(/(\d+)\s*(?:единиц[аы]?\s*)?урон/i) || [])[1]) || 0;
+        if (name === 'Дурман') dmg = parseInt((txt.match(/на\s+(\d+)/i) || [])[1]) || 0;
+        dmg = Math.round(dmg * (mult || 1));
+        const radius = parseInt((txt.match(/радиусе?\s*(\d+)/i) || [])[1]) || Z.radius || 5;
+        let turns = Z.upkeep ? null : (parseInt((txt.match(/(\d+)\s*ход/i) || [])[1]) || 8);
+        const slow = name === 'Вихревой плащ' ? (parseInt((txt.match(/на\s+(\d+)\s+а\s+так/i) || [])[1]) || 15) : (name === 'Дурман' ? (parseInt((txt.match(/медлен\S*\s+на\s+(\d+)/i) || [])[1]) || 0) : 0);
+        const flee = Z.flee ? { maxLevel: parseInt((txt.match(/до\s+(\d+)\s+уровн/i) || [])[1]) || 16, fleeTurns: (() => { const all = txt.match(/на\s+(\d+)\s*ход/gi) || []; return all.length ? parseInt(all[all.length - 1].replace(/\D+/g, '')) : 2; })() } : null;
+        const upkeep = Z.upkeep ? getSpellUpkeep(name, full, isFree, enhanced, true) : 0;
+        const effId = 'zone-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const arrowPct = name === 'Вихревой плащ' ? (parseInt((txt.match(/(\d+)\s*%/) || [])[1]) || 20) : 0;
+        const what = Z.flee ? `нежить до ${flee.maxLevel} ур. бежит ${flee.fleeTurns} х.` : Z.slowOnly ? `враги −${slow} фт скорости` : `${dmg} урона за ход${Z.who === 'undead' ? ' нежити' : Z.who === 'all' ? ' всем внутри' : ' врагам'}${slow ? ', −' + slow + ' фт скорости' : ''}${Z.mpHalf ? ' и ' + Math.round(dmg / 2) + ' по мане' : ''}${Z.resistDown ? ', −' + Z.resistDown + '% сопротивлений каждый ход' : ''}`;
+        const where = Z.place === 'follow' ? `вокруг тебя (${radius} фт, ходит с тобой)` : Z.place === 'self' ? `на месте каста (радиус ${radius} фт)` : (Z.kind === 'wall' ? 'там, где мастер проведёт стену (до 30 фт)' : `там, где мастер поставит камень (радиус ${radius} фт)`);
+        pushOrRefreshTimedEffect({ id: effId, name, effectName: name, description: `${Z.icon} Зона на боевой сетке: ${what}; ${where}.${upkeep ? ' Поддержание ' + upkeep + ' маны/ход.' : ''}`,
+            turnsRemaining: turns === null ? Infinity : turns, manaPerTurn: upkeep, gridZoneId: effId, rangedResist: arrowPct || undefined });
+        renderActiveEffects();
+        const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+        const zone = { id: effId, effId, uid: myUidG(), ownerName: myName, spell: name, kind: Z.kind, place: Z.place, radiusFt: radius, dmg: Z.slowOnly || Z.flee ? 0 : dmg, dmgType: Z.dmgType, who: Z.who, icon: Z.icon, turns: turns === null ? null : turns + 1 };
+        if (Z.mpHalf) zone.mpDmg = Math.round(dmg / 2);
+        if (slow) zone.slow = slow;
+        if (Z.noResist) zone.noResist = true;
+        if (Z.resistDown) zone.resistDown = Z.resistDown;
+        if (flee) { zone.effect = 'flee'; zone.maxLevel = flee.maxLevel; zone.fleeTurns = flee.fleeTurns; }
+        if (Z.kind === 'wall') zone.maxLen = 6;
+        window.CloudSync.addPendingZone(zone, myName).catch(e => alert('Зона не передана мастеру: ' + e.message));
+        return `${Z.icon} ${what}; ${where}.${turns ? ' ' + turns + ' х.' : ''}${upkeep ? ' Поддержание ' + upkeep + ' маны/ход, пока не снимешь.' : ''}${arrowPct ? ' Игнорируешь ' + arrowPct + '% урона от стрел.' : ''} Бьёт автоматически каждый ход.`;
+    }
+    // Руны: каст отправляет руну мастеру («Руны к установке» на боевой сетке), он ставит её на клетку.
+    const GRID_RUNE_SPELLS = { 'Огненная руна': 1, 'Морозная руна': 1, 'Грозовая руна': 1, 'Ядовитая руна': 1, 'Руна солнца': 1, 'Руна гейзера': 1 };
+    function castGridRune(name, desc, enhanced) {
+        const d = String(desc || '');
+        const m = d.match(/нанося\s+(\d+)/i) || d.match(/наносит\s+(\d+)/i) || d.match(/на\s+(\d+)\s+урона/i) || d.match(/(\d+)\s+(?:единиц|ед\.)\s+\S*\s*урона/i);
+        const dmg = m ? parseInt(m[1]) : 0;
+        const fm = d.match(/нанесения\s+руны\s+до\s+(\d+)/i);
+        let maxFt = fm ? parseInt(fm[1]) : 25;
+        if ((window.perkBonuses || {}).runeMaster) maxFt *= 2; // «Мастер рун»
+        const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+        const inS = window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && window.CloudSync.addPendingRune;
+        if (!inS) { alert('✴ «' + name + '» наложена' + (dmg ? ' (урон ' + dmg + ')' : '') + '. Вне сессии мастер отмечает её вручную.'); return; }
+        window.CloudSync.addPendingRune({ id: 'pr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), uid: myUidG(), ownerName: myName, spell: name, dmg, maxFt, enhanced: !!enhanced }, myName)
+            .then(() => alert('✴ «' + name + '»' + (enhanced ? ' (усиленная)' : '') + (dmg ? ', урон ' + dmg : '') + ': руна готова. Мастер поставит её на боевую сетку — не дальше ' + maxFt + ' фт от тебя. Сработает, когда враг подойдёт вплотную, и ударит всех в 5 фт.'))
+            .catch(e => alert('Руна не передана мастеру: ' + e.message));
+    }
+    // Удар руны или чужого площадного заклинания: по мне (с моими сопротивлениями) или по моему существу.
+    function gridAoeHit(e) {
+        const who = e.from ? '«' + e.from + '»' : 'Взрыв';
+        if (e.summonId) {
+            const sm = activeSummons.find(x => x.id === e.summonId); if (!sm) return;
+            if (e.knock) { alchToast('💦 ' + who + ' подбрасывает «' + escHtml(sm.name) + '».'); return; }
+            sm.curHp = Math.max(0, (sm.curHp || 0) - (e.dmg || 0));
+            alchToast('💥 ' + who + ': «' + escHtml(sm.name) + '» −' + (e.dmg || 0));
+            if (sm.curHp <= 0) { alertSafe('💀 «' + sm.name + '» погибает (' + who + ').'); window.dismissSummon(sm.id); }
+            else renderActiveSummonsList();
+            return;
+        }
+        if (e.knock) {
+            pushOrRefreshTimedEffect({ id: 'eff-knock', name: e.from || 'Руна', effectName: 'Подброшен', description: 'Подброшен потоком воды: −2 к кубам', turnsRemaining: 1, rollPenalty: -2 });
+            alertSafe('💦 ' + who + ' подбрасывает тебя: −2 к кубам на ход.');
+            return;
+        }
+        let res = 0; try { res = (computeTotalResistances() || {})[e.dmgType] || 0; } catch (x) { }
+        const dmg = Math.max(0, Math.round((e.dmg || 0) * (1 - res / 100)));
+        const hpEl = document.getElementById('cur-hp');
+        hpEl.value = Math.max(0, (parseInt(hpEl.value) || 0) - dmg);
+        alertSafe('💥 ' + who + ' задевает тебя: −' + dmg + ' ХП' + (res ? ' (сопротивление ' + res + '%, было бы ' + e.dmg + ')' : '') + '.');
+        if (dmg > 0) armorHitProgress(e.dmgType || 'physical');
+    }
+
+    // ---- Прокачка брони как в Скайриме: навык растёт от физических попаданий по персонажу ----
+    // Опыт за удар фиксированный (не зависит от урона и числа надетых частей). Смешанный комплект — качаются оба навыка.
+    const ARMOR_HIT_PROGRESS = 0.5; // доля «успеха» навыка за одно попадание (оружейный удар игрока = 1 успех)
+    const ARMOR_SLOTS_FOR_SKILL = ['helmet', 'chest', 'gloves', 'boots', 'shield'];
+    function armorPieceClass(item) {
+        if (!item) return null;
+        const t = String(item.armorType || '') + ' ' + String(item.category || '');
+        if (/heavy|тяж[её]л/i.test(t)) return 'heavy';
+        if (/light|л[её]гк/i.test(t)) return 'light';
+        const r = (window.armorRecipes || []).find(x => x.name === item.name);
+        if (r && r.armorType) return /тяж/i.test(r.armorType) ? 'heavy' : 'light';
+        return null;
+    }
+    function wornArmorClasses() {
+        const set = new Set(); let anyPiece = false;
+        const inv = new Map(playerInventory.map(i => [i.itemId, i]));
+        ARMOR_SLOTS_FOR_SKILL.forEach(sl => {
+            const it = equippedSlots[sl] ? inv.get(equippedSlots[sl]) : null;
+            if (!it) return;
+            if (!(parseInt(it.armorValue) > 0 || sl !== 'shield')) return;
+            anyPiece = true;
+            const c = armorPieceClass(it); if (c) set.add(c);
+        });
+        if (anyPiece && !set.size) { const g = (document.getElementById('eq-armor') || {}).value; if (g === 'heavy' || g === 'light') set.add(g); }
+        return [...set];
+    }
+    function armorHitProgress(dmgType) {
+        if (dmgType && dmgType !== 'physical') return; // магия броню не качает
+        const cls = wornArmorClasses(); if (!cls.length) return;
+        cls.forEach(c => logSkillSuccessByName(c === 'heavy' ? 'Тяжелая броня' : 'Легкая броня', ARMOR_HIT_PROGRESS));
+    }
+    window.armorHitProgress = armorHitProgress; window.wornArmorClasses = wornArmorClasses;
+
     window.applyIncomingStatusEffects = function (effects) {
         let names = [], removedNames = [], ignoredNames = [];
         effects.forEach(e => {
@@ -8277,7 +8569,12 @@ window.toggleSkillPanel = function (idx) {
             if (e.cmd === 'craftOrder') { handleCraftOrderCmd(e); return; }
             if (e.cmd === 'death') { handleGmDeathCmd(e); return; } // команды мастера: потеря вещей / воскрешение / жизни
             // мастер нанёс урон — проверка концентрации. Команда старше 2 минут (игрок был офлайн) уже не актуальна — не бросаем «задним числом».
-            if (e.cmd === 'damaged') { if (!e.ts || Date.now() - e.ts < 120000) window.concentrationCheck(e.dmg); return; }
+            if (e.cmd === 'aoeHit') { gridAoeHit(e); return; } // руна/площадное заклинание задело меня или моё существо
+            if (e.cmd === 'damaged') {
+                if (!e.ts || Date.now() - e.ts < 120000) window.concentrationCheck(e.dmg);
+                armorHitProgress(e.dmgType); // опыт брони засчитываем и задним числом — попадание было
+                return;
+            }
             if (e.undeadOnly && !(playerSupernaturalState && playerSupernaturalState.vampirism)) { // «не действует на живых существ»
                 ignoredNames.push(e.effectName);
                 return;
@@ -8311,7 +8608,8 @@ window.toggleSkillPanel = function (idx) {
             const incoming = {
                 id: 'eff-' + Date.now() + Math.random().toString(36).slice(2, 6),
                 name: e.name || 'Противник', effectName: e.effectName, description: e.description || '',
-                turnsRemaining: e.turnsRemaining || 1, hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, speed: e.speed || 0, value: e.value || 0,
+                // болезнь длится до лечения; Infinity при пересылке через базу может превратиться в null — поэтому по имени/флагу
+                turnsRemaining: (e.permanent || /^Болезнь:/.test(e.effectName || '') || e.turnsRemaining === Infinity) ? Infinity : (e.turnsRemaining || 1), hp: e.hp || 0, mp: e.mp || 0, armor: e.armor || 0, speed: e.speed || 0, value: e.value || 0,
                 percentEffects: e.percentEffects || []
             };
             if (e.rollPenalty) incoming.rollPenalty = e.rollPenalty;
@@ -8448,20 +8746,48 @@ window.toggleSkillPanel = function (idx) {
         saveLocalStorage();
     };
 
+    // ---- Ход/круг. Вне сессии — личный счётчик, как раньше. В сессии — общий: кто бы ни нажал (игрок или мастер),
+    // ход переключается у всех, и у каждого игрока его эффекты прокручиваются сами (syncSessionTurns ниже).
+    function localTurnTick() { rollSheogorathChaos(); tickActiveEffects(); }
+    function inSyncedSession() { return !!(window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && window.CloudSync.advanceSessionTurn); }
+    function advanceShared(kind) {
+        const nm = (document.getElementById('char-name') || {}).value || 'Игрок';
+        window.CloudSync.advanceSessionTurn(kind, nm).then(r => {
+            if (r && r.skipped) alchToast((kind === 'round' ? 'Круг' : 'Ход') + ' только что переключил(а) ' + (r.by || 'кто-то') + ' — повторно не листаю.');
+        }).catch(e => alert('Не удалось переключить: ' + e.message));
+    }
     window.nextTurn = function () {
+        if (inSyncedSession()) { advanceShared('turn'); return; }
         gameTurn++;
-        rollSheogorathChaos();
-        tickActiveEffects();
+        localTurnTick();
         updateTurnRoundDisplay();
         saveLocalStorage();
     };
 
     window.nextRound = function () {
+        if (inSyncedSession()) { advanceShared('round'); return; }
         gameRound++;
-        rollSheogorathChaos();
-        tickActiveEffects();
+        localTurnTick();
         updateTurnRoundDisplay();
         saveLocalStorage();
+    };
+    // Вызывается из CloudSync на каждом снимке сессии (после загрузки персонажа).
+    window.syncSessionTurns = function (data, code) {
+        if (!data || !code) return;
+        const tick = parseInt(data.sessionTickCounter) || 0;
+        const turn = parseInt(data.sessionTurnCounter) || 0, round = parseInt(data.sessionRoundCounter) || 0;
+        let changed = false;
+        if (sessionTurnSync.code !== code || tick < sessionTurnSync.tick) {
+            // новая сессия (или мастер начал заново) — подхватываем счётчик без прокрутки эффектов задним числом
+            sessionTurnSync = { code, tick }; changed = true;
+        } else if (tick > sessionTurnSync.tick) {
+            const n = Math.min(10, tick - sessionTurnSync.tick); // долго не было на связи — не крутим больше 10 ходов разом
+            sessionTurnSync.tick = tick;
+            for (let i = 0; i < n; i++) localTurnTick();
+            changed = true;
+        }
+        if (gameTurn !== turn || gameRound !== round) { gameTurn = turn; gameRound = round; changed = true; }
+        if (changed) { updateTurnRoundDisplay(); if (typeof updateCombatDock === 'function') updateCombatDock(); saveLocalStorage(); }
     };
 
     const ENCHANT_AUTO_APPLY_ARMOR = {
@@ -9247,10 +9573,26 @@ window.toggleSkillPanel = function (idx) {
         const itemName = (isPoison ? 'Яд' : 'Зелье') + ': ' + effects.map(e => e.name).join(' + ');
         const stored = effects.map(e => ({ name: e.name, magnitude: e.magnitude, duration: e.duration, unit: e.unit, kind: e.kind }));
 
-        addToInventory(itemName + '#' + Date.now(), itemName, 1, 0.25, isPoison ? 'Яд' : 'Зелье', desc, {
+        // Одинаковые зелья (то же название, эффекты и цена) складываются в одну стопку — раньше у каждого был уникальный id по времени.
+        const potKey = i => [i.name, i.category, i.effect, i.price, JSON.stringify(i.alchemyEffects || null)].join('¦');
+        const newKey = [itemName, isPoison ? 'Яд' : 'Зелье', desc, totalPrice, JSON.stringify(stored)].join('¦');
+        const sameStack = playerInventory.find(i => potKey(i) === newKey);
+        const brewId = sameStack ? sameStack.itemId : itemName + '#' + Date.now();
+        addToInventory(brewId, itemName, 1, 0.25, isPoison ? 'Яд' : 'Зелье', desc, {
             alchemyEffects: stored, price: totalPrice,
             craftCost: craftCostOf(picked.map(n => ({ name: n, qty: 1 })), 1), craftKind: 'alch'
         });
+        // Прежние разрозненные стопки одинаковых зелий (по 1 шт.) сливаем в одну.
+        (function () {
+            const seen = {};
+            playerInventory = playerInventory.filter(i => {
+                if (!i.alchemyEffects || !/^(Зелье|Яд)/.test(i.category || '') || i.craftKind !== 'alch') return true;
+                const k = potKey(i), f = seen[k];
+                if (f && !i.equipped && !f.equipped) { f.count += i.count; return false; }
+                seen[k] = i; return true;
+            });
+            renderInventoryList();
+        })();
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Алхимия');
         // Запоминаем удачное сочетание (ключ — ингредиенты по алфавиту, чтобы порядок выбора не плодил дубли).
         knownBrewRecipes[picked.slice().sort().join('|')] = { ingredients: picked.slice(), effects: effects.map(e => e.name), itemName };
@@ -9455,6 +9797,11 @@ window.toggleSkillPanel = function (idx) {
           if (speechKind === 'intimidate' && pbD.intimidateBonus) { statMod += pbD.intimidateBonus; helpNote += ` (+${pbD.intimidateBonus} «Запугивание»)`; }
         }
 
+        // Гроза: вспышка молнии иногда выдаёт прячущегося (шанс 1 из 4 на бросок Скрытности) — −2.
+        if (skillLabel && canonSkillKey(skillLabel) === 'скрытность') {
+            const sessW = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
+            if (sessW && sessW.currentWeather === 'storm' && Math.random() < 0.25) { statMod -= 2; helpNote += ' (⚡ вспышка молнии выдала тебя: −2)'; }
+        }
         const isCombatSkill = skillLabel && COMBAT_SKILLS_TIE_REROLL.includes(skillLabel);
         const hasDc = dc !== null && !isNaN(dc);
         // «Повышение навыка» Скрытность / Взлом / Карманные кражи: к значению куба добавляется +N% от значения куба.
@@ -10384,6 +10731,7 @@ window.toggleSkillPanel = function (idx) {
             : '<option value="">Нет активных целей (зайди в сессию мастера на вкладке «Сессия»)</option>';
         if (alive.some(e => e.id === prev)) select.value = prev;
         else if (marked) select.value = marked;
+        try { gridAnnotateTargets(); } catch (e) { }
         if (typeof updateCombatDock === 'function') updateCombatDock();
     };
 
@@ -10401,7 +10749,15 @@ window.toggleSkillPanel = function (idx) {
         const gold = parseInt(s.partyGold) || 0;
         const g = document.getElementById('party-stash-gold'); if (g) g.textContent = formatNumber(gold);
         const list = document.getElementById('party-stash-list');
-        const items = (Array.isArray(s.partyStash) ? s.partyStash : []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+        const allStash = Array.isArray(s.partyStash) ? s.partyStash : [];
+        const stCat = (document.getElementById('stash-category-filter') || {}).value || 'all';
+        const stQ = String((document.getElementById('stash-search') || {}).value || '').trim().toLowerCase().replace(/ё/g, 'е');
+        const items = allStash.filter(it => (stCat === 'all' || classifyItemBroad(it) === stCat) &&
+            (!stQ || String(it.name || '').toLowerCase().replace(/ё/g, 'е').indexOf(stQ) !== -1))
+            .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+        const stCnt = document.getElementById('stash-filter-count');
+        if (stCnt) stCnt.textContent = (stCat !== 'all' || stQ) ? `Показано ${items.length} из ${allStash.length}` : '';
+        if (list && allStash.length && !items.length) { list.innerHTML = '<p style="opacity:.6; font-size:13px; margin:2px 0;">По этому фильтру ничего не найдено.</p>'; return; }
         if (list) list.innerHTML = items.length ? items.map(i => `<div class="stat-block" style="align-items:center;">
             <span><strong>${escHtml(i.name)}</strong> × ${i.count}${i.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(String(i.effect).slice(0, 90))}</span>` : ''}</span>
             <button style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashTake('${jsq(i.itemId)}')">→ Себе</button></div>`).join('')
@@ -10413,11 +10769,20 @@ window.toggleSkillPanel = function (idx) {
         const worn = Object.keys(equippedSlots).some(k => equippedSlots[k] === itemId);
         if (worn) { alert('«' + item.name + '» надет(а) — сначала сними.'); return; }
         const doPut = n => {
-            const snapshot = JSON.parse(JSON.stringify(item));
+            // Сначала списываем у себя (синхронно), потом пишем в сундук; при ошибке возвращаем.
+            // Раньше списание шло ПОСЛЕ ответа сервера — двойной клик клал в сундук две штуки из одной.
+            const cur = playerInventory.find(i => i.itemId === itemId);
+            n = Math.max(1, Math.floor(n) || 1);
+            if (!cur || cur.count < n) { alchToast('Столько у тебя уже нет.'); return; }
+            const snapshot = JSON.parse(JSON.stringify(cur));
+            adjustInventoryQty(itemId, -n); saveLocalStorage();
             window.CloudSync.stashItem(snapshot, n, stashMyName()).then(() => {
-                adjustInventoryQty(itemId, -n); saveLocalStorage();
-                alchToast('🎒 В сундук: ' + escHtml(item.name) + (n > 1 ? ' ×' + n : ''));
-            }).catch(e => alert('Не удалось положить: ' + e.message));
+                alchToast('🎒 В сундук: ' + escHtml(snapshot.name) + (n > 1 ? ' ×' + n : ''));
+            }).catch(e => {
+                const extra = Object.assign({}, snapshot); ['itemId', 'name', 'count', 'weight', 'category', 'effect'].forEach(k => delete extra[k]);
+                addToInventory(snapshot.itemId, snapshot.name, n, snapshot.weight, snapshot.category, snapshot.effect, extra); saveLocalStorage();
+                alert('Не удалось положить: ' + e.message);
+            });
         };
         if (item.count > 1) askQuantity({ title: 'В сундук: ' + item.name, note: 'У тебя: ' + item.count, max: item.count, def: item.count, okText: 'Положить', onOk: doPut });
         else doPut(1);
@@ -10443,10 +10808,14 @@ window.toggleSkillPanel = function (idx) {
         const goldEl = document.getElementById('char-gold');
         const mine = parseInt(goldEl.value) || 0;
         if (sign > 0 && n > mine) { alert('У тебя только ' + mine + ' золота.'); return; }
+        // Кладём: списываем сразу (двойной клик раньше удваивал золото в сундуке), при ошибке возвращаем.
+        if (sign > 0) { goldEl.value = mine - n; updateAll(); saveLocalStorage(true); }
         window.CloudSync.changeStashGold(sign * n, stashMyName()).then(() => {
-            goldEl.value = Math.max(0, (parseInt(goldEl.value) || 0) - sign * n);
-            updateAll(); saveLocalStorage(true);
-        }).catch(e => alert(e.message));
+            if (sign < 0) { goldEl.value = (parseInt(goldEl.value) || 0) + n; updateAll(); saveLocalStorage(true); }
+        }).catch(e => {
+            if (sign > 0) { goldEl.value = (parseInt(goldEl.value) || 0) + n; updateAll(); saveLocalStorage(true); }
+            alert(e.message);
+        });
     };
 
     // ========================================================================
@@ -10485,12 +10854,79 @@ window.toggleSkillPanel = function (idx) {
         }
         const mk = document.getElementById('dock-marked-btn'), mt = dockMarkedAlive();
         if (mk) { mk.style.display = mt ? '' : 'none'; if (mt) mk.textContent = '🎯 Атаковать: ' + String(mt.name).slice(0, 18); }
+        try { dockRenderInfo(); } catch (e) { console.error('dock info', e); }
         const fav = document.getElementById('dock-fav-spells');
         const enhOkFav = sp => { try { return !cardEnhancedReason(sp.id); } catch (e) { return false; } };
-        if (fav) fav.innerHTML = (customSpells || []).filter(s => s.favorite && s.name).slice(0, 3).map(s => `<button type="button" class="btn-success" onclick="castCustomSpell('${jsq(s.id)}', false)" title="Избранное: ${escHtml(s.name)}">★ ${escHtml(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</button>` + (enhOkFav(s) ? `<button type="button" class="btn-success" style="background:#7a4e2c;" onclick="castCustomSpell('${jsq(s.id)}', true)" title="Усиленный каст «${escHtml(s.name)}» (х2 маны)">⚡</button>` : '')).join('');
+        if (fav) fav.innerHTML = (customSpells || []).filter(s => s.favorite && s.name).slice(0, 3).map(s => `<button type="button" class="btn-success" onclick="castCustomSpell('${jsq(s.id)}', false)" title="Избранное: ${escHtml(s.name)}">★ ${escHtml(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</button>` + (enhOkFav(s) ? `<button type="button" class="btn-success" style="background:#7a4e2c;" onclick="castCustomSpell('${jsq(s.id)}', true)" title="Усиленный каст «${escHtml(s.name)}»">⚡</button>` : '')).join('');
         // чтобы док не перекрывал нижние элементы страницы — отступ равен его реальной высоте
         document.body.style.setProperty('--st-dock-h', dock.offsetHeight + 'px');
     };
+    // ---- Сводка в доке: чтобы в бою не прыгать по вкладкам ----
+    const DOCK_RES_ICONS = [['physical', '🛡', 'Физ.'], ['fire', '🔥', 'Огонь'], ['frost', '❄', 'Холод'], ['shock', '⚡', 'Электр.'], ['poison', '☠', 'Яд'], ['disease', '🦠', 'Болезни'], ['magic', '✨', 'Магия'], ['shout', '🗣', 'Крики']];
+    // переключатели = зеркала чекбоксов боевой вкладки (меняем исходный чекбокс и шлём change — вся логика остаётся прежней)
+    const DOCK_TOGGLES = [
+        { id: 'chk-power-attack', label: '💪 Силовая', title: 'Силовая атака: урон ББ ×1.5, −1 к броску d20' },
+        { id: 'chk-sneak-attack', label: '🌑 Скрытная', title: 'Скрытная атака из тени: крит ×2 (кинжалы ×3)' },
+        { id: 'chk-defensive-stance', label: '🛡 Стойка', title: 'Защитная стойка: щит даёт бонусы перков блокирования' },
+        { id: 'chk-dual-wield', label: '⚔ Два оружия', title: 'Бой двумя одноручными (нужны перки)', when: () => (parseInt((document.getElementById('wep-melee-offhand-dmg') || {}).value) || 0) > 0 || document.getElementById('chk-dual-wield').checked },
+        { id: 'chk-sprint-attack', label: '🏃 Рывок', title: 'Рывок-атака (перки «Рывок»/«Великий рывок»)', when: () => !!((window.perkBonuses || {}).sprintPowerAttackDouble || document.getElementById('chk-sprint-attack').checked) },
+        { id: 'chk-enhanced-cast', label: '✨ Усил. каст', title: 'Усиленный каст выбранного в бою заклинания' }
+    ];
+    window.dockFlip = function (id) {
+        const c = document.getElementById(id); if (!c || c.disabled) return;
+        c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof updateCombatDock === 'function') updateCombatDock();
+    };
+    window.dockToggleInfo = function () {
+        const dock = document.getElementById('combat-dock'); if (!dock) return;
+        const off = !dock.classList.contains('st-dock-info-off');
+        dock.classList.toggle('st-dock-info-off', off);
+        try { localStorage.setItem('skyrim_dock_info_off', off ? '1' : ''); } catch (e) { }
+        const b = document.getElementById('dock-info-toggle'); if (b) b.textContent = off ? '▸ Сводка' : '▾';
+        document.body.style.setProperty('--st-dock-h', dock.offsetHeight + 'px');
+    };
+    let _dockInfoInit = false;
+    function dockRenderInfo() {
+        const dock = document.getElementById('combat-dock'); if (!dock) return;
+        if (!_dockInfoInit) {
+            _dockInfoInit = true;
+            let off = false; try { off = localStorage.getItem('skyrim_dock_info_off') === '1'; } catch (e) { }
+            if (off) { dock.classList.add('st-dock-info-off'); const b = document.getElementById('dock-info-toggle'); if (b) b.textContent = '▸ Сводка'; }
+            const g = document.getElementById('char-gold'); if (g) g.addEventListener('input', () => updateCombatDock());
+        }
+        const v = id => (document.getElementById(id) || {}).value;
+        const txt = id => ((document.getElementById(id) || {}).textContent || '').trim();
+        const chip = (icon, val, title, cls) => `<span class="st-dock-chip${cls ? ' ' + cls : ''}" title="${escHtml(title)}">${icon} ${escHtml(String(val))}</span>`;
+        const parts = [];
+        parts.push(chip('💰', formatNumber(parseInt(v('char-gold')) || 0), 'Золото'));
+        parts.push(chip('🛡', txt('armor-total') || '0', 'Класс брони (с баффами)'));
+        parts.push(chip('🏃', (parseInt(v('val-speed')) || 0) + ' фт', 'Скорость за ход'));
+        const wc = parseFloat(txt('weight-current')) || 0, wm = parseFloat(txt('weight-max-display')) || 0;
+        parts.push(chip('⚖', (Math.round(wc * 10) / 10) + '/' + wm, wc > wm ? 'Перегруз! Скорость и действия ограничены' : 'Вес / грузоподъёмность', wc > wm ? 'st-dock-bad' : ''));
+        const mel = String(v('wep-melee-name') || '').trim(), rng = String(v('wep-ranged-name') || '').trim();
+        const dmg = parseInt(v('main-panel-dmg')) || 0;
+        if (mel) parts.push(chip('🗡', (mel.length > 18 ? mel.slice(0, 17) + '…' : mel) + ' · ' + dmg, 'Ближнее оружие · итоговый урон ' + dmg));
+        if (rng) parts.push(chip('🏹', (rng.length > 18 ? rng.slice(0, 17) + '…' : rng) + ' · ' + (parseInt(v('wep-ranged-dmg')) || 0), 'Дальнее оружие · базовый урон'));
+        if (typeof weaponPoison !== 'undefined' && weaponPoison) parts.push(chip('☠', 'яд на оружии', 'На оружии: ' + weaponPoison.name, 'st-dock-good'));
+        let res = null; try { res = computeTotalResistances(); } catch (e) { }
+        if (res) {
+            const r = DOCK_RES_ICONS.filter(([k]) => res[k]).map(([k, ic, nm]) => `<span class="${res[k] < 0 ? 'st-dock-bad' : ''}" title="${nm}: ${res[k]}%">${ic}${res[k]}%</span>`);
+            if (r.length) parts.push(`<span class="st-dock-chip st-dock-res" title="Сопротивления (отрицательные — уязвимость)">${r.join(' ')}</span>`);
+        }
+        { // погода — что сейчас мешает/помогает
+            const sw = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
+            const wk = sw && sw.currentWeather;
+            if (wk && wk !== 'clear' && typeof WEATHER_TYPES !== 'undefined' && WEATHER_TYPES[wk]) parts.unshift(chip('', WEATHER_TYPES[wk].name, WEATHER_TYPES[wk].effect || 'Без штрафов'));
+        }
+        const st = document.getElementById('dock-stats'); if (st) st.innerHTML = parts.join('');
+        const tg = document.getElementById('dock-toggles');
+        if (tg) tg.innerHTML = DOCK_TOGGLES.map(t => {
+            const c = document.getElementById(t.id); if (!c) return '';
+            if (t.when && !t.when()) return '';
+            if (t.id === 'chk-enhanced-cast' && c.disabled) return `<span class="st-dock-tg st-dock-tg-off" title="${escHtml(c.title || 'Сейчас недоступен')}">${t.label}</span>`;
+            return `<button type="button" class="st-dock-tg${c.checked ? ' on' : ''}" aria-pressed="${c.checked}" title="${escHtml(t.title)}" onclick="dockFlip('${t.id}')">${t.label}</button>`;
+        }).join('');
+    }
     function dockGoCombatTab() {
         const btn = document.querySelector('.tab-link[onclick*="\'tab6\'"]');
         if (btn && typeof openTab === 'function') openTab({ currentTarget: btn }, 'tab6');
@@ -10536,8 +10972,8 @@ window.toggleSkillPanel = function (idx) {
         const btn = (s, big) => {
             const base = `<button type="button" class="st-dock-pick${big ? ' btn-success' : ''}" style="flex:1; margin:0;" onclick="dockPickSpell('${jsq(s.id)}', false)">${s.favorite ? '★ ' : ''}${escHtml(s.name)} <span style="opacity:.7; font-size:12px;">— ${escHtml(costOf(s))} МП</span></button>`;
             if (!enhOk(s)) return `<div style="display:flex; gap:6px; margin-bottom:6px;">${base}</div>`;
-            const c2 = Math.round((parseFloat(costOf(s)) || 0) * 2);
-            return `<div style="display:flex; gap:6px; margin-bottom:6px;">${base}<button type="button" class="st-dock-pick" style="flex:0 0 auto; margin:0; background:#7a4e2c; color:#fff;" onclick="dockPickSpell('${jsq(s.id)}', true)" title="Усиленный каст: х2 маны, «Усиленный эффект» из описания">⚡ Усилен. <span style="font-size:12px; opacity:.85;">${c2} МП</span></button></div>`;
+            let fct = 2; try { const inf = spellCardInfo(s.id); fct = getEnhancedCostFactor(inf && inf.school, s.name); } catch (e) { } const c2 = Math.round((parseFloat(costOf(s)) || 0) * fct);
+            return `<div style="display:flex; gap:6px; margin-bottom:6px;">${base}<button type="button" class="st-dock-pick" style="flex:0 0 auto; margin:0; background:#7a4e2c; color:#fff;" onclick="dockPickSpell('${jsq(s.id)}', true)" title="Усиленный каст: больше маны, «Усиленный эффект» из описания">⚡ Усилен. <span style="font-size:12px; opacity:.85;">${c2} МП</span></button></div>`;
         };
         const fav = all.filter(s => s.favorite), combat = all.filter(s => !s.favorite && isCombat(s)), rest = all.filter(s => !s.favorite && !isCombat(s));
         let html = '';
@@ -10557,9 +10993,9 @@ window.toggleSkillPanel = function (idx) {
     // ВНИМАНИЕ: раньше этот счётчик двигал каждый игрок на любое «Следующий ход» и окно «поднять труп 5 ходов» сжималось — теперь его двигает мастер;
     // пропуск хода — редкое явное действие, поэтому здесь счётчик тикает по ТЗ (если снова начнёт «разгоняться» — убрать вызов ниже).
     window.dockSkipTurn = function () {
-        dockLog('⏭ {n} пропускает ход (паралич/отдых/по решению мастера).');
-        if (window.CloudSync && typeof window.CloudSync.bumpSessionTurnCounter === 'function') window.CloudSync.bumpSessionTurnCounter();
-        alchToast('⏭ Ход пропущен — мастер увидит это в журнале.');
+        // только сигнал в журнал: общий ход теперь переключают кнопки «След. ход/круг» (иначе пропуск листал бы ход всем)
+        dockLog('⏸ {n} пропускает ход (паралич/отдых/по решению мастера).');
+        alchToast('⏸ Ход пропущен — мастер увидит это в журнале.');
     };
 
     // Карта владений для игрока: схема + метка «партия здесь» (session.partyPos, ставит мастер).
@@ -11535,6 +11971,7 @@ window.toggleSkillPanel = function (idx) {
             // в описании описывают призываемое существо/предмет, а не урон по цели. Кастуются через
             // обычную кнопку "Каст" на карточке заклинания, не через этот инструмент.
             if (findSummonTemplateBySpellName(s.name)) return;
+            if (GRID_RUNE_SPELLS[s.name]) return; // руны не бьют напрямую — ставятся на боевую сетку (кнопка «Каст» на карточке)
             if (PLAYER_CONTROL_SPELLS[s.name] || /^Аура Стендарра/.test(s.name) || WEAPON_SPIRITS[s.name] || WALL_SPELLS[s.name]) return; // управляющие заклинания, аура и «духи оружия» идут отдельно
             const dmg = parseSpellDamageFromDesc(s.desc);
             const enhDmg = parseSpellDamageFromDesc(s.desc, true);
@@ -11921,6 +12358,7 @@ function updateHungerPenalty() {
 }    
     window.updateAttackActionInfo = function () {
         try { refreshEnhancedButtons(); } catch (e) { }
+        try { gridAnnotateTargets(); } catch (e) { }
         const val = document.getElementById('attack-action-select').value;
         const infoEl = document.getElementById('attack-action-info');
         if (!infoEl) return;
@@ -11946,8 +12384,12 @@ function updateHungerPenalty() {
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const target = session && (session.enemies || []).find(e => e.id === targetId);
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
+        // Боевая сетка: досягаемость и видимость проверяем ДО траты маны/стрел; штраф за дальность — к броску ниже.
+        const gridChk = gridCheckFor(actionVal, targetId);
+        if (gridChk && gridChk.onGrid && !gridChk.ok) { alert('Не достать «' + target.name + '»: ' + gridChk.reason + '.'); return; }
 
         let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null, dmgType = 'physical';
+        let aoeArea = null; // площадное заклинание: { radiusFt, center, spell }
 
         let adrenalineDmg = 0;
         let controlStatus = null; // {name, turns, desc} — для заклинаний Страх/Полиморф и т.п., см. ниже
@@ -12047,6 +12489,7 @@ function updateHungerPenalty() {
             const spell = customSpells.find(s => s.id === actionVal.slice(6));
             if (!spell) { alert('Заклинание не найдено.'); return; }
             const enhancedCast = document.getElementById('chk-enhanced-cast').checked && !enhancedBlockReason(spell.school, liveSpellDesc(spell), spell.name);
+            { const ar = window.GridCore ? window.GridCore.spellArea(splitSpellDescByEnhancement(liveSpellDesc(spell))[enhancedCast ? 'enhanced' : 'base'] || liveSpellDesc(spell), spell.name) : null; if (ar) aoeArea = Object.assign({ spell: spell.name }, ar); }
             let baseDmg = parseSpellDamageFromDesc(spell.desc, enhancedCast) || 0;
             let rangeNote = '';
             const diceS = getSpellDice(liveSpellDesc(spell), enhancedCast);
@@ -12196,6 +12639,7 @@ function updateHungerPenalty() {
             if (pct) dmg = Math.round(dmg * (1 + pct / 100));
         }
 
+        if (gridChk && gridChk.onGrid) { if (gridChk.penalty) { mod += gridChk.penalty; actionLabel += ` (дальность ${gridChk.feet} фт: ${gridChk.penalty})`; } else actionLabel += ` (${gridChk.feet} фт)`; }
         if (actionVal === 'ranged') { const wr = weatherMods().ranged; if (wr) { mod += wr; actionLabel += ` (погода ${wr})`; } }
         if (actionVal === 'melee' || actionVal === 'ranged') { const gta = getGearTextBonuses().atk; if (gta) { mod += gta; actionLabel += ` (экипировка +${gta} к кубам атаки)`; } }
         { const dsm = skillNameForProgress ? diseaseSkillMod(canonSkillKey(skillNameForProgress)) : 0; if (dsm) { mod += dsm; actionLabel += ` (🦠 болезнь ${dsm > 0 ? '+' : ''}${dsm})`; } }
@@ -12261,7 +12705,7 @@ function updateHungerPenalty() {
         const attackPoison = (hit && weaponPoison && (actionVal === 'melee' || actionVal === 'ranged')) ? weaponPoison : null;
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,
-            targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId,
+            targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea,
             spellPerk: spellPerkInfo, bash: bashInfo, powerShot: powerShotNow,
             godProcs: (actionVal === 'melee' || actionVal === 'ranged') ? {
                 kill: (actionVal === 'melee' && document.getElementById('chk-power-attack').checked) ? gb('instantKillChance') : 0,
@@ -12382,6 +12826,7 @@ function updateHungerPenalty() {
         const attackTargetId = pendingPlayerAttack.targetId;
         const elemNow = pendingPlayerAttack.extraElem || null;
         let mainHit = window.CloudSync.applyDamageToEnemy(pendingPlayerAttack.targetId, pendingPlayerAttack.dmg, playerName || 'Игрок', pendingPlayerAttack.logText, pendingPlayerAttack.dmgType, pendingPlayerAttack.penetrationPct);
+        if (pendingPlayerAttack.area && pendingPlayerAttack.dmg) { const paA = Object.assign({}, pendingPlayerAttack); mainHit = mainHit.then(r0 => { try { gridApplyAoe(paA, playerName || 'Игрок'); } catch (x) { console.error(x); } return r0; }); }
         if (elemNow) mainHit = mainHit.then(r0 => {
             if (!r0 || r0.killed) return r0; // добитую цель дух уже не бьёт
             return applySpiritHit(elemNow, attackTargetId, playerName || 'Игрок').then(sp => {
@@ -13744,6 +14189,7 @@ function updateHungerPenalty() {
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
             gameRound: gameRound,
+            turnSync: sessionTurnSync,
             gameYear: gameYear,
             gameMonth: gameMonth,
             gameDayNum: gameDayNum,
@@ -14151,6 +14597,7 @@ function updateHungerPenalty() {
             activeTimedEffects.forEach(e => { if (e && (e.turnsRemaining === null || e.turnsRemaining === undefined)) e.turnsRemaining = Infinity; });
             gameTurn = parseInt(data.gameTurn) || 0;
             gameRound = parseInt(data.gameRound) || 0;
+            sessionTurnSync = (data.turnSync && typeof data.turnSync === 'object' && typeof data.turnSync.code === 'string') ? { code: data.turnSync.code, tick: parseInt(data.turnSync.tick) || 0 } : { code: '', tick: 0 };
             gameYear = parseInt(data.gameYear) || 201;
             gameMonth = parseInt(data.gameMonth);
             if (isNaN(gameMonth)) gameMonth = 6;
@@ -14542,7 +14989,8 @@ function updateHungerPenalty() {
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=2"></script>
-<script src="cloud.js?v=19"></script>
+<script src="grid-core.js?v=2"></script>
+<script src="cloud.js?v=25"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

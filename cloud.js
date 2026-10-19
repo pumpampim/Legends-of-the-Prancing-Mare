@@ -178,6 +178,8 @@
             }
             cloudDataReady = true;
             updateStatusBar();
+            if (lastSessionData) processMyPendingEffects(lastSessionData); // эффекты, пришедшие до загрузки персонажа
+            if (lastSessionData && typeof window.syncSessionTurns === 'function') window.syncSessionTurns(lastSessionData, currentSessionCode);
         }).catch(e => {
             console.error('Ошибка загрузки персонажа из облака:', e);
             // Даже при ошибке загрузки разрешаем сохранение — иначе персонаж
@@ -250,8 +252,15 @@
                     // с полосками жизни как у самих игроков. Оружие (category:'weapon') не входит —
                     // это экипируемый предмет, не боевой юнит сам по себе.
                     patch['participants.' + currentUser.uid + '.summons'] = summons.map(s => ({
-                        id: s.id, name: s.name, curHp: s.curHp || 0, maxHp: s.maxHp || 1, dmgType: s.dmgType || ''
+                        id: s.id, name: s.name, curHp: s.curHp || 0, maxHp: s.maxHp || 1, dmgType: s.dmgType || '',
+                        curMp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, speed: s.speed || 30 // для подписей и лимита хода на боевой сетке мастера
                     }));
+                    // Урон игрока (итоговый урон оружия) — подпись над фигурой на боевой сетке мастера
+                    { const dEl = el('main-panel-dmg'); patch['participants.' + currentUser.uid + '.dmg'] = dEl ? (parseInt(dEl.value) || 0) : 0; }
+                    { const sEl = el('val-speed'); patch['participants.' + currentUser.uid + '.speed'] = sEl ? (parseInt(sEl.value) || 0) : 30; } // скорость — лимит перемещения на сетке
+                    // какие длительные зоны игрока ещё держатся (мастер убирает с сетки зоны, чьих эффектов больше нет)
+                    patch['participants.' + currentUser.uid + '.zoneEffs'] = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [])
+                        .filter(e => e && e.gridZoneId && (e.turnsRemaining === null || e.turnsRemaining > 0 || e.turnsRemaining === Infinity)).map(e => e.gridZoneId);
                     db.collection('sessions').doc(currentSessionCode).update(patch)
                         .catch(e => console.error('Ошибка синхронизации с сессией:', e));
                 }
@@ -563,6 +572,59 @@
         // Троттлинг раз в 2 секунды — без него случайный спам по кнопке (100 кликов подряд = 100
         // отдельных FieldValue.increment() записей) мог бы выбить дневной лимит бесплатного
         // тарифа Firestore (20k записей/день) за один долгий бой группы из 5 человек.
+        // Общий ход/круг сессии (синхронно у мастера и всех игроков). kind: 'turn' | 'round'.
+        // sessionTickCounter — сколько раз всего «тикало» (ход или круг): по нему игроки прокручивают свои эффекты,
+        // а мастер — статусы врагов. Повторное переключение в течение 3 секунд игнорируется (несколько человек нажали разом).
+        advanceSessionTurn: function (kind, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const now = Date.now();
+            let result = null;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const d = doc.data() || {};
+                if (d.status !== 'active') throw new Error('Сессия закрыта.');
+                const la = d.lastAdvance || {};
+                if (la.at && now - la.at < 3000 && now >= la.at) { result = { skipped: true, by: la.by }; return; }
+                const turn = (parseInt(d.sessionTurnCounter) || 0) + (kind === 'round' ? 0 : 1);
+                const round = (parseInt(d.sessionRoundCounter) || 0) + (kind === 'round' ? 1 : 0);
+                const who = authorName || 'Игрок';
+                tx.update(ref, {
+                    sessionTurnCounter: turn, sessionRoundCounter: round,
+                    sessionTickCounter: (parseInt(d.sessionTickCounter) || 0) + 1,
+                    lastAdvance: { at: now, by: who, kind: kind === 'round' ? 'round' : 'turn' },
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: now, author: who, text: (kind === 'round' ? '🔄 ' + who + ': следующий круг (круг ' + round + ')' : '⏭️ ' + who + ': следующий ход (ход ' + turn + ')') + '.' })
+                });
+                result = { skipped: false, turn, round };
+            })).then(() => result);
+        },
+        // Длительная зона (плащ/аура/круг/стена/камень) от игрока — в очередь мастера
+        addPendingZone: function (zone, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            return db.collection('sessions').doc(currentSessionCode).update({
+                pendingZones: firebase.firestore.FieldValue.arrayUnion(zone),
+                combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: (zone.icon || '✴') + ' ' + (authorName || 'Игрок') + ': «' + zone.spell + '»' + (zone.place === 'gm' ? ' — мастер ставит её на сетку.' : ' действует вокруг заклинателя.') })
+            });
+        },
+        // Руна от игрока — в очередь мастера (он ставит её на боевую сетку)
+        addPendingRune: function (rune, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            return db.collection('sessions').doc(currentSessionCode).update({
+                pendingRunes: firebase.firestore.FieldValue.arrayUnion(rune),
+                combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: '✴ ' + (authorName || 'Игрок') + ' накладывает «' + rune.spell + '» — мастер ставит её на сетку.' })
+            });
+        },
+        // Заклинание «Управление погодой»: игрок меняет общую погоду сессии (видят все, запись в журнал).
+        setSessionWeather: function (key, authorName) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const allowed = ['clear', 'cloudy', 'rain', 'storm', 'snow', 'blizzard', 'fog'];
+            if (allowed.indexOf(key) === -1) return Promise.reject(new Error('Неизвестная погода.'));
+            const who = authorName || 'Игрок';
+            return db.collection('sessions').doc(currentSessionCode).update({
+                currentWeather: key,
+                combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: who, text: '🌦 ' + who + ' меняет погоду заклинанием «Управление погодой».' })
+            });
+        },
         bumpSessionTurnCounter: function () {
             if (!currentSessionCode || !db) return Promise.resolve();
             const now = Date.now();
@@ -838,6 +900,7 @@
             qty = Math.max(1, parseInt(qty) || 1);
             return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
+                if ((doc.data() || {}).status !== 'active') throw new Error('Сессия закрыта мастером — сундук недоступен.');
                 const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
                 const ex = stash.find(s => s.itemId === item.itemId);
                 if (ex) ex.count = (ex.count || 0) + qty;
@@ -855,6 +918,7 @@
             let taken = null;
             return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
+                if ((doc.data() || {}).status !== 'active') throw new Error('Сессия закрыта мастером — сундук недоступен.');
                 const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
                 const idx = stash.findIndex(s => s.itemId === itemId);
                 if (idx === -1 || (stash[idx].count || 0) < qty) throw new Error('Этого уже нет в сундуке (кто-то успел раньше).');
@@ -874,6 +938,7 @@
             if (!delta) return Promise.resolve(0);
             return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
+                if ((doc.data() || {}).status !== 'active') throw new Error('Сессия закрыта мастером — сундук недоступен.');
                 const cur = parseInt((doc.data() || {}).partyGold) || 0;
                 if (cur + delta < 0) throw new Error('В сундуке только ' + cur + ' золота.');
                 tx.update(ref, {
@@ -1098,11 +1163,11 @@
                 errEl.style.display = 'block';
             }
 
+            // Пишем поля по отдельности: раньше запись игрока заменялась целиком, и при каждом входе/перезагрузке
+            // стиралась очередь от мастера (pendingStatusEffects: болезни, статусы, заказы, команды) и прочие поля.
             const patch = {};
-            patch['participants.' + currentUser.uid] = {
-                name, curHp, curMp, maxHp, maxMp,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
+            const pref = 'participants.' + currentUser.uid + '.';
+            Object.assign(patch, { [pref + 'name']: name, [pref + 'curHp']: curHp, [pref + 'curMp']: curMp, [pref + 'maxHp']: maxHp, [pref + 'maxMp']: maxMp, [pref + 'updatedAt']: firebase.firestore.FieldValue.serverTimestamp() });
 
             db.collection('sessions').doc(code).update(patch).then(() => {
                 el('session-join-block').style.display = 'none';
@@ -1123,6 +1188,7 @@
         lastSessionData = null;   // раньше после выхода «старая» сессия оставалась в getSessionData()
         localStorage.removeItem(SESSION_KEY);
         if (typeof window.updateCombatDock === 'function') window.updateCombatDock();
+        if (typeof window.renderPartyStash === 'function') window.renderPartyStash();
         el('session-active-block').style.display = 'none';
         el('session-join-block').style.display = 'block';
         el('session-code-input').value = '';
@@ -1146,9 +1212,12 @@
     function subscribeToSession(code) {
         if (unsubSession) unsubSession();
         unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
-            if (!doc.exists) {
-                // Сессию закрыл/удалил мастер
+            if (!doc.exists || (doc.data() || {}).status === 'closed') {
+                // Сессию закрыл/удалил мастер. Раньше при status:'closed' игрок оставался «в сессии» и мог брать из сундука,
+                // который мастер уже перенёс в новую сессию (дубль вещей и золота).
+                const wasClosed = doc.exists;
                 window.leaveSession();
+                if (wasClosed) { const n = el('session-join-error'); if (n) { n.textContent = 'Мастер закрыл сессию.'; n.style.display = 'block'; } }
                 return;
             }
             renderSession(doc.data());
@@ -1360,15 +1429,21 @@
         // Мастер мог наложить статус-эффект (паралич/страх и т.п.) атакой — он приходит через
         // сессию (у игрока нет живого листенера на свой собственный документ персонажа).
         // Применяем один раз и сразу же чистим очередь в сессии, чтобы не наложить повторно.
-        if (currentUser && data.participants && data.participants[currentUser.uid]) {
-            const pending = data.participants[currentUser.uid].pendingStatusEffects;
-            if (Array.isArray(pending) && pending.length && typeof window.applyIncomingStatusEffects === 'function') {
-                window.applyIncomingStatusEffects(pending);
-                if (currentSessionCode) {
-                    db.collection('sessions').doc(currentSessionCode).update({
-                        ['participants.' + currentUser.uid + '.pendingStatusEffects']: []
-                    }).catch(e => console.error('Ошибка очистки статус-эффектов:', e));
-                }
+        processMyPendingEffects(data);
+        if (cloudDataReady && typeof window.syncSessionTurns === 'function') window.syncSessionTurns(data, currentSessionCode);
+    }
+    // Очередь эффектов от мастера/союзников. Пока персонаж не загружен из облака, НЕ применяем и НЕ чистим —
+    // иначе загрузка персонажа затирала эффект (болезнь, полученная, пока игрок был офлайн, терялась).
+    function processMyPendingEffects(data) {
+        if (!data || !currentUser || !data.participants || !data.participants[currentUser.uid]) return;
+        if (!cloudDataReady) return; // применим сразу после загрузки персонажа (loadCharacterFromCloud)
+        const pending = data.participants[currentUser.uid].pendingStatusEffects;
+        if (Array.isArray(pending) && pending.length && typeof window.applyIncomingStatusEffects === 'function') {
+            window.applyIncomingStatusEffects(pending);
+            if (currentSessionCode) {
+                db.collection('sessions').doc(currentSessionCode).update({
+                    ['participants.' + currentUser.uid + '.pendingStatusEffects']: []
+                }).catch(e => console.error('Ошибка очистки статус-эффектов:', e));
             }
         }
     }

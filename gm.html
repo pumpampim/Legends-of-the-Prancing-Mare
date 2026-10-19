@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -116,6 +116,38 @@
                     <button class="btn-danger" onclick="closeSession()">Закрыть сессию</button>
                 </div>
             </div>
+        </div>
+
+        <div class="panel" id="gg-panel">
+            <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Боевая сетка</h2>
+            <div id="gg-tools" class="gg-tools">
+                <button type="button" data-tool="select" onclick="GmGrid.setTool('select')" title="Выбрать и двигать фигуры">✋ Фигуры</button>
+                <button type="button" data-tool="wall" onclick="GmGrid.setTool('wall')" title="Стена: не пройти, не видно сквозь">🧱 Стена</button>
+                <button type="button" data-tool="rock" onclick="GmGrid.setTool('rock')" title="Камень: не пройти, не видно сквозь">🪨 Камень</button>
+                <button type="button" data-tool="tree" onclick="GmGrid.setTool('tree')" title="Дерево: не пройти, не видно сквозь">🌲 Дерево</button>
+                <button type="button" data-tool="water" onclick="GmGrid.setTool('water')" title="Вода: не пройти, но стрелять/колдовать через неё можно">💧 Вода</button>
+                <button type="button" data-tool="bush" onclick="GmGrid.setTool('bush')" title="Кусты: только для вида">🌿 Кусты</button>
+                <button type="button" data-tool="erase" onclick="GmGrid.setTool('erase')">🧽 Ластик</button>
+                <button type="button" data-tool="ruler" onclick="GmGrid.setTool('ruler')" title="Клик — начало, наведи — расстояние">📏 Линейка</button>
+                <button type="button" data-tool="rune" onclick="GmGrid.setTool('rune')" title="Поставить свою руну (тип и урон справа)">✴ Руна</button>
+                <select id="gg-rune-type" style="width:auto; margin:0;"></select>
+                <input type="number" id="gg-rune-dmg" value="50" min="0" style="width:64px; margin:0;" title="Урон руны">
+            </div>
+            <div class="gg-tools" style="margin-top:4px;">
+                <span>Размер:</span><input type="number" id="gg-w" value="50" min="5" max="100" style="width:58px; margin:0;">×<input type="number" id="gg-h" value="50" min="5" max="100" style="width:58px; margin:0;">
+                <button type="button" onclick="GmGrid.resize()">Применить</button>
+                <button type="button" onclick="GmGrid.zoom(-4)" title="Мельче">−</button><button type="button" onclick="GmGrid.zoom(4)" title="Крупнее">+</button>
+                <button type="button" onclick="GmGrid.toggleLabels()" title="Подписи ХП/МП/урона">🏷 Подписи</button>
+                <button type="button" onclick="GmGrid.fullscreen()">⛶ Во весь экран</button>
+                <button type="button" onclick="GmGrid.clearTerrain()">Убрать окружение</button>
+                <button type="button" class="btn-danger" onclick="GmGrid.clearAll()">Очистить поле</button>
+            </div>
+            <div id="gg-status" class="gg-note" style="margin:4px 0;"></div>
+            <div class="gg-layout">
+                <div id="gg-wrap" class="gg-wrap"><canvas id="gg-canvas"></canvas><div id="gg-tip" class="gg-tip"></div></div>
+                <div id="gg-side" class="gg-side"></div>
+            </div>
+            <p class="gg-note">Клетка = 5 фт. Игроки видят у себя расстояние до врагов: ближний бой — только в досягаемости оружия (5 фт, копья/посохи/молоты — 10 фт), луки и заклинания — 60 фт без штрафа, дальше −1 к попаданию за каждые 2 клетки. Стены, камни и деревья блокируют проход и видимость. Руна срабатывает, когда враг подходит к ней вплотную, и бьёт всех в 5 фт.</p>
         </div>
 
         <div class="grid-2">
@@ -328,9 +360,13 @@
                         <button type="button" style="width:auto; margin:0;" onclick="gmAddTimer()">+</button>
                     </div>
                 </div>
-                <button class="btn-success" style="margin-top:6px; width:100%;" onclick="gmAdvanceTurn()">⏭️ Объявить следующий ход (вся группа)</button>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn-success" style="flex:1; margin:0;" onclick="gmAdvanceTurn('turn')">⏭️ Следующий ход (вся группа)</button>
+                    <button class="btn-success" style="flex:1; margin:0;" onclick="gmAdvanceTurn('round')">🔄 Следующий круг</button>
+                </div>
+                <div id="gm-turn-status" style="font-size:12px; opacity:.8; margin-top:4px;"></div>
                 <button class="btn-danger" style="margin-top:4px; width:100%;" onclick="resetSessionTurnCounter()" title="Обнуляет общий счётчик ходов сессии — окно 'поднять труп' и т.п. тоже сбросится">↺ Обнулить общий счётчик ходов</button>
-                <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Тикает статус-эффекты и кулдауны криков у врагов, напоминает игрокам в журнале прокрутить свои эффекты. Личные баффы/дебаффы на листах игроков эта кнопка не трогает — каждый игрок всё ещё крутит их у себя сам.</p>
+                <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Ход и круг общие: переключить может мастер или любой игрок (повтор в течение 3 секунд не считается). При каждом переключении у врагов тикают яды, статусы и кулдауны криков, а у игроков — их эффекты на листе.</p>
             </div>
 
             <div class="panel">
@@ -1173,6 +1209,8 @@
 <script src="enemies-data.js?v=4"></script>
 <script src="combat-calc.js?v=2"></script>
 <script src="enemy-loot.js?v=4"></script>
-<script src="gm.js?v=25"></script>
+<script src="grid-core.js?v=2"></script>
+<script src="gm.js?v=33"></script>
+<script src="gm-grid.js?v=2"></script>
 </body>
 </html>
