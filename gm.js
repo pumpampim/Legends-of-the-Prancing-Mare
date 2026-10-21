@@ -124,7 +124,11 @@
     // характеристики у бандитов были, но влияли только на бросок попадания (atkMod), а сам урон
     // брался плоским weaponDmg — и генератор запекал в него лишь маленький модификатор (+1…+7).
     // Враги без характеристик (вся база enemies-data.js) считаются как прежде — stat=0.
+    // TASK-001: расчёт перенесён в combat-bonuses.js (StBonuses.collectEnemyAttackBonuses) — тот же модуль, что считает
+    // удар игрока. Возвращает прежние поля {base, stat, total, label} плюс разбивку {weaponEnchant, spiritFlat,
+    // additivePct, mult, notes}. Запасной расчёт — на случай старого кэша страницы без нового файла.
     function enemyWeaponDamage(enemy) {
+        if (window.StBonuses) return window.StBonuses.collectEnemyAttackBonuses(enemy);
         const base = enemy.weaponDmg || 0;
         if (!base) return { base: 0, stat: 0, total: 0, label: '' };
         const stat = enemy.isRanged ? (enemy.dex || 0) : (enemy.str || 0);
@@ -195,6 +199,7 @@
                 showOverlay(true);
                 el('no-session-block').style.display = 'none';
                 el('session-block').style.display = 'none';
+                gmSetInSession(false);
                 return;
             }
             showOverlay(false);
@@ -331,7 +336,7 @@
         if (!currentCode) return;
         const nTr = Object.keys((lastData && lastData.trades) || {}).length;
         if (!confirm('Закрыть сессию? Игроки больше не смогут в неё зайти (текущие данные сохранятся).' + (nTr ? '\n\nНезавершённых обменов: ' + nTr + ' — вещи и золото из них вернутся владельцам.' : ''))) return;
-        gmSettleTradesBeforeClose().then(() => db.collection('sessions').doc(currentCode).update({ status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp() }).finally(() => {
+        gmSettleTradesBeforeClose().then(() => db.collection('sessions').doc(currentCode).update({ status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp(), currentDungeon: null /* ТЗ-2 2.5: данж закрывается вместе с сессией */ }).finally(() => {
             if (_gmHeartbeatTimer) { clearInterval(_gmHeartbeatTimer); _gmHeartbeatTimer = null; }
             if (unsubSession) { unsubSession(); unsubSession = null; }
             localStorage.removeItem(GM_SESSION_KEY);
@@ -339,6 +344,7 @@
             currentCode = null;
             el('session-block').style.display = 'none';
             el('no-session-block').style.display = 'block';
+            gmSetInSession(false);
         })).catch(e => alert('Не удалось закрыть сессию: ' + e.message + '. Если ошибка при возврате вещей из обменов — сессия осталась открытой, попробуй ещё раз.'));
     };
 
@@ -349,6 +355,9 @@
     el('session-block').style.display = 'block';
     el('gm-session-code').textContent = code;
     loadGmItems();
+    // Восстанавливаем последний таб пульта (Эпик 1 ТЗ-2; по умолчанию «Бой»).
+    gmSetInSession(true);
+    try { window.openGmTab(gmSavedTab(), { noScroll: true }); } catch (e) { console.error(e); }
     if (unsubSession) unsubSession();
     unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
         if (!doc.exists) return;
@@ -1199,6 +1208,8 @@
         if (typeof populateCoopSelects === 'function') populateCoopSelects();
         if (typeof renderMerchantStaleness === 'function') renderMerchantStaleness();
         if (typeof window.renderGmMap === 'function') window.renderGmMap();
+        try { gmRenderInbox(); } catch (e) { console.error(e); }
+        try { renderDungeonPanel(); } catch (e) { console.error(e); }
     }
 
     // ---------- Отряд ----------
@@ -1565,6 +1576,45 @@
     }
     window.gmEnemyDisease = gmEnemyDisease;
 
+    // Поля врага из записи базы enemies-data.js (урон, резисты, заклинания, лут, болезнь, генерация снаряжения драугров/изгоев).
+    // Раньше жило только внутри addEnemy; вынесено, чтобы так же создавать врагов при развёртывании данжа (ТЗ-2, эпик 2.2).
+    function gmEnemyExtraFromDb(pick) {
+        const extra = {};
+        if (!pick) return extra;
+        if (pick.weaponDmg) extra.weaponDmg = pick.weaponDmg;
+        // Рандомайзер оружия — у драугров/подобных несколько вариантов оружия в источнике
+        // (Враги.xlsx), раньше просто брался статичный weaponNote. Один случайный вариант при
+        // каждом добавлении в бой — правдоподобнее, чем всегда одно и то же оружие у всех.
+        if (pick.weaponOptions && pick.weaponOptions.length) {
+            extra.weaponNote = pick.weaponOptions[Math.floor(Math.random() * pick.weaponOptions.length)];
+        } else if (pick.weaponNote) {
+            extra.weaponNote = pick.weaponNote;
+        }
+        if (Object.keys(pick.resist || {}).length) extra.resist = pick.resist;
+        if ((pick.spells || []).length) extra.spells = pick.spells;
+        if ((pick.shouts || []).length) extra.shouts = pick.shouts;
+        if (pick.loot) extra.loot = pick.loot;
+        // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
+        if (window.EnemyGear && window.EnemyGear.familyOf(pick.name)) {
+            const gen = window.EnemyGear.generate(pick, enemyLootCtx(pick.level));
+            if (gen) {
+                extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
+                extra.corpseLoot = { gold: gen.gold, items: gen.lootItems };
+                extra.loot = genLootText(gen);
+            }
+        }
+        // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
+        if (pick.carrierOfDisease) { extra.carrierOfDisease = pick.carrierOfDisease; extra.diseaseChance = pick.diseaseChance || 0; }
+        if (pick.soul) extra.soul = pick.soul; // размер души для захвата душ
+        if (pick.level) extra.level = pick.level; // уровень и тип — для заклинаний «до N уровня»
+        if (pick.kind) extra.kind = pick.kind;
+        // Только гуманоидов можно поднять заклинанием (Воины/Шаманы/Боевые маги — фалмеры
+        // и подобные; звери/монстры/ловушки — нет).
+        if (['Воины', 'Шаманы', 'Боевые маги'].includes(pick.category)) extra.isRaisable = true;
+                return extra;
+    }
+    window.gmEnemyExtraFromDb = gmEnemyExtraFromDb;
+
     window.addEnemy = function () {
         const name = el('enemy-name-input').value.trim();
         if (!name) return;
@@ -1580,38 +1630,7 @@
         if (manualDmg) extra.weaponDmg = manualDmg;
         if (manualResist) extra.resist = { physical: manualResist };
         if (manualLoot) extra.loot = manualLoot;
-        if (currentEnemyDbPick && currentEnemyDbPick.name === name) {
-            if (currentEnemyDbPick.weaponDmg) extra.weaponDmg = currentEnemyDbPick.weaponDmg;
-            // Рандомайзер оружия — у драугров/подобных несколько вариантов оружия в источнике
-            // (Враги.xlsx), раньше просто брался статичный weaponNote. Один случайный вариант при
-            // каждом добавлении в бой — правдоподобнее, чем всегда одно и то же оружие у всех.
-            if (currentEnemyDbPick.weaponOptions && currentEnemyDbPick.weaponOptions.length) {
-                extra.weaponNote = currentEnemyDbPick.weaponOptions[Math.floor(Math.random() * currentEnemyDbPick.weaponOptions.length)];
-            } else if (currentEnemyDbPick.weaponNote) {
-                extra.weaponNote = currentEnemyDbPick.weaponNote;
-            }
-            if (Object.keys(currentEnemyDbPick.resist || {}).length) extra.resist = currentEnemyDbPick.resist;
-            if ((currentEnemyDbPick.spells || []).length) extra.spells = currentEnemyDbPick.spells;
-            if ((currentEnemyDbPick.shouts || []).length) extra.shouts = currentEnemyDbPick.shouts;
-            if (currentEnemyDbPick.loot) extra.loot = currentEnemyDbPick.loot;
-            // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
-            if (window.EnemyGear && window.EnemyGear.familyOf(currentEnemyDbPick.name)) {
-                const gen = window.EnemyGear.generate(currentEnemyDbPick, enemyLootCtx(currentEnemyDbPick.level));
-                if (gen) {
-                    extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
-                    extra.corpseLoot = { gold: gen.gold, items: gen.lootItems };
-                    extra.loot = genLootText(gen);
-                }
-            }
-            // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
-            if (currentEnemyDbPick.carrierOfDisease) { extra.carrierOfDisease = currentEnemyDbPick.carrierOfDisease; extra.diseaseChance = currentEnemyDbPick.diseaseChance || 0; }
-            if (currentEnemyDbPick.soul) extra.soul = currentEnemyDbPick.soul; // размер души для захвата душ
-            if (currentEnemyDbPick.level) extra.level = currentEnemyDbPick.level; // уровень и тип — для заклинаний «до N уровня»
-            if (currentEnemyDbPick.kind) extra.kind = currentEnemyDbPick.kind;
-            // Только гуманоидов можно поднять заклинанием (Воины/Шаманы/Боевые маги — фалмеры
-            // и подобные; звери/монстры/ловушки — нет).
-            if (['Воины', 'Шаманы', 'Боевые маги'].includes(currentEnemyDbPick.category)) extra.isRaisable = true;
-        }
+        if (currentEnemyDbPick && currentEnemyDbPick.name === name) Object.assign(extra, gmEnemyExtraFromDb(currentEnemyDbPick));
         // Снаряжение/добыча по выбору мастера главнее и значений из базы, и автоматического генератора.
         const gearExtra = buildEnemyGearExtra();
         if (gearExtra) {
@@ -6119,6 +6138,8 @@
         const isOpen = body.style.display !== 'none';
         body.style.display = isOpen ? 'none' : 'block';
         if (chev) chev.textContent = isOpen ? '▸' : '▾';
+        // Открыли панель «Шёпот» — входящие считаются прочитанными, бейдж инбокса надо пересчитать сразу.
+        try { gmRenderInbox(); } catch (e) { }
     };
 
 
@@ -6129,35 +6150,71 @@
     function lsGet(key, def) { try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? def : v; } catch (e) { return def; } }
     function lsSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { alert('Не удалось сохранить в браузере: ' + e.message); } }
 
-    // ---- 3.1 пульт: группы панелей по заголовку ----
-    const GM_GROUPS = {
-        prep: ['Подготовка сессии', 'Журнал сессии', 'Молва', 'Сюжет', 'Справочник гильдии', 'Справочник зачарований', 'Все погодные явления'],
-        scene: ['Время суток и погода', 'Карта и положение', 'Живые торговцы', 'Запустить праздник', 'Походный лагерь', 'Шёпот', 'Чат партии', 'Опрос', 'Гильдии', 'Сверхъестественное', 'Репутация', 'Штрафы и тюрьма', 'Выдать квест'],
-        combat: ['Боевая сетка', 'Отряд', 'Противники', 'Разрешить атаку', 'Порядок ходов', 'Боевой журнал', 'Кооперативная атака', 'Активный блок', 'Турниры', 'Шаблоны NPC'],
-        rewards: ['Награда на всю группу', 'Сундук отряда', 'Запросы на крафт', 'Инвентарь и деньги', 'Создать предмет', 'База предметов', 'Открыть рецепты', 'Проверить зелье', 'Проверить зачарование'],
-        randoms: ['Случайное событие', 'Групповой бросок', 'Генератор']
+    // ---- Эпик 1 (ТЗ-2): табы мастера ----
+    // Раньше (эпик 3.1 / TASK-003) кнопки пульта лишь сворачивали панели чужих групп по совпадению заголовка,
+    // и после перехода к нужной панели мастер листал обратно к пульту. Теперь группа панели задана в разметке
+    // (data-gm-tab), панели других групп скрыты целиком, а пульт липкий. Шторки внутри панелей работают как раньше.
+    const GM_TABS = { combat: 'Бой', scene: 'Сцена', rewards: 'Награды', world: 'Мир', refs: 'Справочники' };
+    const GM_TAB_ORDER = ['combat', 'scene', 'rewards', 'world', 'refs'];
+    // Старые группы пульта → новые табы: чтобы после обновления открылась привычная группа, а не всегда «Бой».
+    const GM_TAB_FROM_OLD_GROUP = { combat: 'combat', scene: 'scene', rewards: 'rewards', prep: 'world', randoms: 'world', other: 'world' };
+    let _gmTabsWarned = false;
+    function gmSavedTab() {
+        let t = null;
+        try { t = localStorage.getItem('gmActiveTab'); } catch (e) { }
+        if (GM_TABS[t]) return t;
+        return GM_TAB_FROM_OLD_GROUP[lsGet('skyrim_gm_dash_group', '')] || 'combat';
+    }
+    // Новая панель без data-gm-tab видна во ВСЕХ табах — предупреждаем один раз, чтобы автор её разметил.
+    function gmWarnUntabbedPanels() {
+        if (_gmTabsWarned) return; _gmTabsWarned = true;
+        const loose = Array.from(document.querySelectorAll('#session-block > .panel:not([data-gm-tab])'))
+            .filter(p => p.querySelector(':scope > h2')) // шапка с кодом сессии без заголовка видна всегда — так задумано
+            .map(p => p.querySelector(':scope > h2').textContent.replace(/[▸▾]/g, '').trim());
+        if (loose.length) console.warn('[gm-tabs] Панели без data-gm-tab (видны во всех табах):', loose);
+    }
+    // opts.noScroll — при восстановлении таба после загрузки/входа в сессию не дёргать страницу.
+    window.openGmTab = function (tabName, opts) {
+        if (!GM_TABS[tabName]) tabName = 'combat';
+        document.querySelectorAll('.panel[data-gm-tab]').forEach(p => { p.style.display = p.dataset.gmTab === tabName ? '' : 'none'; });
+        // Обёртки-сетки (.grid-2), в которых не осталось видимых панелей, тоже прячем — иначе пустой отступ между панелями.
+        document.querySelectorAll('#session-block .grid-2').forEach(w => {
+            const tabbed = w.querySelectorAll(':scope > .panel[data-gm-tab]');
+            if (!tabbed.length) return;
+            const any = Array.from(w.children).some(c => !c.matches('.panel[data-gm-tab]') || c.dataset.gmTab === tabName);
+            w.style.display = any ? '' : 'none';
+        });
+        document.querySelectorAll('#gm-dashboard .dash-btn[data-gm-tab]').forEach(b => {
+            const on = b.dataset.gmTab === tabName;
+            b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        try { localStorage.setItem('gmActiveTab', tabName); } catch (e) { }
+        gmWarnUntabbedPanels();
+        if (!(opts && opts.noScroll)) {
+            // Не в самый верх страницы (там заголовок и чеклист), а к началу содержимого сессии — сразу под пультом.
+            const sb = el('session-block'), dash = el('gm-dashboard');
+            if (sb && sb.offsetParent !== null) {
+                const top = sb.getBoundingClientRect().top + window.scrollY - ((dash && dash.offsetHeight) || 0) - 6;
+                if (window.scrollY > top) window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            }
+        }
+        try { gmRenderInbox(); } catch (e) { }
     };
-    function gmApplyGroups() {
-        document.querySelectorAll('.panel[data-sec-id]').forEach(p => {
-            if (p.dataset.group) return;
-            const t = (p.querySelector(':scope > h2') || {}).textContent || '';
-            let g = 'other';
-            Object.keys(GM_GROUPS).some(k => { if (GM_GROUPS[k].some(s => t.indexOf(s) !== -1)) { g = k; return true; } return false; });
-            p.dataset.group = g;
-        });
-    }
-    function gmShowGroup(group) {
-        gmApplyGroups();
-        document.querySelectorAll('.panel[data-sec-id]').forEach(p => {
-            const open = p.dataset.group === group;
-            const body = el(p.dataset.secId + '-body'); const chev = p.querySelector('.section-chevron');
-            if (body) body.style.display = open ? 'block' : 'none';
-            if (chev) chev.textContent = open ? '▾' : '▸';
-        });
-        document.querySelectorAll('#gm-dashboard .dash-btn[data-group]').forEach(b => b.classList.toggle('active', b.dataset.group === group));
-        lsSet('skyrim_gm_dash_group', group);
-    }
+    // Совместимость со старым именем (эпик 3.1 / TASK-003): старые группы переводятся в новые табы.
+    function gmShowGroup(group) { window.openGmTab(GM_TABS[group] ? group : GM_TAB_FROM_OLD_GROUP[group], { noScroll: true }); }
     window.gmShowGroup = gmShowGroup;
+    // Пульт с табами нужен только в сессии: на экране входа/создания табам нечего показывать.
+    function gmSetInSession(on) { document.body.classList.toggle('gm-in-session', !!on); }
+    // Alt+1…Alt+5. Ctrl+цифра браузер забирает себе (переключение вкладок браузера), поэтому Alt.
+    // По e.code, а не e.key: на Mac Alt+1 печатает «¡», и key был бы не цифрой.
+    document.addEventListener('keydown', ev => {
+        if (!ev.altKey || ev.ctrlKey || ev.metaKey || !currentCode) return;
+        const m = /^Digit([1-5])$/.exec(ev.code || ''); if (!m) return;
+        const t = ev.target;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return; // не мешать вводу
+        ev.preventDefault();
+        window.openGmTab(GM_TAB_ORDER[+m[1] - 1]);
+    });
     const GM_CHECKLIST_LABELS = 5;
     function gmChecklistInit() {
         const box = el('gm-first-checklist'); if (!box) return;
@@ -6174,14 +6231,138 @@
         });
     }
     function gmDashboardInit() {
-        document.querySelectorAll('#gm-dashboard .dash-btn[data-group]').forEach(b => { b.onclick = () => gmShowGroup(b.dataset.group); });
+        document.querySelectorAll('#gm-dashboard .dash-btn[data-gm-tab]').forEach(b => { b.onclick = () => window.openGmTab(b.dataset.gmTab); });
         const r = el('gm-checklist-reset');
         if (r) r.onclick = () => { try { localStorage.removeItem('gmFirstSessionDone'); localStorage.removeItem('gmFirstChecklist'); } catch (e) { } gmChecklistInit(); };
         gmChecklistInit();
-        gmApplyGroups();
+        // Таб применяем сразу (панели лежат в скрытом session-block, на экране входа это ничего не ломает) —
+        // тогда при входе в сессию не мелькают на миг все 47 панелей. enterSessionView применит его ещё раз.
+        window.openGmTab(gmSavedTab(), { noScroll: true });
     }
     document.addEventListener('DOMContentLoaded', () => setTimeout(gmDashboardInit, 0));
     if (document.readyState !== 'loading') setTimeout(gmDashboardInit, 0);
+
+    // ---- TASK-005: инбокс мастера ----
+    // Всё, что ждёт решения мастера, раньше было разбросано по разным панелям (заявки — в «Гильдиях», руны — в сетке,
+    // шёпот — в «Сцене»), и заявку можно было не заметить полсессии. Инбокс только СОБИРАЕТ счётчики и ведёт к панели;
+    // сами решения принимаются там же, где и раньше.
+    const GM_INBOX_CRAFT_STALE_MS = 3 * 24 * 3600 * 1000; // «старый» заказ NPC — 3 реальных дня (в заказе нет игровой даты)
+    const GM_INBOX_CRAFT_REFRESH_MS = 5 * 60 * 1000;     // заказы лежат в листах игроков, читаем их не чаще раза в 5 минут
+    let _gmCraftStale = { key: '', fetchedAt: 0, count: 0 };
+    let _gmInboxList = [];
+    const gmArr = v => Array.isArray(v) ? v : [];
+    function gmWhisperSeenKey() { return 'skyrim_gm_whisper_seen_' + currentCode; }
+    // Храним ts последнего ПРОЧИТАННОГО шёпота (а не время открытия панели): ts ставит браузер игрока,
+    // и при расхождении часов сравнение с Date.now() мастера давало бы ложные «новые».
+    function gmWhisperSeenTs() { try { return parseInt(localStorage.getItem(gmWhisperSeenKey())) || 0; } catch (e) { return 0; } }
+    function gmMarkWhispersSeenIfVisible() {
+        const list = el('gm-whispers-list');
+        // offsetParent === null — панель (или одна из внешних) свёрнута; в фоновой вкладке тоже никто не читает.
+        if (!list || list.offsetParent === null || document.hidden) return;
+        // До initGmSectionAccordions (снимок сессии может прийти раньше DOMContentLoaded) все панели ещё развёрнуты —
+        // «видимость» тогда ничего не значит, и весь шёпот ложно считался бы прочитанным.
+        if (!list.closest('.panel[data-sec-id]')) return;
+        const maxTs = gmArr(lastData && lastData.whispers).reduce((m, w) => Math.max(m, w.ts || 0), 0);
+        if (maxTs > gmWhisperSeenTs()) { try { localStorage.setItem(gmWhisperSeenKey(), String(maxTs)); } catch (e) { } }
+    }
+    // Заказы NPC живут в characters/{uid}.craftOrders (мастер их только рассылает), поэтому в документе сессии их не видно.
+    // Возраст берём из id: 'order_' + Date.now() + случайный хвост — первые 13 цифр и есть время отправки.
+    function gmRefreshCraftStale() {
+        if (!currentCode || !lastData) return;
+        const uids = Object.keys(lastData.participants || {}).sort();
+        const key = currentCode + '|' + uids.join(',');
+        const now = Date.now();
+        if (key === _gmCraftStale.key && now - _gmCraftStale.fetchedAt < GM_INBOX_CRAFT_REFRESH_MS) return;
+        _gmCraftStale.key = key; _gmCraftStale.fetchedAt = now;
+        Promise.all(uids.map(u => db.collection('characters').doc(u).get()
+            .then(doc => doc.exists ? gmArr(doc.data().craftOrders) : []).catch(() => [])))
+            .then(lists => {
+                if (_gmCraftStale.key !== key) return; // за время чтения сменилась сессия/состав — результат уже не про то
+                let n = 0;
+                lists.forEach(l => l.forEach(o => {
+                    if (!o || o.status !== 'active') return;
+                    const m = /^order_(\d{13})/.exec(String(o.id || ''));
+                    if (m && now - parseInt(m[1]) > GM_INBOX_CRAFT_STALE_MS) n++;
+                }));
+                if (n !== _gmCraftStale.count) { _gmCraftStale.count = n; gmRenderInbox(); }
+            });
+    }
+    function gmInboxItems() {
+        const d = lastData || {};
+        const items = [];
+        // Цель — id элемента внутри нужной панели, а не таб: таб берётся из data-gm-tab той панели, где элемент лежит,
+        // так что пункт не «потеряется», если панель перенесут в другой таб.
+        const add = (count, label, targetId) => { if (count > 0) items.push({ count, label, action: () => gmJumpToPanel(targetId) }); };
+        add(gmArr(d.questClaims).length, '📜 Заявки на квесты', 'quest-claims');
+        add(gmArr(d.museumRequests).length, '🎼 Заявки в музей', 'museum-requests');
+        const seen = gmWhisperSeenTs();
+        add(gmArr(d.whispers).filter(w => (w.ts || 0) > seen).length, '🤫 Шёпот от игроков', 'gm-whispers-list');
+        add(gmArr(d.pendingRunes).length, '✴ Руны к установке', 'gg-panel');
+        add(gmArr(d.pendingZones).filter(z => z && z.place === 'gm').length, '🔥 Стены/камни к установке', 'gg-panel');
+        add(_gmCraftStale.count, '📋 Старые заказы NPC (3+ дня)', 'craft-order-npc');
+        return items;
+    }
+    window.gmInboxItems = gmInboxItems;
+    function gmJumpToPanel(targetId) {
+        const target = el(targetId); if (!target) return;
+        const panel = target.closest('.panel[data-sec-id]'); if (!panel) return;
+        const tabPanel = target.closest('.panel[data-gm-tab]');
+        if (tabPanel) window.openGmTab(tabPanel.dataset.gmTab, { noScroll: true });
+        // Панель может быть вложена в другую (как «Шёпот») — раскрываем всю цепочку, иначе подсветится невидимое.
+        for (let p = panel; p; p = p.parentElement && p.parentElement.closest('.panel[data-sec-id]')) {
+            const body = el(p.dataset.secId + '-body');
+            if (body && body.style.display === 'none') window.toggleGmSectionById(p.dataset.secId);
+        }
+        gmInboxToggle(false);
+        const dash = el('gm-dashboard');
+        const top = panel.getBoundingClientRect().top + window.scrollY - ((dash && dash.offsetHeight) || 0) - 10; // пульт липкий — не прятать заголовок под ним
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        panel.classList.remove('st-flash'); void panel.offsetWidth; // перезапуск подсветки при повторном клике
+        panel.classList.add('st-flash');
+        setTimeout(() => panel.classList.remove('st-flash'), 1800);
+        gmRenderInbox();
+    }
+    function gmInboxToggle(open) {
+        const menu = el('gm-inbox-menu'); if (!menu) return;
+        menu.hidden = open === undefined ? !menu.hidden : !open;
+        if (!menu.hidden) {
+            gmRenderInboxMenu();
+            // Пульт теперь с overflow-x (на телефоне листается вбок) и обрезал бы список — ставим его fixed под кнопкой.
+            const r = el('gm-inbox-btn').getBoundingClientRect();
+            menu.style.top = Math.round(r.bottom + 4) + 'px';
+            menu.style.left = Math.round(Math.max(4, Math.min(r.left, window.innerWidth - menu.offsetWidth - 4))) + 'px';
+        }
+    }
+    window.gmInboxToggle = gmInboxToggle;
+    window.gmInboxPick = function (i) { const it = _gmInboxList[i]; if (it) it.action(); };
+    function gmRenderInboxMenu() {
+        const menu = el('gm-inbox-menu'); if (!menu) return;
+        menu.innerHTML = _gmInboxList.map((it, i) =>
+            `<button type="button" class="st-inbox-item" onclick="gmInboxPick(${i})"><span>${escapeHtml(it.label)}</span><b>${it.count}</b></button>`).join('');
+    }
+    function gmRenderInbox() {
+        const btn = el('gm-inbox-btn'), menu = el('gm-inbox-menu');
+        if (!btn || !menu) return;
+        if (!currentCode || !lastData) { btn.style.display = 'none'; menu.hidden = true; return; }
+        gmMarkWhispersSeenIfVisible();
+        gmRefreshCraftStale();
+        _gmInboxList = gmInboxItems();
+        const n = _gmInboxList.reduce((s, it) => s + it.count, 0);
+        btn.style.display = n > 0 ? '' : 'none';
+        el('gm-inbox-count').textContent = n;
+        if (!n) menu.hidden = true;
+        else if (!menu.hidden) gmRenderInboxMenu();
+    }
+    window.gmRenderInbox = gmRenderInbox;
+    // Клик мимо — закрыть список (как обычный выпадающий список).
+    document.addEventListener('click', ev => {
+        const menu = el('gm-inbox-menu');
+        if (menu && !menu.hidden && !ev.target.closest('.st-inbox-wrap')) menu.hidden = true;
+    });
+    // Список стоит position:fixed под кнопкой — при прокрутке он «отъехал» бы от неё, проще закрыть.
+    window.addEventListener('scroll', () => { const menu = el('gm-inbox-menu'); if (menu && !menu.hidden) menu.hidden = true; }, { passive: true });
+    // Вернулись во вкладку с открытым «Шёпотом» — отметить прочитанным, пока мастер смотрит на него.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { gmRenderInbox(); } catch (e) { } } });
 
     // ---- 3.2 мини-сетка врагов ----
     function renderEnemyGrid(enemies) {
@@ -6406,6 +6587,319 @@
     function gmEpic3Init() { renderEncounterSelect(); renderNpcTemplateSelect(); renderPlot(); renderGmTimers(); }
     document.addEventListener('DOMContentLoaded', gmEpic3Init);
     if (document.readyState !== 'loading') gmEpic3Init();
+
+    // ========================================================================
+    // ТЗ-2, ЭПИК 2: ПРЕСЕТЫ ДАНЖЕЙ
+    // Пресеты мастера — Firestore gmPresets/{uid} { dungeons:[…], hiddenAuto:[id…] }: переживают смену устройства
+    // (в localStorage им нельзя, см. ТЗ). Черновики — window.dungeonPresetsAuto (dungeon-presets-data.js, собирается
+    // tools/build-dungeon-presets.js); в облако черновики не копируются (их ~800 КБ при лимите документа 1 МБ),
+    // туда попадает только то, что мастер сохранил. Сохранённый пресет с тем же id заменяет черновик.
+    // В сессии — sessions/{code}.currentDungeon: КОПИЯ лута с полными данными предметов (игроку не нужна база
+    // мастера, чтобы положить вещь в инвентарь), lootTaken — id уже обысканных контейнеров.
+    // ========================================================================
+    let _gmDungeons = [];          // сохранённые мастером
+    let _gmDungeonHiddenAuto = []; // черновики, которые мастер удалил
+    let _gmDungeonsLoaded = false;
+    let _dgnEditing = null;        // пресет в редакторе (рабочая копия)
+    const dgnArr = v => Array.isArray(v) ? v : [];
+    function gmPresetsRef() { return currentUser && db ? db.collection('gmPresets').doc(currentUser.uid) : null; }
+    function gmLoadDungeons() {
+        const ref = gmPresetsRef(); if (!ref) return Promise.resolve();
+        return ref.get().then(doc => {
+            const d = doc.exists ? (doc.data() || {}) : {};
+            _gmDungeons = dgnArr(d.dungeons); _gmDungeonHiddenAuto = dgnArr(d.hiddenAuto); _gmDungeonsLoaded = true;
+            renderDungeonPresetSelect(); renderDungeonPanel();
+        }).catch(e => {
+            console.error('Пресеты данжей не загрузились:', e);
+            const box = el('dungeon-current-status');
+            if (box) box.innerHTML = '<span style="color:#e74c3c;">Не удалось загрузить сохранённые пресеты: ' + escapeHtml(e.message) +
+                (/permission/i.test(e.message) ? ' — в правилах Firestore нет блока gmPresets (см. firestore.rules).' : '') + '</span>';
+        });
+    }
+    // Перезаписываем документ целиком (ТЗ: «проще, чем diff»): пресетов у мастера десятки, не тысячи.
+    function gmSaveDungeons() {
+        const ref = gmPresetsRef(); if (!ref) return Promise.reject(new Error('Не авторизован.'));
+        return ref.set(stripUndefinedDeep({ dungeons: _gmDungeons, hiddenAuto: _gmDungeonHiddenAuto, updatedAt: Date.now() }));
+    }
+    function gmAllDungeons() {
+        const savedIds = new Set(_gmDungeons.map(d => d.id));
+        const hidden = new Set(_gmDungeonHiddenAuto);
+        const drafts = dgnArr(window.dungeonPresetsAuto).filter(d => !savedIds.has(d.id) && !hidden.has(d.id));
+        return _gmDungeons.concat(drafts);
+    }
+    function gmFindDungeon(id) { return gmAllDungeons().find(d => d.id === id) || null; }
+    const dgnClone = o => JSON.parse(JSON.stringify(o));
+
+    window.renderDungeonPresetSelect = function () {
+        const sel = el('dungeon-preset-select'), hf = el('dungeon-hold-filter'); if (!sel || !hf) return;
+        const all = gmAllDungeons();
+        const holds = [...new Set(all.map(d => d.hold).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+        if (hf.options.length !== holds.length + 1) {
+            const cur = hf.value;
+            hf.innerHTML = '<option value="">Все владения</option>' + holds.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+            hf.value = holds.includes(cur) ? cur : '';
+        }
+        const hold = hf.value;
+        const prev = sel.value;
+        const mine = _gmDungeons.filter(d => !hold || d.hold === hold);
+        const drafts = all.filter(d => d.autoGenerated && (!hold || d.hold === hold));
+        const opt = d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name || '(без названия)')}${d.autoGenerated ? ' (черновик)' : ''}${d.level ? ' · ур. ' + d.level : ''}</option>`;
+        let html = '<option value="">— выбери пресет —</option>';
+        if (mine.length) html += '<optgroup label="Мои пресеты">' + mine.map(opt).join('') + '</optgroup>';
+        // черновики по владениям — 300+ строк в одном списке не найти
+        const byHold = {}; drafts.forEach(d => { (byHold[d.hold || '—'] = byHold[d.hold || '—'] || []).push(d); });
+        Object.keys(byHold).sort((a, b) => a.localeCompare(b, 'ru')).forEach(h => {
+            html += `<optgroup label="Черновики: ${escapeHtml(h)}">` + byHold[h].sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(opt).join('') + '</optgroup>';
+        });
+        sel.innerHTML = html;
+        if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+    };
+
+    window.onDungeonPresetPicked = function () {
+        const id = el('dungeon-preset-select').value;
+        const p = id ? gmFindDungeon(id) : null;
+        _dgnEditing = p ? dgnClone(p) : null;
+        renderDungeonEditor();
+        renderDungeonPanel();
+    };
+
+    // Предпросмотр выбранного пресета: что развернётся в сессии.
+    function renderDungeonPreview() {
+        const box = el('dungeon-preview'); if (!box) return;
+        const p = _dgnEditing;
+        if (!p) { box.innerHTML = ''; return; }
+        const en = dgnArr(p.enemies).map(e => escapeHtml(e.name) + (e.count > 1 ? ' ×' + e.count : '') + (e.base ? ` <span style="opacity:.6;" title="${escapeHtml(e.note || '')}">(статы: ${escapeHtml(e.base)})</span>` : '')).join(', ');
+        const lt = dgnArr(p.loot).map(c => `<div>• <strong>${escapeHtml(c.label || 'Контейнер')}</strong>: ${c.gold ? c.gold + ' зол.' + (dgnArr(c.items).length ? ', ' : '') : ''}${dgnArr(c.items).map(i => escapeHtml(i.name) + ((i.qty || 1) > 1 ? ' ×' + i.qty : '')).join(', ') || (c.gold ? '' : '<span style="opacity:.6;">пусто</span>')}</div>`).join('');
+        box.innerHTML = `<div style="border-left:3px solid var(--accent-color, #c8a566); padding-left:8px;">
+            <div><strong>${escapeHtml(p.name || '(без названия)')}</strong>${p.hold ? ' · ' + escapeHtml(p.hold) : ''}${p.level ? ' · мин. ур. ' + p.level : ''}${p.autoGenerated ? ' <span style="color:#e67e22;">— черновик, проверь перед игрой</span>' : ''}</div>
+            <div style="margin-top:4px;">⚔ ${en || '<span style="opacity:.6;">врагов нет</span>'}</div>
+            <div style="margin-top:4px;">${lt || '<span style="opacity:.6;">контейнеров нет</span>'}</div></div>`;
+    }
+
+    function renderDungeonEditor() {
+        const det = el('dungeon-editor'); if (!det) return;
+        const p = _dgnEditing;
+        renderDungeonPreview();
+        if (!p) { det.style.display = 'none'; return; }
+        det.style.display = 'block';
+        el('dgn-name').value = p.name || '';
+        const hs = el('dgn-hold');
+        const holds = Object.keys(window.holdsData || {});
+        hs.innerHTML = '<option value="">—</option>' + holds.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        hs.value = holds.includes(p.hold) ? p.hold : '';
+        el('dgn-notes').value = p.notes || '';
+        const dl = el('dgn-enemy-datalist');
+        if (dl && !dl.options.length) dl.innerHTML = (window.enemiesData || []).map(e => `<option value="${escapeHtml(e.name)}"></option>`).join('');
+        el('dgn-enemies-list').innerHTML = dgnArr(p.enemies).map((e, i) => `<div class="dgn-enemy-row" data-idx="${i}" style="display:flex; gap:4px; margin-top:4px;">
+            <input type="text" class="dgn-en-name" list="dgn-enemy-datalist" value="${escapeHtml(e.name || '')}" placeholder="Имя врага" style="flex:2;">
+            <input type="number" class="dgn-en-count" value="${parseInt(e.count) || 1}" min="1" max="30" style="width:64px;">
+            <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="removeDungeonRow('enemies', ${i})">✕</button></div>`).join('');
+        el('dgn-loot-list').innerHTML = dgnArr(p.loot).map((c, i) => `<div class="dgn-loot-row" data-idx="${i}" style="border:1px solid var(--border-color); border-radius:4px; padding:6px; margin-top:6px;">
+            <div style="display:flex; gap:4px;"><input type="text" class="dgn-c-label" value="${escapeHtml(c.label || '')}" placeholder="Сундук у входа" style="flex:2;">
+            <input type="number" class="dgn-c-gold" value="${parseInt(c.gold) || 0}" min="0" style="width:80px;" title="Золото">
+            <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="removeDungeonRow('loot', ${i})">✕</button></div>
+            <textarea class="dgn-c-items" rows="${Math.min(8, Math.max(2, dgnArr(c.items).length))}" style="margin-top:4px;" placeholder="Железный меч × 1">${escapeHtml(dgnArr(c.items).map(it => it.name + ((it.qty || 1) > 1 ? ' × ' + it.qty : '')).join('\n'))}</textarea></div>`).join('');
+        el('dgn-editor-msg').innerHTML = '';
+    }
+
+    // Читает редактор обратно в объект. Предметы-«снимки» (зачарованные «Меч [Огонь]», которых нет в базе под этим
+    // именем) сохраняются как были — по имени строки находим прежний снимок в этом же контейнере.
+    function collectDungeonEditor() {
+        const p = _dgnEditing; if (!p) return null;
+        p.name = (el('dgn-name').value || '').trim();
+        p.hold = el('dgn-hold').value || '';
+        p.notes = el('dgn-notes').value || '';
+        const oldEnemies = dgnArr(p.enemies);
+        p.enemies = Array.from(document.querySelectorAll('#dgn-enemies-list .dgn-enemy-row')).map(r => {
+            const name = (r.querySelector('.dgn-en-name').value || '').trim();
+            if (!name) return null;
+            const prev = oldEnemies[+r.dataset.idx] || {};
+            const e = { name, count: Math.max(1, Math.min(30, parseInt(r.querySelector('.dgn-en-count').value) || 1)) };
+            // шаблон статов (base) остаётся, только если имя не меняли — иначе берётся враг базы с новым именем
+            if (prev.base && prev.name === name) { e.base = prev.base; if (prev.note) e.note = prev.note; }
+            return e;
+        }).filter(Boolean);
+        const oldLoot = dgnArr(p.loot);
+        const unknown = [];
+        p.loot = Array.from(document.querySelectorAll('#dgn-loot-list .dgn-loot-row')).map((r, k) => {
+            const prev = oldLoot[+r.dataset.idx] || {};
+            const prevItems = dgnArr(prev.items);
+            const items = (r.querySelector('.dgn-c-items').value || '').split('\n').map(line => {
+                const m = /^\s*(.+?)(?:\s*[×xх*]\s*(\d+))?\s*$/i.exec(line); if (!m || !m[1].trim()) return null;
+                const name = m[1].trim(), qty = Math.max(1, parseInt(m[2]) || 1);
+                const snapPrev = prevItems.find(i => i.name === name && i.price !== undefined);
+                const it = snapPrev ? Object.assign({}, snapPrev) : { name };
+                if (qty > 1) it.qty = qty; else delete it.qty;
+                if (!snapPrev && name !== 'Отмычка' && !gmFindItemByName(name)) unknown.push(name);
+                return it;
+            }).filter(Boolean);
+            return { id: prev.id || ('c' + Date.now().toString(36) + k), label: (r.querySelector('.dgn-c-label').value || '').trim() || 'Контейнер', gold: Math.max(0, parseInt(r.querySelector('.dgn-c-gold').value) || 0), items };
+        });
+        // id контейнеров внутри пресета должны быть уникальны — по ним игрок обыскивает
+        const seen = new Set(); p.loot.forEach((c, i) => { while (seen.has(c.id)) c.id = c.id + '_' + i; seen.add(c.id); });
+        return { preset: p, unknown };
+    }
+
+    window.removeDungeonRow = function (kind, idx) {
+        const r = collectDungeonEditor(); if (!r) return;
+        r.preset[kind].splice(idx, 1);
+        renderDungeonEditor(); el('dungeon-editor').open = true;
+    };
+    window.addDungeonEnemy = function () {
+        const r = collectDungeonEditor(); if (!r) return;
+        r.preset.enemies.push({ name: '', count: 1 });
+        renderDungeonEditor(); el('dungeon-editor').open = true;
+    };
+    window.addDungeonContainer = function () {
+        const r = collectDungeonEditor(); if (!r) return;
+        r.preset.loot.push({ id: 'c' + Date.now().toString(36), label: '', gold: 0, items: [] });
+        renderDungeonEditor(); el('dungeon-editor').open = true;
+    };
+    window.createNewDungeonPreset = function () {
+        el('dungeon-preset-select').value = '';
+        _dgnEditing = { id: null, name: '', hold: (lastData && ((lastData.partyPos && lastData.partyPos.hold) || lastData.currentHold)) || '', notes: '', enemies: [], loot: [] };
+        renderDungeonEditor(); el('dungeon-editor').open = true; el('dgn-name').focus();
+    };
+    window.saveDungeonPreset = function () {
+        const r = collectDungeonEditor(); if (!r) return;
+        const p = r.preset;
+        if (!p.name) { el('dgn-editor-msg').innerHTML = '<span style="color:#e74c3c;">Укажи название.</span>'; return; }
+        if (!p.id) p.id = 'dgn-' + Date.now();
+        // Сохранённый черновик становится обычным пресетом мастера (тот же id — черновик в списке больше не показывается).
+        delete p.autoGenerated;
+        p.updatedAt = Date.now(); if (!p.createdAt) p.createdAt = p.updatedAt;
+        const i = _gmDungeons.findIndex(d => d.id === p.id);
+        if (i === -1) _gmDungeons.push(dgnClone(p)); else _gmDungeons[i] = dgnClone(p);
+        gmSaveDungeons().then(() => {
+            renderDungeonPresetSelect(); el('dungeon-preset-select').value = p.id;
+            renderDungeonPreview();
+            el('dgn-editor-msg').innerHTML = '<span style="color:#2ecc71;">💾 Сохранено.</span>' +
+                (r.unknown.length ? `<br><span style="color:#e67e22;">Нет в базе предметов (выдадутся как есть, без цены и свойств): ${r.unknown.map(escapeHtml).join(', ')}</span>` : '');
+        }).catch(e => { el('dgn-editor-msg').innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });
+    };
+    window.deleteDungeonPreset = function () {
+        const p = _dgnEditing; if (!p || !p.id) { _dgnEditing = null; renderDungeonEditor(); return; }
+        if (!confirm('Удалить пресет «' + (p.name || '?') + '»?')) return;
+        _gmDungeons = _gmDungeons.filter(d => d.id !== p.id);
+        // удалённый черновик (или сохранённая версия черновика) не должен снова всплыть из dungeon-presets-data.js
+        if (String(p.id).indexOf('auto-') === 0 && !_gmDungeonHiddenAuto.includes(p.id)) _gmDungeonHiddenAuto.push(p.id);
+        gmSaveDungeons().then(() => { _dgnEditing = null; renderDungeonPresetSelect(); el('dungeon-preset-select').value = ''; renderDungeonEditor(); renderDungeonPanel(); })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Предмет пресета → полный снимок для сессии (как лут сундука/трупа: имя, цена, вес, категория, слот, броня/урон, эффекты).
+    function dgnResolveItem(it) {
+        if (it.price !== undefined) return Object.assign({}, it, { qty: it.qty || 1 }); // уже снимок (зачарованная вещь)
+        if (it.name === 'Отмычка') return { name: 'Отмычка', category: 'Инструменты', price: 5, weight: 0.1, qty: it.qty || 1 };
+        const db0 = gmFindItemByName(it.name);
+        if (!db0) return { name: it.name, category: 'Добыча', price: 0, weight: 0.5, qty: it.qty || 1 };
+        const loot = window.EnemyLoot ? window.EnemyLoot.toLoot(db0, it.qty || 1) : { name: db0.name, price: db0.price || 0, weight: db0.weight || 0, category: db0.category || '' };
+        loot.qty = it.qty || 1;
+        return loot;
+    }
+    // Враг пресета → объект врага сессии (тот же набор полей, что addEnemy при выборе из базы).
+    function dgnBuildEnemies(list) {
+        const out = [];
+        dgnArr(list).forEach(e => {
+            const tpl = (window.enemiesData || []).find(x => x.name === (e.base || e.name)) || null;
+            const n = Math.max(1, Math.min(30, parseInt(e.count) || 1));
+            for (let k = 0; k < n; k++) {
+                const maxHp = tpl ? (parseInt(tpl.hp) || 10) : 50;
+                const maxMp = tpl && tpl.spells && tpl.spells.length ? Math.max(...tpl.spells.map(s => s.cost || 0)) * 3 : 0;
+                const extra = tpl ? gmEnemyExtraFromDb(tpl) : {};
+                if (e.note) extra.weaponNote = [extra.weaponNote, e.note].filter(Boolean).join(' · ');
+                if (!tpl) extra.weaponNote = [extra.weaponNote, 'нет в базе — статы задай вручную'].filter(Boolean).join(' · ');
+                out.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name: n > 1 ? e.name + ' ' + (k + 1) : e.name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
+            }
+        });
+        return out;
+    }
+
+    window.deployDungeonToSession = function () {
+        if (!currentCode || !lastData) { alert('Сначала войди в сессию.'); return; }
+        const r = collectDungeonEditor();
+        if (!r || !r.preset) { alert('Выбери пресет или создай новый.'); return; }
+        const p = r.preset;
+        if (!p.name) { alert('У пресета нет названия.'); return; }
+        const cur = lastData.currentDungeon;
+        if (cur && !confirm('Заменить текущий данж «' + (cur.name || '?') + '»?\nВраги прошлого данжа останутся в бою — убери их сам, если нужно.')) return;
+        const newEnemies = dgnBuildEnemies(p.enemies);
+        const items = dgnArr(p.loot).map(c => ({ id: c.id, label: c.label || 'Контейнер', gold: parseInt(c.gold) || 0, items: dgnArr(c.items).map(dgnResolveItem) }));
+        const dungeon = { presetId: p.id || null, name: p.name, hold: p.hold || '', openedAt: Date.now(), lootTaken: [], items };
+        const prev = dgnArr(lastData.enemies);
+        window._gmUndo = { ts: Date.now(), sessionCode: currentCode, enemies: JSON.parse(JSON.stringify(prev)) }; // «↶ Отменить» в журнале вернёт врагов как до развёртывания
+        if (typeof gmUndoRefresh === 'function') gmUndoRefresh();
+        // Одной записью: враги, данж и строка в журнале появляются у игроков одновременно.
+        db.collection('sessions').doc(currentCode).update(stripUndefinedDeep({
+            enemies: prev.concat(newEnemies),
+            currentDungeon: dungeon,
+            combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🏰 Мастер разворачивает данж: «${p.name}». Врагов: ${newEnemies.length}. Контейнеров: ${items.length}.` })
+        })).then(() => { el('dgn-editor-msg').innerHTML = '<span style="color:#2ecc71;">🚀 Развёрнуто в сессии.</span>'; })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.closeDungeonSession = function () {
+        if (!currentCode || !lastData || !lastData.currentDungeon) { alert('В сессии нет открытого данжа.'); return; }
+        const d = lastData.currentDungeon;
+        if (!confirm('Закрыть данж «' + (d.name || '?') + '»? У игроков пропадёт панель «Вы в: …» и необысканные контейнеры.')) return;
+        db.collection('sessions').doc(currentCode).update({
+            currentDungeon: null,
+            combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🏰 Мастер завершает данж: «${d.name || '?'}».` })
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Мастер отдаёт контейнер конкретному игроку. Пишем НЕ в лист игрока (его автосохранение затёрло бы вещи), а
+    // командой в очередь pendingStatusEffects — игрок кладёт добычу себе сам, как заказы NPC. Транзакция: контейнер
+    // помечается обысканным в той же записи, поэтому параллельный обыск игроком не даст лут дважды.
+    window.gmGiveDungeonContainer = function (containerId) {
+        const sel = el('dgn-give-' + containerId);
+        const uid = sel ? sel.value : '';
+        if (!currentCode || !uid) { alert('Выбери игрока.'); return; }
+        const ref = db.collection('sessions').doc(currentCode);
+        let label = '', pname = '';
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            if (!doc.exists) throw new Error('Сессия не найдена.');
+            const d = doc.data() || {};
+            const dg = d.currentDungeon;
+            if (!dg) throw new Error('Нет активного данжа.');
+            const taken = dgnArr(dg.lootTaken);
+            if (taken.includes(containerId)) throw new Error('Этот контейнер уже обыскан.');
+            const c = dgnArr(dg.items).find(x => x.id === containerId);
+            if (!c) throw new Error('Контейнер не найден.');
+            if (!(d.participants || {})[uid]) throw new Error('Игрок не в сессии.');
+            label = c.label || 'контейнер'; pname = (d.participants[uid] || {}).name || 'Игрок';
+            const cmd = { id: 'dl-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), cmd: 'dungeonLoot', fromGm: true, ts: Date.now(),
+                dungeon: dg.name || '', containerId, label, gold: parseInt(c.gold) || 0, items: dgnArr(c.items) };
+            const patch = { 'currentDungeon.lootTaken': taken.concat([containerId]) };
+            patch['participants.' + uid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(stripUndefinedDeep(cmd));
+            patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🔍 Мастер отдаёт «${label}» игроку ${pname}: ${[c.gold ? c.gold + ' зол.' : ''].concat(dgnArr(c.items).map(i => i.name + ((i.qty || 1) > 1 ? ' ×' + i.qty : ''))).filter(Boolean).join(', ') || 'пусто'}.` });
+            tx.update(ref, patch);
+        })).catch(e => alert(e.message));
+    };
+
+    // Статус данжа в сессии + список необысканных контейнеров с выдачей игроку. Зовётся из renderAll.
+    function renderDungeonPanel() {
+        const box = el('dungeon-current-status'); if (!box) return;
+        if (currentUser && !_gmDungeonsLoaded && !gmRenderDungeonLoadStarted) { gmRenderDungeonLoadStarted = true; gmLoadDungeons(); }
+        if (el('dungeon-preset-select') && !el('dungeon-preset-select').options.length) renderDungeonPresetSelect();
+        const d = lastData && lastData.currentDungeon;
+        if (!d) { box.innerHTML = '<span style="opacity:.7;">В сессии данж не развёрнут.</span>'; return; }
+        const taken = dgnArr(d.lootTaken), all = dgnArr(d.items);
+        const left = all.filter(c => !taken.includes(c.id));
+        const parts = lastData.participants || {};
+        // панель перерисовывается на каждый снимок сессии — не сбрасываем игрока, которого мастер уже выбрал
+        const chosen = {}; box.querySelectorAll('select[id^="dgn-give-"]').forEach(s => { chosen[s.id] = s.value; });
+        const opts = Object.keys(parts).map(u => `<option value="${u}">${escapeHtml((parts[u] || {}).name || '?')}</option>`).join('');
+        box.innerHTML = `<div style="background:rgba(0,0,0,.2); border:1px solid var(--accent-color, #c8a566); border-radius:4px; padding:6px 8px;">
+            🏰 В сессии открыт: <strong>${escapeHtml(d.name || '?')}</strong>. Обыскано: ${taken.length}/${all.length} контейнеров.
+            ${left.map(c => `<div style="display:flex; gap:4px; align-items:center; margin-top:4px; flex-wrap:wrap;">
+                <span style="flex:1 1 180px;">🔍 ${escapeHtml(c.label || 'Контейнер')} <span style="opacity:.6;">(${[c.gold ? c.gold + ' зол.' : ''].concat(dgnArr(c.items).map(i => i.name + ((i.qty || 1) > 1 ? ' ×' + i.qty : ''))).filter(Boolean).map(escapeHtml).join(', ') || 'пусто'})</span></span>
+                ${opts ? `<select id="dgn-give-${escapeHtml(c.id)}" style="width:auto;">${opts}</select><button style="width:auto; padding:2px 8px;" onclick="gmGiveDungeonContainer('${jsq(c.id)}')">Выдать</button>` : ''}
+            </div>`).join('') || '<div style="opacity:.7; margin-top:4px;">Всё обыскано.</div>'}</div>`;
+        Object.keys(chosen).forEach(id => { const s = el(id); if (s && parts[chosen[id]]) s.value = chosen[id]; });
+    }
+    let gmRenderDungeonLoadStarted = false;
+    window.renderDungeonPanel = renderDungeonPanel;
 
     document.addEventListener('DOMContentLoaded', initGmSectionAccordions);
     if (document.readyState !== 'loading') initGmSectionAccordions();

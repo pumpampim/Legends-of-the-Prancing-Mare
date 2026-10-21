@@ -128,7 +128,7 @@
                 { name: "Мощный выстрел", steps: 1, desc: "С каждым 3 выстрелом противник (кроме самых крупных) получает -1 к кубам на следующее его действие", req: { skill: "Стрельба", thresholds: [50], prereq: [["Орлиный взор"]] } },
                 { name: "Бережливый охотник", steps: 1, desc: "Из мёртвых тел можно вытащить в два раза больше стрел.", req: { skill: "Стрельба", thresholds: [50], prereq: [["Критический выстрел"]] } },
                 { name: "Егерь", steps: 1, desc: "Более быстрое перемещение с натянутой тетивой.(скорость становится обычной)", req: { skill: "Стрельба", thresholds: [60], prereq: [["Бережливый охотник"]] } },
-                { name: "Быстрая стрельба", steps: 1, desc: "Стрельба 70 Мощный выстрел", req: null }
+                { name: "Быстрая стрельба", steps: 1, desc: "Тетива натягивается на 30% быстрее.", req: { skill: "Стрельба", thresholds: [70], prereq: [["Мощный выстрел"]] } }
             ],
             "Блокирование": [
                 { name: "Щитоносец", steps: 5, desc: "Блокирование эффективнее на 20/25/30/35/40% от базового значения брони щита", req: { skill: "Блокирование", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
@@ -142,35 +142,35 @@
             ],
             "Тяжелая броня": [
                 { name: "Джаггернаут", steps: 5, desc: "Базовое значение тяжелой брони увеличивается на 20/40/60/80/100%", req: { skill: "Тяжелая броня", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
-                { name: "Стальные кулаки", steps: 1, desc: "При бое без оружия тяжёлые перчатки наносят дополнительный урон, равный их классу брони", req: { skill: "Тяжёлая броня", thresholds: [30], prereq: [["Джаггернаут"]] } },
-                { name: "Хорошая экипировка", steps: 1, desc: "Класс брони увеличивается на 25 % при ношении полного комплекта тяжёлых доспехов: шлем, кираса, перчатки, сапоги.", req: { skill: "Тяжёлая броня", thresholds: [30], prereq: [["Джаггернаут"]] } },
-                { name: "Мягкая подбивка", steps: 1, desc: "Вы получаете половину урона от падения, если носите полный комплект тяжёлых доспехов: шлем, кираса, перчатки, сапоги.", req: { skill: "Тяжёлая броня", thresholds: [50], prereq: [["Стальные кулаки"]] } },
-                { name: "Центр тяжести", steps: 1, desc: "При ношении только тяжёлой брони вы теряете равновесие на 50 % реже.", req: { skill: "Тяжёлая броня", thresholds: [50], prereq: [["Хорошая экипировка"]] } },
-                { name: "Упорная тренировка", steps: 1, desc: "Надетая тяжёлая броня ничего не весит и не замедляет ваши движения.", req: { skill: "Тяжёлая броня", thresholds: [70], prereq: [["Мягкая подбивка"]] } },
-                { name: "Полный комплект", steps: 1, desc: "Дополнительный бонус 25% к классу брони при ношении полного комплекта однотипной тяжёлой брони.", req: { skill: "Тяжёлая броня", thresholds: [100], prereq: [["Центр тяжести"]] } },
-                { name: "Боевой маг", steps: 1, desc: "Штраф в цене заклинаний во время ношения брони убирается", req: { skill: "Тяжёлая броня", thresholds: [40], prereq: [] } }
+                { name: "Стальные кулаки", steps: 1, desc: "При бое без оружия тяжёлые перчатки наносят дополнительный урон, равный их классу брони", req: { skill: "Тяжелая броня", thresholds: [30], prereq: [["Джаггернаут"]] } },
+                { name: "Хорошая экипировка", steps: 1, desc: "Класс брони увеличивается на 25 % при ношении полного комплекта тяжёлых доспехов: шлем, кираса, перчатки, сапоги.", req: { skill: "Тяжелая броня", thresholds: [30], prereq: [["Джаггернаут"]] } },
+                { name: "Мягкая подбивка", steps: 1, desc: "Вы получаете половину урона от падения, если носите полный комплект тяжёлых доспехов: шлем, кираса, перчатки, сапоги.", req: { skill: "Тяжелая броня", thresholds: [50], prereq: [["Стальные кулаки"]] } },
+                { name: "Центр тяжести", steps: 1, desc: "При ношении только тяжёлой брони вы теряете равновесие на 50 % реже.", req: { skill: "Тяжелая броня", thresholds: [50], prereq: [["Хорошая экипировка"]] } },
+                { name: "Упорная тренировка", steps: 1, desc: "Надетая тяжёлая броня ничего не весит и не замедляет ваши движения.", req: { skill: "Тяжелая броня", thresholds: [70], prereq: [["Мягкая подбивка"]] } },
+                { name: "Полный комплект", steps: 1, desc: "Дополнительный бонус 25% к классу брони при ношении полного комплекта однотипной тяжёлой брони.", req: { skill: "Тяжелая броня", thresholds: [100], prereq: [["Центр тяжести"]] } },
+                { name: "Боевой маг", steps: 1, desc: "Штраф в цене заклинаний во время ношения брони убирается", req: { skill: "Тяжелая броня", thresholds: [40], prereq: [] } }
             ],
             "Легкая броня": [
                 { name: "Ловкость в обороне", steps: 5, desc: "Класс легкой брони увеличивается на 20% за каждый уровень (100% макс)", req: { skill: "Легкая броня", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
-                { name: "Подгонка по фигуре", steps: 1, desc: "Класс брони увеличивается на 25% при ношении полного комплекта лёгких доспехов.", req: { skill: "Лёгкая броня", thresholds: [30], prereq: [["Ловкость в обороне"]] } },
-                { name: "Вторая кожа", steps: 1, desc: "Надетая лёгкая броня ничего не весит и не замедляет Ваши движения.", req: { skill: "Лёгкая броня", thresholds: [50], prereq: [["Подгонка по фигуре"]] } },
-                { name: "Крылья ветра", steps: 1, desc: "При ношении полного комплекта лёгких доспехов скорость увеличивается на 5 футов", req: { skill: "Лёгкая броня", thresholds: [60], prereq: [["Вторая кожа"]] } },
-                { name: "Полный комплект", steps: 1, desc: "Дополнительный бонус 25% к классу брони при ношении полного комплекта однотипной лёгкой брони.", req: { skill: "Тяжёлая броня", thresholds: [100], prereq: [["Центр тяжести"]] } },
-                { name: "Чувство маны", steps: 1, desc: "Убирает штраф в цене заклинаний за ношение брони", req: { skill: "Лёгкая броня", thresholds: [40], prereq: [] } }
+                { name: "Подгонка по фигуре", steps: 1, desc: "Класс брони увеличивается на 25% при ношении полного комплекта лёгких доспехов.", req: { skill: "Легкая броня", thresholds: [30], prereq: [["Ловкость в обороне"]] } },
+                { name: "Вторая кожа", steps: 1, desc: "Надетая лёгкая броня ничего не весит и не замедляет Ваши движения.", req: { skill: "Легкая броня", thresholds: [50], prereq: [["Подгонка по фигуре"]] } },
+                { name: "Крылья ветра", steps: 1, desc: "При ношении полного комплекта лёгких доспехов скорость увеличивается на 5 футов", req: { skill: "Легкая броня", thresholds: [60], prereq: [["Вторая кожа"]] } },
+                { name: "Полный комплект", steps: 1, desc: "Дополнительный бонус 25% к классу брони при ношении полного комплекта однотипной лёгкой брони.", req: { skill: "Легкая броня", thresholds: [100], prereq: [["Подгонка по фигуре"]] } },
+                { name: "Чувство маны", steps: 1, desc: "Убирает штраф в цене заклинаний за ношение брони", req: { skill: "Легкая броня", thresholds: [40], prereq: [] } }
             ],
             "Скрытность": [
                 { name: "Скрытность", steps: 5, desc: "Вас сложнее обнаружить (+1 к кубам за каждый уровень навыка макс +5)", req: { skill: "Скрытность", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
                 { name: "Приглушённые шаги", steps: 1, desc: "Броня издает меньше шума. Враги не слышат ваших шагов.", req: { skill: "Скрытность", thresholds: [30], prereq: [["Скрытность"]] } },
                 { name: "Удар в спину", steps: 1, desc: "Скрытные атаки одноручным оружием наносят 3х больше урона.", req: { skill: "Скрытность", thresholds: [30], prereq: [["Скрытность"]] } },
                 { name: "Лёгкий шаг", steps: 1, desc: "Нажимные пластины не срабатывают, когда вы наступаете на них.", req: { skill: "Скрытность", thresholds: [40], prereq: [["Приглушённые шаги"]] } },
-                { name: "Клинок ассасина", steps: 1, desc: "Скрытные атаки кинжалами наносят 6х урон.", req: { skill: "Скрытность", thresholds: [50], prereq: [["Верный прицел"]] } },
+                { name: "Клинок ассасина", steps: 1, desc: "Скрытные атаки кинжалами наносят 6х урон.", req: { skill: "Скрытность", thresholds: [50], prereq: [["Удар в спину"]] } },
                 { name: "Верный прицел", steps: 1, desc: "Скрытные атаки из лука наносят 3х урона", req: { skill: "Скрытность", thresholds: [40], prereq: [["Удар в спину"]] } },
                 { name: "Тихий кувырок", steps: 1, desc: "При спринте в режиме скрытности происходит бесшумный кувырок вперёд. (10 футов)", req: { skill: "Скрытность", thresholds: [50], prereq: [["Лёгкий шаг"]] } },
                 { name: "Тишина", steps: 1, desc: "Ходьба и бег с оружием а так же звук оружия и шепот не влияют на обнаружение.", req: { skill: "Скрытность", thresholds: [70], prereq: [["Тихий кувырок"]] } }
             ],
             "Взлом": [
                 { name: "Взломщик-новичок", steps: 1, desc: "Простые замки уровня \"Новичек\" значительно легче взломать.Убирает штраф от открытия без навыка.", req: null },
-                { name: "Взломщик-ученик", steps: 1, desc: "Замки уровня «Ученик» значительно легче взломать.Убирает штраф от открытия без навыка.", req: { skill: "взлом", thresholds: [25], prereq: [["Взломщик-ученик"]] } },
+                { name: "Взломщик-ученик", steps: 1, desc: "Замки уровня «Ученик» значительно легче взломать.Убирает штраф от открытия без навыка.", req: { skill: "Взлом", thresholds: [25], prereq: [["Взломщик-новичок"]] } },
                 { name: "Умелые ручки", steps: 1, desc: "Способность незаметно взламывать замки. Отмычки не издают звука", req: { skill: "Взлом", thresholds: [40], prereq: [["Взломщик-ученик"]] } },
                 { name: "Восковой слепок", steps: 1, desc: "Если от взломанного замка существует ключ, автоматически образуется его дубликат.", req: { skill: "Взлом", thresholds: [50], prereq: [["Умелые ручки"]] } },
                 { name: "Взломщик-адепт", steps: 1, desc: "Замки уровня «Адепт» значительно легче взломать.Убирает штраф от открытия без навыка.", req: { skill: "Взлом", thresholds: [50], prereq: [["Взломщик-ученик"]] } },
@@ -209,16 +209,16 @@
                 { name: "Мастер рун", steps: 1, desc: "Вы можете ставить руны на вдвое большее расстояние. (50 футов)", req: { skill: "Разрушение", thresholds: [40], prereq: [["Ученик школы разрушения"]] } },
                 { name: "Адепт школы разрушения", steps: 1, desc: "Заклинания школы разрушения уровня адепта расходуют вдвое меньше магии.", req: { skill: "Разрушение", thresholds: [50], prereq: [["Ученик школы разрушения"]] } },
                 { name: "Жаркое пламя", steps: 1, desc: "Урон от огня обращает противника в бегство, если его уровень здоровья низок.(меньше 5 %)", req: { skill: "Разрушение", thresholds: [50], prereq: [["Усиленное пламя"]] } },
-                { name: "Глубокая заморозка", steps: 1, desc: "Урон от холода парализует противника, если его уровень здоровья низок(меньше 5%)", req: { skill: "Разрушение", thresholds: [60], prereq: [["Усиленное пламя"]] } },
-                { name: "Дезинтеграция", steps: 1, desc: "Урон от электричества дезинтегрирует противника, если его уровень здоровья низок.(меньше 5%)", req: { skill: "Разрушение", thresholds: [70], prereq: [["Усиленное пламя"]] } },
+                { name: "Глубокая заморозка", steps: 1, desc: "Урон от холода парализует противника, если его уровень здоровья низок(меньше 5%)", req: { skill: "Разрушение", thresholds: [60], prereq: [["Усиленный мороз"]] } },
+                { name: "Дезинтеграция", steps: 1, desc: "Урон от электричества дезинтегрирует противника, если его уровень здоровья низок.(меньше 5%)", req: { skill: "Разрушение", thresholds: [70], prereq: [["Усиленные молнии"]] } },
                 { name: "Эксперт школы разрушения", steps: 1, desc: "Заклинания школы разрушения уровня эксперта расходуют вдвое меньше магии.", req: { skill: "Разрушение", thresholds: [75], prereq: [["Адепт школы разрушения"]] } }
             ],
             "Восстановление": [
-                { name: "Новичок школы восстановления", steps: 1, desc: "Заклинания уровня «Новичок» расходуют вдвое меньше маны.", req: { skill: "Востановление", thresholds: [0], prereq: [] } },
+                { name: "Новичок школы восстановления", steps: 1, desc: "Заклинания уровня «Новичок» расходуют вдвое меньше маны.", req: { skill: "Восстановление", thresholds: [0], prereq: [] } },
                 { name: "Двойное восстановление", steps: 1, desc: "При сотворении заклинания школы восстановления с двух рук получается его более сильный вариант.", req: { skill: "Восстановление", thresholds: [20], prereq: [["Новичок школы восстановления"]] } },
                 { name: "Регенерация", steps: 1, desc: "Лечебные заклинания на 50 % более эффективны.", req: { skill: "Восстановление", thresholds: [20], prereq: [["Новичок школы восстановления"]] } },
                 { name: "Ученик школы восстановления", steps: 1, desc: "Заклинания школы восстановления уровня ученика расходуют вдвое меньше магии.", req: { skill: "Восстановление", thresholds: [25], prereq: [["Новичок школы восстановления"]] } },
-                { name: "Восполнение", steps: 2, desc: "Магия увеличивается на 25/50 % от базового манапула.", req: { skill: "Востановление", thresholds: [30, 50], prereq: [["Новичок школы восстановления"]] } },
+                { name: "Восполнение", steps: 2, desc: "Магия увеличивается на 25/50 % от базового манапула.", req: { skill: "Восстановление", thresholds: [30, 50], prereq: [["Новичок школы восстановления"]] } },
                 { name: "Передышка", steps: 1, desc: "Лечебные заклинания также вышают физический урон на 10% на 5 ходов персонажа", req: { skill: "Восстановление", thresholds: [40], prereq: [["Новичок школы восстановления"]] } },
                 { name: "Адепт школы восстановления", steps: 1, desc: "Заклинания школы восстановления уровня адепта расходуют вдвое меньше магии.", req: { skill: "Восстановление", thresholds: [50], prereq: [["Ученик школы восстановления"]] } },
                 { name: "Оберег-поглотитель", steps: 1, desc: "Обереги при ударе по ним заклинаниями подпитывают вашу магию(Половина урона превращается в ману).", req: { skill: "Восстановление", thresholds: [60], prereq: [["Новичок школы восстановления"]] } },
@@ -418,7 +418,7 @@
             sheogorath: {
                 1: { randomDmg: true, randomDefense: true, randomBuff: true },
                 2: { elementalResist: 20, randomDmg: true, randomDefense: true, randomBuff: true },
-                3: { elementalResist: 20, randomDmg: true, randomDefense: true, randomBuff: true }
+                3: { elementalResist: 35, randomDmg: true, randomDefense: true, randomBuff: true }
             },
             clavicus: {
                 1: { hp: 25, speech: 15 },
@@ -427,7 +427,7 @@
             },
             molag: {
                 1: { hp: 25, mp: 25, coldResist: 10, physResist: 5 },
-                2: { hp: 20, mp: 50, coldResist: 20, physResist: 5, weaponVamp: 5 },
+                2: { hp: 50, mp: 50, coldResist: 20, physResist: 5, weaponVamp: 5 },
                 3: { hp: 100, mp: 75, coldResist: 35, physResist: 10, weaponVamp: 10 }
             },
             hircine: {
@@ -537,7 +537,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=20">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -555,10 +555,12 @@
     <script src="holidays-data.js?v=3"></script>
     <script src="skill-books-data.js?v=3"></script>
     <script src="unique-weapons-data.js?v=3"></script>
-    <script src="spell-tomes-data.js?v=3"></script>
+    <script src="spell-tomes-data.js?v=4"></script>
 <script src="powers-data.js?v=6"></script>
     <script src="enemies-data.js?v=3"></script>
     <script src="holds-map.js?v=4"></script>
+    <script src="combat-bonuses.js?v=1"></script>
+    <script src="builds-data.js?v=1"></script>
 </head>
 <body>
 
@@ -702,7 +704,7 @@
                 </div>
                 
                 <label>Раса (Автоприбавка навыков активна!)</label>
-                <select id="char-race" onchange="updateAll(); saveLocalStorage();">
+                <select id="char-race" onchange="onRaceChanged()">
                     <option value="nord">Норд (+10 HP, +5 HP/лвл, +10 Двуручное)</option>
                     <option value="altmer">Альтмер (+20 Маны, +10 Иллюзия, +2 Инт, +1 Муд)</option>
                     <option value="breton">Бретон (10% Резист магии, +10 Колдовство, +2 Инт, +1 Хар)</option>
@@ -733,6 +735,7 @@
                     <option value="tower">Башня (раз до рассвета: Башенный ключ — «Открывание» без маны)</option>
                 </select>
                 <div id="mage-sign-status" style="font-size:13px; margin-top:2px;"></div>
+                <div id="origin-lock-status" class="st-origin-lock" style="display:none;"></div>
 
                 <div class="grid-2" style="margin-top:10px;">
                     <div>
@@ -764,6 +767,8 @@
                 <div class="stat-block"><label>Мудрость (Муд)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-wis">Мод: 0</span><input type="number" id="stat-wis" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 <div class="stat-block"><label>Харизма (Хар)</label><div style="display:flex;align-items:center;"><span class="mod-indicator" id="mod-cha">Мод: 0</span><input type="number" id="stat-cha" value="10" min="1" data-raw-stat="10" onchange="handleStatChange(this)"></div></div>
                 </div>
+                <!-- На компьютере сюда переезжают голод и вера (st-layout: placeDesktopBlocks) — под характеристиками было пусто -->
+                <div id="st-desk-faith-slot" class="st-desk-slot"></div>
             </div>
         </div>
 
@@ -798,7 +803,8 @@
                         </div>
                     </div>
 
-                    <div class="vital-bar" style="border-color: #f1c40f; margin-top:6px;">
+                    <div id="st-dmg-home">
+                    <div class="vital-bar" id="st-dmg-block" style="border-color: #f1c40f; margin-top:6px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <label style="color:#f1c40f; margin:0;">БОЕВОЙ УРОН И ЗАЩИТА</label>
                             <div style="font-size:12px;"><input type="checkbox" id="manual-dmg-lock" onchange="updateAll()"> Ручной урон</div>
@@ -810,6 +816,7 @@
                             <div id="resistances-display" style="font-size:12px; margin-top:3px; opacity:.85;"></div>
                         </div>
                     </div>
+                    </div>
 
                     <div class="grid-2" style="margin-top:6px; background:var(--input-bg); padding:6px; border-radius:4px; font-size:13px;">
                         <div>Скорость: <input type="number" id="val-speed" value="35" style="width:48px;display:inline;padding:1px;" onchange="saveLocalStorage()"> фт. (<input type="checkbox" id="manual-speed-lock" onchange="updateAll()"> Ручной)</div>
@@ -818,6 +825,8 @@
                 </div>
 
                 <div>
+                    <div id="st-survival-home">
+                    <div id="st-survival-faith">
                     <label>Голод (дней без еды)</label>
                     <input type="number" id="food-starve" value="0" min="0" readonly
                            style="background:#080604; color:#c8a566; cursor:not-allowed;"
@@ -873,6 +882,10 @@
                         ВНИМАНИЕ: Поклонение Даэдра! Опасайтесь Дозорных Стендарра!
                     </div>
                     <textarea id="faith-notes" rows="2" placeholder="Доп. заметки по вере (необязательно)..." style="margin-top:6px; font-size:12px;" onchange="saveLocalStorage()"></textarea>
+                    </div>
+                    </div>
+                    <!-- На компьютере сюда переезжает «Боевой урон и защита» (освободившееся место после голода и веры) -->
+                    <div id="st-desk-dmg-slot"></div>
                 </div>
             </div>
 
@@ -909,6 +922,12 @@
 
     <!-- ТАБ 2: ВЕТКИ ПЕРКОВ -->
     <div id="tab2" class="tab-content">
+        <!-- Готовые билды: только подсказка по пути перков, сами перки не ставит (взятый перк снять нельзя) -->
+        <details class="panel st-builds" id="builds-panel" ontoggle="if (this.open) renderBuildsPanel()">
+            <summary class="st-builds-summary">📘 Готовые билды <span style="font-size:13px; font-weight:normal; opacity:.7;">— путь перков для типовых персонажей</span></summary>
+            <p style="font-size:13px; opacity:.8; margin:6px 0;">Выбери билд — увидишь, какие перки брать и в каком порядке, что уже взято и что доступно прямо сейчас. Перки здесь не ставятся сами: <strong>взятый перк нельзя снять</strong>, поэтому решай заранее. «🔦 Подсветить» отметит перки билда в ветках ниже.</p>
+            <div id="builds-list"></div>
+        </details>
         <div class="panel" id="lord-perks-panel" style="display:none; margin-bottom:12px;"></div>
         <div class="grid-3" id="skills-container"></div>
     </div>
@@ -1074,7 +1093,7 @@
         <div class="panel">
             <h2>Интерактивная Книга Заклинаний и Свитки</h2>
             <p style="font-size:13px; color:#aaa; margin-top:-8px; text-align:center;">
-                Записывайте любые заклинания, выученные в Коллегии. Вы можете вручную изменять как базовую, так и текущую стоимость каста заклинания!
+                Заклинания изучаются только из <strong>томов</strong> (Инвентарь → «📖 Изучить», том расходуется) и на <strong>обучении в Коллегии магов</strong> (Адепт и Эксперт, вкладка «Профессии» → «🏋 Тренировки гильдий», только для членов Коллегии). Выученное заклинание остаётся в книге навсегда — убрать или заменить его нельзя.
             </p>
 
             <div class="panel">
@@ -1091,7 +1110,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-destr">
                     <div id="spells-destr-list"></div>
-                    <button class="btn" style="background:#94291f; color:white; font-size:13px;" onclick="addCustomSpell('destr')">+ Выучить заклинание Разрушения</button>
+                    <div class="st-spell-learn-hint">📖 Новые заклинания школы Разрушения — из тома или в Коллегии магов.</div>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','restor')">
@@ -1099,7 +1118,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-restor">
                     <div id="spells-restor-list"></div>
-                    <button class="btn" style="background:#1e8449; color:white; font-size:13px;" onclick="addCustomSpell('restor')">+ Выучить заклинание Восстановления</button>
+                    <div class="st-spell-learn-hint">📖 Новые заклинания школы Восстановления — из тома или в Коллегии магов.</div>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','alter')">
@@ -1107,7 +1126,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-alter">
                     <div id="spells-alter-list"></div>
-                    <button class="btn" style="background:#f39c12; color:white; font-size:13px;" onclick="addCustomSpell('alter')">+ Выучить заклинание Изменения</button>
+                    <div class="st-spell-learn-hint">📖 Новые заклинания школы Изменения — из тома или в Коллегии магов.</div>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','illus')">
@@ -1115,7 +1134,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-illus">
                     <div id="spells-illus-list"></div>
-                    <button class="btn" style="background:#8e44ad; color:white; font-size:13px;" onclick="addCustomSpell('illus')">+ Выучить заклинание Иллюзии</button>
+                    <div class="st-spell-learn-hint">📖 Новые заклинания школы Иллюзии — из тома или в Коллегии магов.</div>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','conj')">
@@ -1123,7 +1142,7 @@
                 </div>
                 <div class="profession-body" id="magic-body-conj">
                     <div id="spells-conj-list"></div>
-                    <button class="btn" style="background:#34495e; color:white; font-size:13px;" onclick="addCustomSpell('conj')">+ Выучить заклинание Колдовства</button>
+                    <div class="st-spell-learn-hint">📖 Новые заклинания школы Колдовства — из тома или в Коллегии магов.</div>
                 </div>
 
                 <div class="profession-header" onclick="toggleAccordion('magic','summons')">
@@ -1323,6 +1342,11 @@
     <div id="tab6" class="tab-content">
         <div class="panel">
             <h2><span class="skyrim-icon icon-scroll" aria-hidden="true"></span> Сессия</h2>
+            <!-- ТЗ-2, эпик 2.4: мастер развернул данж — где мы и что тут можно обыскать -->
+            <div id="player-dungeon-status" class="st-dungeon-status" style="display:none;">
+                <strong>🏰 Вы в: <span id="player-dungeon-name">—</span></strong>
+                <div id="player-dungeon-loot" style="margin-top:6px;"></div>
+            </div>
 
             <div id="session-join-block">
                 <p style="font-size:15px; opacity:.85;">Введи код сессии, который дал мастер, чтобы синхронизировать HP/MP, противников, инициативу и боевой журнал в реальном времени.</p>
@@ -1708,16 +1732,40 @@
 
     <!-- ТАБ 10: ПРОВЕРКА КУБОВ -->
     <div id="tab10" class="tab-content">
-        <div class="panel">
+        <!-- Бросок кубов и Взлом — рядом и компактно (на телефоне друг под другом, .grid-2 сам схлопывается) -->
+        <div class="grid-2 st-check-pair">
+        <div class="panel st-compact-panel">
             <h2><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросок кубов</h2>
             <p style="font-size:14px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
 
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="dice-quick-presets"></div>
 
-            <label>Навык проверки</label>
+            <div class="st-dice-grid">
+                <div><label>Навык проверки</label>
             <select id="dice-skill" onchange="onDiceSkillPicked()">
                 <option value="">— без навыка (просто характеристика или голый кубик) —</option>
+            </select></div>
+                <div><label>Характеристика</label>
+            <select id="dice-stat" onchange="updateDiceStatInfo()">
+                <option value="">— не добавлять —</option>
+                <option value="str">Сила</option>
+                <option value="dex">Ловкость</option>
+                <option value="con">Телосложение</option>
+                <option value="int">Интеллект</option>
+                <option value="wis">Мудрость</option>
+                <option value="cha">Харизма</option>
             </select>
+                <div id="dice-stat-info" style="font-size:12px; opacity:.7; margin-top:2px;"></div></div>
+                <div><label>Кубик</label>
+            <select id="dice-type">
+                <option value="20">к20 (стандартная проверка)</option>
+                <option value="12">к12</option>
+                <option value="6">к6</option>
+                <option value="100">к100</option>
+            </select></div>
+                <div><label>Сложность (DC)</label>
+                <input type="number" id="dice-dc" placeholder="необязательно"></div>
+            </div>
             <div id="dice-thief-wrap" style="display:none; margin:4px 0;">
                 <label style="display:block;"><input type="checkbox" id="dice-thief-asleep"> 😴 Цель спит («Ночной вор» +2)</label>
                 <label style="display:block;"><input type="checkbox" id="dice-thief-key"> 🔑 Крадём ключ («Ключник»)</label>
@@ -1732,42 +1780,20 @@
                 </select>
             </div>
 
-            <label>Характеристика (модификатор)</label>
-            <select id="dice-stat" onchange="updateDiceStatInfo()">
-                <option value="">— не добавлять —</option>
-                <option value="str">Сила</option>
-                <option value="dex">Ловкость</option>
-                <option value="con">Телосложение</option>
-                <option value="int">Интеллект</option>
-                <option value="wis">Мудрость</option>
-                <option value="cha">Харизма</option>
-            </select>
-            <div id="dice-stat-info" style="font-size:13px; opacity:.7; margin:-4px 0 6px;"></div>
-
-            <label>Кубик</label>
-            <select id="dice-type">
-                <option value="20">к20 (стандартная проверка)</option>
-                <option value="12">к12</option>
-                <option value="6">к6</option>
-                <option value="100">к100</option>
-            </select>
-
-            <label>Сложность проверки (Сложность/DC, необязательно)</label>
-            <input type="number" id="dice-dc" placeholder="Например: 15">
 
             <button class="btn-success" style="width:100%; margin-top:10px;" onclick="rollDiceCheck()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
 
-            <div id="dice-result" style="margin-top:14px; padding:12px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
-                <div style="font-size:34px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
+            <div id="dice-result" style="margin-top:8px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; text-align:center;">
+                <div style="font-size:28px; font-weight:bold; color:var(--accent-color);" id="dice-result-total">—</div>
                 <div style="font-size:14px; opacity:.75;" id="dice-result-formula"></div>
                 <div style="font-size:16px; font-weight:bold; margin-top:4px;" id="dice-result-verdict"></div>
             </div>
 
-            <h3 style="margin-top:16px;">Журнал бросков</h3>
-            <div id="dice-history" style="max-height:220px; overflow-y:auto; font-size:14px;"></div>
+            <h3 style="margin-top:10px;">Журнал бросков</h3>
+            <div id="dice-history" style="max-height:160px; overflow-y:auto; font-size:13px;"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel st-compact-panel">
             <h2>🔓 Взлом замка</h2>
             <p style="font-size:14px; opacity:.8;">Нужна отмычка в инвентаре. Провал ломает отмычку, успех — нет. Навык Взлом ниже порога сложности замка даёт штраф (−2 до −5 в зависимости от ступени), если не открыт соответствующий перк «Взломщик-...».</p>
 
@@ -1794,6 +1820,7 @@
                 <button class="btn-success" style="width:auto;" onclick="takeChestGold()">Забрать</button>
             </div>
             <div id="chest-gold-note" style="font-size:13px; opacity:.8; margin-top:4px;"></div>
+        </div>
         </div>
 
         <div class="panel">
@@ -2253,7 +2280,77 @@
         apprenticeVuln = keys[Math.floor(Math.random() * keys.length)];
         return apprenticeVuln;
     }
+    // ---------- Раса и Камень судьбы: выбор один раз ----------
+    // Выбранные раса и знак рождения закрепляются навсегда, как взятые перки. Чтобы не наказывать за мисклик,
+    // первые 5 минут после первого выбора их можно менять; потом оба поля блокируются. Отсчёт идёт от первого
+    // изменения любого из двух полей, хранится в сейве (originLock), поэтому перезагрузка страницы его не сбрасывает.
+    // С уровнем 2+ выбор закрепляется сразу: персонаж уже играет.
+    const ORIGIN_GRACE_MS = 5 * 60 * 1000;
+    let originLock = { startedAt: null, locked: false };
+    let _originPrev = { race: 'nord', sign: 'none' };
+    function originGraceLeftMs() {
+        if (originLock.locked || !originLock.startedAt) return originLock.locked ? 0 : null;
+        return Math.max(0, originLock.startedAt + ORIGIN_GRACE_MS - Date.now());
+    }
+    function originIsLocked() {
+        if (originLock.locked) return true;
+        if ((characterLevel || 1) >= 2) return true;
+        const left = originGraceLeftMs();
+        return left !== null && left <= 0;
+    }
+    function renderOriginLock() {
+        const race = document.getElementById('char-race'), sign = document.getElementById('char-sign'), box = document.getElementById('origin-lock-status');
+        if (!race || !sign) return;
+        if (originIsLocked() && !originLock.locked) { originLock.locked = true; saveLocalStorage(true); } // время вышло — фиксируем в сейве
+        const locked = originLock.locked;
+        race.disabled = locked; sign.disabled = locked;
+        race.title = sign.title = locked ? 'Раса и камень судьбы выбраны окончательно' : '';
+        if (!box) return;
+        const left = originGraceLeftMs();
+        if (locked) { box.style.display = 'block'; box.className = 'st-origin-lock st-origin-locked'; box.textContent = '🔒 Раса и камень судьбы выбраны окончательно.'; }
+        else if (left !== null) {
+            const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+            box.style.display = 'block'; box.className = 'st-origin-lock st-origin-grace';
+            box.textContent = `⏳ Расу и камень ещё можно изменить: ${m}:${String(sec).padStart(2, '0')}. Потом выбор закрепится навсегда.`;
+        } else { box.style.display = 'block'; box.className = 'st-origin-lock'; box.textContent = 'Выбери расу и камень судьбы. После первого выбора будет 5 минут, чтобы передумать, — потом выбор закрепится навсегда.'; }
+    }
+    // Возвращает true, если изменение принято; иначе откатывает поле к прежнему значению.
+    function acceptOriginChange(kind) {
+        const elx = document.getElementById(kind === 'race' ? 'char-race' : 'char-sign');
+        if (originIsLocked()) {
+            elx.value = _originPrev[kind];
+            renderOriginLock();
+            alert('Раса и камень судьбы уже выбраны окончательно — изменить их нельзя.');
+            return false;
+        }
+        if (!originLock.startedAt) originLock.startedAt = Date.now();
+        _originPrev[kind] = elx.value;
+        renderOriginLock();
+        return true;
+    }
+    window.onRaceChanged = function () {
+        if (!acceptOriginChange('race')) return;
+        updateAll();
+        saveLocalStorage();
+    };
+    // Старые сейвы без originLock: если персонаж уже явно выбран (знак, не-дефолтная раса или уровень 2+) — закреплён;
+    // чистый новый лист — отсчёт начнётся с первого выбора.
+    function restoreOriginLock(data) {
+        const lvl = parseInt(data.characterLevel) || 1;
+        if (data.originLock && typeof data.originLock === 'object') {
+            originLock = { startedAt: Number(data.originLock.startedAt) || null, locked: !!data.originLock.locked };
+        } else {
+            const chosen = lvl >= 2 || (data.sign && data.sign !== 'none') || (data.race && data.race !== 'nord');
+            originLock = { startedAt: null, locked: !!chosen };
+        }
+        _originPrev = { race: data.race || 'nord', sign: data.sign || 'none' };
+        renderOriginLock();
+    }
+    setInterval(() => { if (!originLock.locked && originLock.startedAt) renderOriginLock(); }, 1000);
+    window.addEventListener('load', () => { try { renderOriginLock(); } catch (e) { } });
+
     window.onSignChanged = function () {
+        if (!acceptOriginChange('sign')) return;
         const sign = (document.getElementById('char-sign') || {}).value;
         if (sign === 'apprentice') { if (!apprenticeVuln) rollApprenticeVuln(); }
         else apprenticeVuln = null;
@@ -2646,7 +2743,7 @@ let daysWithoutFood = 0;
                 `;
             }
             return `
-                <div class="perk-item">
+                <div class="perk-item" data-perk-key="${idx}-${pItemIdx}">
                     <div class="perk-row">
                         <div class="perk-left">
                             <span style="color:#cfc5b6; font-size:14px;">${p.name}</span>
@@ -2700,6 +2797,105 @@ window.toggleSkillPanel = function (idx) {
     if (chev) chev.textContent = isOpen ? '▸' : '▾';
 };
 
+    // ---------- Раскладка «Главной» на компьютере ----------
+    // На широком экране голод и вера переезжают под характеристики (там было пусто), а «Боевой урон и защита» —
+    // на их место в «Панели состояния». Переносим сами узлы (id и обработчики остаются те же), а на узком экране
+    // возвращаем их домой — порядок блоков на телефоне не меняется.
+    (function () {
+        const mq = window.matchMedia ? window.matchMedia('(min-width: 900px)') : null;
+        const move = (id, toId) => { const n = document.getElementById(id), t = document.getElementById(toId); if (n && t && n.parentElement !== t) t.appendChild(n); };
+        function placeDesktopBlocks() {
+            const desk = !!(mq && mq.matches);
+            move('st-survival-faith', desk ? 'st-desk-faith-slot' : 'st-survival-home');
+            move('st-dmg-block', desk ? 'st-desk-dmg-slot' : 'st-dmg-home');
+            document.body.classList.toggle('st-desk-layout', desk);
+        }
+        if (mq) { if (mq.addEventListener) mq.addEventListener('change', placeDesktopBlocks); else if (mq.addListener) mq.addListener(placeDesktopBlocks); }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', placeDesktopBlocks); else placeDesktopBlocks();
+        window.placeDesktopBlocks = placeDesktopBlocks;
+    })();
+
+    // ---------- Готовые билды (builds-data.js) ----------
+    function buildPerkLocate(tree, name) {
+        const sIdx = skillNames.indexOf(tree);
+        const list = fullPerksManifest[tree] || [];
+        const pIdx = list.findIndex(p => p.name === name);
+        return { sIdx, pIdx, perk: pIdx === -1 ? null : list[pIdx] };
+    }
+    function buildPerkTaken(sIdx, pIdx, steps) {
+        let n = 0;
+        for (let st = 1; st <= steps; st++) { const c = document.getElementById(`perk-${sIdx}-${pIdx}-${st}`); if (c && c.checked) n++; }
+        return n;
+    }
+    // Что мешает взять следующую ступень прямо сейчас (те же правила, что validatePerkCheck, но без побочных эффектов)
+    function buildPerkBlocker(perk, nextStep) {
+        const r = perk.req;
+        if (!r) return '';
+        if (r.skill) {
+            const need = (r.thresholds || [])[nextStep - 1] || 0, have = getEffectiveSkillValue(r.skill);
+            if (have < need) return `навык «${r.skill}» ${have}/${need}`;
+        }
+        for (const g of (r.prereq || [])) if (!g.some(n => isPerkChecked(n))) return 'нужен перк ' + g.map(n => '«' + n + '»').join(' или ');
+        return '';
+    }
+    let _buildsHighlighted = null;
+    window.renderBuildsPanel = function () {
+        const box = document.getElementById('builds-list');
+        if (!box) return;
+        const builds = window.buildsData || [];
+        const openIds = new Set(Array.from(box.querySelectorAll('details.st-build[open]')).map(d => d.dataset.build));
+        box.innerHTML = builds.map(b => {
+            let done = 0, total = 0; const seenAlt = {};
+            const rows = b.perks.map(e => {
+                const loc = buildPerkLocate(e.tree, e.perk);
+                if (!loc.perk) return `<li style="color:#e74c3c;">«${escHtml(e.perk)}» — нет в ветке «${escHtml(e.tree)}»</li>`;
+                const want = Math.min(e.steps || loc.perk.steps, loc.perk.steps);
+                const taken = buildPerkTaken(loc.sIdx, loc.pIdx, loc.perk.steps);
+                const ok = taken >= want;
+                // «на выбор» (alt): группа считается одним пунктом и выполненной, если взят любой её перк
+                if (e.alt) { if (!seenAlt[e.alt]) { seenAlt[e.alt] = { done: false }; total++; } if (ok && !seenAlt[e.alt].done) { seenAlt[e.alt].done = true; done++; } }
+                else { total++; if (ok) done++; }
+                let st;
+                if (ok) st = '<span class="st-bp-ok">✔ взят</span>';
+                else {
+                    const block = buildPerkBlocker(loc.perk, taken + 1);
+                    st = block ? `<span class="st-bp-lock">🔒 ${escHtml(block)}</span>` : '<span class="st-bp-now">🟢 можно взять сейчас</span>';
+                    if (taken) st = `<span class="st-bp-part">◐ ${taken}/${want}</span> ` + st;
+                }
+                const steps = want > 1 ? ` (${want} ступ.)` : '';
+                const note = [e.alt ? 'на выбор' : '', e.note || ''].filter(Boolean).join(': ');
+                return `<li><span class="st-bp-tree">${escHtml(e.tree)}</span> — <strong>${escHtml(e.perk)}</strong>${steps}${note ? ` <span style="opacity:.65;">(${escHtml(note)})</span>` : ''} · ${st}</li>`;
+            }).join('');
+            const isHl = _buildsHighlighted === b.id;
+            return `<details class="st-build" data-build="${escHtml(b.id)}" ${openIds.has(b.id) ? 'open' : ''}>
+                <summary>${b.icon || ''} <strong>${escHtml(b.name)}</strong> <span style="opacity:.7; font-size:13px;">— взято ${done} из ${total}</span></summary>
+                <div class="st-build-body">
+                    <div>${escHtml(b.role || '')}</div>
+                    <div class="st-build-meta">Навыки: ${escHtml((b.skills || []).join(', '))}<br>Раса: ${escHtml(b.race || '—')} · Знак: ${escHtml(b.sign || '—')} · Боги: ${escHtml(b.gods || '—')}${b.stats ? '<br>Характеристики: ' + escHtml(b.stats) : ''}</div>
+                    <button type="button" style="width:auto; margin:6px 0;" onclick="highlightBuildPerks('${escHtml(b.id)}')">${isHl ? '✖ Снять подсветку' : '🔦 Подсветить в ветках'}</button>
+                    <ol class="st-build-perks">${rows}</ol>
+                    ${b.tips ? `<div class="st-build-tips">💡 ${escHtml(b.tips)}</div>` : ''}
+                </div></details>`;
+        }).join('') || '<p style="opacity:.7;">Билды не загружены (builds-data.js).</p>';
+    };
+    window.highlightBuildPerks = function (id) {
+        document.querySelectorAll('.perk-item.st-build-hl').forEach(x => x.classList.remove('st-build-hl'));
+        if (_buildsHighlighted === id) { _buildsHighlighted = null; window.renderBuildsPanel(); return; }
+        const b = (window.buildsData || []).find(x => x.id === id); if (!b) return;
+        _buildsHighlighted = id;
+        let first = null;
+        b.perks.forEach(e => {
+            const loc = buildPerkLocate(e.tree, e.perk); if (!loc.perk) return;
+            const item = document.querySelector(`.perk-item[data-perk-key="${loc.sIdx}-${loc.pIdx}"]`); if (!item) return;
+            item.classList.add('st-build-hl');
+            const body = document.getElementById('skill-body-' + loc.sIdx);
+            if (body && body.style.display === 'none') window.toggleSkillPanel(loc.sIdx); // раскрываем ветку, чтобы подсветку было видно
+            if (!first) first = item;
+        });
+        window.renderBuildsPanel();
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
     // Обработчик ручного изменения навыка
     // Проверяет, отмечена ли хоть одна ступень перка с данным именем (в любом навыке)
     function isPerkChecked(perkName) {
@@ -2721,9 +2917,14 @@ window.toggleSkillPanel = function (idx) {
     // Эффективное значение навыка = базовое (вложенное игроком) + расовый бонус.
     // Именно оно должно использоваться во всех проверках/формулах — это то, что
     // реально видит и ожидает игрок, глядя на цифру в поле навыка.
+    // Имя навыка сравниваем без учёта регистра и «ё/е»: в данных перков встречалось «Тяжёлая броня» и «взлом»,
+    // indexOf не находил навык, проверка считала его равным 0 — и почти вся ветка брони не бралась вообще.
+    const _skillNameNorm = n => String(n || '').toLowerCase().replace(/ё/g, 'е').trim();
     function getEffectiveSkillValue(skillName) {
-        const idx = skillNames.indexOf(skillName);
+        let idx = skillNames.indexOf(skillName);
+        if (idx === -1) { const k = _skillNameNorm(skillName); idx = skillNames.findIndex(n => _skillNameNorm(n) === k); }
         if (idx === -1) return 0;
+        skillName = skillNames[idx]; // ниже расовый бонус ищется по точному имени
         const input = document.getElementById(`skill-${idx}`);
         if (!input) return 0;
         const raw = parseInt(input.getAttribute('data-raw-val')) || 10;
@@ -2734,12 +2935,11 @@ window.toggleSkillPanel = function (idx) {
 
     function validatePerkCheck(checkbox) {
         if (!checkbox.checked) {
-            // Возвращаем очко при снятии перка — respec без штрафа. Не проверяем каскадно,
-            // не сломает ли это перки, которые требовали именно этот (игрок сам разберётся,
-            // если решит откатить несколько ступеней разом).
-            perkPointsAvailable += 1;
-            renderLevelPanel();
-            updateAll(); saveLocalStorage(); return;
+            // Взятый перк — навсегда: отказаться от него и переложить очко в другой нельзя (решение автора правил).
+            // Раньше снятие галочки возвращало очко, и билд можно было перекраивать перед каждым боем.
+            checkbox.checked = true;
+            alert('Перк уже взят — отказаться от него нельзя. Очки перков вкладываются один раз.');
+            return;
         }
 
         const skillIdx = parseInt(checkbox.dataset.skillidx);
@@ -3012,7 +3212,7 @@ window.toggleSkillPanel = function (idx) {
                 <div style="font-size:11px; opacity:.65; margin-bottom:2px;">Школа: ${escHtml(SCHOOL_CODE_TO_SKILL[school] || school)}</div>
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:4px;">
                     <button type="button" class="st-fav-btn" id="fav-${id}" onclick="toggleSpellFavorite('${id}')" title="Избранное: попадает наверх списка заклинаний в боевой панели" style="width:auto; flex:0 0 auto; margin:0; padding:0 6px; background:transparent; border:none; font-size:20px; cursor:pointer; color:#e6b800;">${loadedData && loadedData.favorite ? '★' : '☆'}</button>
-                    <select class="spell-name-select" style="width:55%; font-weight:bold; padding:2px;" onchange="onSpellPicked('${id}', '${school}')">
+                    <select class="spell-name-select" style="width:55%; font-weight:bold; padding:2px;" disabled title="Заклинание выбирается при изучении (том или Коллегия) и не меняется" onchange="onSpellPicked('${id}', '${school}')">
                         ${buildSpellOptions(school, isCustomName ? null : name)}
                     </select>
                     <div style="width:40%; text-align:right; font-size:13px;">
@@ -3029,7 +3229,7 @@ window.toggleSkillPanel = function (idx) {
                     ${name === 'Равновесие' ? `<button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a2c2c; color:white;" onclick="castEquilibrium()" title="Конвертирует ХП в ману (100 ХП → 75 МП — не 1:1), не тратит обычную ману на каст">⚖️ Конвертировать ХП→МП</button>` :
                     `<button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#4e4537; color:white;" onclick="castCustomSpell('${id}', false)">Каст</button>
                     <button class="btn" style="width:auto; margin:0; padding:2px 6px; font-size:12px; background:#7a4e2c; color:white;" onclick="castCustomSpell('${id}', true)" title="х2 маны, использует 'Усиленный эффект' из описания">Усилен. каст</button>`}
-                    <button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:12px;" onclick="deleteSpell('${school}', '${id}')">Х</button>
+                    ${name ? '' : `<button class="btn btn-danger" style="width:auto; margin:0; padding:2px 4px; font-size:12px;" onclick="deleteSpell('${school}', '${id}')" title="Пустая карточка (заклинание не выбрано) — можно убрать">Х</button>`}
                 </div>
             </div>
         `;
@@ -3038,7 +3238,17 @@ window.toggleSkillPanel = function (idx) {
         if (loadedData && isCustomName) {
             document.getElementById(`card-${id}`).querySelector('.spell-name-select').value = '__custom__';
         }
+        if (name) lockSpellCard(document.getElementById(`card-${id}`));
         if (!loadedData) saveSpellsAndRefresh();
+    }
+    // Выученное заклинание — навсегда, как взятый перк: название, базовая цена и описание (из него считаются урон и
+    // длительность) больше не правятся, кнопки удаления нет. Избранное (☆), цель и каст работают как раньше.
+    function lockSpellCard(card) {
+        if (!card) return;
+        card.classList.add('st-spell-locked');
+        const sel = card.querySelector('.spell-name-select'); if (sel) sel.disabled = true;
+        ['.spell-name-custom', '.spell-base', '.spell-desc'].forEach(q => { const x = card.querySelector(q); if (x) { x.readOnly = true; x.title = 'Выученное заклинание не меняется'; } });
+        const del = card.querySelector('.btn-danger[onclick^="deleteSpell"]'); if (del) del.remove();
     }
 
     window.onSpellPicked = function(id, school) {
@@ -3132,7 +3342,10 @@ window.toggleSkillPanel = function (idx) {
 
     function deleteSpell(school, id) {
         const card = document.getElementById(`card-${id}`);
-        if(card) { card.remove(); saveSpellsAndRefresh(); }
+        if (!card) return;
+        // Убрать можно только пустую карточку (из старых сейвов, где заклинание так и не выбрали) — выученное навсегда.
+        if (card.classList.contains('st-spell-locked')) { alert('Выученное заклинание нельзя убрать из книги.'); return; }
+        card.remove(); saveSpellsAndRefresh();
     }
 
     const SCHOOL_CODE_TO_SKILL = { destr: 'Разрушение', restor: 'Восстановление', conj: 'Колдовство', illus: 'Иллюзия', alter: 'Изменение' };
@@ -5219,7 +5432,10 @@ window.toggleSkillPanel = function (idx) {
     // за 985, зелье из двух ингредиентов за 4 золотых — за 198, блюдо из продуктов на 4 — за 25. Так «наковал/сварил → продал»
     // стало лучшим заработком в игре. Теперь у сделанной вещи запоминается стоимость материалов (craftCost, за штуку),
     // а торговец платит не больше стоимости × множитель (CRAFT_SELL_CAPS). Покупные и найденные вещи не затронуты.
-    const CRAFT_SELL_CAPS = { smith: 7, alch: 11, cook: 8, ench: 7 };
+    // Значения подняты по просьбе автора после плейтеста (было smith 7 / alch 11 / cook 8 / ench 7): при прежних
+    // потолках крафт почти не окупал время. Множитель — к стоимости материалов, ДО навыка речи, профиля торговца и
+    // репутации, поэтому реальная выручка ниже. Табличная цена предмета остаётся верхней границей (Math.min ниже).
+    const CRAFT_SELL_CAPS = { smith: 12, alch: 15, cook: 10, ench: 12 };
     function materialPrice(name) {
         const sm = (window.smithingMaterials || {})[name]; if (sm && sm.price) return sm.price;
         const ck = (window.cookingIngredients || {})[name]; if (ck && ck.price) return ck.price;
@@ -5640,6 +5856,7 @@ window.toggleSkillPanel = function (idx) {
                     ${potionKindOf(item) === 'poison' && item.alchemyEffects ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px; background:#5b2c6f;" onclick="applyPoisonToWeapon('${jsq(item.itemId)}')" title="Нанести на экипированное оружие — сработает на одном ударе">☠ На оружие</button>` : ''}
                     ${isFoodItem(item) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#5c4a2c;" onclick="eatAnyFood('${jsq(item.itemId)}')">🍽 Поесть</button>` : ''}
                     ${(item.category || '').indexOf('Свит') === 0 ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useScrollItem('${jsq(item.itemId)}')">Читать</button>` : ''}
+                    ${(item.category === 'Книги заклинаний' || /^Том заклинания:/.test(item.name || '')) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px; background:#3b2f5c;" onclick="learnSpellFromTome('${jsq(item.itemId)}')" title="Выучить заклинание — том расходуется">📖 Изучить</button>` : ''}
                     ${item.category === 'Книга умения' ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="readSkillBook('${jsq(item.itemId)}')" title="+1 к навыку «${escHtml(item.skill || '')}», расходует книгу">📖 Читать</button>` : ''}
                     ${item.maxUses ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useLimitedItem('${jsq(item.itemId)}')" title="${escHtml(item.effect || '')}">✨ Использовать (${item.usesLeft != null ? item.usesLeft : item.maxUses}/${item.maxUses})</button>` : ''}
                     ${item.enchantment ? `<button class="btn-danger" style="width:auto; padding:2px 6px; font-size:13px;" onclick="disenchantItem('${jsq(item.itemId)}')" title="Разрушает вещь и узнаёт зачарование «${escHtml(item.enchantment.name)}» навсегда">💥 Разрушить</button>` : ''}
@@ -7486,8 +7703,30 @@ window.toggleSkillPanel = function (idx) {
         const sel = card.querySelector('.spell-name-select');
         sel.value = name;
         window.onSpellPicked(card.id.replace('card-', ''), school);
+        lockSpellCard(card);
         return true;
     }
+    // Том заклинания из инвентаря → заклинание в книгу, том расходуется. Школу и имя берём из базы томов по названию:
+    // у тома, выданного мастером или купленного, в инвентаре могут не сохраниться поля school/spellName.
+    window.learnSpellFromTome = function (itemId) {
+        const item = playerInventory.find(i => i.itemId === itemId);
+        if (!item || item.count <= 0) return;
+        const tome = (window.spellTomesData || (typeof spellTomesData !== 'undefined' ? spellTomesData : [])).find(t => t.name === item.name);
+        const spell = (tome && tome.spellName) || item.spellName || String(item.name || '').replace(/^Том заклинания:\s*/, '');
+        const school = (tome && MAGE_SCHOOL_CODES[tome.school]) || findSpellSchoolByName(spell);
+        if (!school || !getSpellTier(school, spell)) { alert('Не нашёл заклинание «' + spell + '» в книге школ — покажи том мастеру.'); return; }
+        if (customSpells.some(s => s.name === spell)) { alert('«' + spell + '» уже есть в твоей книге заклинаний. Том можно продать.'); return; }
+        if (!confirm('Изучить «' + spell + '»? Том будет прочитан и исчезнет, а заклинание навсегда останется в книге.')) return;
+        const r = learnSpellIntoBook(school, spell);
+        if (r !== true) { alert(r === 'known' ? '«' + spell + '» уже есть в книге.' : 'Не получилось добавить заклинание.'); return; }
+        removeFromInventoryByName(itemId, 1);
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage(true);
+        const nm = (document.getElementById('char-name') || {}).value || 'Игрок';
+        if (window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && window.CloudSync.postCombatLog) window.CloudSync.postCombatLog('📖 ' + nm + ' изучил(а) заклинание «' + spell + '» из тома.', nm);
+        alert('📖 Выучено: «' + spell + '» (' + (SCHOOL_CODE_TO_SKILL[school] || school) + '). Заклинание добавлено в книгу.');
+    };
     function mageStudyTick() {
         const st = trainState.mageStudy;
         if (!st || gameDayIndex() < st.startDay + st.days) return;
@@ -8567,6 +8806,7 @@ window.toggleSkillPanel = function (idx) {
                 return;
             }
             if (e.cmd === 'craftOrder') { handleCraftOrderCmd(e); return; }
+            if (e.cmd === 'dungeonLoot') { handleDungeonLootCmd(e); return; } // ТЗ-2 2.4: мастер отдал контейнер данжа
             if (e.cmd === 'death') { handleGmDeathCmd(e); return; } // команды мастера: потеря вещей / воскрешение / жизни
             // мастер нанёс урон — проверка концентрации. Команда старше 2 минут (игрок был офлайн) уже не актуальна — не бросаем «задним числом».
             if (e.cmd === 'aoeHit') { gridAoeHit(e); return; } // руна/площадное заклинание задело меня или моё существо
@@ -10031,7 +10271,7 @@ window.toggleSkillPanel = function (idx) {
     function renderSkillProgressList() {
         const el = document.getElementById('skill-progress-list');
         if (!el) return;
-        el.innerHTML = '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px;">' + skillNames.map((name, idx) => {
+        el.innerHTML = '<div class="st-skill-progress-grid">' + skillNames.map((name, idx) => {
             // Читаем то же самое отображаемое значение поля навыка (skill-N.value), что видно
             // на вкладке «Ветки перков» — гарантирует, что два места всегда показывают одно число.
             const skillInput = document.getElementById('skill-' + idx);
@@ -10041,7 +10281,7 @@ window.toggleSkillPanel = function (idx) {
             // Название и кнопка "+1" рядом: раньше justify-content:space-between уносил кнопку на дальний
             // край строки. Колонка текста фиксированной ширины (с многоточием) — кнопки выстраиваются в ровный столбик.
             return `<div class="party-row" style="display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:3px 6px;">
-                <span style="flex:0 1 230px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
+                <span style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
                 <button style="width:auto; flex-shrink:0; padding:2px 8px; margin:0;" onclick="logSkillSuccess(${idx})">+1</button>
             </div>`;
         }).join('') + '</div>';
@@ -11656,9 +11896,10 @@ window.toggleSkillPanel = function (idx) {
         s.vampire.lordPerks = s.vampire.lordPerks || {};
         const got = s.vampire.lordPerks;
         if (!chk.checked) {
-            const dep = LORD_PERKS.find(q => got[q.name] && q.name !== name && q.prereq.some(g => g.indexOf(name) !== -1 && !g.some(n => n !== name && got[n])));
-            if (dep) { chk.checked = true; alert(`Сначала сними перк «${dep.name}» — он требует «${name}».`); return; }
-            delete got[name]; perkPointsAvailable += 1;
+            // Как и в обычных ветках: взятый перк вампира-лорда не снимается и очко не возвращается.
+            chk.checked = true;
+            alert('Перк уже взят — отказаться от него нельзя.');
+            return;
         } else {
             for (const g of perk.prereq) {
                 if (!g.some(n => got[n])) { chk.checked = false; alert(`Сначала нужен перк: ${g.join(' или ')}.`); return; }
@@ -12444,7 +12685,7 @@ function updateHungerPenalty() {
             if (spiritE) {
                 const w = spiritE.weaponSpirit;
                 const boostD = getSkillBoostPercent('Разрушение') + ((typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0);
-                const sd = Math.round(w.dmg * (1 + boostD / 100) * (1 + gb('elementalWeaponDmg') / 100));
+                const sd = window.StBonuses.weaponSpiritDamage(w.dmg, boostD, gb('elementalWeaponDmg')); // TASK-001: формула духа — в combat-bonuses.js
                 // Дух лежит на обоих одноручных оружиях, если при касте были «двойные» руки и сейчас они всё ещё в деле
                 const offNow = (document.getElementById('wep-melee-offhand-name') || {}).value || '';
                 const bothHands = actionVal === 'melee' && !!w.offName && document.getElementById('chk-dual-wield').checked && (offNow || '(второе оружие)') === w.offName;
@@ -12964,6 +13205,49 @@ function updateHungerPenalty() {
             })
             .catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // ТЗ-2, эпик 2.4: добыча из контейнера данжа — и при обыске самим игроком, и когда мастер отдал контейнер
+    // (команда dungeonLoot). Кладём так же, как лут с трупа: те же поля предмета, сразу немедленное сохранение.
+    function applyDungeonLoot(loot) {
+        (loot.items || []).forEach(it => {
+            const extra = { slot: it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price, alchemyEffects: it.alchemyEffects };
+            if (it.enchantment) extra.enchantment = it.enchantment;
+            if (typeof it.chargeDaysLeft === 'number') extra.chargeDaysLeft = it.chargeDaysLeft;
+            addToInventory(it.name, it.name, Math.max(1, Math.min(999, parseInt(it.qty) || 1)), it.weight || 0,
+                /^Зель/i.test(it.category || '') ? 'Зелье' : (it.category || ''), it.effect || '', extra);
+        });
+        if (loot.gold) {
+            const goldInput = document.getElementById('char-gold');
+            goldInput.value = (parseInt(goldInput.value) || 0) + (parseInt(loot.gold) || 0);
+        }
+        renderInventoryList();
+        updateAll();
+        saveLocalStorage(true); // немедленно — без окна гонки с мастером
+        const parts = [];
+        if (loot.gold) parts.push(loot.gold + ' зол.');
+        (loot.items || []).forEach(it => parts.push('«' + it.name + '»' + ((parseInt(it.qty) || 1) > 1 ? ' ×' + it.qty : '')));
+        return parts;
+    }
+    window.playerSearchContainer = function (containerId) {
+        if (!window.CloudSync || !window.CloudSync.takeFromDungeon) return;
+        if (!confirm('Обыскать?')) return;
+        window.CloudSync.takeFromDungeon(containerId).then(result => {
+            const parts = applyDungeonLoot(result);
+            const name = (document.getElementById('char-name') || {}).value || 'Игрок';
+            if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog('🔍 ' + name + ' обыскал(а) «' + ((result.container && result.container.label) || 'контейнер') + '»: ' + (parts.join(', ') || 'пусто'), name);
+            alert('Найдено: ' + (parts.join(', ') || 'ничего'));
+        }).catch(e => alert(e.message));
+    };
+    // Команда мастера «отдать контейнер игроку». id команды запоминаем: очередь чистится отдельной записью, и
+    // повторный снимок сессии до очистки иначе положил бы ту же добычу второй раз.
+    function handleDungeonLootCmd(e) {
+        let seen = [];
+        try { seen = JSON.parse(localStorage.getItem('skyrim_dungeon_loot_applied') || '[]'); } catch (er) { seen = []; }
+        if (e.id && seen.indexOf(e.id) !== -1) return;
+        const parts = applyDungeonLoot(e);
+        if (e.id) { seen.push(e.id); try { localStorage.setItem('skyrim_dungeon_loot_applied', JSON.stringify(seen.slice(-100))); } catch (er) { } }
+        if (typeof window.alchToast === 'function') window.alchToast('🔍 Мастер отдал тебе «' + escHtml(e.label || 'контейнер') + '»: ' + escHtml(parts.join(', ') || 'пусто'));
+    }
 
     // Обыск трупа самим игроком — раньше это умел делать только мастер, что было неудобно.
     window.playerLootCorpse = function (enemyId) {
@@ -13492,6 +13776,8 @@ function updateHungerPenalty() {
         // === ВЫЗЫВАЕМ БОЕВОЙ КАЛЬКУЛЯТОР (теперь он определён снаружи) ===
         updateCombat(str, dex);
         updateVitalBars();
+        // панель билдов пересчитываем, только когда она открыта (она зависит от навыков и взятых перков)
+        { const bp = document.getElementById('builds-panel'); if (bp && bp.open && typeof window.renderBuildsPanel === 'function') window.renderBuildsPanel(); }
         // saveLocalStorage(); // если нужно сохранять, раскомментируй
     } // ← ЭТА СКОБКА ЗАКРЫВАЕТ updateAll()
 
@@ -13749,254 +14035,56 @@ function updateHungerPenalty() {
     }
 
     // ===== ОТДЕЛЬНАЯ ФУНКЦИЯ updateCombat (исправленная) =====
+  // TASK-001: вся арифметика удара — в combat-bonuses.js (StBonuses.computePlayerWeaponAttack), здесь только сбор
+  // данных листа. Чтения DOM и геттеры эффектов вынесены сюда, чтобы модуль можно было проверять без страницы
+  // (window.__stSelfTestAttack) и звать с экрана мастера на тех же данных.
+  function collectPlayerAttackInput(finalStr, finalDex) {
+    const val = id => document.getElementById(id).value;
+    const mode = val('active-combat-weapon');
+    const meleeType = val('wep-melee-type');
+    // «Стальные кулаки»: класс брони надетых перчаток, только в тяжёлой броне (иначе 0 — бонуса нет).
+    let steelFistsArmor = 0;
+    if (equippedSlots.gloves) {
+        const glvF = playerInventory.find(i => i.itemId === equippedSlots.gloves);
+        const glvArm = glvF ? (parseInt(glvF.armorValue || glvF.armor) || 0) : 0;
+        if (glvArm && document.getElementById('eq-armor') && document.getElementById('eq-armor').value === 'heavy') steelFistsArmor = glvArm;
+    }
+    // Азура: стихийным считается оружие с зачарованием огня/холода/электричества в названии.
+    const isElemental = id => { const it = id ? playerInventory.find(i => i.itemId === id) : null; return !!(it && it.enchantment && /огн|пламя|холод|мороз|электр|молни/i.test(it.enchantment.name || '')); };
+    return {
+        mode,
+        starve: parseInt(val('food-starve')) || 0,
+        str: finalStr || parseInt(val('stat-str')) || 10,
+        dex: finalDex || parseInt(val('stat-dex')) || 10,
+        wis: parseInt(val('stat-wis')) || 10,
+        perks: window.perkBonuses || {},
+        isPowerAttack: document.getElementById('chk-power-attack').checked,
+        isDualWield: document.getElementById('chk-dual-wield').checked,
+        isSprintAttack: document.getElementById('chk-sprint-attack').checked,
+        melee: { dmg: parseInt(val('wep-melee-dmg')), type: meleeType, name: val('wep-melee-name'), offhandDmg: parseInt(val('wep-melee-offhand-dmg')) || 0 },
+        ranged: { dmg: parseInt(val('wep-ranged-dmg')), ammoDmg: parseInt(val('ammo-dmg')) || 0, type: val('wep-ranged-type'), name: val('wep-ranged-name') || '' },
+        enchantDmgMelee: getActiveWeaponEnchantDmg(true),
+        enchantDmgRanged: getActiveWeaponEnchantDmg(false),
+        offhandEnchantDmg: getOffhandWeaponEnchantDmg(),
+        weaponDmgPct: (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().weaponDamagePercent : 0,
+        skillBoostPct: { 'стрельба': getSkillBoostPercent('стрельба'), 'одноручное оружие': getSkillBoostPercent('одноручное оружие'), 'двуручное оружие': getSkillBoostPercent('двуручное оружие') },
+        unarmedBonus: getActiveUnarmedBonus(),
+        steelFistsArmor,
+        weaponDmgFlat: getActiveDmgFlat(),
+        god: window.activeGodBonuses || {},
+        elementalEnchant: { melee: isElemental(equippedSlots.meleeWeapon), ranged: isElemental(equippedSlots.rangedWeapon) },
+        sheogorathMult: (typeof sheogorathRoll !== 'undefined') ? sheogorathRoll.dmgMult : 1
+    };
+  }
+  window.collectPlayerAttackInput = collectPlayerAttackInput;
+
   function updateCombat(finalStr, finalDex) {
     if (document.getElementById('manual-dmg-lock').checked) {
         return;
     }
-
-    const mode = document.getElementById('active-combat-weapon').value;
-    const starve = parseInt(document.getElementById('food-starve').value) || 0;
-
-    let str = finalStr || parseInt(document.getElementById('stat-str').value) || 10;
-    let dex = finalDex || parseInt(document.getElementById('stat-dex').value) || 10;
-
-    const perks = window.perkBonuses || {};
-
-    let baseDmg = 2, totalDmg = 2, hitModifier = 0;
-    let wepType = 'unarmed';
-    let infoNotes = []; // текстовые пометки для GM (пробитие брони, обезглавливание, пассивки)
-    let enchantDmgMain = 0, offhandDmg = 0, offhandEnchantDmg = 0, statModForFormula = 0, statLabelForFormula = 'Сила';
-
-    const strMod = Math.floor((str - 10) / 2);
-    const dexMod = Math.floor((dex - 10) / 2);
-
-    const isPowerAttack = document.getElementById('chk-power-attack').checked;
-    const isDualWield = document.getElementById('chk-dual-wield').checked;
-    const isSprintAttack = document.getElementById('chk-sprint-attack').checked;
-
-    if (mode === 'melee') {
-        baseDmg = parseInt(document.getElementById('wep-melee-dmg').value) || 2;
-        wepType = document.getElementById('wep-melee-type').value;
-        const wepName = document.getElementById('wep-melee-name').value.toLowerCase();
-        // Призванное оружие (имя всегда начинается с "Призван...", см. performSummon) бьёт от
-        // Мудрости, не от Силы — по прямой просьбе, логичнее для оружия, вызванного магией.
-        const isSummonedWeapon = wepName.indexOf('призван') === 0;
-        const wisMod = calcAbilityMod(parseInt(document.getElementById('stat-wis').value) || 10);
-        hitModifier = isSummonedWeapon ? wisMod : strMod;
-
-        if (wepType === 'twohand_sword') hitModifier -= 2;
-        if (wepType === 'twohand_axe') hitModifier -= 3;
-        if (wepType === 'twohand_hammer') hitModifier -= 4;
-
-        const isTwoHanded = (wepType === 'twohand_sword' || wepType === 'twohand_axe' || wepType === 'twohand_hammer');
-
-        // === Бонусы от перков к базовому урону ===
-        let perkBonus = 0;
-
-        // Процентные бонусы (Сильная рука, Варвар)
-        perkBonus += baseDmg * (isTwoHanded ? (perks.twoHandedDamage || 0) : (perks.oneHandedDamage || 0));
-
-        // Копьё/пика (кровопотеря + доп. урон через сопротивления)
-        if (wepType === 'onehand' || wepType === 'twohand_sword') {
-            if (wepName.includes('коп') || wepName.includes('пик')) {
-                perkBonus += (perks.spearBleedDamage || 0) + (perks.spearResistDamage || 0);
-            }
-        }
-
-        // Топор (одноручный, кровопотеря)
-        if (wepType === 'onehand' && wepName.includes('топ')) {
-            perkBonus += (perks.axeBleedDamage || 0);
-        }
-        // Секира (двуручная, кровопотеря)
-        if (wepType === 'twohand_axe') {
-            perkBonus += (perks.greatAxeBleedDamage || 0);
-        }
-
-        // Боевые искусства (фикс. урон через сопротивление, не зависит от оружия)
-        if (perks.armorPenetrationDamage) {
-            perkBonus += perks.armorPenetrationDamage;
-        }
-
-        // Булава — игнор % брони цели (не считаем числом — нет статы брони цели, просто подсказка мастеру)
-        if (wepType === 'onehand' && wepName.includes('булав') && perks.maceArmorPenetration) {
-            infoNotes.push(`🔨 Костолом: игнорирует ${Math.round(perks.maceArmorPenetration * 100)}% брони цели`);
-        }
-        // Молот (двуручный) — аналогично
-        if (wepType === 'twohand_hammer' && perks.hammerArmorPenetration) {
-            infoNotes.push(`🔨 Крушитель черепов: игнорирует ${Math.round(perks.hammerArmorPenetration * 100)}% брони цели`);
-        }
-
-        // Итоговый урон: база + бонус от перков + сила
-        enchantDmgMain = getActiveWeaponEnchantDmg(true);
-        statModForFormula = str; statLabelForFormula = 'Сила';
-        totalDmg = baseDmg + perkBonus + str;
-        totalDmg += enchantDmgMain;
-
-        // === Двойное оружие (одноручное/кинжал, не для двуручного) ===
-        if (isDualWield && !isTwoHanded && wepType !== 'unarmed') {
-            if (perks.dualWieldHitBonus) {
-                hitModifier += perks.dualWieldHitBonus;
-            }
-            offhandDmg = parseInt(document.getElementById('wep-melee-offhand-dmg').value) || 0;
-            offhandEnchantDmg = getOffhandWeaponEnchantDmg();
-            if (offhandDmg > 0 || offhandEnchantDmg > 0) {
-                totalDmg += offhandDmg + offhandEnchantDmg;
-            }
-        }
-
-        // === Силовая атака / Рывок-атака ===
-        if (isPowerAttack && wepType !== 'unarmed') {
-            // Бонусы к попаданию от Боевой стойки и Стойки чемпиона
-            if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
-            if (perks.twoHandedPowerAttackHitBonus && isTwoHanded) hitModifier += perks.twoHandedPowerAttackHitBonus;
-
-            // Рывок / Великий рывок: спринт-атака заменяет обычную силовую (х2 вместо 1.5+бонусы)
-            const sprintPerkUnlocked = perks.sprintPowerAttackDouble;
-            if (isSprintAttack && sprintPerkUnlocked) {
-                totalDmg = Math.round(totalDmg * 2);
-                infoNotes.push('🏃 Рывок-атака: фиксированный х2 урона (дистанция подтверждена мастером)');
-            } else {
-                // Раньше при isSprintAttack без перка код молча уходил в обычную силовую атаку
-                // без единого слова об этом — игрок не понимал, почему галочка "ничего не делает".
-                if (isSprintAttack && !sprintPerkUnlocked) {
-                    infoNotes.push('⚠ Галочка «Рывок-атака» стоит, но перк «Рывок»/«Великий рывок» не открыт — считается как обычная силовая атака.');
-                }
-                // Обычная силовая атака: множитель 1.5 + бонусы (Безжалостный удар, Сокрушительный удар)
-                let powerMult = 1.5;
-                if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
-
-                // Двойная мясорубка: +50% урона на силовую атаку двумя одноручными оружиями
-                if (isDualWield && !isTwoHanded && perks.dualWieldPowerAttackDamage) {
-                    powerMult += perks.dualWieldPowerAttackDamage;
-                }
-
-                totalDmg = Math.round(totalDmg * powerMult);
-
-                // Шанс обезглавливания (Безжалостный удар / Сокрушительный удар)
-                if (perks.decapitationChance) {
-                    infoNotes.push(`💀 Шанс обезглавливания: ${Math.round(perks.decapitationChance * 100)}%`);
-                }
-            }
-        } else if (isSprintAttack) {
-            infoNotes.push('⚠️ Рывок-атака засчитывается только вместе с «Силовой атакой»');
-        }
-
-        // Бонусы к попаданию от Боевых искусств
-        if (perks.hitBonus) hitModifier += perks.hitBonus;
-        // Мечник — бонус на силовую атаку мечом
-        if (wepType === 'onehand' && isPowerAttack && wepName.includes('меч')) {
-            hitModifier += (perks.swordPowerAttackHitBonus || 0);
-        }
-        // Глубокие раны — бонус на силовую атаку двуручным мечом
-        if (wepType === 'twohand_sword' && isPowerAttack) {
-            hitModifier += (perks.greatswordPowerAttackHitBonus || 0);
-        }
-
-        // Контрудар и Безоружный бой — не числовой бонус к этому броску, просто подсказка, что активны
-        if (perks.counterAttackBonus) infoNotes.push('🛡️ Контрудар активен: за каждые 2 полученных попадания +1 к кубам до смерти противника');
-        if (wepType === 'unarmed' && perks.canUseGauntlets) infoNotes.push('👊 Безоружный бой: можно атаковать кастетами');
-        if (isTwoHanded && perks.sweepingSideAttack && isPowerAttack) infoNotes.push('🌀 Веерная атака: силовая атака при шаге вбок задевает всех противников впереди');
-
-    } else {
-        // Дальний бой (без изменений)
-        baseDmg = parseInt(document.getElementById('wep-ranged-dmg').value) || 0;
-        let ammoDmg = parseInt(document.getElementById('ammo-dmg').value) || 0;
-        wepType = document.getElementById('wep-ranged-type').value;
-        // Призванный лук — та же логика, что у призванного ближнего оружия: бьёт от Мудрости.
-        const rangedWepName = (document.getElementById('wep-ranged-name').value || '').toLowerCase();
-        const isSummonedRanged = rangedWepName.indexOf('призван') === 0;
-        const wis = parseInt(document.getElementById('stat-wis').value) || 10;
-        const rangedWisMod = calcAbilityMod(wis);
-        hitModifier = isSummonedRanged ? rangedWisMod : dexMod;
-        enchantDmgMain = getActiveWeaponEnchantDmg(false);
-        statModForFormula = isSummonedRanged ? wis : dex; statLabelForFormula = isSummonedRanged ? 'Мудрость' : 'Ловкость';
-        totalDmg = baseDmg + (isSummonedRanged ? wis : dex) + ammoDmg;
-        totalDmg += enchantDmgMain;
-
-        // Избыточное натяжение: +20%/ранг к базовому урону лука
-        if (perks.rangedDamagePercent) {
-            const bonus = Math.round(baseDmg * perks.rangedDamagePercent);
-            totalDmg += bonus;
-        }
-        // Критический выстрел: добавляет долю модификатора Силы к урону
-        if (perks.criticalShotStrFraction) {
-            const strBonus = Math.round(strMod * perks.criticalShotStrFraction);
-            if (strBonus) {
-                totalDmg += strBonus;
-                infoNotes.push(`🎯 Критический выстрел: +${strBonus} от Силы`);
-            }
-        }
-        // Твёрдая рука: бонус к попаданию
-        if (perks.rangedHitBonus) hitModifier += perks.rangedHitBonus;
-    }
-
-    hitModifier -= starve * 2;
-
-    // Активные заклинания-баффы типа "Повышает урон оружия на N%" — раньше нигде не применялись.
-    const weaponDmgPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().weaponDamagePercent : 0;
-    if (weaponDmgPct) totalDmg = Math.round(totalDmg * (1 + weaponDmgPct / 100));
-    // «Повышение навыка» (зачарование/зелье): Одноручное/Двуручное/Стрельба — урон оружия на N% больше.
-    const boostSkillKey = weaponBoostSkill(mode, wepType, ['twohand_sword', 'twohand_axe', 'twohand_hammer'].includes(wepType));
-    const weaponBoostPct = boostSkillKey ? getSkillBoostPercent(boostSkillKey) : 0;
-    if (weaponBoostPct) totalDmg = Math.round(totalDmg * (1 + weaponBoostPct / 100));
-    // «Повреждение наносимого физ.урона» (дебафф): оружие бьёт на N слабее.
-    if (mode === 'melee' && wepType === 'unarmed') { const unB = getActiveUnarmedBonus(); if (unB) totalDmg += unB; } // «Трансмутация мускулы»
-    let steelFistsNote = 0;
-    if (mode === 'melee' && wepType === 'unarmed' && perks.steelFists && equippedSlots.gloves) { // «Стальные кулаки»: + класс брони тяжёлых перчаток
-        const glvF = playerInventory.find(i => i.itemId === equippedSlots.gloves);
-        const glvArm = glvF ? (parseInt(glvF.armorValue || glvF.armor) || 0) : 0;
-        if (glvArm && document.getElementById('eq-armor') && document.getElementById('eq-armor').value === 'heavy') { totalDmg += glvArm; steelFistsNote = glvArm; }
-    }
-    const weaponDmgFlat = getActiveDmgFlat();
-    if (weaponDmgFlat) totalDmg = Math.max(0, totalDmg + weaponDmgFlat);
-
-    // Бонусы бога к урону оружием — раньше godBonuses существовал в данных, но реально считались
-    // только hp/mp/armor/speed. Подключаем весь боевой блок разом.
-    let godDmgNotes = [];
-    if (steelFistsNote) godDmgNotes.push('«Стальные кулаки» +' + steelFistsNote);
-    if (gb('weaponDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('weaponDmg') / 100)); godDmgNotes.push(`оружие +${gb('weaponDmg')}%`); }
-    if (mode === 'melee' && gb('meleeDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('meleeDmg') / 100)); godDmgNotes.push(`ближний бой +${gb('meleeDmg')}%`); }
-    if (mode !== 'melee' && gb('rangedDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('rangedDmg') / 100)); godDmgNotes.push(`дальний бой +${gb('rangedDmg')}%`); }
-    if (gb('pureDmg')) { totalDmg = Math.round(totalDmg * (1 + gb('pureDmg') / 100)); godDmgNotes.push(`чистый урон (Намира) +${gb('pureDmg')}%`); }
-    if (mode === 'melee' && gb('axeDmg') && (wepType === 'twohand_axe' || document.getElementById('wep-melee-name').value.toLowerCase().match(/топор|секир/))) {
-        totalDmg = Math.round(totalDmg * (1 + gb('axeDmg') / 100)); godDmgNotes.push(`топор/секира (Талос) +${gb('axeDmg')}%`);
-    }
-    if (enchantDmgMain && gb('elementalWeaponDmg')) { // Азура: стихийное оружие бьёт сильнее
-        const wIdEl = mode === 'melee' ? equippedSlots.meleeWeapon : equippedSlots.rangedWeapon;
-        const wItEl = wIdEl ? playerInventory.find(i => i.itemId === wIdEl) : null;
-        if (wItEl && wItEl.enchantment && /огн|пламя|холод|мороз|электр|молни/i.test(wItEl.enchantment.name || '')) {
-            const bEl = Math.round(enchantDmgMain * gb('elementalWeaponDmg') / 100);
-            totalDmg += bEl; godDmgNotes.push(`стихийное оружие (Азура) +${bEl}`);
-        }
-    }
-    if (enchantDmgMain && gb('enchantDmg')) {
-        const bonus = Math.round(enchantDmgMain * gb('enchantDmg') / 100);
-        totalDmg += bonus; godDmgNotes.push(`зачарование (Акатош) +${bonus}`);
-    }
-    if (isPowerAttack && gb('powerAttackDmg') && mode === 'melee') {
-        totalDmg = Math.round(totalDmg * (1 + gb('powerAttackDmg') / 100)); godDmgNotes.push(`силовая атака +${gb('powerAttackDmg')}%`);
-    }
-    // Шеогорат — случайный множитель урона за ход (роль кидается по "Следующий ход/круг").
-    if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) {
-        totalDmg = Math.round(totalDmg * sheogorathRoll.dmgMult);
-        godDmgNotes.push(`Шеогорат: урон ×${sheogorathRoll.dmgMult} на этот ход`);
-    }
-    if (isPowerAttack && gb('powerAttackHeal') && mode === 'melee') {
-        godDmgNotes.push(`⚕️ силовая атака лечит ${gb('powerAttackHeal')}% от урона (применится автоматически при "Применить" в бою)`);
-    }
-    if (isPowerAttack && gb('instantKillChance') && mode === 'melee') {
-        godDmgNotes.push(`💀 Шанс мгновенного убийства (Мерунес Дагон): ${gb('instantKillChance')}% — бросается автоматически при «Применить»`);
-    }
-    if (gb('fearChance')) {
-        godDmgNotes.push(`😱 Доп. шанс обратить цель в бегство: +${gb('fearChance')}% — бросается автоматически при «Применить»`);
-    }
-
-    let sneakMult = 2;
-    if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
-    else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
-    else if (mode !== 'melee' && wepType === 'bow' && perks.sneakBowTriple) sneakMult = 3; // «Верный прицел»: скрытные атаки из лука ×3
-    // Бонус бога (Боэтия/Ноктюрнал) к множителю урона из скрытности — было только текстом.
-    sneakMult += gb('sneakMult');
+    const calcR = window.StBonuses.computePlayerWeaponAttack(collectPlayerAttackInput(finalStr, finalDex));
+    const { totalDmg, hitModifier, sneakMult, mode, wepType, baseDmg, enchantDmgMain, offhandDmg, offhandEnchantDmg,
+        statModForFormula, statLabelForFormula, weaponDmgPct, weaponBoostPct, boostSkillKey, weaponDmgFlat, infoNotes, godDmgNotes } = calcR;
 
     // Формула по составным частям (до множителей силовой атаки/рывка/скрытности)
     let formulaParts = [`${statLabelForFormula} ${statModForFormula >= 0 ? '+' : ''}${statModForFormula}`, `оружие ${baseDmg}`];
@@ -14081,6 +14169,7 @@ function updateHungerPenalty() {
             name: document.getElementById('char-name').value,
             race: document.getElementById('char-race').value,
             sign: document.getElementById('char-sign').value,
+            originLock: originLock, // когда выбраны раса/знак и закреплены ли (см. ORIGIN_GRACE_MS)
             lvl: characterLevel, // дублируем в старое поле для обратной совместимости, не читаем при восстановлении
             lives: document.getElementById('char-lives').value,
             diary: playerDiary,
@@ -14483,6 +14572,7 @@ function updateHungerPenalty() {
             document.getElementById('char-name').value = data.name || '';
             document.getElementById('char-race').value = data.race || 'nord';
             document.getElementById('char-sign').value = data.sign || 'none';
+            restoreOriginLock(data);
             // char-level больше не восстанавливается отдельно — его выставит updateAll() из characterLevel
             document.getElementById('char-lives').value = (data.lives === undefined || data.lives === null || data.lives === '') ? 50 : data.lives;
             playerDiary = Array.isArray(data.diary) ? data.diary : []; renderDiary();
@@ -14988,9 +15078,9 @@ function updateHungerPenalty() {
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
 <script src="firebase-config.js?v=3"></script>
-<script src="combat-calc.js?v=2"></script>
+<script src="combat-calc.js?v=3"></script>
 <script src="grid-core.js?v=2"></script>
-<script src="cloud.js?v=25"></script>
+<script src="cloud.js?v=26"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

@@ -15,8 +15,13 @@
     // dmgType: 'physical'/'fire'/… (без типа резисты не применяются — как и раньше).
     // penetrationPct: пробитие защиты — снижает ПОЛОЖИТЕЛЬНЫЙ резист цели на этот удар (уязвимость пробитием не «лечится»).
     // Возвращает { base, finalDmg, resist (итоговый, %), notes:[…] } — notes годятся для вывода пользователю.
-    function previewDamage(enemy, dmgAmount, dmgType, penetrationPct) {
+    // bonusesCtx (необязательно, TASK-001): { steps } из StBonuses.computePlayerWeaponAttack — тогда dmgAmount считается
+    // СЫРОЙ базой оружия и бонусы применяются до резистов. Без него всё как раньше: dmgAmount — уже итоговый урон.
+    function previewDamage(enemy, dmgAmount, dmgType, penetrationPct, bonusesCtx) {
         const e = enemy || {};
+        if (bonusesCtx && bonusesCtx.steps && typeof window !== 'undefined' && window.StBonuses) {
+            dmgAmount = window.StBonuses.applyBonuses(dmgAmount, bonusesCtx.steps);
+        }
         const base = Math.max(0, Number(dmgAmount) || 0);
         const notes = [];
         let resist = dmgType && e.resist ? (e.resist[dmgType] || 0) : 0;

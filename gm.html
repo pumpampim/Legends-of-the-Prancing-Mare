@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=14">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -78,14 +78,20 @@
         <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти</button>
     </div>
 
-    <!-- ===== ПУЛЬТ СЕССИИ (эпик 3.1) ===== -->
-    <div id="gm-dashboard" class="st-dashboard">
-        <button type="button" class="dash-btn st-dash-btn" data-group="prep">📖 Подготовка</button>
-        <button type="button" class="dash-btn st-dash-btn" data-group="scene">🎭 Сцена</button>
-        <button type="button" class="dash-btn st-dash-btn" data-group="combat">⚔️ Бой</button>
-        <button type="button" class="dash-btn st-dash-btn" data-group="rewards">🎁 Награды</button>
-        <button type="button" class="dash-btn st-dash-btn" data-group="randoms">🎲 Случайности</button>
-        <button type="button" class="dash-btn st-dash-btn" data-group="other">🗂 Прочее</button>
+    <!-- ===== ПУЛЬТ СЕССИИ: табы (эпик 1 ТЗ-2) =====
+         Раньше кнопки групп только сворачивали/разворачивали панели, и после перехода к панели мастер листал страницу
+         обратно наверх к пульту. Теперь пульт липкий, а видна только одна группа панелей (data-gm-tab на панели).
+         Alt+1…Alt+5 — переключение с клавиатуры. -->
+    <div id="gm-dashboard" class="st-dashboard" role="tablist">
+        <button type="button" class="dash-btn st-dash-btn" data-gm-tab="combat" role="tab" title="Alt+1">⚔️ Бой</button>
+        <button type="button" class="dash-btn st-dash-btn" data-gm-tab="scene" role="tab" title="Alt+2">🎭 Сцена</button>
+        <button type="button" class="dash-btn st-dash-btn" data-gm-tab="rewards" role="tab" title="Alt+3">🎁 Награды</button>
+        <button type="button" class="dash-btn st-dash-btn" data-gm-tab="world" role="tab" title="Alt+4">🌍 Мир</button>
+        <button type="button" class="dash-btn st-dash-btn" data-gm-tab="refs" role="tab" title="Alt+5">📚 Справочники</button>
+        <span class="st-inbox-wrap">
+            <button type="button" id="gm-inbox-btn" class="dash-btn st-dash-btn st-inbox-btn" style="display:none;" onclick="gmInboxToggle()" title="Что ждёт решения мастера">📥 Инбокс (<span id="gm-inbox-count">0</span>)</button>
+            <div id="gm-inbox-menu" class="st-inbox-menu" hidden></div>
+        </span>
         <button type="button" class="dash-btn st-dash-btn st-dash-reset" id="gm-checklist-reset" title="Показать чеклист первой сессии снова">↺ Чеклист</button>
     </div>
     <details id="gm-first-checklist" class="panel st-checklist" open style="display:none;">
@@ -118,7 +124,7 @@
             </div>
         </div>
 
-        <div class="panel" id="gg-panel">
+        <div class="panel" data-gm-tab="combat" id="gg-panel">
             <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Боевая сетка</h2>
             <div id="gg-tools" class="gg-tools">
                 <button type="button" data-tool="select" onclick="GmGrid.setTool('select')" title="Выбрать и двигать фигуры">✋ Фигуры</button>
@@ -151,13 +157,13 @@
         </div>
 
         <div class="grid-2">
-            <div class="panel">
+            <div class="panel" data-gm-tab="combat">
                 <h2><span class="skyrim-icon icon-shield" aria-hidden="true"></span> Отряд</h2>
                 <div style="margin-bottom:6px;"><button class="btn-danger" style="font-size:12px;" onclick="gmPartyFell()" title="Вся партия падает: игроки видят экран «Персонаж пал»">☠ Вся партия пала</button></div>
                 <div id="gm-party-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px;"></div>
             </div>
 
-            <div class="panel">
+            <div class="panel" data-gm-tab="combat">
                 <h2><span class="skyrim-icon icon-skull" aria-hidden="true"></span> Противники</h2>
                 <div id="gm-enemy-bulk" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
                     <button type="button" style="width:auto; margin:0;" onclick="gmEnemySelectAll(true)">Выделить всех</button>
@@ -227,7 +233,7 @@
             </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-gm-tab="world">
             <h2>🧭 Подготовка сессии</h2>
             <p style="font-size:13px; opacity:.75;">Всё по владению на одном экране: жители с квестами, места, враги, погода и положение партии. Владение подставляется по метке партии на карте, но его можно выбрать вручную.</p>
             <div id="prep-now" style="margin-bottom:8px; padding:6px 8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
@@ -246,7 +252,7 @@
             <div id="prep-body" style="max-height:600px; overflow:auto;"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-gm-tab="scene">
             <h2>📖 Журнал сессии</h2>
             <p style="font-size:13px; opacity:.75;">Игроки видят это на вкладке «Дневник». Сводку можно перезаписывать, слухи добавляются списком.</p>
             <label>Сводка прошлой сессии</label>
@@ -263,7 +269,7 @@
             <div id="gm-journal-entries" style="max-height:220px; overflow:auto;"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-gm-tab="scene">
             <h2>🗣 Молва</h2>
             <p style="font-size:13px; opacity:.75;">Сайт запоминает деяния партии (победы, павшие, штрафы, тюрьма, выданные квесты) и превращает их в слухи: верные, искажённые или ложные. Игроки читают слухи во вкладке «Дневник» — у каждого слуха пометка, в каком владении его слышали; когда партия приходит в это владение, он оказывается сверху.</p>
             <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
@@ -308,7 +314,7 @@
             <div id="rum-result" style="font-size:13px; color:#2ecc71; margin-top:6px;"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2><span class="skyrim-icon icon-sword" aria-hidden="true"></span> Разрешить атаку (НПС → игрок)</h2>
             <p style="font-size:13px; opacity:.75;">Выбери, кто из текущих противников атакует и кого из игроков — сайт бросит кубы и посчитает урон (оружие или заклинание/крик противника). Применение — отдельная кнопка.</p>
             <label>Атакующий (противник)</label>
@@ -338,7 +344,7 @@
         </div>
 
         <div class="grid-2">
-            <div class="panel">
+            <div class="panel" data-gm-tab="combat">
                 <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Порядок ходов</h2>
                 <p style="font-size:12px; opacity:.75;">Своя система, без броска инициативы — расставляешь порядок сам, из игроков/врагов/существ (призванных и поднятых игроками) или вручную по имени.</p>
                 <div id="turn-order-list"></div>
@@ -369,7 +375,7 @@
                 <p style="font-size:11px; opacity:.6; margin:4px 0 0;">Ход и круг общие: переключить может мастер или любой игрок (повтор в течение 3 секунд не считается). При каждом переключении у врагов тикают яды, статусы и кулдауны криков, а у игроков — их эффекты на листе.</p>
             </div>
 
-            <div class="panel">
+            <div class="panel" data-gm-tab="scene">
                 <h2>🤫 Шёпот с игроками (видно только тебе и адресату)</h2>
                 <div id="gm-whispers-list" style="max-height:160px; overflow-y:auto;"></div>
                 <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
@@ -380,7 +386,7 @@
                 <button style="margin-top:6px; width:100%;" onclick="clearWhispers()">Очистить шёпот (и твои ответы)</button>
             </div>
 
-            <div class="panel">
+            <div class="panel" data-gm-tab="scene">
                 <h2><span class="skyrim-icon icon-book" aria-hidden="true"></span> Боевой журнал
                     <button type="button" id="gm-undo-btn" class="st-undo-btn" onclick="gmUndoLast()" title="Отменяет последнее изменение врагов (доступно 30 секунд)" disabled>↶ Отменить</button></h2>
                 <div id="gm-combat-log" class="combat-log"></div>
@@ -395,7 +401,7 @@
                 </div>
             </div>
 
-            <div class="panel">
+            <div class="panel" data-gm-tab="scene">
                 <h2>🌤️ Время суток и погода</h2>
                 <p style="font-size:13px; opacity:.75;">Задаёт мастер — видят все игроки в сессии. Погода подбирается случайно из пула, подходящего региону.</p>
                 <label>Время суток</label>
@@ -446,7 +452,7 @@
             </div>
 
             <!-- ===== КАРТА И ПОЛОЖЕНИЕ ПАРТИИ ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="world">
                 <h2>🗺️ Карта и положение партии</h2>
                 <p style="font-size:13px; opacity:.75;">Схема Скайрима. Клик по владению — приблизить. В приближении клик по городу, метке места или любой точке выбирает позицию; «Партия здесь» показывает её игрокам на вкладке «Карта» и ставит текущее владение (для цен и сбора ингредиентов). Приближённое владение показывается картой-картинкой. Метки подземелий расставляются в справочнике «Владения» и видны только тебе; чтобы показать метку игрокам, выбери её (или любую точку) и нажми «📌 Метка для игроков» — подпись берётся из поля ниже.</p>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
@@ -518,8 +524,52 @@
                 <div id="gm-map-result" style="margin-top:6px; font-size:14px;"></div>
             </div>
 
+            <!-- ===== ПРЕСЕТЫ ДАНЖЕЙ (ТЗ-2, эпик 2) ===== -->
+            <div class="panel" data-gm-tab="world" id="gm-dungeon-panel">
+                <h2>🏰 Пресеты данжей</h2>
+                <p style="font-size:13px; opacity:.75;">Готовишь данж один раз — потом разворачиваешь в сессии одной кнопкой: враги встают в бой, игроки видят «Вы в: …» и сами обыскивают контейнеры. Черновики собраны из справочника владений (враги и лут по вики) — проверь и поправь перед игрой; сохранённый пресет живёт в облаке и доступен с любого устройства.</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                    <select id="dungeon-hold-filter" style="flex:1 1 160px;" onchange="renderDungeonPresetSelect()" title="Показать черновики только этого владения"><option value="">Все владения</option></select>
+                    <select id="dungeon-preset-select" style="flex:2 1 240px;" onchange="onDungeonPresetPicked()"></select>
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                    <button class="btn-success" style="width:auto;" onclick="deployDungeonToSession()">🚀 Развернуть в сессии</button>
+                    <button class="btn-danger" style="width:auto;" onclick="closeDungeonSession()">🚪 Закрыть данж</button>
+                    <button style="width:auto;" onclick="createNewDungeonPreset()">+ Новый</button>
+                </div>
+                <div id="dungeon-current-status" style="font-size:13px; margin-bottom:8px;"></div>
+                <div id="dungeon-preview" style="font-size:13px;"></div>
+
+                <details id="dungeon-editor" style="display:none; border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-top:8px;">
+                    <summary style="cursor:pointer; font-weight:bold;">✏️ Редактор пресета</summary>
+                    <div style="margin-top:8px;">
+                        <label>Название</label>
+                        <input type="text" id="dgn-name" placeholder="Курган Мрачного Водопада">
+                        <label>Владение</label>
+                        <select id="dgn-hold"></select>
+                        <label>Заметки мастера</label>
+                        <textarea id="dgn-notes" rows="4"></textarea>
+
+                        <label style="margin-top:8px;">Враги (имя из базы + количество)</label>
+                        <datalist id="dgn-enemy-datalist"></datalist>
+                        <div id="dgn-enemies-list"></div>
+                        <button style="width:auto; margin-top:4px;" onclick="addDungeonEnemy()">+ Враг</button>
+
+                        <label style="margin-top:8px;">Контейнеры с лутом <span style="opacity:.6; font-weight:normal;">(предметы — по одному в строке: «Железный меч × 2»)</span></label>
+                        <div id="dgn-loot-list"></div>
+                        <button style="width:auto; margin-top:4px;" onclick="addDungeonContainer()">+ Контейнер</button>
+
+                        <div style="display:flex; gap:6px; margin-top:12px;">
+                            <button class="btn-success" style="flex:1;" onclick="saveDungeonPreset()">💾 Сохранить</button>
+                            <button class="btn-danger" style="width:auto;" onclick="deleteDungeonPreset()">🗑 Удалить</button>
+                        </div>
+                        <div id="dgn-editor-msg" style="font-size:13px; margin-top:6px;"></div>
+                    </div>
+                </details>
+            </div>
+
             <!-- ===== СЛУЧАЙНЫЕ СОБЫТИЯ (Задача E) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="world">
                 <h2>🎲 Случайное событие в пути</h2>
                 <p style="font-size:12px; opacity:.75;">54 встречи из таблицы (д100, но реально заполнено только до 54). У каждой может быть условие ("только на дорогах" и т.п.) — ты сам решаешь, подходит ли контекст, событие не фильтруется автоматически.</p>
                 <button class="btn-success" style="width:100%;" onclick="rollRandomEvent()">🎲 Бросить случайное событие</button>
@@ -527,14 +577,14 @@
             </div>
 
             <!-- ===== СПРАВОЧНИК ПО ВСЕЙ ПОГОДЕ (только мастер) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="refs">
                 <h2>📋 Все погодные явления</h2>
                 <p style="font-size:12px; opacity:.75;">Игрок видит только ТЕКУЩУЮ погоду и её эффект (в виджете на своём листе) — полный список всех вариантов только здесь.</p>
                 <div id="all-weather-body"></div>
             </div>
 
             <!-- ===== ЖИВЫЕ ТОРГОВЦЫ (Задача C) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="rewards">
                 <h2>🏪 Живые торговцы</h2>
                 <p style="font-size:12px; opacity:.75;">Обновляет ассортимент (10-20 товаров) и сбрасывает золото торговца до базового. Ниже видно, у кого ассортимент устарел (7+ игровых дней с момента последнего обновления, считается по общему счётчику дней сессии) — авто-сброса нет специально, чтобы не менять товар посреди игры без твоего ведома.</p>
                 <label>Тип торговца</label>
@@ -547,7 +597,7 @@
             </div>
 
             <!-- ===== ПРАЗДНИК ВРУЧНУЮ (Задача F) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="world">
                 <h2>🎉 Запустить праздник вручную</h2>
                 <p style="font-size:12px; opacity:.75;">Праздники по дате и так подсвечиваются у игроков автоматически (если календарь совпадает) — это для случая, когда хочешь запустить эффект праздника независимо от текущей даты на листе игрока.</p>
                 <select id="holiday-manual-select"></select>
@@ -557,7 +607,7 @@
             </div>
 
             <!-- ===== ГРУППОВОЙ БРОСОК (Задача I.1) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="combat">
                 <h2>🎲 Групповой бросок</h2>
                 <p style="font-size:12px; opacity:.75;">Все игроки в сессии получают запрос кинуть указанный навык. Каждый бросает у себя (d20+модификатор+бонусы навыка), результат сразу виден здесь.</p>
                 <label>Навык</label>
@@ -569,7 +619,7 @@
             </div>
 
             <!-- ===== КООПЕРАТИВНАЯ АТАКА (Задача I.2) ===== -->
-            <div class="panel">
+            <div class="panel" data-gm-tab="combat">
                 <h2>⚔️ Кооперативная атака</h2>
                 <p style="font-size:12px; opacity:.75;">Двое игроков бьют одну цель одновременно — один общий бросок, урон обоих оружий складывается.</p>
                 <label>Игрок 1</label>
@@ -584,7 +634,7 @@
         </div>
 
         <!-- ===== НОВЫЙ БЛОК: БАЗА ПРЕДМЕТОВ ===== -->
-       <div class="panel">
+       <div class="panel" data-gm-tab="refs">
     <h2>📦 База предметов</h2>
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
         <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
@@ -613,7 +663,7 @@
 </div>
 
         <!-- ===== СОЗДАНИЕ СВОЕГО ПРЕДМЕТА ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="refs">
             <h2>🛠️ Создать предмет</h2>
             <label>Название</label>
             <input type="text" id="ci-name" placeholder="Название предмета">
@@ -742,7 +792,7 @@
         </div>
 
         <!-- ===== ПРОВЕРКА АЛХИМИИ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="refs">
             <h2><span class="skyrim-icon icon-potion" aria-hidden="true"></span> Проверить зелье/яд</h2>
             <p style="font-size:13px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам — как на 2, так и на 3 ингредиента, как у игроков. Снаряжение (гир-бонус) не учитывается.</p>
             <label>Игрок (для навыка/перков)</label>
@@ -760,7 +810,7 @@
         </div>
 
         <!-- ===== ПРОВЕРКА ЗАЧАРОВАНИЯ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="refs">
             <h2><span class="skyrim-icon icon-gem" aria-hidden="true"></span> Проверить зачарование</h2>
             <p style="font-size:13px; opacity:.75;">Считает по реальному навыку игрока (с расовым бонусом) и его перкам.</p>
             <label>Игрок (для навыка/перков)</label>
@@ -787,7 +837,7 @@
         </div>
 
         <!-- ===== ОТКРЫТИЕ РЕЦЕПТОВ КУЗНИЦЫ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Открыть рецепты кузницы игроку</h2>
             <p style="font-size:14px; opacity:.8;">Игрок видит на своей вкладке «Кузница» только то, что ты ему отметишь здесь — по правилу «нужно найти мастера, который научит». Использует того же игрока, что выбран ниже в панели «Инвентарь».</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
@@ -799,7 +849,7 @@
         </div>
 
         <!-- ===== ИНВЕНТАРЬ И ДЕНЬГИ ИГРОКОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🎒 Инвентарь и деньги игрока</h2>
             <p style="font-size:14px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить или списать.</p>
             <select id="inv-player-select" style="width:100%; margin-bottom:10px;" onchange="loadPlayerInventoryForGm()"></select>
@@ -843,7 +893,7 @@
         </div>
 
         <!-- ===== ГИЛЬДИИ (Задача B) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🏛️ Гильдии</h2>
             <p style="font-size:12px; opacity:.75;">Счётчик выполненных заказов по каждой гильдии — использует того же игрока, что выбран выше в панели инвентаря.</p>
             <div id="museum-requests"></div>
@@ -852,7 +902,7 @@
         </div>
 
         <!-- ===== ЛИМИТЫ ИГРОКОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="world">
             <h2>⚙️ Лимиты игроков</h2>
             <p style="font-size:12px; opacity:.75;">Пустое поле — значение по умолчанию. 0 — без ограничения. Лимиты считаются на игровой день игрока.</p>
             <div id="player-limits-form" style="display:grid; grid-template-columns:1fr 90px; gap:6px; align-items:center;">
@@ -867,7 +917,7 @@
         </div>
 
         <!-- ===== СПРАВОЧНИК ПО ГИЛЬДИИ (только мастер, одна гильдия за раз) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="refs">
             <h2>📖 Справочник гильдии</h2>
             <p style="font-size:12px; opacity:.75;">Квестодатели, плюшки гильдии и пороги наград бронёй — из Фракции.xlsx. Игрок этого не видит.</p>
             <select id="guild-info-select" onchange="renderGuildInfoPanel()"></select>
@@ -875,7 +925,7 @@
         </div>
 
         <!-- ===== АКТИВНЫЙ БЛОК (скрытые кубы) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>🛡️ Активный блок</h2>
             <p style="font-size:12px; opacity:.75;">Отдельный инструмент от обычной атаки — не трогает её вообще. Оба броска скрытые, результат видишь только ты (игрок узнаёт только исход).</p>
             <label>Атакующий (враг)</label>
@@ -893,7 +943,7 @@
         </div>
 
         <!-- ===== ПОХОДНЫЙ ЛАГЕРЬ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="scene">
             <h2>⛺ Походный лагерь</h2>
             <div id="gm-camp-status" style="font-size:13px; opacity:.8; margin-bottom:8px;"></div>
             <label>Местность (влияет на шанс ночной засады)</label>
@@ -907,7 +957,7 @@
         </div>
 
         <!-- ===== ТУРНИРЫ БОЙЦОВСКОГО КЛУБА ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🥊 Турниры Бойцовского клуба</h2>
             <p style="font-size:12px; opacity:.75;">Группа по УРОВНЮ ПЕРСОНАЖА, не по заказам гильдии. Сами бои — обычным боевым инструментом (1на1/3на3, 5 боёв); эта панель — только запись (залог 200) и выдача награды. Использует того же игрока, что выбран в панели «Инвентарь».</p>
             <label>Группа</label>
@@ -926,21 +976,21 @@
         </div>
 
         <!-- ===== СПРАВОЧНИК ЗАЧАРОВАНИЙ (только мастер, полный список) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="refs">
             <h2>🔮 Справочник зачарований</h2>
             <p style="font-size:12px; opacity:.75;">Все эффекты зачарования оружия/брони — игрок видит в своём инструменте зачарования только УЗНАННЫЕ (разрушив подходящую вещь), это полный список для справки/создания предметов.</p>
             <div id="all-enchants-body" style="max-height:400px; overflow-y:auto;"></div>
         </div>
 
         <!-- ===== СВЕРХЪЕСТЕСТВЕННОЕ (Задача B) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🌙 Сверхъестественное</h2>
             <p style="font-size:12px; opacity:.75;">Ликантропия/вампиризм того же выбранного игрока.</p>
             <div id="supernatural-panel-body"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
         </div>
 
         <!-- ===== РЕПУТАЦИЯ ПО ВЛАДЕНИЯМ (Задача D, видно только мастеру) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>⚖️ Репутация по владениям</h2>
             <p style="font-size:12px; opacity:.75;">Видно только мастеру — игрок свою репутацию не видит. Может быть отрицательной.</p>
             <div id="reputation-list"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
@@ -960,14 +1010,14 @@
         </div>
 
         <!-- ===== ШТРАФЫ И ТЮРЬМА ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🔒 Штрафы и тюрьма</h2>
             <p style="font-size:12px; opacity:.75;">Штраф видно и игроку (в отличие от репутации) — он должен знать, что должен и сколько. От 1000 септимов обычно ведёт в тюрьму, если не оплачен сразу; отказ платить — тоже повод посадить, независимо от суммы.</p>
             <div id="crime-panel-body"><p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p></div>
         </div>
 
         <!-- ===== ВЫДАЧА КВЕСТОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>📜 Выдать квест</h2>
 
             <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
@@ -1012,7 +1062,7 @@
         </div>
 
         <!-- ===== НАГРАДА НА ВСЮ ГРУППУ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2><span class="skyrim-icon icon-chest" aria-hidden="true"></span> Награда на всю группу</h2>
             <p style="font-size:13px; opacity:.75;">Выдаёт золото и/или один предмет сразу всем участникам сессии — без выбора по одному.</p>
             <label>Золото каждому</label>
@@ -1030,7 +1080,7 @@
         </div>
 
         <!-- ===== ЧАТ ПАРТИИ OOC (эпик 3.3) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="scene">
             <h2>💬 Чат партии (вне игры)</h2>
             <div id="gm-ooc-log" class="combat-log" style="max-height:200px;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
@@ -1040,7 +1090,7 @@
         </div>
 
         <!-- ===== ОПРОС ПАРТИИ (эпик 3.4) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="scene">
             <h2>📊 Опрос партии</h2>
             <input type="text" id="gm-poll-question" placeholder="Вопрос: идём через перевал или в обход?">
             <textarea id="gm-poll-options" rows="3" placeholder="Варианты — по одному в строке (от 2 до 5)"></textarea>
@@ -1049,7 +1099,7 @@
         </div>
 
         <!-- ===== ШАБЛОНЫ NPC (эпик 3.8) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>💾 Шаблоны NPC</h2>
             <p style="font-size:13px; opacity:.75;">Сохранённые из генераторов враги (до 20, хранятся в этом браузере). «Загрузить в бой» добавляет точную копию без случайности.</p>
             <select id="gm-npc-template-select"></select>
@@ -1060,7 +1110,7 @@
         </div>
 
         <!-- ===== ДЕРЕВО СЮЖЕТА (эпик 3.9) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="world">
             <h2>🧭 Сюжет</h2>
             <p style="font-size:13px; opacity:.75;">Узлы сюжета и связи между ними. Зелёный — идёт, серый — закрыт, красный — провален. Хранится в этом браузере.</p>
             <svg id="gm-plot-svg" class="st-plot-svg" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid meet"></svg>
@@ -1073,7 +1123,7 @@
         </div>
 
         <!-- ===== ЗАПРОСЫ НА КРАФТ (эпик 2.8) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>📋 Запросы на крафт</h2>
             <p style="font-size:13px; opacity:.75;">NPC просит изготовить предмет. Игрок увидит заказ на вкладке инвентаря и сдаст его, когда принесёт нужное — награда начислится сама.</p>
             <label>Кто просит (NPC)</label>
@@ -1094,7 +1144,7 @@
         </div>
 
         <!-- ===== СУНДУК ОТРЯДА (эпик 2.1) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>🎒 Сундук отряда</h2>
             <p style="font-size:13px; opacity:.75;">Общий склад группы. Игроки сами кладут и берут; в журнале видно кто что взял.</p>
             <div style="margin-bottom:6px;">💰 Золото: <strong id="gm-stash-gold">0</strong></div>
@@ -1105,7 +1155,7 @@
 
         <!-- ===== ГЕНЕРАТОР ЛУТА СУНДУКОВ ===== -->
         <!-- ===== ГЕНЕРАТОР ЛУТА: уровень + тип сундука в одном блоке (обычный или тематический фракции) ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="rewards">
             <h2>📦 Генератор лута (сундук)</h2>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <div style="flex:1; min-width:150px;">
@@ -1137,7 +1187,7 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>🗡️ Генератор бандита</h2>
             <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера + снаряжение, подобранное по уровню (чем выше уровень — тем лучше материал, до стекла/эбонита на 50-м, кап уровня). Есть шанс лука (охотничий/имперский/орочий/эльфийский/стеклянный/эбонитовый — тоже по уровню). ХП/мана/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает.</p>
             <label>Средний уровень группы</label>
@@ -1149,7 +1199,7 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР МАГОВ-БАНДИТОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>🔮 Генератор мага-бандита</h2>
             <p style="font-size:13px; opacity:.75;">Отдельный генератор — только заклинания (2-4 шт, реальные из книги заклинаний, ранг растёт с уровнем) и магическое одеяние вместо брони/оружия. Кап уровня — 60 (выше базовых бандитов). Мана в разы больше, чем у обычных бандитов.</p>
             <label>Средний уровень группы</label>
@@ -1161,7 +1211,7 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР ДРАУГРОВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>⚰️ Генератор драугра</h2>
             <p style="font-size:13px; opacity:.75;">Как у бандитов: случайное древненордское оружие и броня (оружие и броня могут быть зачарованными — у старших типов зачарование почти всегда), заклинания и крики берутся из записи выбранного типа. С трупа выпадает не всё: часть снаряжения «потрёпана», плюс костная мука, золото, драгоценности и свитки. Зачарованные вещи игрок может разрушить и узнать зачарование.</p>
             <label>Тип драугра</label>
@@ -1175,7 +1225,7 @@
         </div>
 
         <!-- ===== ГЕНЕРАТОР ИЗГОЕВ ===== -->
-        <div class="panel">
+        <div class="panel" data-gm-tab="combat">
             <h2>🌿 Генератор изгоя</h2>
             <p style="font-size:13px; opacity:.75;">Случайные оружие и броня изгоев (топор или лук; у шамана — кинжал; у «Верескового сердца» броня ×2). Особые свойства (похищение ХП/МП, заклинания шаманов) берутся из записи выбранного типа.</p>
             <label>Тип изгоя</label>
@@ -1207,10 +1257,12 @@
 <script src="fish-data.js?v=3"></script>
 <script src="spell-data.js?v=3"></script>
 <script src="enemies-data.js?v=4"></script>
-<script src="combat-calc.js?v=2"></script>
+<script src="combat-bonuses.js?v=1"></script>
+<script src="combat-calc.js?v=3"></script>
 <script src="enemy-loot.js?v=4"></script>
 <script src="grid-core.js?v=2"></script>
-<script src="gm.js?v=33"></script>
+<script src="dungeon-presets-data.js?v=1"></script>
+<script src="gm.js?v=36"></script>
 <script src="gm-grid.js?v=2"></script>
 </body>
 </html>

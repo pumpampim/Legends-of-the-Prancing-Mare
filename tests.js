@@ -460,6 +460,22 @@
         ok(/физический 25%/.test(W.StCombat.resistSummary({ resist: { physical: 25 } })) && /огонь −50%/.test(W.StCombat.resistSummary({ resist: { fire: -50 } })), 'Урон: подпись резистов для списка целей');
     }
 
+    // ---------- УРОН ОРУЖИЕМ (combat-bonuses.js, TASK-001) ----------
+    // Эталоны сняты со старого updateCombat ДО выноса формулы (и сверены на 20 000 случайных наборов) — если число
+    // здесь поменялось, значит поменялся баланс удара. Дробный урон (23.6) — так считала и старая формула.
+    if (W.StBonuses) {
+        const st = W.StBonuses.selfTest();
+        const by = n => (st.find(r => r.сценарий.indexOf(n) === 0) || {});
+        eq(by('базовый').урон, 23.6, 'Удар: базовый (меч 8, СИЛ 14, «Сильная рука» 20%) = 8 + 1.6 + 14');
+        eq(by('силовая').урон, 35, 'Удар: силовая атака ×1.5 с округлением');
+        eq([by('скрытная').урон, by('скрытная').скрытность], [18.8, '×3'], 'Удар: кинжал, скрытность ×3');
+        eq([by('дух огня').урон, by('дух огня').дух], [28.6, 12], 'Удар: зачарование +5 и дух огня 10 × 1.2');
+        eq(by('бог').урон, 33, 'Удар: бог — оружие +10%, потом ближний бой +25% (по очереди, с округлением)');
+        ok(st.every(r => r.повтор === r.урон), 'Удар: журнал шагов воспроизводит итог (applyBonuses)');
+        eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, str: 3 }).total, 10, 'Удар врага: оружие + СИЛ');
+        eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true }).total, 11, 'Удар врага: лук + ЛОВ');
+    } else ok(false, 'combat-bonuses.js не загружен');
+
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;
     if (typeof document !== 'undefined') {

@@ -1845,6 +1845,21 @@ body.st-dock-on .container { padding-bottom: calc(var(--st-dock-h, 120px) + 14px
 .st-dash-btn { width: auto; margin: 0; padding: 6px 12px; font-size: 14px; }
 .st-dash-btn.active { background: var(--accent-color, #c8a566); color: #17130e; font-weight: bold; }
 .st-dash-reset { margin-left: auto; opacity: .7; font-size: 12px; }
+/* Эпик 1 (ТЗ-2): пульт мастера — липкие табы. z-index ниже окна входа (.auth-overlay, 1000) и модалок,
+   иначе пульт торчал бы поверх них; выше обычного содержимого страницы. */
+#gm-dashboard { position: sticky; top: 0; z-index: 900; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
+    background: var(--panel-bg, #1a1712); border-bottom: 2px solid var(--accent-color, #c8a566); }
+#gm-dashboard .dash-btn { flex: 0 0 auto; min-height: 44px; padding: 8px 16px; font-size: 14px; }
+#gm-dashboard .dash-btn.active { background: var(--accent-color, #c8a566); color: #1a1712; font-weight: bold; border-color: var(--accent-color, #c8a566); }
+#gm-dashboard .st-dash-reset { min-height: 0; padding: 6px 10px; font-size: 12px; }
+body:not(.gm-in-session) #gm-dashboard { display: none; }
+@media (max-width: 700px) { #gm-dashboard .dash-btn { padding: 8px 10px; font-size: 13px; } }
+.st-inbox-wrap { position: relative; align-self: center; flex: 0 0 auto; }
+.st-inbox-btn { background: #a52a2a !important; color: #fff !important; font-weight: bold; }
+.st-inbox-menu { position: fixed; z-index: 950; min-width: 250px; max-width: 92vw; padding: 4px; background: rgba(12,10,7,.97); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+.st-inbox-menu[hidden] { display: none; }
+.st-inbox-item { display: flex; justify-content: space-between; gap: 10px; width: 100%; margin: 2px 0; padding: 6px 10px; text-align: left; font-size: 14px; }
+.st-inbox-item b { color: #e74c3c; }
 .st-checklist label { display: flex; gap: 8px; align-items: center; margin: 4px 0; font-size: 15px; }
 .st-checklist input { width: auto; margin: 0; }
 .st-enemy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; margin-bottom: 8px; }
@@ -1965,3 +1980,66 @@ body.st-hub-open { overflow: hidden; }
 #gg-panel.gg-full { position: fixed; inset: 0; z-index: 9000; margin: 0; overflow: auto; background: var(--panel-bg, #1d1a14); }
 #gg-panel.gg-full .gg-wrap, #gg-panel.gg-full .gg-side { max-height: calc(100vh - 170px); }
 @media (max-width: 760px) { .gg-layout { flex-direction: column; } .gg-side { flex: none; width: 100%; max-height: none; } }
+
+/* ТЗ-2, эпик 2.4: панель данжа у игрока */
+.st-dungeon-status { background: var(--input-bg, #221c15); border: 1px solid var(--accent-color, #c8a566); border-radius: 4px; padding: 6px 10px; margin-bottom: 8px; }
+.st-dungeon-search { display: block; width: 100%; margin-top: 4px; text-align: left; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; }
+
+/* Перки: взятый перк не снимается — курсор подсказывает это заранее */
+.perk-checkbox:checked { cursor: not-allowed; }
+/* Готовые билды (вкладка «Ветки перков») */
+.st-builds > summary.st-builds-summary { cursor: pointer; font-size: 18px; font-weight: bold; color: var(--accent-color, #c8a566); list-style-position: inside; }
+.st-build { border: 1px solid var(--border-color); border-radius: 4px; margin: 6px 0; padding: 4px 8px; }
+.st-build > summary { cursor: pointer; padding: 4px 0; }
+.st-build-body { font-size: 14px; padding: 4px 0 6px; }
+.st-build-meta { font-size: 13px; opacity: .8; margin-top: 4px; }
+.st-build-perks { margin: 4px 0 4px 18px; padding: 0; font-size: 13px; line-height: 1.6; }
+.st-build-tips { font-size: 13px; opacity: .85; border-left: 3px solid var(--accent-color, #c8a566); padding-left: 8px; margin-top: 4px; }
+.st-bp-tree { opacity: .6; }
+.st-bp-ok { color: #2ecc71; }
+.st-bp-now { color: #f1c40f; }
+.st-bp-lock { opacity: .7; }
+.st-bp-part { color: #e67e22; }
+.perk-item.st-build-hl { outline: 2px solid var(--accent-color, #c8a566); background: rgba(200, 165, 102, .12); border-radius: 4px; }
+
+/* ===== Раскладка листа на компьютере ===== */
+/* Голод и вера под характеристиками (переносится скриптом placeDesktopBlocks при ширине ≥ 900px) */
+.st-desk-slot:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+body.st-desk-layout #st-desk-dmg-slot > .vital-bar { margin-top: 0 !important; }
+
+/* Прогресс по навыкам: 3 колонки на компьютере, без внутренней прокрутки */
+.st-skill-progress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+@media (min-width: 701px) { #skill-progress-list { max-height: none !important; overflow: visible !important; } }
+@media (max-width: 1000px) { .st-skill-progress-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .st-skill-progress-grid { grid-template-columns: 1fr; } }
+
+/* Бросок кубов и Взлом — рядом, компактно */
+.st-check-pair { align-items: start; }
+.st-compact-panel > p { font-size: 13px !important; margin: 4px 0 8px; }
+.st-compact-panel label { margin-top: 4px; margin-bottom: 2px; font-size: 13px; }
+.st-compact-panel select, .st-compact-panel input { padding-top: 4px; padding-bottom: 4px; }
+.st-dice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+.st-dice-grid > div { min-width: 0; }
+.st-dice-grid select, .st-dice-grid input, #lock-tier { width: 100%; max-width: 100%; box-sizing: border-box; }
+@media (max-width: 420px) { .st-dice-grid { grid-template-columns: 1fr; } }
+
+/* Слоты брони в одну строку: подпись — название — броня — «Надеть» (на телефоне как раньше, в столбик) */
+@media (min-width: 701px) {
+    .slot-row { flex-wrap: nowrap; padding: 3px 6px; margin-bottom: 2px; }
+    .slot-row span { flex: 0 0 118px; width: auto; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .slot-row input[type="text"] { flex: 1 1 auto; width: auto !important; min-width: 0; }
+    .slot-row input[type="number"] { flex: 0 0 58px; width: 58px !important; }
+    .slot-row .slot-picker { flex: 0 0 80px; }
+    .slot-enchant-info { margin: -1px 0 3px 6px; font-size: 12px; }
+}
+
+/* Книга заклинаний: выученное не меняется */
+.st-spell-learn-hint { font-size: 13px; opacity: .75; padding: 6px 4px; }
+.st-spell-locked .spell-name-select:disabled { opacity: 1; color: inherit; cursor: default; }
+.st-spell-locked .spell-base[readonly], .st-spell-locked .spell-desc[readonly] { opacity: .85; cursor: default; }
+
+/* Раса и камень судьбы: 5 минут на передумать, потом закреплено */
+.st-origin-lock { font-size: 13px; margin-top: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); opacity: .9; }
+.st-origin-grace { border-color: #e67e22; color: #f0b27a; }
+.st-origin-locked { border-color: var(--accent-color, #c8a566); color: var(--accent-color, #c8a566); }
+#char-race:disabled, #char-sign:disabled { opacity: 1; cursor: not-allowed; }

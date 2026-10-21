@@ -45,5 +45,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+
+    // Пресеты данжей мастера (ТЗ-2, эпик 2): личные заготовки, переживают смену устройства.
+    // Читает и пишет только сам мастер — игрокам пресеты не нужны, они видят копию
+    // развёрнутого данжа в сессии (sessions/{code}.currentDungeon), а её покрывает правило сессий.
+    match /gmPresets/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

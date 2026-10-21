@@ -662,6 +662,27 @@
             }));
         },
 
+        // ТЗ-2, эпик 2.4: обыск контейнера данжа. Транзакция только по сессии: контейнер атомарно помечается
+        // обысканным, двое одновременно — повезёт одному («Этот контейнер уже обыскан»). Вещи и золото игрок
+        // кладёт себе САМ (как с трупами, lootCorpseForSelf) — запись в characters/{uid} из транзакции стёрло бы
+        // ближайшее автосохранение листа, которое держит инвентарь у себя в памяти.
+        takeFromDungeon: function (containerId) {
+            if (!currentSessionCode || !db || !currentUser) return Promise.reject(new Error('Нет соединения с сессией.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            let got = null;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const dungeon = (doc.data() || {}).currentDungeon;
+                if (!dungeon) throw new Error('Нет активного данжа.');
+                const taken = Array.isArray(dungeon.lootTaken) ? dungeon.lootTaken : [];
+                if (taken.indexOf(containerId) !== -1) throw new Error('Этот контейнер уже обыскан.');
+                const container = (dungeon.items || []).find(c => c.id === containerId);
+                if (!container) throw new Error('Контейнер не найден.');
+                tx.update(ref, { 'currentDungeon.lootTaken': taken.concat([containerId]) });
+                got = { container: container, gold: parseInt(container.gold) || 0, items: container.items || [], dungeon: dungeon.name || '' };
+            })).then(() => got);
+        },
+
         lootCorpseForSelf: function (enemyId) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
@@ -1410,6 +1431,7 @@
         renderJournal(data.journal || {}, { hold: (data.partyPos && data.partyPos.hold) || data.currentHold || '' });
         if (typeof window.processTrades === 'function') window.processTrades(data.trades || {});
         if (typeof window.processQuestDecisions === 'function') { try { window.processQuestDecisions(data.questDecisions || []); } catch (e) { console.error(e); } }
+        renderPlayerDungeon(data.currentDungeon || null);
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
         renderLog(data.combatLog || []);
@@ -1432,6 +1454,30 @@
         processMyPendingEffects(data);
         if (cloudDataReady && typeof window.syncSessionTurns === 'function') window.syncSessionTurns(data, currentSessionCode);
     }
+    // ТЗ-2, эпик 2.4: «Вы в: [Данж]» и кнопки обыска оставшихся контейнеров.
+    let _lastDungeonOpenedAt = null;
+    function renderPlayerDungeon(dungeon) {
+        const status = el('player-dungeon-status');
+        if (!status) return;
+        if (!dungeon) { status.style.display = 'none'; _lastDungeonOpenedAt = null; return; }
+        status.style.display = 'block';
+        el('player-dungeon-name').textContent = dungeon.name || '—';
+        // Новый данж — один раз сказать игроку (и в фоне, если вкладка свёрнута). При первом снимке после входа не шумим.
+        if (_lastDungeonOpenedAt !== null && dungeon.openedAt !== _lastDungeonOpenedAt) {
+            if (typeof window.alchToast === 'function') window.alchToast('🏰 Вы в: ' + escHtmlC(dungeon.name || 'данж'));
+            if (typeof window.stNotify === 'function') window.stNotify('🏰 Мастер открыл данж', dungeon.name || '');
+        }
+        _lastDungeonOpenedAt = dungeon.openedAt || 0;
+        const lootBox = el('player-dungeon-loot');
+        const taken = dungeon.lootTaken || [];
+        const remaining = (dungeon.items || []).filter(c => taken.indexOf(c.id) === -1);
+        if (!remaining.length) { lootBox.innerHTML = '<div style="font-size:13px; opacity:.75;">Всё здесь обыскано.</div>'; return; }
+        lootBox.innerHTML = remaining.map(c =>
+            '<button type="button" class="st-dungeon-search" onclick="playerSearchContainer(\'' + jsqC(c.id) + '\')">🔍 ' + escHtmlC(c.label || 'Контейнер') + '</button>').join('');
+    }
+    function escHtmlC(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function jsqC(s) { return escHtmlC(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
+
     // Очередь эффектов от мастера/союзников. Пока персонаж не загружен из облака, НЕ применяем и НЕ чистим —
     // иначе загрузка персонажа затирала эффект (болезнь, полученная, пока игрок был офлайн, терялась).
     function processMyPendingEffects(data) {
