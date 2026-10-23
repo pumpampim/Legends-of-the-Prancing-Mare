@@ -304,7 +304,8 @@
         applyDamageToEnemy: function (enemyId, dmgAmount, authorName, logText, dmgType, penetrationPct) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -316,8 +317,8 @@
                 if (window.StCombat) {
                     const pv = window.StCombat.previewDamage(enemies[idx], dmgAmount, dmgType, penetrationPct);
                     resist = pv.resist; finalDmg = pv.finalDmg;
-                } else {
-                    let resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
+                } else { // запасной расчёт без combat-calc.js (раньше let/const внутри затеняли внешние resist/finalDmg — урон выходил undefined)
+                    resist = dmgType && enemies[idx].resist ? (enemies[idx].resist[dmgType] || 0) : 0;
                     // Пробитие брони/магической защиты (Боевые искусства/богиня Малакат/Азура) —
                     // снижает эффективный резист цели именно для этого удара, не трогает сам объект врага.
                     // Уязвимость (отрицательный резист) пробитием не «лечится».
@@ -332,7 +333,7 @@
                             if (magicTypes.indexOf(dmgType) !== -1 && dmgType !== 'magic') resist += (st.res.magic || 0);
                         });
                     }
-                    const finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
+                    finalDmg = Math.max(0, Math.round(dmgAmount * (1 - resist / 100)));
                 }
                 const newHp = Math.max(0, (enemies[idx].curHp || 0) - finalDmg);
                 const patch = { curHp: newHp };
@@ -348,8 +349,8 @@
                 if (finalLogText) {
                     update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: finalLogText });
                 }
-                return ref.update(update).then(() => ({ newHp, enemyName: enemies[idx].name, finalDmg, resist, killed: wasAlive && newHp <= 0, enemy: enemies[idx] }));
-            });
+                tx.update(ref, update); __txRes = ({ newHp, enemyName: enemies[idx].name, finalDmg, resist, killed: wasAlive && newHp <= 0, enemy: enemies[idx] });
+            })).then(() => __txRes);
         },
 
         // Статус-эффекты на врагах (Страх/Успокоение/Ярость/Полиморф и т.п.) — раньше у объекта
@@ -359,7 +360,8 @@
         applyStatusToEnemy: function (enemyId, statusName, statusDesc, turns, authorName, extra) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -370,18 +372,19 @@
                 statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });
                 const logText = `✨ ${authorName || 'Игрок'} накладывает на «${enemies[idx].name}»: ${statusName}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}`;
-                return ref.update({
+                tx.update(ref, {
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText })
-                }).then(() => ({ enemyName: enemies[idx].name }));
-            });
+                }); __txRes = ({ enemyName: enemies[idx].name });
+            })).then(() => __txRes);
         },
 
         // Снимает со статусов врага одноразовый флаг (напр. 'advantage' после атаки с преимуществом): статус целиком убирается, если у него нет других эффектов.
         clearEnemyStatusFlag: function (enemyId, flag) {
             if (!currentSessionCode || !db) return Promise.resolve();
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) return;
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -391,15 +394,16 @@
                 const after = before.filter(st => !(st && ((window.StCombat ? Object.assign(window.StCombat.statusRule(st.name), st) : st)[flag])));
                 if (after.length === before.length) return;
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: after });
-                return ref.update({ enemies: enemies });
-            });
+                tx.update(ref, { enemies: enemies }); __txRes = (undefined);
+            })).then(() => __txRes);
         },
 
         // Изгнание в Обливион («Изгнание/Высылка даэдра»): враг исчезает из боя целиком, без трупа и души.
         banishEnemy: function (enemyId, authorName, logText) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -407,18 +411,19 @@
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 const name = enemies[idx].name;
                 enemies.splice(idx, 1);
-                return ref.update({
+                tx.update(ref, {
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText || `🌀 ${authorName || 'Игрок'} изгоняет «${name}» в Обливион.` })
-                }).then(() => ({ enemyName: name }));
-            });
+                }); __txRes = ({ enemyName: name });
+            })).then(() => __txRes);
         },
 
         // Статус на всех живых врагов, подходящих под предикат (Круг защиты: нежить до N уровня). predicate(enemy) → bool.
         applyStatusToEnemiesWhere: function (predicate, statusName, statusDesc, turns, authorName, extra) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const names = [];
@@ -429,12 +434,12 @@
                     statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                     return Object.assign({}, e, { statusEffects: statuses });
                 });
-                if (!names.length) return { count: 0, names: [] };
-                return ref.update({
+                if (!names.length) { __txRes = { count: 0, names: [] }; return; }
+                tx.update(ref, {
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: `✨ ${authorName || 'Игрок'}: «${statusName}» накладывается на: ${names.join(', ')}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}` })
-                }).then(() => ({ count: names.length, names }));
-            });
+                }); __txRes = ({ count: names.length, names });
+            })).then(() => __txRes);
         },
 
         // Статус сразу на нескольких врагов: nameRegexSource — регулярное выражение по имени (напр. нежить); только живые.
@@ -442,7 +447,8 @@
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             const re = new RegExp(nameRegexSource, 'i');
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const names = [];
@@ -453,19 +459,20 @@
                     statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                     return Object.assign({}, e, { statusEffects: statuses });
                 });
-                if (!names.length) return { count: 0, names: [] };
-                return ref.update({
+                if (!names.length) { __txRes = { count: 0, names: [] }; return; }
+                tx.update(ref, {
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: `✨ ${authorName || 'Игрок'}: «${statusName}» накладывается на: ${names.join(', ')} (${statusDesc}${turns ? ', ' + turns + ' х.' : ''})` })
-                }).then(() => ({ count: names.length, names }));
-            });
+                }); __txRes = ({ count: names.length, names });
+            })).then(() => __txRes);
         },
 
         // Прямое изменение ХП/маны врага (лечение/урон от зелий и ядов, ручные правки). dHp/dMp — со знаком.
         modifyEnemyVitals: function (enemyId, dHp, dMp, authorName, logText) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -480,8 +487,8 @@
                 enemies[idx] = Object.assign({}, en, patch);
                 const update = { enemies: enemies };
                 if (logText) update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText });
-                return ref.update(update).then(() => ({ enemyName: en.name, newHp, newMp, appliedHp: newHp - (en.curHp || 0), appliedMp: newMp - (en.curMp || 0) }));
-            });
+                tx.update(ref, update); __txRes = ({ enemyName: en.name, newHp, newMp, appliedHp: newHp - (en.curHp || 0), appliedMp: newMp - (en.curMp || 0) });
+            })).then(() => __txRes);
         },
 
         // Яд (или любое варево) на враге: мгновенные эффекты применяются сразу, длящиеся — статус-эффектами на враге
@@ -490,7 +497,8 @@
         applyAlchemyToEnemy: function (enemyId, effects, sourceName, authorName) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция: два игрока бьют одного врага одновременно — ни один удар не теряется
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -560,11 +568,11 @@
                 en.statusEffects = statuses;
                 enemies[idx] = en;
                 const logText = `☠ ${authorName || 'Игрок'} отравляет «${en.name}» («${sourceName || 'яд'}»): ${notes.join('; ') || '—'}`;
-                return ref.update({
+                tx.update(ref, {
                     enemies: enemies,
                     combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText })
-                }).then(() => ({ enemyName: en.name, notes }));
-            });
+                }); __txRes = ({ enemyName: en.name, notes });
+            })).then(() => __txRes);
         },
 
         // Увеличивает общий счётчик ходов сессии на 1 — вызывается при "Следующий ход"/"Следующий
@@ -662,6 +670,21 @@
             }));
         },
 
+        // Ловушку обезвредил сам игрок (бросок на его листе) — отмечаем в сессии, чтобы мастер видел.
+        setTrapDisarmed: function (trapId) {
+            if (!currentSessionCode || !db) return Promise.resolve();
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                const list = ((doc.data() || {}).placedTraps || []).map(t => t && t.id === trapId ? Object.assign({}, t, { state: 'disarmed', victims: [] }) : t);
+                tx.update(ref, { placedTraps: list });
+            }));
+        },
+        // Убирает применённые листом команды мастера (characters/{uid}.gmCmds). Повтор не страшен — id применённых хранятся в сейве.
+        ackGmCmds: function (cmds) {
+            if (!currentUser || !db || !Array.isArray(cmds) || !cmds.length) return Promise.resolve();
+            return db.collection('characters').doc(currentUser.uid).update({ gmCmds: firebase.firestore.FieldValue.arrayRemove.apply(null, cmds) });
+        },
+
         // ТЗ-2, эпик 2.4: обыск контейнера данжа. Транзакция только по сессии: контейнер атомарно помечается
         // обысканным, двое одновременно — повезёт одному («Этот контейнер уже обыскан»). Вещи и золото игрок
         // кладёт себе САМ (как с трупами, lootCorpseForSelf) — запись в characters/{uid} из транзакции стёрло бы
@@ -748,6 +771,28 @@
                 else items.push(Object.assign({}, entry, { qty: qty }));
                 stocks[key] = Object.assign({}, stock, { items: items, gold: (stock.gold || 0) - total });
                 tx.update(ref, { merchantStocks: stripUndefinedForCloud(stocks) });
+            }));
+        },
+
+        // Перк «Вкладчик»: игрок вкладывает золото в лавку — запас золота торговца растёт навсегда,
+        // а сам игрок записывается в investors (для «Скупщика»: такой торговец берёт у него краденое).
+        investInMerchantStock: function (key, amount, uid, name) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const data = doc.data();
+                const stocks = Object.assign({}, data.merchantStocks || {});
+                const stock = stocks[key];
+                if (!stock) throw new Error('Торговец уже уехал — обнови список.');
+                const investors = Array.isArray(stock.investors) ? stock.investors.slice() : [];
+                if (investors.indexOf(uid) !== -1) throw new Error('Ты уже вложился в эту лавку.');
+                investors.push(uid);
+                stocks[key] = Object.assign({}, stock, { gold: (stock.gold || 0) + amount, investors: investors });
+                tx.update(ref, {
+                    merchantStocks: stripUndefinedForCloud(stocks),
+                    combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: name || 'Игрок', text: `💰 ${name || 'Игрок'} вкладывает ${amount} золота в лавку «${stock.label || 'Торговец'}» (перк «Вкладчик»)` })
+                });
             }));
         },
 
@@ -1042,22 +1087,23 @@
         markCorpseRaised: function (enemyId) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            let __txRes; // транзакция — параллельные правки списка врагов не теряются
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) return;
                 enemies[idx] = Object.assign({}, enemies[idx], { raised: true });
-                return ref.update({ enemies: enemies });
-            });
+                tx.update(ref, { enemies: enemies }); __txRes = (undefined);
+            })).then(() => __txRes);
         },
 
         // «Трансмутация смерти»: труп превращается в пепел — обыскать и поднять нельзя. Резолвится true, если превратили мы.
         turnCorpseToAsh: function (enemyId) {
             if (!currentSessionCode || !db) return Promise.resolve(true);
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) return true;
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -1065,8 +1111,9 @@
                 if (idx === -1) return true;
                 if (enemies[idx].ashes) return false;
                 enemies[idx] = Object.assign({}, enemies[idx], { ashes: true, corpseLoot: null, looted: true, isRaisable: false });
-                return ref.update({ enemies: enemies }).then(() => true);
-            });
+                tx.update(ref, { enemies: enemies });
+                return true;
+            })).then(r => r !== false); // false — кто-то успел раньше (душа/пепел уже есть)
         },
 
         // Помечает труп как «душа уже захвачена» (захват души — один раз на существо). Резолвится
@@ -1074,7 +1121,7 @@
         markSoulTaken: function (enemyId) {
             if (!currentSessionCode || !db) return Promise.resolve(true);
             const ref = db.collection('sessions').doc(currentSessionCode);
-            return ref.get().then(doc => {
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) return true;
                 const data = doc.data();
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
@@ -1082,8 +1129,9 @@
                 if (idx === -1) return true;
                 if (enemies[idx].soulTaken) return false;
                 enemies[idx] = Object.assign({}, enemies[idx], { soulTaken: true });
-                return ref.update({ enemies: enemies }).then(() => true);
-            });
+                tx.update(ref, { enemies: enemies });
+                return true;
+            })).then(r => r !== false); // false — кто-то успел раньше (душа/пепел уже есть)
         },
 
         // Флаг «игрок в городе»: хранится в участнике сессии, чтобы его могли менять и сам игрок, и мастер.

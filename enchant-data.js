@@ -58,9 +58,12 @@ function calcEnchantPower(effect, soulGemName, enchantSkill, perks) {
     const skillFrac = (enchantSkill || 0) / 100;
     let mult = 1 + ((perks && perks.enchantGeneralBonus) || 0);
     if (perks) {
-        if (effect.name === 'Урон огнем' && perks.enchantFireBonus) mult += perks.enchantFireBonus;
-        if (effect.name === 'Урон холодом' && perks.enchantFrostBonus) mult += perks.enchantFrostBonus;
-        if (effect.name === 'Урон электричеством' && perks.enchantShockBonus) mult += perks.enchantShockBonus;
+        // «Огненные/Морозные/Грозовые чары»: по описанию — «на оружие и доспехи», поэтому и урон стихией (оружие),
+        // и сопротивление этой стихии (доспехи). Раньше усиливался только урон.
+        const n = effect.name;
+        if ((n === 'Урон огнем' || n === 'Сопротивление огню') && perks.enchantFireBonus) mult += perks.enchantFireBonus;
+        if ((n === 'Урон холодом' || n === 'Сопротивление холоду') && perks.enchantFrostBonus) mult += perks.enchantFrostBonus;
+        if ((n === 'Урон электричеством' || n === 'Сопротивление электричеству') && perks.enchantShockBonus) mult += perks.enchantShockBonus;
         if (effect.name.indexOf('Повышение навыка') === 0 && perks.enchantSkillBonus) mult += perks.enchantSkillBonus;
         if ((effect.name === 'Повышение здоровья' || effect.name === 'Повышение магии') && perks.enchantLifeBonus) mult += perks.enchantLifeBonus;
     }

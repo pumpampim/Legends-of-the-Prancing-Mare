@@ -229,14 +229,15 @@ Object.keys(alchemyBaseEffects).forEach(n => {
 //   Целитель — только ЗЕЛЬЯ и только «Восстановление здоровья/магии» и «Увеличение физ.урона».
 // ctx = { skill, alchemistRank, hasProvisor, hasHealer, hasPoisoner, gear (в %), mode: 'potion' | 'poison' }
 // ----------------------------------------------------------------------------
-const ALCHEMY_PERK_STEP = 0.25;
+const ALCHEMY_PERK_STEP = 0.25;   // Провизор / Целитель / Отравитель: +25%
+const ALCHEMIST_RANK_STEP = 0.2;  // «Алхимик»: +20% за ранг (до 100%), как в описании перка
 function alchemyFactor(effectName, ctx, forDuration) {
     const info = alchemyBaseEffects[effectName];
     ctx = ctx || {};
     const cap = forDuration ? 80 : 100;
     const skill = Math.min(Math.max(ctx.skill === undefined ? 5 : ctx.skill, 5), cap);
     let f = (1 + skill / 200) / (1 + 5 / 200);
-    f *= 1 + ALCHEMY_PERK_STEP * Math.min(ctx.alchemistRank || 0, 5);
+    f *= 1 + ALCHEMIST_RANK_STEP * Math.min(ctx.alchemistRank || 0, 5);
     const potion = ctx.mode !== 'poison';
     if (info) {
         if (potion && info.polarity === 'positive' && ctx.hasProvisor) f *= 1 + ALCHEMY_PERK_STEP;

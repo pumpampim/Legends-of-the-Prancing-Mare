@@ -211,13 +211,21 @@
             const l = (root.alchemyPremadePotions || []).filter(p => /^Яд/.test(p.name));
             if (!l.length) return null;
             const pz = pick(l);
-            return { it: toLoot({ name: pz.name, category: pz.category, weight: pz.weight, price: pz.price, effect: pz.effect }) };
+            return { it: toLoot({ name: pz.name, category: pz.category, weight: pz.weight, price: pz.price, effect: pz.effect, alchemyEffects: pz.alchemyEffects }) };
         }
         if (/^зель[яеи]$/.test(t)) {
-            const l = pool.filter(i => /^Зелье \(лут\)/.test(i.category || '')); return l.length ? { it: toLoot(pick(l)) } : null;
+            // готовые зелья живут в alchemyPremadePotions (alchemy-data.js), в пуле мастера их нет — берём оттуда, как и яды
+            const l = (root.alchemyPremadePotions || []).filter(p => /^Зелье/.test(p.name)).concat(pool.filter(i => /^Зелье \(лут\)/.test(i.category || '')));
+            if (!l.length) return null;
+            const pz = pick(l);
+            return { it: toLoot({ name: pz.name, category: pz.category, weight: pz.weight, price: pz.price, effect: pz.effect, alchemyEffects: pz.alchemyEffects }) };
         }
         if (/^книг[аи]?$/.test(t)) {
             const l = byCat(pool, /^Книга умения/); return l.length ? { it: toLoot(pick(l)) } : null;
+        }
+        if (/^шкур[аы]?$/.test(t)) {
+            // «Шкуры» (великан и др.): случайная звериная шкура из базы
+            const l = byCat(pool, /^Шкуры/); return l.length ? { it: toLoot(pick(l)) } : null;
         }
         if (/^украшени\S*$/.test(t)) {
             const l = byCat(pool, /^Ювелирн/); return l.length ? { it: toLoot(pick(l)) } : null;
@@ -279,7 +287,7 @@
         if (!tok) return null;
         if (GOLD_RE.test(tok) && !/кам(?:ен|н)/i.test(tok)) return { chance: p, gold: goldAmount(raw, ctx.level) };
         // оружие/броня фракции в генераторе берутся из экипировки врага
-        if (opts && opts.skipGear && /оружи|кинжал|щит\b|брон[яи]|шлем|топор|меч\b|лук\b|стрел[аыу]\s+(?:изгое|древн|нордск)/i.test(tok) && /изгое|древн|нордск|фалмер|железн/i.test(tok)) return null;
+        if (opts && opts.skipGear && /оружи|кинжал|щит(?![а-яё])|брон[яи]|шлем|топор|меч(?![а-яё])|лук(?![а-яё])|стрел[аыу]\s+(?:изгое|древн|нордск)/i.test(tok) && /изгое|древн|нордск|фалмер|железн/i.test(tok)) return null;
         if (JEWEL_RE.test(tok)) {
             const enchant = /(^|\s)зачарован/i.test(tok) && !/незачарован/i.test(tok);
             const it = jewelryOf(ctx.pool || [], tok, enchant, ctx.level);

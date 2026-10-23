@@ -421,9 +421,12 @@
         db.collection('characters').doc(targetUid).get().then(doc => {
             if (!doc.exists) { alert('Не нашёл документ игрока.'); return; }
             const data = doc.data();
-            const stats = data.stats || [10, 10, 10, 10, 10, 10]; // str,dex,con,int,wis,cha
+            // effectiveStats в листе — объект {str,dex,con,int,wis,cha} (итоговые, с расой/знаком); старые сейвы — массив. Приводим к массиву.
+            const es = data.effectiveStats;
+            const stats = (es && !Array.isArray(es) && typeof es === 'object') ? ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => es[k])
+                : (es || data.stats || [10, 10, 10, 10, 10, 10]); // str,dex,con,int,wis,cha
             const statMod = shieldType === 'heavy' ? calcAbilityMod(parseInt(stats[2]) || 10) : calcAbilityMod(parseInt(stats[1]) || 10);
-            const blockSkill = parseInt((data.skills || [])[3]) || 10; // Блокирование — индекс 3 в skillNames
+            const blockSkill = parseInt((data.effectiveSkills || data.skills || [])[3]) || 10; // Блокирование — индекс 3 в skillNames (с расовым бонусом)
             const skillMod = Math.floor(blockSkill / 10);
             // "Щитоносец" — skillIdx 3 (Блокирование), perkIdx 0, 5 ступеней → 20/25/30/35/40% среза урона.
             const SHIELDBEARER_PCT = [0, 20, 25, 30, 35, 40];
@@ -519,26 +522,46 @@
         // Спокойная ночь — ХП/МП всех УЧАСТНИКОВ сессии до максимума + статус "Полноценный отдых".
         const participants = lastData.participants || {};
         const uids = Object.keys(participants);
+        const restNotes = [];
         const writes = uids.map(uid => {
             const p = participants[uid];
+            const extraRest = {};
             // Раньше тут было update({'vitals.0': …, 'vitals.1': …}) — но vitals это МАССИВ: путь через точку превращал его в словарь
             // {0:…, 1:…} и терялись макс. ХП/МП (индексы 2-3). Теперь правим массив целиком в транзакции.
-            return updateCharacterVitals(uid, v => {
-                v[0] = parseInt(v[2]) || p.maxHp || 0;
-                v[1] = parseInt(v[3]) || p.maxMp || 0;
-            }, {
+            // Длительный отдых по тем же правилам, что «Следующий день» у игрока: мана полностью (знак Атронаха — половина
+            // израсходованной), здоровье — до максимума только с «Лечебной припаркой» (тратится 1 шт.). Раньше лагерь лечил всё.
+            return updateCharacterVitals(uid, (v, data) => {
+                const nm = p.name || uid;
+                const maxHp = parseInt(v[2]) || p.maxHp || 0, maxMp = parseInt(v[3]) || p.maxMp || 0;
+                const curHp = parseInt(v[0]) || 0, curMp = parseInt(v[1]) || 0;
+                const spent = Math.max(0, maxMp - curMp);
+                const atronach = data.sign === 'atronach';
+                v[1] = Math.max(curMp, Math.min(maxMp, curMp + (atronach ? Math.ceil(spent / 2) : spent)));
+                let hpNote = 'ХП без изменений (нет лечебной припарки)';
+                if (curHp >= maxHp) hpNote = 'ХП и так полные';
+                else {
+                    const inv = Array.isArray(data.inventory) ? data.inventory.map(i => Object.assign({}, i)) : [];
+                    const pi = inv.findIndex(i => /^Лечебная припарка/.test(i.itemId || '') || /^Лечебная припарка/.test(i.name || ''));
+                    if (pi !== -1 && (inv[pi].count || 0) > 0) {
+                        inv[pi].count -= 1; if (inv[pi].count <= 0) inv.splice(pi, 1);
+                        extraRest.inventory = inv;
+                        v[0] = maxHp; hpNote = `припарка: ХП ${curHp} → ${maxHp}`;
+                    }
+                }
+                restNotes.push(`${nm}: мана ${curMp} → ${v[1]}${atronach ? ' (Атронах — половина)' : ''}, ${hpNote}`);
+            }, Object.assign(extraRest, {
                 pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({
                     id: 'rest-' + Date.now() + Math.random().toString(36).slice(2, 6),
                     name: 'Лагерь', effectName: 'Полноценный отдых', description: '+1 к кубам на все проверки навыков (весь следующий игровой день).', turnsRemaining: 20
                 })
-            }).catch(e => console.error('Ошибка отдыха для', uid, e));
+            })).catch(e => console.error('Ошибка отдыха для', uid, e));
         });
         Promise.all(writes).then(() => {
             db.collection('sessions').doc(currentCode).update({
                 'campState.active': false,
                 combatLog: firebase.firestore.FieldValue.arrayUnion({
                     ts: Date.now(), author: 'Мастер',
-                    text: `😴 Ночь прошла спокойно (бросок ${roll} > ${chance}%). ХП/МП группы восстановлены, статус «Полноценный отдых» применён.`
+                    text: `😴 Ночь прошла спокойно (бросок ${roll} > ${chance}%). ${restNotes.join('; ')}. Статус «Полноценный отдых» применён.`
                 })
             });
         });
@@ -561,8 +584,8 @@
         // нанося и т.п. одним паттерном. (ед.?|единиц) — раньше "N единиц урона" не понималось,
         // только сокращённое "ед.". Опциональное слово перед "урон" — "физ/огненн/ледян/..." —
         // раньше "наносит 40 физ урона" не матчилось, т.к. между числом и "урон" было слово.
-        const m = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+|огненн[а-яёА-ЯЁ]*\s+|ледян[а-яёА-ЯЁ]*\s+|электрич[а-яёА-ЯЁ]*\s+|яд[а-яёА-ЯЁ]*\s+)?урон/i) ||
-                  text.match(/(\d+)\s*(?:ед\.?|единиц)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
+        const m = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*(?:ед\.?|единиц[аы]?)?\s*(?:физ[а-яёА-ЯЁ]*\s+|огненн[а-яёА-ЯЁ]*\s+|ледян[а-яёА-ЯЁ]*\s+|электрич[а-яёА-ЯЁ]*\s+|яд[а-яёА-ЯЁ]*\s+)?урон/i) ||
+                  text.match(/(\d+)\s*(?:ед\.?|единиц[аы]?)?\s*(?:физ[а-яёА-ЯЁ]*\s+)?урон/i);
         if (m) return parseInt(m[1]);
         // Урон кубиками («наносит 4д6», «9д6») — для списка берём среднее; при броске кидаются настоящие кубы (getSpellDice).
         const dm = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*[дd]\s*(\d+)/i);
@@ -1210,6 +1233,8 @@
         if (typeof window.renderGmMap === 'function') window.renderGmMap();
         try { gmRenderInbox(); } catch (e) { console.error(e); }
         try { renderDungeonPanel(); } catch (e) { console.error(e); }
+        try { renderGmTraps(); gmTrapsTickWatch(lastData); } catch (e) { console.error(e); }
+        try { if (el('gm-pet-select') && !el('gm-pet-select').options.length) gmRenderPetSelect(); else { const ps = el('gm-pet-give-player'); if (ps && ps.options.length !== Object.keys(lastData.participants || {}).length) gmRenderPetSelect(); } } catch (e) { }
     }
 
     // ---------- Отряд ----------
@@ -1350,6 +1375,24 @@
 
     // ---------- Противники ----------
 
+    // Что враг держит в руках (для заклинаний): free — руки свободны, one — одно одноручное (или только щит),
+    // two — двуручное/лук/арбалет, both — два оружия или оружие со щитом. Колдовать можно только с free/one.
+    // Пока мастер не выбрал вручную — угадываем по оружию из базы.
+    const GM_HANDS_LABEL = { free: '✋ руки свободны', one: '🗡 одно одноручное / щит', two: '🏹 двуручное / лук', both: '⚔ два оружия / оружие+щит' };
+    function gmEnemyHands(e) {
+        if (e && GM_HANDS_LABEL[e.hands]) return e.hands;
+        if (!e || !e.weaponDmg) return 'free';
+        const t = String(e.weaponNote || '') + ' ' + (e.name || '');
+        if (e.isRanged || /двуруч|секир|молот|лук|арбалет|посох|пик[аи]|копь/i.test(t)) return 'two';
+        if (/щит/i.test(t)) return 'both';
+        return 'one';
+    }
+    window.gmEnemyHands = gmEnemyHands;
+    window.gmSetEnemyHands = function (id, v) {
+        const en = (lastData.enemies || []).find(x => x.id === id);
+        window.setEnemyField(id, 'hands', v);
+        if (en) gmPostLogEntryText(`✋ ${en.name}: в руках — ${(GM_HANDS_LABEL[v] || v).replace(/^\S+\s/, '')} (смена оружия — действие хода).`);
+    };
     function renderEnemies(enemies) {
         const target = el('gm-enemies-list');
         gmCheckMarked(enemies);
@@ -1412,6 +1455,8 @@
                 '<span style="display:flex; gap:4px;"><button style="width:auto;padding:2px 8px;font-size:12px;" onclick="gmToggleMark(\'' + e.id + '\')" title="Игроки увидят 🎯 и кнопку «Атаковать помеченного»">' + (isMarked ? '🎯 Снять метку' : '🎯 Пометить') + '</button>' +
                 '<button class="btn-danger" style="width:auto;padding:2px 8px;font-size:12px;" onclick="removeEnemy(\'' + e.id + '\')">Убрать</button></span></div>' +
                 statsLine + statusLine + levelLine + summonedLine + dmgLine + resistLine + spellsHtml + lootLine + shoutsHtml +
+                ((e.spells && e.spells.length) || e.weaponDmg ? '<div style="font-size:12px; margin-top:2px;">В руках: <select style="width:auto; font-size:12px; padding:1px 4px;" title="Смена хвата — действие врага в этом ходу. С двуручным/луком и с двумя предметами колдовать нельзя." onchange="gmSetEnemyHands(\'' + e.id + '\', this.value)">' +
+                    Object.keys(GM_HANDS_LABEL).map(k => '<option value="' + k + '"' + (gmEnemyHands(e) === k ? ' selected' : '') + '>' + GM_HANDS_LABEL[k] + '</option>').join('') + '</select></div>' : '') +
                 '<div class="grid-2" style="gap:6px; margin-top:4px;">' +
                 '<div><label style="font-size:12px;">HP (' + (e.maxHp || 0) + ' макс.)</label>' +
                 '<input type="number" value="' + (e.curHp || 0) + '" onchange="setEnemyField(\'' + e.id + '\',\'curHp\',this.value)"></div>' +
@@ -1475,7 +1520,8 @@
         currentEnemyDbPick = e;
         el('enemy-name-input').value = e.name;
         el('enemy-hp-input').value = e.hp;
-        const totalMana = e.spells && e.spells.length ? Math.max(...e.spells.map(s => s.cost)) * 3 : 0;
+        // Мана врага: из базы (поле mana), иначе — запас на три самых дорогих заклинания.
+        const totalMana = parseInt(e.mana) > 0 ? parseInt(e.mana) : (e.spells && e.spells.length ? Math.max(...e.spells.map(s => s.cost || 0)) * 3 : 0);
         el('enemy-mp-input').value = totalMana;
         let info = '';
         if (e.weaponDmg) { const wd = enemyWeaponDamage(e); info += `Урон: ${wd.total}${wd.stat ? ' (оружие ' + wd.base + ' + ' + wd.label + ' ' + wd.stat + ')' : ''}${e.weaponNote ? ' — ' + escapeHtml(e.weaponNote) : ''}<br>`; }
@@ -1657,7 +1703,7 @@
 
     // TEXT_ENEMY_FIELDS — поля, которые НЕ надо принудительно приводить к числу (раньше
     // Number(value)||0 стояло безусловно для любого поля — для текста типа "лут" это дало бы 0).
-    const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name', 'kind'];
+    const TEXT_ENEMY_FIELDS = ['loot', 'weaponNote', 'name', 'kind', 'hands'];
     window.setEnemySummoned = function (id, checked) {
         const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, summoned: !!checked } : e);
         gmUpdateEnemies(enemies).catch(e => console.error(e));
@@ -1797,6 +1843,35 @@
         gmUpdateEnemies(next).then(() => gmPostLogEntryText('🗑 Мастер убирает: ' + names.join(', ') + '.')).catch(err => alert('Ошибка: ' + err.message));
     };
 
+    // Резист игрока к входящему урону атаки мастера. Раньше брался только резист по типу урона: «Сопротивление магии»
+    // (перк Изменения, расовое, зачарования) не действовало на огонь/холод/электричество врагов — хотя для врагов
+    // общий магический резист к стихиям прибавляется (combat-calc.js). Теперь так же и для игроков, потолок 85%.
+    // shieldBlock — галочка «Игрок закрывается щитом»: перки Блокирования «Отбивание стрел» (стрела в щит — 0 урона)
+    // и «Защита от стихий» (+50% к огню/холоду/электричеству). Без щита или перков галочка ничего не даёт.
+    const GM_ELEM_TYPES = ['fire', 'frost', 'shock'];
+    function gmPlayerIncomingResist(data, dmgType, opts) {
+        const res = (data && data.resistances) || {};
+        const notes = [];
+        let r = res[dmgType] || 0;
+        if (r) notes.push('резист ' + r + '%');
+        const elem = GM_ELEM_TYPES.indexOf(dmgType) !== -1;
+        if (elem && res.magic) { r += res.magic; notes.push('сопр. магии +' + res.magic + '%'); }
+        let zero = false;
+        if (opts && opts.shieldBlock) {
+            const hasShield = !!(data && data.equippedSlots && data.equippedSlots.shield);
+            const perk = pi => !!((data && data.perkStates) || {})['skill3-perk' + pi + '-step1'];
+            if (!hasShield) notes.push('щита нет — блок щитом не засчитан');
+            else {
+                if (opts.isRangedAtk && dmgType === 'physical' && perk(1)) { zero = true; notes.push('🏹 «Отбивание стрел»: стрела в щит — урона нет'); }
+                if (elem && perk(4)) { r += 50; notes.push('🛡 «Защита от стихий» +50%'); }
+                if (!zero && !(elem && perk(4))) notes.push('щит: подходящего перка Блокирования для этой атаки нет');
+            }
+        }
+        r = Math.min(85, Math.max(0, r));
+        return { resist: r, zero, notes };
+    }
+    function gmShieldBlockChecked() { const c = el('gm-attack-shield-block'); return !!(c && c.checked); }
+
     // ---------- Предпросмотр урона по игроку (1.2) ----------
     // Только читает документ игрока и считает; ничего не пишет. Случайные защиты (блок, уклонение, барьер, знак Атронаха) не учитываются.
     window.previewGmAttack = function () {
@@ -1806,9 +1881,15 @@
         if (!dmg) { out.textContent = 'Урона нет — только эффект/статус.'; return; }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const resist = (data.resistances && data.resistances[dmgType]) || 0;
-            const pv = window.StCombat.previewDamage({ resist: { [dmgType]: resist } }, dmg, dmgType, 0);
-            out.textContent = `Ожидаемый урон по игроку: ~${pv.finalDmg} (базовый ${dmg}${pv.notes.length ? ', ' + pv.notes.join(', ') : ''}). Случайные защиты игрока (блок, уклонение, барьер) в предпросмотре не учтены.`;
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const pv = ir.zero ? { finalDmg: 0, notes: [] } : window.StCombat.previewDamage({ resist: { [dmgType]: ir.resist } }, dmg, dmgType, 0);
+            pv.notes = ir.notes.concat(pv.notes.filter(n => !/^резист/.test(n)));
+            const pt = ((lastData && lastData.participants) || {})[targetUid] || {};
+            const hpNow = parseInt(pt.curHp), left = isNaN(hpNow) ? null : Math.max(0, hpNow - pv.finalDmg);
+            out.textContent = `Ожидаемый урон по игроку: ~${pv.finalDmg} (базовый ${dmg}${pv.notes.length ? ', ' + pv.notes.join(', ') : ''})` +
+                (left === null ? '' : left <= 0 ? ` → игрок падает (HP ${hpNow}/${pt.maxHp || '?'})` : ` → останется ~${left}/${pt.maxHp || '?'} HP`) +
+                '. Защиты игрока (блок, уклонение, барьер, оберег) в предпросмотре не учтены.';
+            out.classList.remove('st-preview-flash'); void out.offsetWidth; out.classList.add('st-preview-flash');
         }).catch(e => { out.textContent = 'Не удалось прочитать резисты: ' + e.message; });
     };
 
@@ -2180,6 +2261,18 @@
     // Собирает броню/украшения/оружие/боеприпасы из smithing-data.js в том же формате,
     // что и обычные предметы из items-data.js — чтобы мастер мог выдать готовую вещь
     // напрямую, без крафта игроком.
+    // Свиток заклинания «на поддержании» (тратит ману каждый ход) — таких свитков в игре нет: убираем из базы
+    // мастера, добычи и торговцев (window.isSustainSpell — spell-data.js).
+    function gmSpellDescByName(name) {
+        const S = window.spellsData || {};
+        for (const sc in S) for (const t in S[sc]) { const sp = (S[sc][t] || []).find(x => x.name === name); if (sp) return sp.desc; }
+        return '';
+    }
+    function gmIsSustainScroll(item) {
+        if (!item || !/^Свиток:\s*/.test(item.name || '') || !window.isSustainSpell) return false;
+        return window.isSustainSpell(item.effect || '') || window.isSustainSpell(gmSpellDescByName(item.name.replace(/^Свиток:\s*/, '')));
+    }
+    window.gmIsSustainScroll = gmIsSustainScroll;
     function getSmithingGiveableItems() {
         const out = [];
         (window.armorRecipes || []).forEach(r => {
@@ -2198,12 +2291,15 @@
             });
         });
         (window.weaponRecipes || []).forEach(r => {
-            out.push({
+            const wt = !r.isAmmo && window.SMITH_SUBCAT_TO_WEAPON_TYPE ? window.SMITH_SUBCAT_TO_WEAPON_TYPE[r.subcat] : null;
+            const o = {
                 name: r.name, category: (r.category || 'Оружие') + (r.subcat ? ' — ' + r.subcat : ''),
                 weight: r.weight, price: r.price, armor: null,
                 dmg: r.damage, effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
                 slot: r.isAmmo ? null : r.slot
-            });
+            };
+            if (wt) o.weaponType = wt; // тип оружия едет с вещью (иначе у игрока при экипировке «залипал» прошлый тип)
+            out.push(o);
         });
         (window.armorNonCraftable || []).forEach(a => {
             out.push({
@@ -2246,6 +2342,7 @@
             Object.keys(window.spellsData).forEach(school => {
                 [1, 2, 3, 4].forEach(tier => {
                     (window.spellsData[school][tier] || []).forEach(sp => {
+                        if (window.isSustainSpell && window.isSustainSpell(sp.desc)) return; // свитков заклинаний «на поддержании» нет
                         out.push({
                             name: 'Свиток: ' + sp.name, category: 'Свитки (крафтящиеся)',
                             weight: 0.1, price: TIER_PRICE[tier], armor: null, dmg: null,
@@ -2299,7 +2396,7 @@
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
             gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
             gmAllItems = gmAllItems.concat(window.spellTomesData || []);
-            gmAllItems = dedupeGmItems(gmAllItems);
+            gmAllItems = dedupeGmItems(gmAllItems).filter(i => !gmIsSustainScroll(i));
             // O(1) поиск по id/имени вместо O(n) .find() на каждый клик "Передать" — gmAllItems
             // уже перевалил за 400+ записей. gmAllItems как массив оставлен как есть (нужен для
             // рендера таблицы и .filter()-поисков, которым Map не поможет — там всё равно нужен
@@ -2359,6 +2456,24 @@
         tbody.innerHTML = html;
         if (countSpan) countSpan.textContent = gmFilteredItems.length;
     };
+
+    // Положить вещь в инвентарь игрока (массив из его документа). Сливаем только с такой же «чистой» вещью:
+    // не заточенной и без своего зачарования. Раньше Object.assign перетирал стопку — заточенный меч терял урон
+    // (weaponDmg из базы), а в названии оставалось «(Отличное)».
+    function gmMergeInvItem(inv, base, qty, extra) {
+        const ex = extra || {};
+        let id = base.itemId;
+        const existing = inv.find(i => i.itemId === id && !i.temperTier && (!i.enchantment || !!ex.enchantment));
+        if (existing) {
+            existing.count = (existing.count || 0) + qty;
+            Object.keys(ex).forEach(k => { if (existing[k] === undefined) existing[k] = ex[k]; });
+            return existing;
+        }
+        if (inv.some(i => i.itemId === id)) id = id + '#' + Date.now() + Math.floor(Math.random() * 1000);
+        const it = Object.assign({ weight: 0, category: '', effect: '' }, base, { itemId: id, count: qty }, ex);
+        inv.push(it);
+        return it;
+    }
 
     window.gmGiveItemFromTable = function(itemId) {
         const sourceItem = gmAllItemsByKey.get(itemId); // O(1) вместо O(n) — см. loadGmItems
@@ -2434,29 +2549,22 @@
             }
         }
 
-        db.collection('characters').doc(targetUid).get().then(doc => {
-            const data = doc.data();
+        // Краденое, зачарованное мастером и обычное — разные стопки. Раньше всё ложилось в одну стопку по названию,
+        // и Object.assign перетирал её: чистые слитки становились краденными, заточенный меч терял урон.
+        const gmEnchanted = !!extra.enchantment && !sourceItem.enchantment;
+        const giveName = gmEnchanted ? `${sourceItem.name} [${extra.enchantment.name}]` : sourceItem.name;
+        // itemId в инвентаре игрока = название предмета (по нему считаются ингредиенты, продажа, ковка).
+        let invId = sourceItem.name + (isStolen ? '#stolen' : '');
+        if (gmEnchanted) invId = giveName + '#' + Date.now();
+        const charRef = db.collection('characters').doc(targetUid);
+        // Транзакция: игрок в это время может автосохранить инвентарь — без неё вещь могла потеряться.
+        db.runTransaction(tx => tx.get(charRef).then(doc => {
+            const data = doc.data() || {};
             let inv = data.inventory || [];
-            // itemId в инвентаре игрока = название предмета (по нему считаются ингредиенты, продажа, ковка).
-            // Раньше брался id документа из базы предметов — тот же «Железный слиток» ложился отдельной строкой
-            // и «не работал» в кузнечном деле.
-            const invId = sourceItem.name;
-            const existing = inv.find(item => item.itemId === invId);
-            if (existing) {
-                existing.count += numCount;
-                Object.assign(existing, extra);
-            } else {
-                inv.push(Object.assign({
-                    itemId: invId,
-                    name: sourceItem.name,
-                    count: numCount,
-                    weight: sourceItem.weight || 0,
-                    category: sourceItem.category || '',
-                    effect: sourceItem.effect || ''
-                }, extra));
-            }
-            return db.collection('characters').doc(targetUid).update({ inventory: inv });
-        }).then(() => {
+            if (gmEnchanted) inv.push(Object.assign({ itemId: invId, name: giveName, count: numCount, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, extra));
+            else gmMergeInvItem(inv, { itemId: invId, name: giveName, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, numCount, extra);
+            tx.update(charRef, { inventory: inv });
+        })).then(() => {
             alert(`Предмет "${sourceItem.name}" передан игроку ${playerList[idx].name}!`);
             gmPostLogEntryText(`📦 Мастер выдал «${sourceItem.name}» (×${numCount}) игроку ${playerList[idx].name}.`);
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -3174,9 +3282,10 @@
         return C;
     }
 
+    window.__buildMerchantItems = (t, h) => buildMerchantItems(t, h); // для тестов
     function buildMerchantItems(typeKey, hold) {
         const C = merchantCatalogue(), out = [], used = new Set();
-        const ALL = (window.allItems && window.allItems.length ? window.allItems : gmAllItems) || [];
+        const ALL = ((window.allItems && window.allItems.length ? window.allItems : gmAllItems) || []).filter(i => !gmIsSustainScroll(i));
         const STACK = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
         const affList = (typeKey === 'blacksmith2' || typeKey === 'fletcher') ? (MERCH_AFFINITY[hold] || []) : [];
         const floraRules = typeKey === 'alchemist2' ? MERCH_ING_AFFINITY : (['foodVendor', 'grocer', 'innkeeper'].indexOf(typeKey) !== -1 ? MERCH_FOOD_AFFINITY : []);
@@ -3191,9 +3300,10 @@
             const q = qty ? randInt(qty[0], qty[1]) : (i.category === 'Боеприпасы' ? randInt(10, 30) : (STACK.includes(i.category) ? randInt(2, 6) : 1));
             // Firestore отвергает undefined — добавляем поле, только если оно есть
             const o = { name: i.name, category: i.category, price: i.price, weight: i.weight || 0, effect: i.effect || '', qty: q };
-            if (typeof i.dmg === 'number') o.dmg = i.dmg;
+            if (typeof i.dmg === 'number') o.dmg = i.dmg; else if (typeof i.damage === 'number') o.dmg = i.damage;
             if (typeof i.armor === 'number') o.armor = i.armor;
             if (i.slot) o.slot = i.slot;
+            if (i.weaponType) o.weaponType = i.weaponType;
             if (typeof i.capacity === 'number') o.capacity = i.capacity;
             out.push(o); used.add(i.name);
         };
@@ -3219,6 +3329,9 @@
                 take(C.heavy, 3, 5); take(C.light, 2, 4); take(C.shield, 1, 2);
                 take(itemsOf(['Кузнечные ингредиенты'], i => /руда/i.test(i.name) && i.name !== 'Серебряная руда'), 1, 3, { qty: [2, 6] });
                 always('Кожа', 3, 8); always('Полоски кожи', 4, 12);
+                // ножны под ближнее оружие и держатель щита — всегда, утяжелённые — частью
+                ['Ножны для кинжала', 'Ножны для меча', 'Ножны для боевого топора', 'Ножны для булавы', 'Ножны для двуручного меча', 'Ножны для секиры', 'Ножны для боевого молота', 'Ножны для копья', 'Ножны для пики', 'Ножны для посоха', 'Держатель для щита'].forEach(n => always(n, 1, 3));
+                take(itemsOf(['Ножны и колчаны'], i => i.sheathArmor && !/лука|арбалета/.test(i.name)), 2, 4);
                 take(C.arrow, 1, 2); take(C.gaunt, 0, 1);
                 take(C.specialMelee.concat(C.specialArmor), 0, 2);
                 if (MERCH_REGIONAL_ARMOR[hold]) take(itemsOf(['Уникальная броня'], i => i.location === MERCH_REGIONAL_ARMOR[hold]), 1, 3);
@@ -3226,6 +3339,8 @@
                 break;
             case 'fletcher':
                 always('Железная стрела', 15, 30);
+                ['Колчан для стрел', 'Колчан для болтов', 'Ножны для лука', 'Ножны для арбалета'].forEach(n => always(n, 1, 3));
+                take(itemsOf(['Ножны и колчаны'], i => i.sheathArmor && /лука|арбалета/.test(i.name)), 0, 2);
                 take(C.bow, 5, 7); take(C.xbow, 0, 2);
                 take(C.arrow, 5, 7); take(C.bolt, 2, 4);
                 take(C.fxAmmo, 0, 2, { qty: [2, 6] });
@@ -3239,6 +3354,8 @@
             case 'pawnbrokerLive':
                 always('Пергамент', 3, 8); always('Чернила', 2, 6); always('Соль', 2, 6);
                 take(itemsOf(['Бытовые предметы'], POT), 5, 8);
+                take(itemsOf(['Ножны и колчаны'], i => !i.sheathArmor), 3, 5, { qty: [1, 2] });
+                take(itemsOf(['Ножны и колчаны'], i => i.sheathArmor), 1, 2);
                 take(itemsOf(['Походное снаряжение']), 2, 4);
                 take(itemsOf(['Сырые продукты']), 2, 4);
                 take(itemsOf(['Ювелирные изделия']), 1, 2);
@@ -3706,8 +3823,15 @@
                 gold: parseInt(data.gold) || 0,
                 characterLevel: parseInt(data.characterLevel) || 1,
                 levelUpProgress: parseInt(data.levelUpProgress) || 0,
-                perkPointsAvailable: parseInt(data.perkPointsAvailable) || 0
+                perkPointsAvailable: parseInt(data.perkPointsAvailable) || 0,
+                customSpells: Array.isArray(data.customSpells) ? data.customSpells : [],
+                skills: Array.isArray(data.skills) ? data.skills : [],
+                race: data.race || ''
             };
+            renderGmPlayerPerks(data.takenPerks);
+            renderGmPlayerPets(data.pets);
+            if (typeof window.gmRenderTeachSpells === 'function') window.gmRenderTeachSpells();
+            { const ss = el('inv-skill-decrease-select'); if (ss) { const cur = ss.value; ss.innerHTML = SKILL_NAMES_BY_IDX.map((n, i) => `<option value="${i}">${escapeHtml(n)} — ${getEffectiveSkillFromData(currentPlayerInvData, i)}</option>`).join(''); /* как у игрока: с расовым бонусом */ if (cur !== '') ss.value = cur; } }
             el('inv-gold-block').style.display = 'block';
             el('inv-gold-current').textContent = formatNumber(currentPlayerInvData.gold);
             el('inv-level-block').style.display = 'block';
@@ -3757,13 +3881,13 @@
             const newLevel = (parseInt(data.characterLevel) || 1) + 1;
             newLevelForLog = newLevel;
             const newPerkPoints = (parseInt(data.perkPointsAvailable) || 0) + 1;
-            const stats = Array.isArray(data.stats) ? data.stats.slice() : [10, 10, 10, 10, 10, 10];
-            stats[statPos] = (parseInt(stats[statPos]) || 10) + 1;
+            // +1 к характеристике — командой листу (gmCmds), а не записью stats: открытый лист stats из облака на лету
+            // не подхватывал и ближайшим автосохранением затирал прибавку.
             return db.collection('characters').doc(currentInvPlayerUid).update({
                 characterLevel: newLevel,
                 perkPointsAvailable: newPerkPoints,
                 levelUpProgress: 0,
-                stats: stats
+                gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-lv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'stat', key: statKey, delta: 1 })
             });
         }).then(() => {
             alert(`Уровень начислен! Новый уровень + 1 очко перка + 1 к характеристике «${statLabels[statKey]}».`);
@@ -3806,20 +3930,61 @@
         select.innerHTML = SKILL_NAMES_BY_IDX.map((name, i) => `<option value="${i}">${escapeHtml(name)}</option>`).join('');
     }
 
-    window.decreasePlayerSkill = function () {
-        if (!currentInvPlayerUid) return;
+    // ---------- Правки листа игрока мастером ----------
+    // Пишем не значения, а команды в characters/{uid}.gmCmds: лист игрока применяет их сам (один раз, по id) и
+    // убирает. Прямая запись skills/stats/perkStates затиралась бы автосохранением открытого листа игрока.
+    function gmSendCmd(cmd, logText) {
+        if (!currentInvPlayerUid) { alert('Выбери игрока.'); return Promise.resolve(false); }
+        const full = Object.assign({ id: 'gmc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), ts: Date.now() }, cmd);
+        return db.collection('characters').doc(currentInvPlayerUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion(full) })
+            .then(() => {
+                const pname = ((lastData && lastData.participants) || {})[currentInvPlayerUid] ? lastData.participants[currentInvPlayerUid].name : 'игрок';
+                if (logText) gmPostLogEntryText('🎓 Мастер: ' + logText.replace('{p}', pname));
+                const m = el('inv-gm-edit-msg'); if (m) m.innerHTML = '<span style="color:#2ecc71;">✔ Отправлено — применится у игрока (сразу, если лист открыт, иначе при входе).</span>';
+                return true;
+            }).catch(e => { alert('Ошибка: ' + e.message); return false; });
+    }
+    window.gmChangePlayerSkill = function (sign) {
         const skillIdx = parseInt(el('inv-skill-decrease-select').value) || 0;
-        const amount = parseInt(el('inv-skill-decrease-amount').value) || 1;
-        db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
-            const data = doc.exists ? doc.data() : {};
-            const skills = Array.isArray(data.skills) ? data.skills.slice() : [];
-            const current = parseInt(skills[skillIdx]) || 10;
-            skills[skillIdx] = Math.max(10, current - amount);
-            return db.collection('characters').doc(currentInvPlayerUid).update({ skills: skills });
-        }).then(() => {
-            alert(`Навык «${SKILL_NAMES_BY_IDX[skillIdx]}» понижен на ${amount}.`);
-        }).catch(e => alert('Ошибка: ' + e.message));
+        const amount = Math.max(1, parseInt(el('inv-skill-decrease-amount').value) || 1);
+        const name = SKILL_NAMES_BY_IDX[skillIdx];
+        gmSendCmd({ type: 'skill', idx: skillIdx, delta: sign * amount }, `навык «${name}» ${sign > 0 ? '+' : '−'}${amount} игроку {p}.`);
     };
+    // Старое имя кнопки «Понизить» (совместимость).
+    window.decreasePlayerSkill = function () { window.gmChangePlayerSkill(-1); };
+    window.gmChangePlayerStat = function (sign) {
+        const key = el('inv-stat-change-select').value;
+        const amount = Math.max(1, parseInt(el('inv-stat-change-amount').value) || 1);
+        const names = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
+        gmSendCmd({ type: 'stat', key, delta: sign * amount }, `характеристика «${names[key]}» ${sign > 0 ? '+' : '−'}${amount} игроку {p}.`);
+    };
+    window.gmPerkDown = function (sIdx, pIdx, name) {
+        const refund = !!(el('inv-perk-refund') && el('inv-perk-refund').checked);
+        if (!confirm(`Снять одну ступень перка «${name}»${refund ? ' и вернуть очко перка' : ' (без возврата очка)'}?`)) return;
+        gmSendCmd({ type: 'perkDown', s: sIdx, p: pIdx, refund }, `снята ступень перка «${name}» у игрока {p}${refund ? ' (очко возвращено)' : ''}.`);
+    };
+    window.gmRenderTeachSpells = function () {
+        const sel = el('inv-teach-spell'); if (!sel) return;
+        const school = el('inv-teach-school').value;
+        const known = new Set(((currentPlayerInvData && currentPlayerInvData.customSpells) || []).map(s => s.name));
+        const tiers = { 1: 'Новичок', 2: 'Ученик', 3: 'Адепт', 4: 'Эксперт' };
+        const data = (window.spellsData && window.spellsData[school]) || {};
+        sel.innerHTML = [1, 2, 3, 4].map(t => (data[t] || []).length ? `<optgroup label="${tiers[t]}">` + data[t].map(sp =>
+            `<option value="${escapeHtml(sp.name)}" ${known.has(sp.name) ? 'disabled' : ''}>${escapeHtml(sp.name)}${known.has(sp.name) ? ' — уже знает' : ''}</option>`).join('') + '</optgroup>' : '').join('');
+    };
+    window.gmTeachSpell = function () {
+        const school = el('inv-teach-school').value, name = el('inv-teach-spell').value;
+        if (!name) { alert('Выбери заклинание.'); return; }
+        gmSendCmd({ type: 'spell', school, name }, `игрок {p} обучен заклинанию «${name}».`);
+    };
+    function renderGmPlayerPerks(list) {
+        const box = el('inv-perks-list'); if (!box) return;
+        if (!Array.isArray(list)) { box.innerHTML = '<p style="opacity:.6;">Список перков появится, когда игрок откроет лист (он сохраняет сводку взятых перков).</p>'; return; }
+        if (!list.length) { box.innerHTML = '<p style="opacity:.6;">Перков нет.</p>'; return; }
+        box.innerHTML = list.map(p => `<div style="display:flex; justify-content:space-between; gap:6px; padding:2px 0; border-bottom:1px solid var(--border-color);">
+            <span><span style="opacity:.6;">${escapeHtml(p.tree)}:</span> ${escapeHtml(p.name)}${p.steps > 1 ? ` (${p.taken}/${p.steps})` : ''}</span>
+            <button class="btn-danger" style="width:auto; padding:1px 8px; font-size:12px;" onclick="gmPerkDown(${parseInt(p.s)}, ${parseInt(p.p)}, '${jsq(p.name)}')">−1</button></div>`).join('');
+    }
 
     function renderGmPlayerInventory() {
         const target = el('inv-items-list');
@@ -4038,6 +4203,7 @@
         frenzy: { name: 'Бешенство', desc: 'Атакует ближайшую цель без разбора 1 ход.', turns: 1 },
         slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3 },
         weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2, rollPenalty: -2 },
+        calm: { name: 'Успокоение', desc: 'Не атакует 1 ход.', turns: 1 },
         // Ниже — только для врагов (массовая кнопка «Статус»): работают сами — блок атаки, штраф к кубам, урон по ходам.
         stun: { name: 'Оглушение', desc: 'Оглушён — не действует.', turns: 1 },
         burning: { name: 'Горение', desc: 'Горит: 5 урона огнём в начале каждого хода.', turns: 3, dotHp: 5, dotNoResist: true },
@@ -4392,13 +4558,7 @@
                 const data = doc.exists ? doc.data() : {};
                 const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
                 const invId = sourceItem.name; // см. gmGiveItemFromTable: itemId = название
-                const existing = inv.find(i => i.itemId === invId);
-                if (existing) {
-                    existing.count += itemQty;
-                    Object.assign(existing, itemExtra);
-                } else {
-                    inv.push(Object.assign({ itemId: invId, name: sourceItem.name, count: itemQty, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemExtra));
-                }
+                gmMergeInvItem(inv, { itemId: invId, name: sourceItem.name, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemQty, Object.assign({}, itemExtra));
                 update.inventory = inv;
                 return db.collection('characters').doc(uid).update(update);
             });
@@ -4528,6 +4688,34 @@
     // страницы) звало onGmAttackAttackerPicked() ДО того, как этот window.-присвоение вообще
     // успевало выполниться построчно сверху вниз — ReferenceError "is not defined", и весь
     // остаток инициализации после этой строки просто не происходил.
+    // Заклинания врага, которые НЕ атакуют игрока: лечение (dmg — сколько лечит), невидимость, обереги/броня, призыв.
+    // Раньше они шли как атака: «Быстрое лечение» на 50 снимало игроку 50 ХП.
+    function gmEnemySupportSpell(s) {
+        const n = String((s && s.name) || '').toLowerCase();
+        if (/лечени|исцелени|восстановлени/.test(n)) return 'heal';
+        if (/невидим/.test(n)) return 'invis';
+        // Страх/Ярость/Успокоение — не на себя: накладываются на цель как статус (раньше считались кастом на себя и до игрока не доходили).
+        if (/оберег|броня|плоть|кож[аи]|призыв|вызов|оживлени|поднят|ускорени/.test(n) && !(s.dmg > 1)) return 'self';
+        return null;
+    }
+    // Статус, который управляющее заклинание врага вешает на игрока.
+    function gmEnemyControlStatus(s) {
+        const n = String((s && s.name) || '').toLowerCase();
+        if (s && s.dmg > 1) return '';
+        if (/страх|бегств|отпугиван/.test(n)) return 'fear';
+        if (/ярост|бешенств/.test(n)) return 'frenzy';
+        if (/успокоени|умиротворени/.test(n)) return 'calm';
+        return '';
+        return null;
+    }
+    // Мана врага: заклинание стоит cost МП. Если у врага ведётся мана (maxMp > 0), без маны — не кастует.
+    function gmEnemyPayMana(enemy, cost) {
+        if (!cost || !(enemy.maxMp > 0) || typeof enemy.curMp !== 'number') return { ok: true, tracked: false };
+        if (enemy.curMp < cost) return { ok: false };
+        const enemies = (lastData.enemies || []).map(e => e.id === enemy.id ? Object.assign({}, e, { curMp: e.curMp - cost }) : e);
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
+        return { ok: true, tracked: true, left: enemy.curMp - cost };
+    }
     window.onGmAttackAttackerPicked = function () {
         const attackerId = el('gm-attack-attacker-select').value;
         const actionSelect = el('gm-attack-action-select');
@@ -4537,7 +4725,9 @@
         let opts = '';
         if (enemy.weaponDmg) opts += `<option value="weapon">Оружие (${enemyWeaponDamage(enemy).total} урона${enemy.weaponNote ? ' — ' + escapeHtml(enemy.weaponNote) : ''})</option>`;
         (enemy.spells || []).forEach((s, i) => {
-            opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${s.dmg} урона / ${s.cost} МП)</option>`;
+            const sup = gmEnemySupportSpell(s);
+            const ctl = sup ? '' : gmEnemyControlStatus(s);
+            opts += `<option value="spell:${i}">${escapeHtml(s.name)} (${sup ? (sup === 'heal' ? 'на себя: лечит ' + (s.dmg || 0) : 'на себя') : ctl ? 'на цель: ' + GM_STATUS_EFFECTS[ctl].name : (s.dmg || 0) + ' урона'} / ${s.cost || 0} МП)</option>`;
         });
         (enemy.shouts || []).forEach((s, i) => {
             opts += `<option value="shout:${i}">🗣️ ${escapeHtml(s.name)} (эффект, без прямого урона)</option>`;
@@ -4575,6 +4765,11 @@
         const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
         const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
+        if (actionVal.indexOf('spell:') === 0) {
+            const hands = gmEnemyHands(enemy);
+            if (hands === 'two' || hands === 'both') { alert(`«${enemy.name}» не может колдовать: в руках ${GM_HANDS_LABEL[hands].replace(/^\S+\s/, '')}. Смени у врага «В руках» на «руки свободны» или «одно одноручное» — это его действие в этом ходу.`); return; }
+        }
+        if (actionVal === 'weapon' && gmEnemyHands(enemy) === 'free' && enemy.weaponDmg && !confirm(`У «${enemy.name}» руки свободны (оружие убрано). Всё равно атаковать оружием?`)) return;
         const enemyFlags = window.StCombat.statusFlags(enemy);
         { const blk = enemyFlags.noAttack;
           if (blk) { alert('«' + enemy.name + '» не может атаковать: ' + blk.name + (blk.turns ? ' (ещё ' + blk.turns + ' х.)' : '') + '. Сними статус, если нужно разрешить атаку.'); return; } }
@@ -4611,10 +4806,30 @@
             if (enemy.isRanged && gmWeatherRanged()) { atkMod += gmWeatherRanged(); actionLabel += ` (погода ${gmWeatherRanged()})`; } // дождь/гроза/метель/туман мешают и вражеским стрелкам
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
+            const costS = s ? (parseInt(s.cost) || 0) : 0;
+            const sup = gmEnemySupportSpell(s);
+            const pay = gmEnemyPayMana(enemy, costS);
+            if (!pay.ok) { alert(`У «${enemy.name}» не хватает маны на «${s.name}»: нужно ${costS}, есть ${enemy.curMp}.`); return; }
+            if (sup) { // заклинание на себя — не атака по игроку
+                const parts = [];
+                if (sup === 'heal') {
+                    const healed = Math.max(0, Math.min((enemy.maxHp || 0) - (enemy.curHp || 0), parseInt(s.dmg) || 0));
+                    const after = (lastData.enemies || []).map(e => e.id === enemy.id ? Object.assign({}, e, { curHp: (e.curHp || 0) + healed, curMp: pay.tracked ? pay.left : e.curMp }) : e);
+                    gmUpdateEnemies(after).catch(e => console.error(e));
+                    parts.push(`восстанавливает ${healed} ХП`);
+                } else if (sup === 'invis') {
+                    const after = (lastData.enemies || []).map(e => e.id === enemy.id ? Object.assign({}, e, { curMp: pay.tracked ? pay.left : e.curMp, statusEffects: (e.statusEffects || []).filter(x => x.name !== 'Невидимость').concat([{ id: 'st' + Date.now(), name: 'Невидимость', desc: 'не виден, пока не атакует', turns: 3 }]) }) : e);
+                    gmUpdateEnemies(after).catch(e => console.error(e));
+                    parts.push('становится невидимым');
+                } else parts.push('колдует на себя');
+                gmPostLogEntryText(`✨ ${enemy.name}: «${s.name}» — ${parts.join(', ')}${pay.tracked ? ` (−${costS} МП, осталось ${pay.left})` : ''}.`);
+                return;
+            }
             dmg = s ? s.dmg : 0;
-            isSpellAttack = true; spellCost = s ? (parseInt(s.cost) || 0) : 0;
+            isSpellAttack = true; spellCost = costS;
+            if (pay.tracked) statusNote = ` (−${costS} МП, осталось ${pay.left})`;
             dmgType = mapEnemyDmgType(s ? s.name : '');
-            actionLabel = `заклинанием «${s ? s.name : '?'}»`;
+            actionLabel = `заклинанием «${s ? s.name : '?'}»${statusNote}`;
             atkMod = calcAbilityMod(enemy.int || 10);
         } else if (actionVal.indexOf('shout:') === 0) {
             const s = enemy.shouts[parseInt(actionVal.slice(6))];
@@ -4643,12 +4858,13 @@
         const hit = enemyTotal > playerRoll + defBonus;
         const playerRollShown = playerRoll + (defBonus ? ' +1 (🎵 баллада) = ' + (playerRoll + defBonus) : '');
 
-        const statusKey = el('gm-attack-status-select') ? el('gm-attack-status-select').value : '';
+        let statusKey = el('gm-attack-status-select') ? el('gm-attack-status-select').value : '';
+        if (!statusKey && actionVal.indexOf('spell:') === 0) statusKey = gmEnemyControlStatus(enemy.spells[parseInt(actionVal.slice(6))]);
 
         pendingGmAttack = {
             targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
             isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
-            enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|дремора|атронах|даэдр/i.test(enemy.name || '')),
+            enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
@@ -4659,7 +4875,7 @@
             `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRollShown}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
             (!hit ? `<strong style="color:#7a7a7a;">❌ Промах — урона нет.</strong>` :
                 dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед.${dmgBreakdown} (резист цели вычтется автоматически при применении)` :
-                    '<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">Эффект без прямого урона — примени вручную по описанию.</span>');
+                    `<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">${statusKey && GM_STATUS_EFFECTS[statusKey] ? 'Без урона — при применении на цель ляжет «' + GM_STATUS_EFFECTS[statusKey].name + '».' : 'Эффект без прямого урона — примени вручную по описанию.'}</span>`);
         resultBox.style.display = 'block';
         if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
     };
@@ -4667,6 +4883,10 @@
     // Заклинания в enemies-data.js не хранят тип урона отдельно — определяем по названию.
     function mapEnemyDmgType(spellName) {
         const n = (spellName || '').toLowerCase();
+        // Те же исключения, что на листе игрока (detectDmgTypeFromName): стихия не видна по слову в названии.
+        if (/^(пламя|клыки дракона|испепеление|запретное солнце|болид)/.test(n)) return 'fire';
+        if (/^(обморожение|надлом)/.test(n)) return 'frost';
+        if (/^(искры|нестабильное напряжение|раскаты грома)/.test(n)) return 'shock';
         if (/огн|пламен/.test(n)) return 'fire';
         if (/лед|мороз|холод/.test(n)) return 'frost';
         if (/молни|гроз|электр/.test(n)) return 'shock';
@@ -4685,9 +4905,10 @@
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const resist = (data.resistances && data.resistances[dmgType]) || 0;
-            let finalDmg = dmg ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
-            const defNotes = [];
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const resist = ir.resist;
+            let finalDmg = (dmg && !ir.zero) ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
+            const defNotes = ir.notes.filter(n => /Отбивание|Защита от стихий|сопр\. магии/.test(n));
             { // Бонусы богов игрока: Стендарр — резист урону от даэдра/нежити; Мефала — уязвимость к яду
                 const gg = data.godGM || {};
                 if (finalDmg && gg.daedraUndeadResist && pendingGmAttack.enemyUndeadDaedra) {
@@ -4727,7 +4948,10 @@
             // «Повышение навыка» (зачарования/зелья): Блокирование — N% шанс поглотить физ. урон; Лёгкая броня — (N/2)% уклониться.
             if (finalDmg && dmgType === 'physical') {
                 const boosts = data.skillBoosts || {};
-                const blockPct = boosts['блокирование'] || 0;
+                // Блок — только щитом; стрелу щитом отбивают только с перком «Отбивание стрел».
+                const hasShieldB = !!(data.equippedSlots && data.equippedSlots.shield);
+                const arrowOk = !pendingGmAttack.isRangedAtk || !!((data.perkStates || {})['skill3-perk1-step1']);
+                const blockPct = (hasShieldB && arrowOk) ? (boosts['блокирование'] || 0) : 0;
                 const dodgePct = (boosts['легкая броня'] || 0) / 2;
                 if (blockPct > 0 && Math.random() * 100 < blockPct) { defNotes.push(`🛡️ Блок (${blockPct}%) — урон поглощён`); finalDmg = 0; }
                 else if (dodgePct > 0 && Math.random() * 100 < dodgePct) { defNotes.push(`💨 Уклонение (${dodgePct}%) — атака мимо`); finalDmg = 0; }
@@ -4751,8 +4975,35 @@
                 finalDmg *= 2;
                 sunNote = ' (☀️ уязвимость вампира к солнцу — урон ×2)';
             }
-            let logExtra = '', newHp, newMp;
             const chores = [];
+            // Оберег (Восстановление): поглощает урон ЗАКЛИНАНИЙ из своего запаса. С перком «Оберег-поглотитель»
+            // половина поглощённого уходит игроку в ману. Запас уменьшается командой в лист игрока (gmCmds 'wardHit').
+            let wardGainMp = 0;
+            if (finalDmg > 0 && pendingGmAttack.isSpell) {
+                const wEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.ward && (x.ward.left || 0) > 0 && x.turnsRemaining !== 0);
+                if (wEff) {
+                    const absorbed = Math.min(finalDmg, parseInt(wEff.ward.left) || 0);
+                    finalDmg -= absorbed;
+                    const absorbPerk = !!((data.perkStates || {})['skill11-perk7-step1']);
+                    if (absorbPerk) { wardGainMp = Math.floor(absorbed / 2); absorbedMp = (absorbedMp || 0) + wardGainMp; } // мана — тем же путём, что «Атронах»
+                    defNotes.push(`🔰 Оберег «${wEff.name}»: поглощено ${absorbed}${absorbPerk ? `, +${wardGainMp} маны («Оберег-поглотитель»)` : ''}`);
+                    chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'wardHit', effId: wEff.id || null, name: wEff.name, absorbed }) }).catch(() => { }));
+                }
+            }
+            // Верхом (лист игрока: riding + живая лошадь): 70% урона принимает лошадь, 30% — всадник.
+            // ХП лошади меняется командой в лист игрока (gmCmds), как и другие правки мастера.
+            let horseNote = '';
+            if (finalDmg > 0 && data.riding && Array.isArray(data.pets)) {
+                const horse = data.pets.find(pp => pp && pp.rideable && !pp.dead);
+                if (horse) {
+                    const share = (window.PET_RIDING && window.PET_RIDING.horseShare) || 0.7;
+                    const toHorse = Math.min(Math.round(finalDmg * share), parseInt(horse.hp) || 0);
+                    finalDmg -= toHorse;
+                    horseNote = ` (🐎 лошадь «${horse.name}» приняла ${toHorse}${toHorse >= (parseInt(horse.hp) || 0) ? ' и пала' : ''})`;
+                    chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'petHp', petId: horse.id, delta: -toHorse }) }).catch(() => { }));
+                }
+            }
+            let logExtra = '', newHp, newMp;
             // Заклинание «Барьер» (Изменение): pct% ВСЕГО входящего урона уходит в ману (rate маны за 1 урона).
             // Мана кончилась — барьер падает: ошеломление (−2 к кубам на 2 хода) и снятие всех положительных эффектов.
             let barrierBroke = false;
@@ -4811,15 +5062,18 @@
                 // Сигнал «по тебе попали»: проверка концентрации + прокачка брони (как в Скайриме — за каждое попадание).
                 // Раньше уходил в документ персонажа, который сайт игрока не читает, — не работало ни то, ни другое.
                 if (fdmg > 0) { const pd = {}; pd['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'dmg-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'damaged', dmg: fdmg, dmgType: dmgType, ts: Date.now() }); chores.push(db.collection('sessions').doc(currentCode).update(pd).catch(() => { })); }
-                if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}${mistNote}`;
+                if (dmg) logExtra += `, урон ${finalDmg}${resist ? ` (резист ${resist}%, было бы ${dmg})` : ''}${sunNote}${berserkNote}${mistNote}${horseNote}`;
             }
             if (defNotes.length) logExtra += '. ' + defNotes.join('. ');
             // Автоматический бросок на заражение болезнью — раньше этого не было вообще, болезни
             // существовали только как текст в описании монстров. Срабатывает только при физическом
             // попадании (dmgType==='physical') от переносчика (carrierOfDisease задан).
-            if (dmg && dmgType === 'physical' && pendingGmAttack.carrierOfDisease && pendingGmAttack.diseaseChance > 0) {
-                const roll = Math.floor(Math.random() * 100) + 1;
-                const resist = (data.resistances && data.resistances.disease) || 0;
+            if (finalDmg > 0 && dmgType === 'physical' && pendingGmAttack.carrierOfDisease && pendingGmAttack.diseaseChance > 0) { // уклонился, заблокировал, туман — урона нет, заражения тоже
+                // Альтмер, босмер, редгард — преимущество против болезней: бросаем дважды, берём лучший (больший) результат.
+                const diseaseAdv = ['altmer', 'bosmer', 'redguard'].indexOf(data.race) !== -1;
+                const roll1 = Math.floor(Math.random() * 100) + 1, roll2 = diseaseAdv ? Math.floor(Math.random() * 100) + 1 : 0;
+                const roll = Math.max(roll1, roll2);
+                const resist = (data.race === 'argonian') ? 100 : ((data.resistances && data.resistances.disease) || 0); // аргонианин: иммунитет
                 const effectiveChance = Math.max(0, pendingGmAttack.diseaseChance * (1 - resist / 100));
                 if (roll <= effectiveChance) {
                     const diseaseName = pendingGmAttack.carrierOfDisease;
@@ -4832,7 +5086,7 @@
                     chores.push(db.collection('sessions').doc(currentCode).update(patch2));
                     logExtra += `. 🚨 Заражение! ${targetName} подхватил(а) болезнь «${diseaseName}» (бросок ${roll} ≤ ${effectiveChance.toFixed(0)}%)`;
                 } else {
-                    logExtra += `. Проверка на заражение не прошла (${roll} > ${effectiveChance.toFixed(0)}%)`;
+                    logExtra += `. Проверка на заражение не прошла (${roll} > ${effectiveChance.toFixed(0)}%${diseaseAdv ? `, преимущество расы: ${roll1}/${roll2}` : ''}${data.race === 'argonian' ? ', аргонианин не болеет' : ''})`;
                 }
             }
             if (barrierBroke) {
@@ -4932,13 +5186,14 @@
         } else {
             gold = randInt(tier.gold[0], tier.gold[1]);
         }
-        lastGeneratedLoot = { tier: tier.label, title: `${theme.label}, ${tier.label.toLowerCase()}`, gold, items };
+        lastGeneratedLoot = { tier: tier.label, title: `${theme.label}, ${tier.label.toLowerCase()}`, gold, items, trap: gmRollChestTrap() };
         resultEl.innerHTML = renderLootHtml(lastGeneratedLoot);
     }
 
     // Общий вывод результата для обоих типов сундуков.
     function renderLootHtml(loot) {
         let html = `<strong>${escapeHtml(loot.title || loot.tier)} сундук:</strong><br>`;
+        if (loot.trap) { const tt = trapType(loot.trap.id) || {}; html += `<span style="color:#e67e22;">🪤 С ловушкой: ${tt.icon || ''} ${escapeHtml(tt.name || loot.trap.id)} — обезвредить: ${escapeHtml(loot.trap.tier)} (сл. ${loot.trap.dc}). Игроку при выдаче придёт бросок на обезвреживание.</span><br>`; }
         if (loot.gold) html += `💰 ${loot.gold} септимов<br>`;
         loot.items.forEach(it => {
             const stats = (it.armor ? ` · броня ${it.armor}` : '') + (it.dmg ? ` · урон ${it.dmg}` : '');
@@ -5007,9 +5262,19 @@
         if (soulGemPool.length && Math.random() < 0.3) items.push(soulGemPool[Math.floor(Math.random() * soulGemPool.length)]);
         if (gemPool.length && Math.random() < 0.25) items.push(gemPool[Math.floor(Math.random() * gemPool.length)]);
 
-        lastGeneratedLoot = { tier: tier.label, title: tier.label, gold, items };
+        lastGeneratedLoot = { tier: tier.label, title: tier.label, gold, items, trap: gmRollChestTrap() };
         resultEl.innerHTML = renderLootHtml(lastGeneratedLoot);
     };
+    // Ловушка сундука по выбору мастера (дротики / булава / колья / случайная) и сложность обезвреживания.
+    function gmRollChestTrap() {
+        const v = (el('loot-trap-select') || {}).value || '';
+        if (!v) return null;
+        const pool = window.CHEST_TRAP_TYPES || ['darts', 'mace', 'spikes'];
+        const id = v === 'random' ? pool[Math.floor(Math.random() * pool.length)] : v;
+        const tierKey = (el('loot-trap-tier') || {}).value || 'adept';
+        const tierT = (window.TRAP_DISARM_TIERS || {})[tierKey] || { label: 'Адепт', dc: 15 };
+        return { id, tier: tierT.label, dc: tierT.dc };
+    }
 
     window.grantGeneratedLoot = function () {
         if (!lastGeneratedLoot) { alert('Сначала сгенерируй лут.'); return; }
@@ -5020,20 +5285,22 @@
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
             lastGeneratedLoot.items.forEach(it => {
                 const itemId = it.name; // а не id документа базы — иначе стек не сливается с одноимённым предметом игрока
-                const existing = inv.find(x => x.itemId === itemId);
                 const extra = {};
                 if (it.slot) extra.slot = it.slot;
                 if (typeof it.armor === 'number') extra.armorValue = it.armor;
                 if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
                 if (typeof it.price === 'number') extra.price = it.price;
                 const q = it.qty || 1; // валюта сундука (Дракры/Думаки) приходит стопкой, не по одной штуке
-                if (existing) { existing.count += q; Object.assign(existing, extra); }
-                else inv.push(Object.assign({ itemId, name: it.name, count: q, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, extra));
+                gmMergeInvItem(inv, { itemId, name: it.name, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, q, extra);
             });
             const newGold = (parseInt(data.gold) || 0) + lastGeneratedLoot.gold;
             return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
         }).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
+            if (lastGeneratedLoot.trap) { // сундук с ловушкой: игрок открывает его — бросок на обезвреживание, провал = ловушка
+                const tt = trapType(lastGeneratedLoot.trap.id);
+                if (tt) gmSendTrapCmd(targetUid, { type: 'trapDisarm', chest: true, trapName: tt.name + ' (сундук)', icon: tt.icon, dc: lastGeneratedLoot.trap.dc, onFail: gmTrapCmdFor(tt, {}) });
+            }
             alert(`Лут (${lastGeneratedLoot.title || lastGeneratedLoot.tier} сундук) выдан игроку ${pname}.`);
             gmPostLogEntryText(`📦 ${pname} нашёл(а) ${(lastGeneratedLoot.title || lastGeneratedLoot.tier).toLowerCase()} сундук: ${lastGeneratedLoot.gold ? lastGeneratedLoot.gold + ' золота + ' : ''}${lastGeneratedLoot.items.map(i => i.name + (i.qty > 1 ? ' ×' + i.qty : '')).join(', ')}.`);
             lastGeneratedLoot = null;
@@ -5387,9 +5654,7 @@
                     inv.push(Object.assign({ itemId: it.name + '#' + Date.now() + idx, name: it.name, count: 1, weight: it.weight || 0, category: it.category || '', effect }, extra));
                     return;
                 }
-                const existing = inv.find(x => x.itemId === it.name);
-                if (existing) { existing.count += qty; Object.assign(existing, extra); }
-                else inv.push(Object.assign({ itemId: it.name, name: it.name, count: qty, weight: it.weight || 0, category: it.category || '', effect }, extra));
+                gmMergeInvItem(inv, { itemId: it.name, name: it.name, weight: it.weight || 0, category: it.category || '', effect }, qty, extra);
             });
             const newGold = (parseInt(data.gold) || 0) + gold;
             return db.collection('characters').doc(targetUid).update({ inventory: stripUndefinedDeep(inv), gold: newGold });
@@ -6608,6 +6873,7 @@
         return ref.get().then(doc => {
             const d = doc.exists ? (doc.data() || {}) : {};
             _gmDungeons = dgnArr(d.dungeons); _gmDungeonHiddenAuto = dgnArr(d.hiddenAuto); _gmDungeonsLoaded = true;
+            _gmPets = dgnArr(d.pets); gmPetsPublish(); gmRenderPetSelect();
             renderDungeonPresetSelect(); renderDungeonPanel();
         }).catch(e => {
             console.error('Пресеты данжей не загрузились:', e);
@@ -6619,7 +6885,7 @@
     // Перезаписываем документ целиком (ТЗ: «проще, чем diff»): пресетов у мастера десятки, не тысячи.
     function gmSaveDungeons() {
         const ref = gmPresetsRef(); if (!ref) return Promise.reject(new Error('Не авторизован.'));
-        return ref.set(stripUndefinedDeep({ dungeons: _gmDungeons, hiddenAuto: _gmDungeonHiddenAuto, updatedAt: Date.now() }));
+        return ref.set(stripUndefinedDeep({ dungeons: _gmDungeons, hiddenAuto: _gmDungeonHiddenAuto, updatedAt: Date.now() }), { merge: true }); // merge: в том же документе лежат питомцы мастера
     }
     function gmAllDungeons() {
         const savedIds = new Set(_gmDungeons.map(d => d.id));
@@ -6805,7 +7071,7 @@
             const n = Math.max(1, Math.min(30, parseInt(e.count) || 1));
             for (let k = 0; k < n; k++) {
                 const maxHp = tpl ? (parseInt(tpl.hp) || 10) : 50;
-                const maxMp = tpl && tpl.spells && tpl.spells.length ? Math.max(...tpl.spells.map(s => s.cost || 0)) * 3 : 0;
+                const maxMp = tpl && parseInt(tpl.mana) > 0 ? parseInt(tpl.mana) : (tpl && tpl.spells && tpl.spells.length ? Math.max(...tpl.spells.map(s => s.cost || 0)) * 3 : 0);
                 const extra = tpl ? gmEnemyExtraFromDb(tpl) : {};
                 if (e.note) extra.weaponNote = [extra.weaponNote, e.note].filter(Boolean).join(' · ');
                 if (!tpl) extra.weaponNote = [extra.weaponNote, 'нет в базе — статы задай вручную'].filter(Boolean).join(' · ');
@@ -6899,7 +7165,264 @@
         Object.keys(chosen).forEach(id => { const s = el(id); if (s && parts[chosen[id]]) s.value = chosen[id]; });
     }
     let gmRenderDungeonLoadStarted = false;
+
+    // ---------- Животные и питомцы мастера ----------
+    // Свои шаблоны — в gmPresets/{uid}.pets (переживают сессии); в текущую сессию копируются в sessions/{code}.customPets,
+    // откуда их видят продавцы у игроков. Выдача — командой в лист игрока (gmCmds, тип 'pet'), как другие правки.
+    let _gmPets = [];
+    function gmPetAllTemplates() { return (window.PET_TEMPLATES || []).map(t => Object.assign({ builtIn: true }, t, { hp: t.hp })).concat(_gmPets); }
+    function gmPetsPublish() {
+        if (!currentCode) return;
+        const cur = JSON.stringify((lastData && lastData.customPets) || []);
+        if (cur === JSON.stringify(_gmPets)) return;
+        db.collection('sessions').doc(currentCode).update({ customPets: stripUndefinedDeep(_gmPets) }).catch(e => console.error('customPets:', e));
+    }
+    function gmRenderPetSelect() {
+        const sel = el('gm-pet-select'); if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">— новое животное —</option>' + gmPetAllTemplates().map(t => `<option value="${escapeHtml(t.id)}">${t.icon || '🐾'} ${escapeHtml(t.name)}${t.builtIn ? ' (стандартное)' : ''} — ${parseInt(t.price) || 0} зол.</option>`).join('');
+        if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+        const ps = el('gm-pet-give-player');
+        if (ps) { const p0 = ps.value; const parts = (lastData && lastData.participants) || {}; ps.innerHTML = Object.keys(parts).map(u => `<option value="${u}">${escapeHtml(parts[u].name || u)}</option>`).join('') || '<option value="">Нет игроков</option>'; if (parts[p0]) ps.value = p0; }
+    }
+    window.gmRenderPetSelect = gmRenderPetSelect;
+    window.gmPetPicked = function () {
+        const t = gmPetAllTemplates().find(x => x.id === el('gm-pet-select').value);
+        el('gm-pet-name').value = t ? t.name : ''; el('gm-pet-icon').value = t ? (t.icon || '') : '';
+        el('gm-pet-hp').value = t ? (parseInt(t.hp) || 1) : 50; el('gm-pet-price').value = t ? (parseInt(t.price) || 0) : 300;
+        el('gm-pet-sellers').value = t ? (t.sellers || []).map(s => s.place || s.city || s.hold).filter(Boolean).join(', ') : '';
+        el('gm-pet-loot').value = t ? (t.loot || []).map(l => l.name + ((l.qty || 1) > 1 ? ' × ' + l.qty : '')).join('\n') : '';
+        el('gm-pet-rideable').checked = !!(t && t.rideable);
+        el('gm-pet-msg').innerHTML = t && t.builtIn ? '<span style="opacity:.75;">Стандартное животное: правки сохранятся как твоё новое (стандартное не меняется).</span>' : '';
+    };
+    window.gmPetNew = function () { el('gm-pet-select').value = ''; window.gmPetPicked(); el('gm-pet-name').focus(); };
+    function gmPetFromForm(id) {
+        const name = (el('gm-pet-name').value || '').trim();
+        if (!name) { alert('Укажи название.'); return null; }
+        const loot = (el('gm-pet-loot').value || '').split('\n').map(line => {
+            const m = /^\s*(.+?)(?:\s*[×xх*]\s*(\d+))?\s*$/i.exec(line); if (!m || !m[1].trim()) return null;
+            return { name: m[1].trim(), qty: Math.max(1, parseInt(m[2]) || 1) };
+        }).filter(Boolean);
+        const sellers = (el('gm-pet-sellers').value || '').split(',').map(x => x.trim()).filter(Boolean).map(place => ({ place, who: 'Продавец: ' + name }));
+        return { id, icon: (el('gm-pet-icon').value || '🐾').trim(), name, kind: name, hp: Math.max(1, parseInt(el('gm-pet-hp').value) || 1),
+            price: Math.max(0, parseInt(el('gm-pet-price').value) || 0), sellers, loot, rideable: el('gm-pet-rideable').checked, custom: true };
+    }
+    window.gmPetSave = function () {
+        const cur = _gmPets.find(x => x.id === el('gm-pet-select').value);
+        const t = gmPetFromForm(cur ? cur.id : 'cpet-' + Date.now().toString(36)); if (!t) return;
+        const i = _gmPets.findIndex(x => x.id === t.id);
+        if (i === -1) _gmPets.push(t); else _gmPets[i] = t;
+        const ref = gmPresetsRef(); if (!ref) { alert('Не авторизован.'); return; }
+        ref.set({ pets: stripUndefinedDeep(_gmPets), updatedAt: Date.now() }, { merge: true }).then(() => {
+            gmPetsPublish(); gmRenderPetSelect(); el('gm-pet-select').value = t.id;
+            el('gm-pet-msg').innerHTML = '<span style="color:#2ecc71;">💾 Сохранено' + (currentCode ? ' и доступно игрокам в этой сессии' : '') + '.</span>';
+        }).catch(e => alert('Ошибка: ' + e.message + (/permission/i.test(e.message) ? ' (нужен блок gmPresets в firestore.rules)' : '')));
+    };
+    window.gmPetDelete = function () {
+        const id = el('gm-pet-select').value; const t = _gmPets.find(x => x.id === id);
+        if (!t) { alert('Удалить можно только своё животное (стандартные не удаляются).'); return; }
+        if (!confirm('Удалить «' + t.name + '»? У игроков, которые его уже купили, оно останется.')) return;
+        _gmPets = _gmPets.filter(x => x.id !== id);
+        const ref = gmPresetsRef(); if (!ref) return;
+        ref.set({ pets: stripUndefinedDeep(_gmPets), updatedAt: Date.now() }, { merge: true }).then(() => { gmPetsPublish(); gmRenderPetSelect(); window.gmPetNew(); });
+    };
+    window.gmPetGive = function () {
+        const uid = el('gm-pet-give-player').value;
+        const sel = el('gm-pet-select').value;
+        const t = sel ? gmPetAllTemplates().find(x => x.id === sel) : gmPetFromForm('cpet-' + Date.now().toString(36));
+        if (!uid || !t) { alert('Выбери игрока и животное.'); return; }
+        const pet = stripUndefinedDeep({ id: t.id, icon: t.icon, name: t.name, kind: t.kind || t.name, hp: parseInt(t.hp) || 1, loot: t.loot || [], rideable: !!t.rideable });
+        db.collection('characters').doc(uid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'pet', pet }) })
+            .then(() => {
+                const pname = (((lastData || {}).participants || {})[uid] || {}).name || 'игрок';
+                gmPostLogEntryText(`🐾 Мастер дарит ${pname}: ${t.icon || ''} ${t.name}.`);
+                el('gm-pet-msg').innerHTML = '<span style="color:#2ecc71;">🎁 Выдано — появится у игрока во вкладке «Инвентарь» → «Животные».</span>';
+            }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    // Животные выбранного в панели инвентаря игрока: ХП ± (команда petHp), чтобы ранить/лечить/убить.
+    function renderGmPlayerPets(pets) {
+        const box = el('inv-pets-list'); if (!box) return;
+        const list = Array.isArray(pets) ? pets : [];
+        if (!list.length) { box.innerHTML = '<p style="opacity:.6;">Нет животных.</p>'; return; }
+        box.innerHTML = list.map(p => `<div style="display:flex; justify-content:space-between; gap:6px; align-items:center; padding:2px 0; border-bottom:1px solid var(--border-color);">
+            <span>${p.icon || '🐾'} ${escapeHtml(p.name)} — ${p.dead ? '☠ погиб' + (p.looted ? ', обыскан' : '') : `ХП ${p.hp}/${p.maxHp}`}</span>
+            ${p.dead ? '' : `<span style="display:flex; gap:4px;"><input type="number" id="pet-dmg-${escapeHtml(p.id)}" value="10" min="1" style="width:60px;">
+            <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:12px;" onclick="gmPetHp('${jsq(p.id)}', -1)">−ХП</button>
+            <button class="btn-success" style="width:auto; padding:1px 6px; font-size:12px;" onclick="gmPetHp('${jsq(p.id)}', 1)">+ХП</button></span>`}</div>`).join('');
+    }
+    window.gmPetHp = function (petId, sign) {
+        if (!currentInvPlayerUid) return;
+        const n = Math.max(1, parseInt((el('pet-dmg-' + petId) || {}).value) || 1);
+        db.collection('characters').doc(currentInvPlayerUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-ph' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'petHp', petId, delta: sign * n }) })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
     window.renderDungeonPanel = renderDungeonPanel;
+
+
+    // ========================================================================
+    // ЛОВУШКИ (traps-data.js). Поставленные ловушки — sessions/{code}.placedTraps:
+    // { id, type, label, state: ready|active|cooldown|disarmed|off, left, victims: [uid], ignited, axes }.
+    // Срабатывание = команда 'trap' в лист каждого задетого игрока (gmCmds): лист сам бросает спасброски от своей
+    // настоящей Ловкости, режет урон своими сопротивлениями и пишет итог в журнал. Ловушки «каждый ход»
+    // бьют автоматически, когда общий счётчик ходов (sessionTickCounter) уходит вперёд.
+    // ========================================================================
+    const trapType = id => (window.TRAP_TYPES || []).find(t => t.id === id) || null;
+    const trapsArr = () => Array.isArray(lastData && lastData.placedTraps) ? lastData.placedTraps : [];
+    function gmTrapCmdFor(t, opts) {
+        opts = opts || {};
+        const cmd = { type: 'trap', trapName: t.name, icon: t.icon, hits: [], note: t.note || '' };
+        if (t.id === 'axes') { cmd.save = { stat: 'dex', dc: (t.save || {}).dc || 10, count: Math.max(1, parseInt(opts.axes) || t.defaultAxes || 3), failHit: { dmg: t.axeDmg || 30, type: 'physical' } }; }
+        else if (t.id === 'tar') cmd.hits = opts.ignite ? (t.igniteHits || []) : [];
+        else if (t.id === 'lamp' && opts.radius) cmd.hits = t.radiusHits || [];
+        else if (opts.perTurn && t.perTurn) cmd.hits = t.perTurn.hits;
+        else if (opts.perTurn && t.perTurnIgnited) cmd.hits = t.perTurnIgnited.hits;
+        else cmd.hits = t.hits || [];
+        if (t.knockback) cmd.knockback = t.knockback;
+        if (t.alarm) cmd.alarm = true;
+        if (t.id === 'tar' && !opts.ignite) cmd.note = 'Смола: ноги вязнут (урона нет, пока не подожгли).';
+        return cmd;
+    }
+    function gmSendTrapCmd(uid, cmd) {
+        const full = Object.assign({ id: 'gmc-t' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), ts: Date.now() }, cmd);
+        return db.collection('characters').doc(uid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion(stripUndefinedDeep(full)) }).catch(e => console.error('trap cmd:', e));
+    }
+    function gmSaveTraps(list) {
+        if (!currentCode) return Promise.resolve();
+        return db.collection('sessions').doc(currentCode).update({ placedTraps: stripUndefinedDeep(list) }).catch(e => alert('Ошибка: ' + e.message));
+    }
+    window.gmTrapTypeInfo = function () {
+        const t = trapType((el('gm-trap-type') || {}).value); const box = el('gm-trap-type-info'); if (!box) return;
+        box.textContent = t ? (t.note || '') + (t.knockback ? ` Отбрасывает на ${t.knockback} фт.` : '') : '';
+    };
+    window.gmPlaceTrap = function () {
+        if (!currentCode) { alert('Сначала войди в сессию.'); return; }
+        const t = trapType(el('gm-trap-type').value); if (!t) return;
+        const label = (el('gm-trap-label').value || '').trim();
+        const list = trapsArr().concat([{ id: 'trap-' + Date.now().toString(36), type: t.id, label, state: 'ready', left: 0, victims: [], ignited: false, axes: t.defaultAxes || null }]);
+        el('gm-trap-label').value = '';
+        gmSaveTraps(list).then(() => gmPostLogEntryText(`🪤 Мастер ставит ловушку: ${t.icon} ${t.name}${label ? ' (' + label + ')' : ''}.`));
+    };
+    window.gmRemoveTrap = function (id) { gmSaveTraps(trapsArr().filter(x => x.id !== id)); };
+    window.gmTrapSetField = function (id, field, value) {
+        gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, x, { [field]: value }) : x));
+    };
+    function gmTrapVictims(id, kind) {
+        return Array.from(document.querySelectorAll(`input[data-trap="${id}"][data-kind="${kind || 'main'}"]:checked`)).map(c => c.value);
+    }
+    window.gmTriggerTrap = function (id) {
+        const tr = trapsArr().find(x => x.id === id); if (!tr) return;
+        const t = trapType(tr.type); if (!t) return;
+        if (tr.state === 'disarmed' || tr.state === 'off') { alert('Эта ловушка уже обезврежена/выключена.'); return; }
+        if (tr.state === 'cooldown') { alert(`Ловушка перезаряжается: ещё ${tr.left} ход(ов).`); return; }
+        const victims = gmTrapVictims(id), around = t.id === 'lamp' ? gmTrapVictims(id, 'radius') : [];
+        if (!victims.length && !around.length) { alert('Отметь, на ком сработала ловушка.'); return; }
+        const parts = (lastData && lastData.participants) || {};
+        const names = u => (parts[u] || {}).name || 'игрок';
+        victims.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited })));
+        around.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { radius: true })));
+        const upd = Object.assign({}, tr, { victims: victims.slice() });
+        if (t.perTurn) { upd.state = 'active'; upd.left = t.perTurn.activeTurns || 0; } // 0 = бьёт, пока не заберут камень
+        if (t.id === 'tar' && tr.ignited) { upd.state = 'active'; upd.left = 0; }
+        if (!t.perTurn && !(t.id === 'tar' && tr.ignited)) upd.state = t.id === 'tar' ? 'ready' : 'off'; // разовые ловушки после срабатывания — разряжены
+        gmSaveTraps(trapsArr().map(x => x.id === id ? upd : x));
+        gmPostLogEntryText(`🪤 Срабатывает ${t.icon} ${t.name}${tr.label ? ' (' + tr.label + ')' : ''}: ${victims.map(names).join(', ')}${around.length ? (victims.length ? '; рядом — ' : 'рядом — ') + around.map(names).join(', ') : ''}.${t.alarm ? ' 🔔 Враги знают, где вы!' : ''}`);
+    };
+    window.gmIgniteTar = function (id) {
+        const tr = trapsArr().find(x => x.id === id); if (!tr) return;
+        gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, x, { ignited: true }) : x)).then(() => gmPostLogEntryText('🔥 Смола подожжена!'));
+    };
+    window.gmTrapClearZone = function (id) { gmTrapSetField(id, 'victims', []); };
+    window.gmTrapRearm = function (id) { gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, x, { state: 'ready', left: 0, victims: [] }) : x)); };
+    // Игрок пытается обезвредить: бросок на его листе (d20 + мод. Ловкости против сложности), провал — срабатывает на нём.
+    window.gmTrapDisarmBy = function (id) {
+        const tr = trapsArr().find(x => x.id === id); if (!tr) return;
+        const t = trapType(tr.type); const uid = (el('gm-trap-disarm-' + id) || {}).value; if (!uid) { alert('Выбери игрока.'); return; }
+        const dc = t.disarmDc || parseInt((el('gm-trap-dc-' + id) || {}).value) || 15;
+        gmSendTrapCmd(uid, { type: 'trapDisarm', trapId: id, trapName: t.name, icon: t.icon, dc, onFail: gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited }) });
+        gmPostLogEntryText(`🪤 ${(((lastData || {}).participants || {})[uid] || {}).name || 'Игрок'} пытается обезвредить «${t.name}» (сл. ${dc}).`);
+    };
+    window.gmTrapTakeStone = function (id) {
+        const tr = trapsArr().find(x => x.id === id); if (!tr) return;
+        const t = trapType(tr.type); const uid = (el('gm-trap-disarm-' + id) || {}).value; if (!uid) { alert('Выбери игрока, который забирает камень.'); return; }
+        db.collection('characters').doc(uid).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
+            const proto = gmFindItemByName(t.stone) || { name: t.stone, category: 'Камни душ', weight: 0.5, price: 100 };
+            const ex = inv.find(x => x.itemId === proto.name);
+            if (ex) ex.count = (ex.count || 0) + 1; else inv.push({ itemId: proto.name, name: proto.name, count: 1, weight: proto.weight || 0.5, category: proto.category || 'Камни душ', effect: proto.effect || '', price: proto.price || 0 });
+            return db.collection('characters').doc(uid).update({ inventory: inv });
+        }).then(() => {
+            gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, x, { state: 'off', victims: [] }) : x));
+            gmPostLogEntryText(`💎 ${(((lastData || {}).participants || {})[uid] || {}).name || 'Игрок'} забирает камень с пьедестала — кристалл душ гаснет.`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+    function renderGmTraps() {
+        const sel = el('gm-trap-type'), box = el('gm-traps-list'); if (!sel || !box) return;
+        if (!sel.options.length) { sel.innerHTML = (window.TRAP_TYPES || []).map(t => `<option value="${t.id}">${t.icon} ${escapeHtml(t.name)}</option>`).join(''); window.gmTrapTypeInfo(); }
+        const parts = (lastData && lastData.participants) || {};
+        const uids = Object.keys(parts);
+        const keepChecks = {}; box.querySelectorAll('input[data-trap]:checked').forEach(c => { keepChecks[c.dataset.trap + '|' + c.dataset.kind + '|' + c.value] = true; });
+        const STATE = { ready: '🟢 готова', active: '🔴 бьёт', cooldown: '⏳ перезарядка', disarmed: '✔ обезврежена', off: '⚪ разряжена' };
+        const list = trapsArr();
+        box.innerHTML = list.length ? list.map(tr => {
+            const t = trapType(tr.type) || { icon: '🪤', name: tr.type };
+            const st = STATE[tr.state] || tr.state;
+            const left = tr.state === 'active' && tr.left ? ` (${tr.left} ход.)` : tr.state === 'cooldown' ? ` (${tr.left} ход.)` : '';
+            const checks = (kind, label) => `<div style="font-size:12px;">${label} ${uids.map(u => `<label style="display:inline; margin-right:8px; font-weight:normal;"><input type="checkbox" style="width:auto;" data-trap="${tr.id}" data-kind="${kind}" value="${u}" ${keepChecks[tr.id + '|' + kind + '|' + u] || (kind === 'main' && (tr.victims || []).indexOf(u) !== -1) ? 'checked' : ''}> ${escapeHtml(parts[u].name || u)}</label>`).join('') || '<span style="opacity:.6;">нет игроков</span>'}</div>`;
+            return `<div class="party-row" style="padding:6px 8px;">
+                <div class="row-name"><span>${t.icon} <strong>${escapeHtml(t.name)}</strong>${tr.label ? ' <span style="opacity:.7;">— ' + escapeHtml(tr.label) + '</span>' : ''}</span><span>${st}${left}</span></div>
+                ${checks('main', t.id === 'lamp' ? 'В центре:' : (t.perTurn || t.id === 'tar' ? 'В зоне:' : 'Задеты:'))}
+                ${t.id === 'lamp' ? checks('radius', 'В радиусе:') : ''}
+                <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; align-items:center;">
+                    ${t.id === 'axes' ? `<label style="font-size:12px; margin:0;">Секир: <input type="number" min="1" max="10" value="${tr.axes || 3}" style="width:56px;" onchange="gmTrapSetField('${tr.id}','axes',parseInt(this.value)||1)"></label>` : ''}
+                    ${t.id === 'tar' && !tr.ignited ? `<button style="width:auto; padding:2px 8px;" onclick="gmIgniteTar('${tr.id}')">🔥 Поджечь</button>` : ''}
+                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmTriggerTrap('${tr.id}')">💥 Сработала</button>
+                    ${(t.perTurn || t.id === 'tar') ? `<button style="width:auto; padding:2px 8px;" onclick="gmTrapClearZone('${tr.id}')" title="Все вышли из зоны">🚶 Никого в зоне</button>` : ''}
+                    ${tr.state === 'off' || tr.state === 'disarmed' ? `<button style="width:auto; padding:2px 8px;" onclick="gmTrapRearm('${tr.id}')">↺ Взвести</button>` : ''}
+                    <select id="gm-trap-disarm-${tr.id}" style="width:auto; font-size:12px;">${uids.map(u => `<option value="${u}">${escapeHtml(parts[u].name || u)}</option>`).join('')}</select>
+                    ${t.stone ? `<button style="width:auto; padding:2px 8px;" onclick="gmTrapTakeStone('${tr.id}')">💎 Забрать камень</button>` : ''}
+                    ${t.disarmDc ? '' : `<select id="gm-trap-dc-${tr.id}" style="width:auto; font-size:12px;">${Object.keys(window.TRAP_DISARM_TIERS || {}).map(k => `<option value="${window.TRAP_DISARM_TIERS[k].dc}" ${k === 'adept' ? 'selected' : ''}>${window.TRAP_DISARM_TIERS[k].label} (сл. ${window.TRAP_DISARM_TIERS[k].dc})</option>`).join('')}</select>`}
+                    <button style="width:auto; padding:2px 8px;" onclick="gmTrapDisarmBy('${tr.id}')">🛠 Обезвредить${t.disarmDc ? ' (Лов сл. ' + t.disarmDc + ')' : ''}</button>
+                    <button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmRemoveTrap('${tr.id}')">✕</button>
+                </div></div>`;
+        }).join('') : '<p style="opacity:.6; font-size:13px;">Ловушек в сцене нет.</p>';
+    }
+    // Ход ловушек: бьющие каждый ход ловушки бьют стоящих в зоне; огненный столб после 4 ходов — 10 ходов перезарядки.
+    let _gmTrapTickBusy = false;
+    function gmTrapsTickWatch(d) {
+        if (!currentCode || !d || _gmTrapTickBusy) return;
+        const tick = parseInt(d.sessionTickCounter) || 0, done = parseInt(d.trapsTick) || 0;
+        if (tick <= done) return;
+        const list = Array.isArray(d.placedTraps) ? d.placedTraps : [];
+        if (!list.some(x => x.state === 'active' || x.state === 'cooldown')) {
+            if (tick > done) db.collection('sessions').doc(currentCode).update({ trapsTick: tick }).catch(() => { });
+            return;
+        }
+        _gmTrapTickBusy = true;
+        const ref = db.collection('sessions').doc(currentCode);
+        const sends = [];
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const dd = doc.data() || {};
+            const t0 = parseInt(dd.sessionTickCounter) || 0, d0 = parseInt(dd.trapsTick) || 0;
+            if (t0 <= d0) return;
+            sends.length = 0;
+            const next = (Array.isArray(dd.placedTraps) ? dd.placedTraps : []).map(tr => {
+                const t = trapType(tr.type); if (!t) return tr;
+                const x = Object.assign({}, tr);
+                for (let k = d0; k < t0; k++) {
+                    if (x.state === 'active') {
+                        (x.victims || []).forEach(u => sends.push([u, gmTrapCmdFor(t, { perTurn: true, ignite: x.ignited })]));
+                        if (t.perTurn && t.perTurn.activeTurns) { x.left = (x.left || 0) - 1; if (x.left <= 0) { x.state = 'cooldown'; x.left = t.perTurn.cooldownTurns || 0; x.victims = []; } }
+                    } else if (x.state === 'cooldown') {
+                        x.left = (x.left || 0) - 1; if (x.left <= 0) { x.state = 'ready'; x.left = 0; }
+                    }
+                }
+                return x;
+            });
+            tx.update(ref, { placedTraps: stripUndefinedDeep(next), trapsTick: t0 });
+        })).then(() => { sends.forEach(([u, c]) => gmSendTrapCmd(u, c)); if (sends.length) gmPostLogEntryText(`🪤 Ход ловушек: ${sends.length} удар(ов) по стоящим в зоне.`); })
+          .catch(e => console.error('traps tick:', e)).finally(() => { _gmTrapTickBusy = false; });
+    }
 
     document.addEventListener('DOMContentLoaded', initGmSectionAccordions);
     if (document.readyState !== 'loading') initGmSectionAccordions();

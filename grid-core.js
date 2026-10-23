@@ -35,9 +35,12 @@
         const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
         let err = dx - dy;
         while (!(x0 === x1 && y0 === y1)) {
-            const e2 = 2 * err;
+            const e2 = 2 * err, px = x0, py = y0;
             if (e2 > -dy) { err -= dy; x0 += sx; }
             if (e2 < dx) { err += dx; y0 += sy; }
+            // Диагональный шаг между двумя стенами (угол): обе соседние клетки непрозрачны — линия не проходит.
+            // Раньше Брезенхэм «просачивался» сквозь угол, и через щель в стенах стреляли и колдовали.
+            if (px !== x0 && py !== y0 && !seeThrough(grid, x0, py) && !seeThrough(grid, px, y0)) return false;
             if (x0 === x1 && y0 === y1) break;
             if (!seeThrough(grid, x0, y0)) return false;
         }
@@ -63,6 +66,7 @@
                 if (!dx && !dy) continue;
                 const nx = x + dx, ny = y + dy, k = nx + '_' + ny;
                 if (nx < 0 || ny < 0 || nx + n > W || ny + n > H || seen.has(k) || !ok(nx, ny)) continue;
+                if (dx && dy && !ok(nx, y) && !ok(x, ny)) continue; // наискосок между двумя препятствиями не протиснуться
                 seen.set(k, d + 1); q.push([nx, ny, d + 1]);
             }
         }
@@ -79,6 +83,7 @@
             for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
                 const nx = x + dx, ny = y + dy, k = nx + '_' + ny;
                 if ((!dx && !dy) || nx < 0 || ny < 0 || nx + n > W || ny + n > H || seen.has(k) || !ok(nx, ny)) continue;
+                if (dx && dy && !ok(nx, y) && !ok(x, ny)) continue; // угол между двумя стенами — не пройти
                 seen.add(k); q.push([nx, ny, d + 1]);
             }
         }

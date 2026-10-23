@@ -2043,3 +2043,12 @@ body.st-desk-layout #st-desk-dmg-slot > .vital-bar { margin-top: 0 !important; }
 .st-origin-grace { border-color: #e67e22; color: #f0b27a; }
 .st-origin-locked { border-color: var(--accent-color, #c8a566); color: var(--accent-color, #c8a566); }
 #char-race:disabled, #char-sign:disabled { opacity: 1; cursor: not-allowed; }
+
+/* «🎯 Предпросмотр»: короткая подсветка строки результата — видно, что кнопка сработала */
+@keyframes st-preview-flash { 0% { background: rgba(200,165,102,.35); } 100% { background: transparent; } }
+.st-preview-flash { animation: st-preview-flash 1.2s ease-out; border-radius: 3px; }
+
+/* «✋ В руках» и животные */
+.st-swap-box { border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; margin-bottom: 6px; font-size: 14px; }
+.st-swap-box > summary { cursor: pointer; }
+.st-pets-panel > summary { list-style-position: inside; }

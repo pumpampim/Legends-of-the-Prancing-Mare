@@ -20,6 +20,7 @@ const smithingMaterials = {
     "Сталгрим": { price: 70, weight: 1 },
     "Костная мука": { price: 5, weight: 0.5 },
     "Хитиновая пластина": { price: 15, weight: 1 },
+    "Хитин коруса": { price: 50, weight: 4 },
     "Шкура нетча": { price: 20, weight: 2 },
     "Козьи рога": { price: 5, weight: 1 },
     "Золотой слиток": { price: 50, weight: 1 },
@@ -1428,6 +1429,7 @@ window.smeltingRecipes = [
     { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура медведя", qty: 1 }], yieldCount: 3 },
     { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура пещерного медведя", qty: 1 }], yieldCount: 3 },
     { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура белого медведя", qty: 1 }], yieldCount: 3 },
+    { name: "Кожа", place: "tanning", ingredients: [{ name: "Шкура тролля", qty: 1 }], yieldCount: 3 },
     { name: "Полоски кожи", place: "tanning", ingredients: [{ name: "Кожа", qty: 1 }], yieldCount: 2 }
 ];
 
@@ -1442,3 +1444,46 @@ window.smeltingRecipes = [
         }
     });
 })();
+
+// Подкатегория рецепта оружия → тип оружия листа (index.html: craftSmithingItem, затем экипировка выставляет «тип оружия»).
+// Секиры — ДВУРУЧНЫЕ (category «Двуручное»), боевые топоры — ОДНОРУЧНЫЕ. Проверяется в tests.js.
+window.SMITH_SUBCAT_TO_WEAPON_TYPE = {
+    'Кинжалы': 'dagger', 'Мечи': 'onehand', 'Боевые топоры': 'onehand:топор', 'Булавы': 'onehand:булава',
+    'Двуручные мечи': 'twohand_sword', 'Секиры': 'twohand_axe', 'Молоты': 'twohand_hammer',
+    'Копья': 'onehand:копьё', 'Пики': 'twohand:пика', 'Кастеты': 'onehand:кастет',
+    'Посохи (база)': 'twohand:посох', // раньше подкатегории не было в таблице — посох выковывался как «одноручное»
+    'Луки (обычные)': 'ranged', 'Луки (особые)': 'ranged', 'Арбалеты': 'ranged:арбалет'
+};
+
+// Ножны и колчаны: кузнечное дело без открытия рецепта мастером (alwaysKnown) — простая работа по коже.
+// Утяжелённые (со стальным слитком) — только с перком «Стальные доспехи» (perkHint проверяет craftSmithingItem).
+window.sheathRecipes = [
+    { name: 'Ножны для кинжала', subcat: 'Ножны и колчаны', sheathKind: 'dagger', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для меча', subcat: 'Ножны и колчаны', sheathKind: 'sword', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для боевого топора', subcat: 'Ножны и колчаны', sheathKind: 'axe', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для булавы', subcat: 'Ножны и колчаны', sheathKind: 'mace', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для двуручного меча', subcat: 'Ножны и колчаны', sheathKind: 'greatsword', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для секиры', subcat: 'Ножны и колчаны', sheathKind: 'battleaxe', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для боевого молота', subcat: 'Ножны и колчаны', sheathKind: 'warhammer', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для лука', subcat: 'Ножны и колчаны', sheathKind: 'bow', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для арбалета', subcat: 'Ножны и колчаны', sheathKind: 'crossbow', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Колчан для стрел', subcat: 'Ножны и колчаны', sheathKind: 'quiverArrows', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Колчан для болтов', subcat: 'Ножны и колчаны', sheathKind: 'quiverBolts', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Держатель для щита', subcat: 'Ножны и колчаны', sheathKind: 'shield', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для кинжала', subcat: 'Ножны и колчаны', sheathKind: 'dagger', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для меча', subcat: 'Ножны и колчаны', sheathKind: 'sword', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для боевого топора', subcat: 'Ножны и колчаны', sheathKind: 'axe', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для булавы', subcat: 'Ножны и колчаны', sheathKind: 'mace', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для двуручного меча', subcat: 'Ножны и колчаны', sheathKind: 'greatsword', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для секиры', subcat: 'Ножны и колчаны', sheathKind: 'battleaxe', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для боевого молота', subcat: 'Ножны и колчаны', sheathKind: 'warhammer', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для лука', subcat: 'Ножны и колчаны', sheathKind: 'bow', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для арбалета', subcat: 'Ножны и колчаны', sheathKind: 'crossbow', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённый держатель для щита', subcat: 'Ножны и колчаны', sheathKind: 'shield', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для копья', subcat: 'Ножны и колчаны', sheathKind: 'spear', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для посоха', subcat: 'Ножны и колчаны', sheathKind: 'staff', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Ножны для пики', subcat: 'Ножны и колчаны', sheathKind: 'pike', alwaysKnown: true, weight: 0.2, price: 50, ingredients: [{ name: 'Кожа', qty: 3 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для копья', subcat: 'Ножны и колчаны', sheathKind: 'spear', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для посоха', subcat: 'Ножны и колчаны', sheathKind: 'staff', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] },
+    { name: 'Утяжелённые ножны для пики', subcat: 'Ножны и колчаны', sheathKind: 'pike', sheathArmor: 5, alwaysKnown: true, perkHint: 'Стальные доспехи', weight: 0.4, price: 75, ingredients: [{ name: 'Кожа', qty: 4 }, { name: 'Стальной слиток', qty: 1 }, { name: 'Полоски кожи', qty: 4 }] }
+];

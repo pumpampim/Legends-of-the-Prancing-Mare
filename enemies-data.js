@@ -35,7 +35,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Чешуя рыбы убийцы и ее икра"
+        loot: "Чешуя рыбы-убийцы, Икра рыбы-убийцы"
     },
     {
         name: "Медведь", category: "Животные", soul: "lesser", hp: 290, carrierOfDisease: "Кровавая лихорадка", diseaseChance: 15,
@@ -59,7 +59,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Шкура снеж.медведя,Медвежьи когти"
+        loot: "Шкура белого медведя,Медвежьи когти"
     },
     {
         name: "Грязевой краб", category: "Животные", soul: "petty", hp: 50,
@@ -67,7 +67,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Клещня гр.краба, Крабовые ноги"
+        loot: "Клешня грязевого краба"
     },
     {
         name: "Саблезуб", category: "Животные", soul: "lesser", hp: 170, carrierOfDisease: "Насморк Пелиниала", diseaseChance: 10,
@@ -131,7 +131,7 @@ const enemiesData = [
         resist: { fire: -40 },
         spells: [],
         shouts: [],
-        loot: "Шкура толля,Жир тролля"
+        loot: "Шкура тролля,Жир тролля"
     },
     {
         name: "Ледяной тролль", category: "Монстры", soul: "common", hp: 500,
@@ -139,7 +139,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Шкура толля,Жир тролля"
+        loot: "Шкура тролля,Жир тролля"
     },
     {
         name: "Ледяное приведение", category: "Монстры", soul: "lesser", hp: 230,
@@ -155,7 +155,7 @@ const enemiesData = [
         resist: {  },
         spells: [{ name: "Невидимость", dmg: 1, cost: 30 }, { name: "Быстрое лечение", dmg: 200, cost: 1 }, { name: "Рой спригана", dmg: 30, cost: 30 }],
         shouts: [],
-        loot: "Стержневой корень, Живица сприганов"
+        loot: "Стержневой корень, Живица сприггана"
     },
     {
         name: "Сприган-матрона", category: "Монстры", soul: "common", hp: 500,
@@ -163,7 +163,7 @@ const enemiesData = [
         resist: {  },
         spells: [{ name: "Невидимость", dmg: 1, cost: 30 }, { name: "Быстрое лечение", dmg: 200, cost: 1 }, { name: "Рой спригана", dmg: 30, cost: 30 }],
         shouts: [],
-        loot: "Стержневой корень, Живица сприганов"
+        loot: "Стержневой корень, Живица сприггана"
     },
     {
         name: "Корус", category: "Монстры", soul: "lesser", hp: 300, carrierOfDisease: "Заумь", diseaseChance: 20,
@@ -339,7 +339,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Копье риклингов и пару септимов/немного еды"
+        loot: "Копье риклинга и пару септимов/немного еды"
     },
     {
         name: "Фалмер (воин)", category: "Воины", soul: "lesser", hp: 150,
@@ -347,7 +347,7 @@ const enemiesData = [
         resist: {  },
         spells: [],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-мастер укрытий (воин)", category: "Воины", soul: "lesser", hp: 200,
@@ -355,7 +355,7 @@ const enemiesData = [
         resist: { physical: 5 },
         spells: [],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-сумрачный страж (воин)", category: "Воины", soul: "common", hp: 250,
@@ -363,7 +363,7 @@ const enemiesData = [
         resist: { physical: 10 },
         spells: [],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-ночной охотник (воин)", category: "Воины", soul: "greater", hp: 350,
@@ -371,7 +371,7 @@ const enemiesData = [
         resist: { physical: 15 },
         spells: [],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер (шаман)", category: "Шаманы", soul: "lesser", hp: 150,
@@ -379,7 +379,7 @@ const enemiesData = [
         resist: {  },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Малый оберег", dmg: 0, cost: 17 }, { name: "Дубовая плоть", dmg: 0, cost: 50 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-мастер укрытий (шаман)", category: "Шаманы", soul: "lesser", hp: 200,
@@ -387,7 +387,7 @@ const enemiesData = [
         resist: { physical: 5 },
         spells: [{ name: "Молния", dmg: 25, cost: 25 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }, { name: "Каменная плоть", dmg: 0, cost: 77 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-сумрачный страж (шаман)", category: "Шаманы", soul: "common", hp: 250,
@@ -395,7 +395,7 @@ const enemiesData = [
         resist: { physical: 10 },
         spells: [{ name: "Плащ молний", dmg: 20, cost: 140 }, { name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-ночной охотник (шаман)", category: "Шаманы", soul: "common", hp: 350,
@@ -403,7 +403,7 @@ const enemiesData = [
         resist: { physical: 15 },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }, { name: "Каменная плоть", dmg: 0, cost: 77 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 150,
@@ -411,7 +411,7 @@ const enemiesData = [
         resist: {  },
         spells: [{ name: "Обморожение", dmg: 15, cost: 15 }, { name: "Лечение", dmg: 0, cost: 10 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-мастер укрытий (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 200,
@@ -419,7 +419,7 @@ const enemiesData = [
         resist: { physical: 5 },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Лечение", dmg: 0, cost: 10 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-сумрачный страж (боевой маг)", category: "Боевые маги", soul: "common", hp: 250,
@@ -427,7 +427,7 @@ const enemiesData = [
         resist: { physical: 10 },
         spells: [{ name: "Морозный плащ", dmg: 0, cost: 135 }, { name: "Молния", dmg: 25, cost: 25 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Лечение", dmg: 0, cost: 10 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Фалмер-ночной охотник (боевой маг)", category: "Боевые маги", soul: "greater", hp: 350,
@@ -435,7 +435,7 @@ const enemiesData = [
         resist: { physical: 15 },
         spells: [{ name: "Цепная молния", dmg: 32, cost: 77 }, { name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Лечение", dmg: 0, cost: 10 }],
         shouts: [],
-        loot: "Фалмерские уши,золото,яды,фалмерское оружие"
+        loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
         name: "Двемерская балиста", category: "Двемерские ловушки", soul: "none", hp: 600,
@@ -459,15 +459,15 @@ const enemiesData = [
         resist: { magic: 25 },
         spells: [],
         shouts: [],
-        loot: "Сердечник центуриона,Стреллы (12 шт)(зависит от уровня), Великий камень душ, Двемерское масло, драгоценные камни"
+        loot: "Сердечник генератора центуриона,Двемерская стрела (12 шт)(зависит от уровня), Великий камень душ, Двемерское масло, драгоценные камни"
     },
-    { name: "Фалмер (лучник)", category: "Монстры", soul: "lesser", hp: 150, weaponDmg: 25, weaponNote: "+ 15 урона ядом, дальний бой", resist: {}, spells: [], shouts: [], loot: "Фалмерские уши, золото, яды, фалмерское оружие" },
-    { name: "Фалмер-мастер укрытий (лучник)", category: "Монстры", soul: "lesser", hp: 200, weaponDmg: 30, weaponNote: "+ 20 урона ядом, дальний бой", resist: { physical: 5 }, spells: [], shouts: [], loot: "Фалмерские уши, золото, яды, фалмерское оружие" },
-    { name: "Фалмер-сумрачный страж (лучник)", category: "Монстры", soul: "common", hp: 250, weaponDmg: 35, weaponNote: "+ 25 урона ядом, дальний бой", resist: { physical: 5 }, spells: [], shouts: [], loot: "Фалмерские уши, золото, яды, фалмерское оружие" },
-    { name: "Фалмер-ночной охотник (лучник)", category: "Монстры", soul: "greater", hp: 350, weaponDmg: 40, weaponNote: "+ 25 урона ядом, дальний бой", resist: { physical: 10 }, spells: [], shouts: [], loot: "Фалмерские уши, золото, яды, фалмерское оружие" },
+    { name: "Фалмер (лучник)", category: "Монстры", soul: "lesser", hp: 150, weaponDmg: 25, weaponNote: "+ 15 урона ядом, дальний бой", resist: {}, spells: [], shouts: [], loot: "Ухо фалмера, золото, яды, фалмерское оружие" },
+    { name: "Фалмер-мастер укрытий (лучник)", category: "Монстры", soul: "lesser", hp: 200, weaponDmg: 30, weaponNote: "+ 20 урона ядом, дальний бой", resist: { physical: 5 }, spells: [], shouts: [], loot: "Ухо фалмера, золото, яды, фалмерское оружие" },
+    { name: "Фалмер-сумрачный страж (лучник)", category: "Монстры", soul: "common", hp: 250, weaponDmg: 35, weaponNote: "+ 25 урона ядом, дальний бой", resist: { physical: 5 }, spells: [], shouts: [], loot: "Ухо фалмера, золото, яды, фалмерское оружие" },
+    { name: "Фалмер-ночной охотник (лучник)", category: "Монстры", soul: "greater", hp: 350, weaponDmg: 40, weaponNote: "+ 25 урона ядом, дальний бой", resist: { physical: 10 }, spells: [], shouts: [], loot: "Ухо фалмера, золото, яды, фалмерское оружие" },
     { name: "Двемерская сфера", category: "Монстры", soul: "none", hp: 400, weaponDmg: 70, resist: { magic: 25 }, spells: [{ name: "Дальний выстрел", dmg: 45, cost: 0 }], shouts: [], loot: "Двемерский металлолом, двемерское масло, драгоценные камни, камни душ разной силы" },
     { name: "Двемерский паук", category: "Монстры", soul: "none", hp: 220, weaponDmg: 30, resist: { magic: 25 }, spells: [{ name: "Молния (х3 за бой)", dmg: 25, cost: 0 }, { name: "Взрыв при гибели (10 фт.)", dmg: 25, cost: 0 }], shouts: [], loot: "Двемерский металлолом, двемерское масло, драгоценные камни, камни душ разной силы" },
-    { name: "Двемерский центурион", category: "Монстры", soul: "none", hp: 800, weaponDmg: 110, resist: {}, spells: [{ name: "Паровое дыхание (конус)", dmg: 90, cost: 0 }], shouts: [], loot: "Сердечник центуриона, стрелы (12 шт, зависит от уровня), Великий камень душ, двемерское масло, драгоценные камни" },
+    { name: "Двемерский центурион", category: "Монстры", soul: "none", hp: 800, weaponDmg: 110, resist: {}, spells: [{ name: "Паровое дыхание (конус)", dmg: 90, cost: 0 }], shouts: [], loot: "Сердечник генератора центуриона, Двемерская стрела (12 шт, зависит от уровня), Великий камень душ, двемерское масло, драгоценные камни" },
     { name: "Лорд дремора", category: "Монстры", soul: "black", hp: 390, weaponDmg: 71, resist: { physical: 32 }, spells: [], shouts: [] },
     { name: "Огненный атронах", category: "Монстры", soul: "lesser", hp: 150, weaponDmg: 20, weaponNote: "Аура: все враги в 5 фт. получают 10 урона огнём каждый ход", resist: {}, spells: [], shouts: [], loot: "Огненная соль" },
     { name: "Ледяной атронах", category: "Монстры", soul: "common", hp: 450, weaponDmg: 40, weaponNote: "Иммунитет к холоду, получает на 33% больше урона от огня", resist: { frost: 100 }, spells: [], shouts: [], loot: "Морозная соль" },
@@ -505,14 +505,14 @@ const enemiesData = [
     // ===== Новые существа (захват душ). HP — по UESP; урон — оценка под масштаб этой игры. =====
     { name: "Олень (самка)", category: "Животные", soul: "petty", hp: 50, weaponDmg: 8, weaponNote: "Обычно убегает", resist: {}, spells: [], shouts: [], loot: "Оленина, оленья шкура, малые рога (50%)" },
     { name: "Олень (самец)", category: "Животные", soul: "petty", hp: 50, weaponDmg: 10, weaponNote: "Обычно убегает", resist: {}, spells: [], shouts: [], loot: "Оленина, оленья шкура, большие рога (50%)" },
-    { name: "Лось", category: "Животные", soul: "petty", hp: 130, weaponDmg: 15, weaponNote: "HP и урон — оценка", resist: {}, spells: [], shouts: [], loot: "Оленина, оленья шкура, рога (50%)" },
+    { name: "Лось", category: "Животные", soul: "petty", hp: 130, weaponDmg: 15, weaponNote: "HP и урон — оценка", resist: {}, spells: [], shouts: [], loot: "Оленина, оленья шкура, большие рога (50%)" },
     { name: "Лиса", category: "Животные", soul: "petty", hp: 22, weaponDmg: 5, weaponNote: "Обычно убегает", resist: {}, spells: [], shouts: [], loot: "Лисья шкура" },
     { name: "Снежная лиса", category: "Животные", soul: "petty", hp: 22, weaponDmg: 5, weaponNote: "Обычно убегает; HP — как у лисы", resist: {}, spells: [], shouts: [], loot: "Шкура снежной лисы" },
-    { name: "Кролик", category: "Животные", soul: "petty", hp: 5, weaponDmg: 0, weaponNote: "Не нападает", resist: {}, spells: [], shouts: [], loot: "Сырая кроличья лапка" },
-    { name: "Коза", category: "Животные", soul: "petty", hp: 25, weaponDmg: 5, weaponNote: "", resist: {}, spells: [], shouts: [], loot: "Козья шкура, козья нога, козьи рога (50%)" },
+    { name: "Кролик", category: "Животные", soul: "petty", hp: 5, weaponDmg: 0, weaponNote: "Не нападает", resist: {}, spells: [], shouts: [], loot: "Сырая кроличья ножка" },
+    { name: "Коза", category: "Животные", soul: "petty", hp: 25, weaponDmg: 5, weaponNote: "", resist: {}, spells: [], shouts: [], loot: "Козья шкура, козий окорок, козьи рога (50%)" },
     { name: "Корова", category: "Животные", soul: "petty", hp: 87, weaponDmg: 0, weaponNote: "Не нападает", resist: {}, spells: [], shouts: [], loot: "Сырая говядина, коровья шкура" },
-    { name: "Курица", category: "Животные", soul: "petty", hp: 5, weaponDmg: 0, weaponNote: "Не нападает", resist: {}, spells: [], shouts: [], loot: "Куриное мясо, перья" },
-    { name: "Хоркер", category: "Животные", soul: "petty", hp: 175, weaponDmg: 25, weaponNote: "В игре 15–22 урона", resist: {}, spells: [], shouts: [], loot: "Мясо хоркера, бивень хоркера, малый шанс сокровища" },
+    { name: "Курица", category: "Животные", soul: "petty", hp: 5, weaponDmg: 0, weaponNote: "Не нападает", resist: {}, spells: [], shouts: [], loot: "Куриная грудка, перья" },
+    { name: "Хоркер", category: "Животные", soul: "petty", hp: 175, weaponDmg: 25, weaponNote: "В игре 15–22 урона", resist: {}, spells: [], shouts: [], loot: "Мясо хоркера, бивень хоркера, малый шанс на до 15 монет" },
     { name: "Собака", category: "Животные", soul: "petty", hp: 60, weaponDmg: 15, weaponNote: "HP и урон — оценка", resist: {}, spells: [], shouts: [], loot: "Собачатина" },
     { name: "Лошадь", category: "Животные", soul: null, hp: 200, weaponDmg: 10, weaponNote: "HP, урон и размер души — оценка/не подтверждены (при захвате спросит размер)", resist: {}, spells: [], shouts: [], loot: "Конина" },
     { name: "Жрец-дракон", category: "Монстры", soul: "grand", hp: 1490, weaponDmg: 60, weaponNote: "Урон — оценка", resist: { magic: 50 }, spells: [{ name: "Молния", dmg: 60, cost: 60 }, { name: "Огненный шар", dmg: 60, cost: 60 }, { name: "Ледяной шип", dmg: 60, cost: 60 }], shouts: [], loot: "Маска жреца-дракона, древнее нордское оружие, золото, драг. камни" }
@@ -545,8 +545,8 @@ window.enemiesData = enemiesData;
         'Бандит': [3, 'people'], 'Бандит-маг': [3, 'people'], 'Разбойник': [5, 'people'], 'Разбойник-маг': [5, 'people'], 'Громила': [8, 'people'], 'Громила-маг': [8, 'people'],
         'Грабитель': [11, 'people'], 'Грабитель-маг': [11, 'people'], 'Головорез': [14, 'people'], 'Головорез-маг': [14, 'people'], 'Мародер': [17, 'people'], 'Мародер-маг': [17, 'people'],
         'Главарь бандитов': [19, 'people'], 'Изгой': [5, 'people'], 'Изгой-шаман': [5, 'people'], 'Изгой вересковое сердце': [15, 'people'], 'Вервольф (враг)': [14, 'monster'],
-        'Вампир': [10, 'people'], 'Кровавый вампир': [14, 'people'], 'Вампир ночной охотник': [17, 'people'], 'Древний вампир': [20, 'people'], 'Волкихарский вампир': [22, 'people'],
-        'Мастер вампир': [18, 'people'], 'Волкихарский мастер вампир': [25, 'people'], 'Вампир хозяин ночи': [30, 'people'],
+        'Вампир': [10, 'undead'], 'Кровавый вампир': [14, 'undead'], 'Вампир ночной охотник': [17, 'undead'], 'Древний вампир': [20, 'undead'], 'Волкихарский вампир': [22, 'undead'],  // вампиры — нежить (Некромаг, урон по нежити, боги против нежити)
+        'Мастер вампир': [18, 'undead'], 'Волкихарский мастер вампир': [25, 'undead'], 'Вампир хозяин ночи': [30, 'undead'],
         'Гончая смерти': [8, 'undead'], 'Горгулья': [14, 'monster'], 'Горгулья-страж': [24, 'monster'], 'Горгулья-бестия': [18, 'monster'], 'Жрец-дракон': [30, 'undead'],
         'Двемерская балиста': [12, 'automaton'], 'Двемерский часовой': [8, 'automaton'], 'Двемерский страж': [14, 'automaton']
     };

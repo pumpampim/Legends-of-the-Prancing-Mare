@@ -26,6 +26,11 @@
         const notes = [];
         let resist = dmgType && e.resist ? (e.resist[dmgType] || 0) : 0;
         if (dmgType && resist) notes.push((resist > 0 ? 'резист ' : 'уязвимость ') + (TYPE_LABEL[dmgType] || dmgType) + ' ' + Math.abs(resist) + '%');
+        // Общий магический резист врага (Жрец-дракон 50%, автоматоны и Луркеры 25%) действует и на огонь/холод/электричество —
+        // раньше прибавлялся только магический резист от статусов, а базовый — лишь к урону типа «магия».
+        if (dmgType && dmgType !== 'magic' && MAGIC_TYPES.indexOf(dmgType) !== -1 && e.resist && e.resist.magic) {
+            const before = resist; resist = Math.max(resist, Math.min(100, resist + e.resist.magic)); notes.push('резист магии +' + (resist - before) + '%');
+        }
         if (penetrationPct && resist > 0) {
             const before = resist;
             resist = Math.max(0, resist - penetrationPct);

@@ -63,6 +63,7 @@ const allItems = [
     { name: "Шкура медведя", category: "Шкуры", type: "misc", weight: 3, price: 50 },
     { name: "Шкура пещерного медведя", category: "Шкуры", type: "misc", weight: 3, price: 60 },
     { name: "Шкура белого медведя", category: "Шкуры", type: "misc", weight: 3, price: 75 },
+    { name: "Шкура тролля", category: "Шкуры", type: "misc", weight: 3, price: 50, effect: "Падает с троллей. В вики Скайрима такой шкуры нет — вес и цена по аналогии со шкурой медведя" },
     { name: "Шкура саблезуба", category: "Шкуры", type: "misc", weight: 2, price: 25 },
     { name: "Шкура снежного саблезуба", category: "Шкуры", type: "misc", weight: 2, price: 40 },
     { name: "Волчья шкура", category: "Шкуры", type: "misc", weight: 1, price: 10 },
@@ -133,6 +134,7 @@ const allItems = [
     { name: "Козьи рога", category: "Бытовые предметы", type: "misc", weight: 1, price: 5, effect: "Падают с коз; продаются торговцами общими товарами. Нужны для рецепта ламеллярной брони с рогами." },
     { name: "Хитиновая пластина", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 5, effect: "Материал хитиновой брони и улучшения хитиновых вещей. Падает с пепельных прыгунов; продаётся кузнецами и торговцами общими товарами на Солстейме." },
     { name: "Шкура нетча", category: "Кузнечные ингредиенты", type: "misc", weight: 2, price: 10, effect: "Материал хитиновой и бонмолдовой брони. Падает с нетчей (бетти- и бык-нетч); продаётся кузнецами и торговцами общими товарами на Солстейме." },
+    { name: "Хитин коруса", category: "Кузнечные ингредиенты", type: "misc", weight: 4, price: 50, effect: "Материал улучшения фалмерской брони и оружия. Падает с корусов" },
     { name: "Сердечный камень", category: "Кузнечные ингредиенты", type: "misc", weight: 1, price: 100, effect: "Осколок Красной горы. Не падает с существ и у торговцев не продаётся — добывается киркой из жил на Солстейме (по 3 камня с жилы; жилы есть, например, у Кургана Белого Хребта). Нужен для создания посохов-заклинателей." },
     { name: "Мешочек", category: "Рюкзаки", type: "misc", slot: "backpack", weight: 2, price: 322, carryBonus: 25 },
     { name: "Небольшой рюкзак", category: "Рюкзаки", type: "misc", slot: "backpack", weight: 2, price: 416, carryBonus: 50 },
@@ -161,6 +163,9 @@ const allItems = [
     { name: "Вилка", category: "Бытовые предметы", type: "misc", weight: 1, price: 1 },
     { name: "Деревянная миска", category: "Бытовые предметы", type: "misc", weight: 0.5, price: 1 },
     { name: "Бивень мамонта", category: "Бытовые предметы", type: "misc", weight: 5, price: 150 },
+    { name: "Бивень хоркера", category: "Бытовые предметы", type: "misc", weight: 1, price: 15, effect: "Падает с хоркеров. Применения в ремесле нет — на продажу или для обустройства дома" },
+    { name: "Ошейник гончей смерти", category: "Бытовые предметы", type: "misc", weight: 2, price: 50, effect: "Падает с гончих смерти — на продажу" },
+    { name: "Рваные штаны", category: "Бытовые предметы", type: "misc", weight: 1, price: 1, effect: "Простая поношенная одежда, брони не даёт" },
     { name: "Инструмент для бальзамирования", category: "Бытовые предметы", type: "misc", weight: 1, price: 2 },
     { name: "Испорченная книга", category: "Бытовые предметы", type: "misc", weight: 1, price: 1 },
     { name: "Казан", category: "Бытовые предметы", type: "misc", weight: 2, price: 4 },
@@ -336,6 +341,7 @@ const allItems = [
     { name: "Печёный картофель", category: "Готовые продукты", type: "food", weight: 0.1, price: 2 },
     { name: "Пирожное с заварным кремом", category: "Готовые продукты", type: "food", weight: 0.5, price: 4 },
     { name: "Хлеб", category: "Готовые продукты", type: "food", weight: 0.2, price: 2 },
+    { name: "Пчелиный мёд", category: "Готовые продукты", type: "food", weight: 0.1, price: 2, effect: "+2 хп" },
     { name: "Капустный суп", category: "Готовые продукты", type: "food", weight: 0.5, price: 5 },
     { name: "Кусок эйдарского сыра", category: "Готовые продукты", type: "food", weight: 0.25, price: 5 },
     { name: "Круг эйдарского сыра", category: "Готовые продукты", type: "food", weight: 2, price: 13 },
@@ -377,6 +383,9 @@ const allItems = [
     // это зелье с реальным эффектом «Сопротивление холоду» (res_frost): −20% урона холодом на 10 кругов, применяется кнопкой «Выпить».
     { name: "Эссенция ледяного привидения", category: "Зелья", type: "potion", weight: 0.5, price: 90, effect: "Сопротивление холоду: 20% на 10 кругов",
       alchemyEffects: [{ name: "Сопротивление холоду", magnitude: 20, duration: 10, unit: "%", kind: "res_frost" }] },
+    // Яд обморожения — с морозных пауков (enemies-data.js). Вес и цена из вики Скайрима (Frostbite Venom: 0.5 / 21), урон — из таблицы «Враги» (20 урона ядом).
+    { name: "Яд обморожения", category: "Яды", type: "potion", weight: 0.5, price: 21, effect: "Урон здоровью: 20 (яд)",
+      alchemyEffects: [{ name: "Урон здоровью", magnitude: 20, kind: "dmg_hp" }] },
 
     // --- 12. Посохи (все 40) ---
     { name: "Посох мужества", category: "Посохи", type: "staff", weight: 8, price: 79, charges: 12, effect: "Цель не обращается в бегство 8 ходов +25 HP" },
@@ -518,7 +527,7 @@ const allItems = [
     { name: "Шлем ветров", category: "Уникальная броня", type: "armor", slot: "helmet", armor: 21, weight: 3, price: 989, material: "Ртуть", location: "Белый берег и Винтерхолд", effect: "Убирает помеху на передвижение на морозе. При ношении полного комплекта дает +10% сопротивления холоду", upgrade: "ртутный слиток", craft: "2 ртутный слиток+череп тролля+кожа" },
     { name: "Броня мороза", category: "Уникальная броня", type: "armor", slot: "chest", armor: 48, weight: 5, price: 1964, material: "Ртуть", location: "Белый берег и Винтерхолд", effect: "Убирает помеху на передвижение на морозе. При ношении полного комплекта дает +10% сопротивления холоду", upgrade: "ртутный слиток", craft: "5 ртутных слитков+шкура ледяного тролля+кожа" },
     { name: "Перчатки метели", category: "Уникальная броня", type: "armor", slot: "gloves", armor: 16, weight: 2, price: 415, material: "Ртуть", location: "Белый берег и Винтерхолд", effect: "Убирает помеху на передвижение на морозе. При ношении полного комплекта дает +10% сопротивления холоду", upgrade: "ртутный слиток", craft: "3 ртутных слитка+зубы ледяного приведения" },
-    { name: "Сапоги буранов", category: "Уникальная броня", type: "armor", slot: "boots", armor: 16, weight: 2, price: 392, material: "Ртуть", location: "Белый берег и Винтерхолд", effect: "Убирает помеху на передвижение на морозе. При ношении полного комплекта дает +10% сопротивления холоду", upgrade: "ртутный слиток", craft: "2 ртутных слитка+шкура снежного медведя" },
+    { name: "Сапоги буранов", category: "Уникальная броня", type: "armor", slot: "boots", armor: 16, weight: 2, price: 392, material: "Ртуть", location: "Белый берег и Винтерхолд", effect: "Убирает помеху на передвижение на морозе. При ношении полного комплекта дает +10% сопротивления холоду", upgrade: "ртутный слиток", craft: "2 ртутных слитка+шкура белого медведя" },
 
     // --- 17. Уникальные щиты ---
     { name: "Стойкость", category: "Уникальные щиты", type: "armor", slot: "shield", armor: 30, weight: 8, price: 1200, material: "Нордик", location: "Туманная застава", effect: "+30 ХП, +100 брони во время блока" },
@@ -532,7 +541,7 @@ const allItems = [
 
     // --- 18. Даэдрические артефакты ---
     { name: "Кольцо Кхаджита", category: "Даэдрические артефакты", type: "jewelry", slot: "ring", weight: 0.25, price: 2837, effect: "+2 к кубам на Скрытность, «Скрытый шаг» 1/день", quest: "Квест «Мертвый узел»" },
-    { name: "Зеркало Квандри", category: "Даэдрические артефакты", type: "armor", slot: "shield", weight: 2, price: 4088, effect: "При блоке атакующий делает спасбросок Мудрости (СЛ15) или «Ужас Вермины»", quest: "Кошмар Неласара" },
+    { name: "Зеркало Квандри", category: "Даэдрические артефакты", type: "weapon", slot: "melee", weaponType: "onehand", dmg: 0, weight: 2, price: 4088, effect: "При блоке атакующий делает спасбросок Мудрости (СЛ15) или «Ужас Вермины»", quest: "Кошмар Неласара" },
     { name: "Рубиновый Тронный Кинжал", category: "Даэдрические артефакты", type: "weapon", slot: "melee", weight: 2, price: 3080, dmg: 8, effect: "Атака по союзнику/неожидающей цели → урон ×4.5, убийство +25 маны", quest: "Интриги легата в Солитьюде" },
     { name: "Кольцо Эпидемии", category: "Даэдрические артефакты", type: "jewelry", slot: "ring", weight: 0.25, price: 2624, effect: "Иммунитет к болезням, за каждую болезнь +5 урона и +1 куб, раз в день «Чумное облако»", quest: "Культ Периайта" },
     { name: "Кубок Бесконечного Хмеля", category: "Даэдрические артефакты", type: "misc", slot: "misc", weight: 1, price: 2418, effect: "Глоток – снимает замедление, +4 Силы на 3 хода, -2 куба на стрельбу/магию", quest: "В «Гарцующей кобыле»" },
@@ -551,7 +560,7 @@ const allItems = [
     { name: "Синее одеяние мага с капюшоном", category: "Магические одеяния", type: "armor", slot: "robe", armor: 0, weight: 1, price: 50, effect: "+50 маны" },
     { name: "Сапоги", category: "Магические одеяния", type: "armor", slot: "boots", armor: 0, weight: 1, price: 10, effect: "" },
     { name: "Капюшон новичка", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 305, effect: "+30 маны" },
-    { name: "Капюшон  ученика", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 415, effect: "+40 маны" },
+    { name: "Капюшон ученика", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 415, effect: "+40 маны" },
     { name: "Капюшон адепта", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 525, effect: "+50 маны" },
     { name: "Капюшон эксперта", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 641, effect: "+60 маны" },
     { name: "Капюшон адепта (Разрушение)", category: "Магические одеяния", type: "armor", slot: "helmet", armor: 0, weight: 1, price: 678, effect: "+50 маны. Заклинания школы Разрушения на 5% дешевле" },
@@ -712,7 +721,37 @@ const allItems = [
     { name: "Свиток: Отпугивание нежити", category: "Свитки (прописанные)", type: "scroll", slot: null, weight: 0.1, price: 45, effect: "" },
     { name: "Свиток: Круг защиты", category: "Свитки (прописанные)", type: "scroll", slot: null, weight: 0.1, price: 60, effect: "" },
     { name: "Свиток: Отталкивание нежити", category: "Свитки (прописанные)", type: "scroll", slot: null, weight: 0.1, price: 60, effect: "" },
-    { name: "Свиток: Отпугивание старшей нежити", category: "Свитки (прописанные)", type: "scroll", slot: null, weight: 0.1, price: 60, effect: "" }
+    { name: "Свиток: Отпугивание старшей нежити", category: "Свитки (прописанные)", type: "scroll", slot: null, weight: 0.1, price: 60, effect: "" },
+    // Ножны и колчаны: оружие из ножен достаётся/убирается бонусным действием (см. index.html, «Ножны»).
+    // Колчан нужен, чтобы стрелять без лишнего действия «достать стрелу/болт из рюкзака».
+    { name: "Ножны для кинжала", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "dagger", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Ножны для меча", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "sword", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Ножны для боевого топора", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "axe", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Ножны для булавы", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "mace", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Ножны для двуручного меча", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "greatsword", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для секиры", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "battleaxe", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для боевого молота", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "warhammer", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для лука", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "bow", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для арбалета", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "crossbow", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Колчан для стрел", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "quiverArrows", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Колчан для болтов", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "quiverBolts", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Держатель для щита", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "shield", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для кинжала", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "dagger", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: на пояс или спину" },
+    { name: "Утяжелённые ножны для меча", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "sword", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: на пояс или спину" },
+    { name: "Утяжелённые ножны для боевого топора", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "axe", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: на пояс или спину" },
+    { name: "Утяжелённые ножны для булавы", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "mace", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: на пояс или спину" },
+    { name: "Утяжелённые ножны для двуручного меча", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "greatsword", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для секиры", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "battleaxe", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для боевого молота", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "warhammer", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для лука", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "bow", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для арбалета", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "crossbow", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённый держатель для щита", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "shield", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Ножны для копья", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "spear", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для посоха", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "staff", weight: 0.2, price: 50, effect: "Слот ножен: только на спину" },
+    { name: "Ножны для пики", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "pike", weight: 0.2, price: 50, effect: "Слот ножен: на пояс или спину" },
+    { name: "Утяжелённые ножны для копья", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "spear", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для посоха", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "staff", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: только на спину" },
+    { name: "Утяжелённые ножны для пики", category: "Ножны и колчаны", type: "sheath", slot: "sheath", sheathKind: "pike", sheathArmor: 5, weight: 0.4, price: 75, effect: "+5 к броне (не лёгкая и не тяжёлая); слот ножен: на пояс или спину" }
 ];
 
 // Делаем глобально доступным для мастера

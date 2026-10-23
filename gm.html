@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=16">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -331,10 +331,12 @@
                 <option value="frenzy">Бешенство (1 ход)</option>
                 <option value="slow">Замедление (3 хода)</option>
                 <option value="weakened">Ослабление (2 хода)</option>
+                <option value="calm">Успокоение (1 ход)</option>
             </select>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
             <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
                 <div id="gm-attack-roll-text"></div>
+                <label style="font-size:13px; font-weight:normal; margin-top:6px; display:block;" title="Перки Блокирования: «Отбивание стрел» — стрела в щит без урона; «Защита от стихий» — +50% к огню/холоду/электричеству"><input type="checkbox" id="gm-attack-shield-block" style="width:auto;" onchange="previewGmAttack()"> 🛡 Игрок закрывается щитом (учесть перки Блокирования)</label>
                 <div id="gm-attack-preview" style="font-size:13px; margin-top:6px; opacity:.9;"></div>
                 <div style="display:flex; gap:6px; margin-top:8px;">
                     <button type="button" style="flex:0 0 auto; width:auto;" onclick="previewGmAttack()" title="Посчитать урон с учётом резистов игрока — ничего не записывает">🎯 Предпросмотр</button>
@@ -344,6 +346,19 @@
         </div>
 
         <div class="grid-2">
+            <!-- ===== ЛОВУШКИ: поставить, сработать на игроках, ход ловушек, обезвреживание ===== -->
+            <div class="panel" data-gm-tab="combat" id="gm-traps-panel">
+                <h2>🪤 Ловушки</h2>
+                <p style="font-size:13px; opacity:.75;">Поставь ловушку в сцене, отметь, на ком она сработала, — урон, спасброски и сопротивления считаются на листах игроков. Ловушки, бьющие каждый ход (огненный столб, горящая смола, кристалл душ), бьют сами при «Следующем ходе».</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <select id="gm-trap-type" style="flex:2 1 220px;" onchange="gmTrapTypeInfo()"></select>
+                    <input type="text" id="gm-trap-label" placeholder="Где (коридор у входа)" style="flex:1 1 140px;">
+                    <button class="btn-success" style="width:auto;" onclick="gmPlaceTrap()">+ Поставить</button>
+                </div>
+                <div id="gm-trap-type-info" style="font-size:12px; opacity:.75; margin:4px 0;"></div>
+                <div id="gm-traps-list"></div>
+            </div>
+
             <div class="panel" data-gm-tab="combat">
                 <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Порядок ходов</h2>
                 <p style="font-size:12px; opacity:.75;">Своя система, без броска инициативы — расставляешь порядок сам, из игроков/врагов/существ (призванных и поднятых игроками) или вручную по имени.</p>
@@ -879,17 +894,79 @@
                 <button style="width:100%; margin-top:4px;" onclick="grantPerkPointOnly()">Начислить только 1 очко перка</button>
                 <button class="btn-danger" style="width:100%; margin-top:4px;" onclick="revokeLevelUp()">Понизить уровень (−1, без отмены уже взятых перков/характеристик)</button>
 
-                <label style="font-size:14px; margin-top:8px;">Понизить конкретный навык</label>
+                <!-- Правки листа мастером: уходят командами в characters/{uid}.gmCmds, лист игрока применяет их сам -->
+                <label style="font-size:14px; margin-top:8px;">Навык <span style="opacity:.6; font-weight:normal;">(игроки сами навыки не меняют; потолок 100)</span></label>
                 <select id="inv-skill-decrease-select"></select>
                 <div style="display:flex; gap:6px; margin-top:4px;">
                     <input type="number" id="inv-skill-decrease-amount" value="1" min="1" style="flex:1;">
-                    <button class="btn-danger" style="width:auto;" onclick="decreasePlayerSkill()">Понизить</button>
+                    <button class="btn-success" style="width:auto;" onclick="gmChangePlayerSkill(1)">+ Повысить</button>
+                    <button class="btn-danger" style="width:auto;" onclick="gmChangePlayerSkill(-1)">− Понизить</button>
                 </div>
+
+                <label style="font-size:14px; margin-top:8px;">Характеристика</label>
+                <div style="display:flex; gap:6px;">
+                    <select id="inv-stat-change-select" style="flex:2;">
+                        <option value="str">Сила</option><option value="dex">Ловкость</option><option value="con">Телосложение</option>
+                        <option value="int">Интеллект</option><option value="wis">Мудрость</option><option value="cha">Харизма</option>
+                    </select>
+                    <input type="number" id="inv-stat-change-amount" value="1" min="1" style="flex:1;">
+                </div>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <button class="btn-success" style="flex:1;" onclick="gmChangePlayerStat(1)">+ Повысить</button>
+                    <button class="btn-danger" style="flex:1;" onclick="gmChangePlayerStat(-1)">− Понизить</button>
+                </div>
+
+                <label style="font-size:14px; margin-top:8px;">Перки игрока <span style="opacity:.6; font-weight:normal;">(снять одну ступень)</span></label>
+                <label style="font-size:13px; font-weight:normal;"><input type="checkbox" id="inv-perk-refund" checked style="width:auto;"> вернуть игроку очко перка</label>
+                <div id="inv-perks-list" style="max-height:180px; overflow-y:auto; font-size:13px;"></div>
+
+                <label style="font-size:14px; margin-top:8px;">Обучить заклинанию</label>
+                <div style="display:flex; gap:6px;">
+                    <select id="inv-teach-school" style="flex:1;" onchange="gmRenderTeachSpells()">
+                        <option value="destr">Разрушение</option><option value="restor">Восстановление</option><option value="alter">Изменение</option>
+                        <option value="illus">Иллюзия</option><option value="conj">Колдовство</option>
+                    </select>
+                    <select id="inv-teach-spell" style="flex:2;"></select>
+                </div>
+                <button class="btn-success" style="width:100%; margin-top:4px;" onclick="gmTeachSpell()">📖 Обучить (заклинание навсегда в книге игрока)</button>
+                <label style="font-size:14px; margin-top:8px;">Животные игрока</label>
+                <div id="inv-pets-list" style="font-size:13px;"></div>
+                <div id="inv-gm-edit-msg" style="font-size:13px; margin-top:4px;"></div>
             </div>
 
             <div id="inv-items-list" style="max-height:400px; overflow-y:auto;">
                 <p style="opacity:.6; font-size:14px;">Выбери игрока выше.</p>
             </div>
+        </div>
+
+        <!-- ===== ЖИВОТНЫЕ И ПИТОМЦЫ: свои шаблоны мастера, продавцы, выдача игрокам ===== -->
+        <div class="panel" data-gm-tab="rewards" id="gm-pets-panel">
+            <h2>🐾 Животные и питомцы</h2>
+            <p style="font-size:13px; opacity:.75;">Не боевые спутники. Стандартные: собака (Маркарт, 500), злокрыс (Морфал, 200), морозный паук (Рифтен, 500), лошадь (конюшни Вайтрана, Солитьюда, Виндхельма, Маркарта, Рифтена, 1000). Свои животные сохраняются у тебя в облаке и появляются у игроков в текущей сессии.</p>
+            <label>Шаблон</label>
+            <select id="gm-pet-select" onchange="gmPetPicked()"></select>
+            <div class="grid-2" style="gap:6px;">
+                <div><label>Название</label><input type="text" id="gm-pet-name" placeholder="Боевой козёл"></div>
+                <div><label>Значок</label><input type="text" id="gm-pet-icon" placeholder="🐐" maxlength="4"></div>
+                <div><label>ХП</label><input type="number" id="gm-pet-hp" min="1" value="50"></div>
+                <div><label>Цена (септимы)</label><input type="number" id="gm-pet-price" min="0" value="300"></div>
+            </div>
+            <label>Где продаётся <span style="opacity:.6; font-weight:normal;">(города или владения через запятую; пусто — только выдача мастером)</span></label>
+            <input type="text" id="gm-pet-sellers" placeholder="Вайтран, Рифт">
+            <label>Что выпадает с тела <span style="opacity:.6; font-weight:normal;">(по одному в строке: «Козья шкура × 1»)</span></label>
+            <textarea id="gm-pet-loot" rows="3"></textarea>
+            <label style="font-weight:normal;"><input type="checkbox" id="gm-pet-rideable" style="width:auto;"> верховое (галочка «Верхом» у игрока)</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button class="btn-success" style="flex:1;" onclick="gmPetSave()">💾 Сохранить своё</button>
+                <button style="width:auto;" onclick="gmPetNew()">+ Новое</button>
+                <button class="btn-danger" style="width:auto;" onclick="gmPetDelete()">🗑</button>
+            </div>
+            <label style="margin-top:8px;">Выдать игроку (без оплаты)</label>
+            <div style="display:flex; gap:6px;">
+                <select id="gm-pet-give-player" style="flex:1;"></select>
+                <button class="btn-success" style="width:auto;" onclick="gmPetGive()">🎁 Выдать</button>
+            </div>
+            <div id="gm-pet-msg" style="font-size:13px; margin-top:4px;"></div>
         </div>
 
         <!-- ===== ГИЛЬДИИ (Задача B) ===== -->
@@ -1178,6 +1255,26 @@
                     </select>
                 </div>
             </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+                <div style="flex:1; min-width:150px;">
+                    <label>Ловушка в сундуке</label>
+                    <select id="loot-trap-select">
+                        <option value="">Без ловушки</option>
+                        <option value="random">Случайная</option>
+                        <option value="darts">🎯 С дротиками (30 ядом)</option>
+                        <option value="mace">🔨 С булавой (15)</option>
+                        <option value="spikes">🗡️ С кольями (30)</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:150px;">
+                    <label>Сложность обезвреживания</label>
+                    <select id="loot-trap-tier">
+                        <option value="apprentice">Ученик (сл. 12)</option>
+                        <option value="adept" selected>Адепт (сл. 15)</option>
+                        <option value="expert">Эксперт (сл. 18)</option>
+                    </select>
+                </div>
+            </div>
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="generateChestLoot()">🎲 Сгенерировать</button>
             <div id="loot-gen-result" style="margin-top:8px; font-size:14px;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
@@ -1241,28 +1338,30 @@
 </div>
 
 <script src="firebase-config.js?v=3"></script>
-<script src="items-data.js?v=11"></script>
-<script src="smithing-data.js?v=6"></script>
-<script src="enchant-data.js?v=3"></script>
+<script src="items-data.js?v=15"></script>
+<script src="smithing-data.js?v=11"></script>
+<script src="enchant-data.js?v=4"></script>
 <script src="holidays-data.js?v=3"></script>
 <script src="random-events-data.js?v=3"></script>
-<script src="skill-books-data.js?v=3"></script>
+<script src="skill-books-data.js?v=4"></script>
 <script src="unique-weapons-data.js?v=3"></script>
 <script src="holds-data.js?v=3"></script>
 <script src="rumors-data.js?v=3"></script>
 <script src="holds-map.js?v=4"></script>
-<script src="spell-tomes-data.js?v=3"></script>
+<script src="spell-tomes-data.js?v=5"></script>
 <script src="cooking-data.js?v=8"></script>
-<script src="alchemy-data.js?v=3"></script>
+<script src="alchemy-data.js?v=4"></script>
 <script src="fish-data.js?v=3"></script>
-<script src="spell-data.js?v=3"></script>
-<script src="enemies-data.js?v=4"></script>
-<script src="combat-bonuses.js?v=1"></script>
-<script src="combat-calc.js?v=3"></script>
-<script src="enemy-loot.js?v=4"></script>
-<script src="grid-core.js?v=2"></script>
-<script src="dungeon-presets-data.js?v=1"></script>
-<script src="gm.js?v=36"></script>
+<script src="spell-data.js?v=5"></script>
+<script src="enemies-data.js?v=8"></script>
+<script src="pets-data.js?v=1"></script>
+<script src="traps-data.js?v=1"></script>
+<script src="combat-bonuses.js?v=4"></script>
+<script src="combat-calc.js?v=4"></script>
+<script src="enemy-loot.js?v=6"></script>
+<script src="grid-core.js?v=3"></script>
+<script src="dungeon-presets-data.js?v=3"></script>
+<script src="gm.js?v=47"></script>
 <script src="gm-grid.js?v=2"></script>
 </body>
 </html>

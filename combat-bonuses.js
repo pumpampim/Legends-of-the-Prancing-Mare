@@ -13,7 +13,8 @@
 (function () {
     'use strict';
 
-    const TWO_HANDED = ['twohand_sword', 'twohand_axe', 'twohand_hammer'];
+    // Двуручное: мечи, секиры, молоты, а также пики и боевые посохи (раньше им некуда было деться, кроме «двуручного меча»).
+    const TWO_HANDED = ['twohand_sword', 'twohand_axe', 'twohand_hammer', 'twohand_pike', 'twohand_staff'];
     const abilityMod = v => Math.floor((v - 10) / 2);
 
     // Какой навык усиливает атаку данным оружием (та же логика, что weaponBoostSkill в index.html).
@@ -48,6 +49,8 @@
         let wepType = 'unarmed';
         const infoNotes = [];
         let enchantDmgMain = 0, offhandDmg = 0, offhandEnchantDmg = 0, statModForFormula = 0, statLabelForFormula = 'Сила';
+        let trueDmg = 0;      // урон «сквозь сопротивление» (Копейщик/Пикосажатель/Боевые искусства): идёт отдельным ударом без резиста
+        let armorIgnore = 0;  // доля брони (физ. резиста) цели, которую удар игнорирует: 0.45 = 45%
 
         const strMod = Math.floor((str - 10) / 2);
         const dexMod = Math.floor((dex - 10) / 2);
@@ -63,33 +66,52 @@
             const wisMod = abilityMod(I.wis);
             hitModifier = isSummonedWeapon ? wisMod : strMod;
 
-            if (wepType === 'twohand_sword') hitModifier -= 2;
+            if (wepType === 'dagger') hitModifier += 1; // кинжал: +1 к атаке (как обещано в списке типов)
+            if (wepType === 'twohand_sword') hitModifier -= 2;    // пика — без штрафа (по правилам)
+            if (wepType === 'twohand_staff') hitModifier -= 3;
             if (wepType === 'twohand_axe') hitModifier -= 3;
             if (wepType === 'twohand_hammer') hitModifier -= 4;
 
             const isTwoHanded = TWO_HANDED.indexOf(wepType) !== -1;
+            const isOneHandedWeapon = !isTwoHanded && wepType !== 'unarmed'; // перки ветки «Одноручное» — только одноручным оружием
+            const isSpear = wepType === 'onehand' && /коп[ьё]/.test(wepName);
+            const isPike = wepType === 'twohand_pike' || (isTwoHanded && /пик[аи]/.test(wepName));
 
             // Бонусы от перков к базовому урону (дробные — округление только на множителях ниже, как и раньше)
             let perkBonus = 0;
-            perkBonus += baseDmg * (isTwoHanded ? (perks.twoHandedDamage || 0) : (perks.oneHandedDamage || 0)); // Сильная рука / Варвар
-            if (wepType === 'onehand' || wepType === 'twohand_sword') {
-                if (wepName.includes('коп') || wepName.includes('пик')) perkBonus += (perks.spearBleedDamage || 0) + (perks.spearResistDamage || 0);
-            }
+            // Кастет без перка «Безоружный бой» — просто кулак (урон 2)
+            if (wepType === 'unarmed' && melee.isKastet && !perks.canUseGauntlets) { baseDmg = 2; infoNotes.push('👊 Без перка «Безоружный бой» кастетом бить нельзя — удар кулаком (2)'); }
+            // Сильная рука — только одноручным оружием (кулаки и кастеты — безоружный бой), Варвар — двуручным
+            perkBonus += baseDmg * (isTwoHanded ? (perks.twoHandedDamage || 0) : (isOneHandedWeapon ? (perks.oneHandedDamage || 0) : 0));
+            // Кровопотеря — обычный урон; «через сопротивление» — отдельно (trueDmg), резист цели его не режет.
+            if (isSpear) { perkBonus += (perks.spearBleedDamage || 0); trueDmg += (perks.spearResistDamage || 0); }          // Копейщик
+            if (isPike) { perkBonus += (perks.pikeBleedDamage || 0); trueDmg += (perks.pikeResistDamage || 0); }             // Пикосажатель
             if (wepType === 'onehand' && wepName.includes('топ')) perkBonus += (perks.axeBleedDamage || 0);
             if (wepType === 'twohand_axe') perkBonus += (perks.greatAxeBleedDamage || 0);
-            if (perks.armorPenetrationDamage) perkBonus += perks.armorPenetrationDamage; // Боевые искусства
+            if (isOneHandedWeapon && perks.martialArtsTrueDmg) trueDmg += perks.martialArtsTrueDmg; // Боевые искусства
 
+            // Игнор брони (доля резиста цели): Костолом — булавы, Крушитель черепов — молоты, Отшельник — посохи.
             if (wepType === 'onehand' && wepName.includes('булав') && perks.maceArmorPenetration) {
+                armorIgnore = Math.max(armorIgnore, perks.maceArmorPenetration);
                 infoNotes.push(`🔨 Костолом: игнорирует ${Math.round(perks.maceArmorPenetration * 100)}% брони цели`);
             }
             if (wepType === 'twohand_hammer' && perks.hammerArmorPenetration) {
+                armorIgnore = Math.max(armorIgnore, perks.hammerArmorPenetration);
                 infoNotes.push(`🔨 Крушитель черепов: игнорирует ${Math.round(perks.hammerArmorPenetration * 100)}% брони цели`);
             }
+            if (wepType === 'twohand_staff' && perks.staffArmorPenetration) {
+                armorIgnore = Math.max(armorIgnore, perks.staffArmorPenetration / 100);
+                infoNotes.push(`🪄 Отшельник: посох игнорирует ${perks.staffArmorPenetration}% брони цели`);
+            }
+            if (trueDmg) infoNotes.push(`🩸 Сквозь сопротивление: +${trueDmg} урона (резист цели не режет)`);
 
             enchantDmgMain = I.enchantDmgMelee || 0;
-            statModForFormula = str; statLabelForFormula = 'Сила';
-            totalDmg = baseDmg + perkBonus + str;
-            steps.push({ source: 'оружие', op: 'set', value: baseDmg }, { source: 'перки', op: 'add', value: perkBonus }, { source: 'Сила', op: 'add', value: str });
+            // К урону прибавляется характеристика удара: Сила; у призванного оружия — Мудрость (как и попадание);
+            // кулаки и кастеты — без Силы (по описанию типа «Кулаки (Урон 2, без Силы)»).
+            const dmgStat = wepType === 'unarmed' ? 0 : (isSummonedWeapon ? I.wis : str);
+            statModForFormula = dmgStat; statLabelForFormula = wepType === 'unarmed' ? 'без характеристики' : (isSummonedWeapon ? 'Мудрость' : 'Сила');
+            totalDmg = baseDmg + perkBonus + dmgStat;
+            steps.push({ source: 'оружие', op: 'set', value: baseDmg }, { source: 'перки', op: 'add', value: perkBonus }, { source: statLabelForFormula, op: 'add', value: dmgStat });
             add('зачарование оружия', enchantDmgMain);
 
             // Двойное оружие (одноручное/кинжал, не для двуручного)
@@ -100,30 +122,34 @@
                 if (offhandDmg > 0 || offhandEnchantDmg > 0) add('второе оружие', offhandDmg + offhandEnchantDmg);
             }
 
-            // Силовая атака / Рывок-атака
+            // Силовая атака / Рывок-атака. Перки каждой ветки — только своим оружием: «Боевая стойка», «Безжалостный удар»,
+            // «Рывок» — одноручным; «Стойка чемпиона», «Сокрушительный удар», «Великий рывок» — двуручным.
             if (isPowerAttack && wepType !== 'unarmed') {
-                if (perks.powerAttackHitBonus) hitModifier += perks.powerAttackHitBonus;
+                hitModifier -= 1; // правила: силовая атака — −1 к кубам
+                if (perks.powerAttackHitBonus && isOneHandedWeapon) hitModifier += perks.powerAttackHitBonus;
                 if (perks.twoHandedPowerAttackHitBonus && isTwoHanded) hitModifier += perks.twoHandedPowerAttackHitBonus;
 
-                const sprintPerkUnlocked = perks.sprintPowerAttackDouble;
+                const sprintPerkUnlocked = isTwoHanded ? perks.twoHandSprintDouble : perks.oneHandSprintDouble;
                 if (isSprintAttack && sprintPerkUnlocked) {
                     mul('рывок-атака', 2);
-                    infoNotes.push('🏃 Рывок-атака: фиксированный х2 урона (дистанция подтверждена мастером)');
+                    infoNotes.push(`🏃 Рывок-атака: фиксированный х2 урона — между тобой и целью должно быть не меньше ${isTwoHanded ? 15 : 20} фт (подтверждает мастер)`);
                 } else {
                     if (isSprintAttack && !sprintPerkUnlocked) {
-                        infoNotes.push('⚠ Галочка «Рывок-атака» стоит, но перк «Рывок»/«Великий рывок» не открыт — считается как обычная силовая атака.');
+                        infoNotes.push(`⚠ Галочка «Рывок-атака» стоит, но перк «${isTwoHanded ? 'Великий рывок' : 'Рывок'}» для этого оружия не открыт — считается как обычная силовая атака.`);
                     }
                     let powerMult = 1.5;
-                    if (perks.standingPowerAttackDamage) powerMult += perks.standingPowerAttackDamage;
+                    const standing = isTwoHanded ? (perks.twoHandStandingPower || 0) : (perks.oneHandStandingPower || 0);
+                    if (standing) powerMult += standing;
                     if (isDualWield && !isTwoHanded && perks.dualWieldPowerAttackDamage) powerMult += perks.dualWieldPowerAttackDamage;
                     mul('силовая атака', powerMult);
-                    if (perks.decapitationChance) infoNotes.push(`💀 Шанс обезглавливания: ${Math.round(perks.decapitationChance * 100)}%`);
+                    const decap = isTwoHanded ? (perks.twoHandDecapChance || 0) : (perks.oneHandDecapChance || 0);
+                    if (decap) infoNotes.push(`💀 Шанс обезглавливания: ${Math.round(decap * 100)}%`);
                 }
             } else if (isSprintAttack) {
                 infoNotes.push('⚠️ Рывок-атака засчитывается только вместе с «Силовой атакой»');
             }
 
-            if (perks.hitBonus) hitModifier += perks.hitBonus;
+            if (perks.martialArtsHitBonus && isOneHandedWeapon) hitModifier += perks.martialArtsHitBonus; // Боевые искусства — только одноручным
             if (wepType === 'onehand' && isPowerAttack && wepName.includes('меч')) hitModifier += (perks.swordPowerAttackHitBonus || 0);
             if (wepType === 'twohand_sword' && isPowerAttack) hitModifier += (perks.greatswordPowerAttackHitBonus || 0);
 
@@ -148,13 +174,17 @@
 
             if (perks.rangedDamagePercent) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent));
             if (perks.criticalShotStrFraction) {
-                const strBonus = Math.round(strMod * perks.criticalShotStrFraction);
+                const strBonus = Math.round(str * perks.criticalShotStrFraction); // доля значения Силы (¼/½/полная), не модификатора
                 if (strBonus) {
                     add('Критический выстрел', strBonus);
                     infoNotes.push(`🎯 Критический выстрел: +${strBonus} от Силы`);
                 }
             }
             if (perks.rangedHitBonus) hitModifier += perks.rangedHitBonus;
+            if (ranged.isStaff && perks.staffArmorPenetration) { // посох в слоте дальнего боя — «Отшельник» действует и тут
+                armorIgnore = Math.max(armorIgnore, perks.staffArmorPenetration / 100);
+                infoNotes.push(`🪄 Отшельник: посох игнорирует ${perks.staffArmorPenetration}% брони цели`);
+            }
         }
 
         hitModifier -= starve * 2;
@@ -218,7 +248,7 @@
         sneakMult += gb('sneakMult'); // Боэтия/Ноктюрнал
 
         return {
-            totalDmg, hitModifier, sneakMult, mode, wepType, baseDmg,
+            totalDmg, hitModifier, sneakMult, mode, wepType, baseDmg, trueDmg, armorIgnore,
             enchantDmgMain, offhandDmg, offhandEnchantDmg, statModForFormula, statLabelForFormula,
             weaponDmgPct, weaponBoostPct, boostSkillKey, weaponDmgFlat,
             infoNotes, godDmgNotes, steps

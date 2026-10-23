@@ -11,7 +11,7 @@
         "0-0": (step) => ({ oneHandedDamage: 0.20 * step }),
         "0-1": () => ({ powerAttackHitBonus: 1 }),
         "0-2": () => ({ canUseGauntlets: true }),
-        "0-3": (step) => ({ hitBonus: step - 1, armorPenetrationDamage: 5 * step }),
+        "0-3": (step) => ({ martialArtsHitBonus: step - 1, martialArtsTrueDmg: 5 * step }), // только одноручное; урон — сквозь сопротивление
         "0-4": (step) => ({ swordPowerAttackHitBonus: step }),
         "0-5": () => ({ counterAttackBonus: true }),
         "0-6": (step) => ({ spearBleedDamage: 5 * step, spearResistDamage: 5 * step }),
@@ -19,18 +19,18 @@
         "0-8": (step) => ({ maceArmorPenetration: 0.15 * step }),
         "0-9": (step) => ({ dualWieldHitBonus: step }),
         "0-10": () => ({ dualWieldPowerAttackDamage: 0.50 }),
-        "0-11": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.05 }),
-        "0-12": () => ({ sprintPowerAttackDouble: true }),
+        "0-11": () => ({ oneHandStandingPower: 0.25, oneHandDecapChance: 0.05 }),
+        "0-12": () => ({ oneHandSprintDouble: true }),
 
         // ==================== ДВУРУЧНОЕ ОРУЖИЕ (skillIdx = 1) ====================
         "1-0": (step) => ({ twoHandedDamage: 0.20 * step }),
         "1-1": () => ({ twoHandedPowerAttackHitBonus: 1 }),
-        "1-2": (step) => ({ spearBleedDamage: 8 * step, spearResistDamage: 8 * step }),
+        "1-2": (step) => ({ pikeBleedDamage: 8 * step, pikeResistDamage: 8 * step }), // пики — отдельно от копий «Копейщика»
         "1-3": (step) => ({ greatAxeBleedDamage: 10 * step }),
         "1-4": (step) => ({ greatswordPowerAttackHitBonus: step }),
         "1-5": (step) => ({ staffEnchantPower: 0.15 * step, staffArmorPenetration: [5, 10, 20][step - 1] || 0 }),
-        "1-6": () => ({ sprintPowerAttackDouble: true }),
-        "1-7": () => ({ standingPowerAttackDamage: 0.25, decapitationChance: 0.10 }),
+        "1-6": () => ({ twoHandSprintDouble: true }),
+        "1-7": () => ({ twoHandStandingPower: 0.25, twoHandDecapChance: 0.10 }),
         "1-8": () => ({ sweepingSideAttack: true }),
         "1-9": (step) => ({ hammerArmorPenetration: 0.25 * step }),
 
@@ -140,9 +140,9 @@
         "2-4": () => ({ powerShotEvery3: true }),
         "2-5": () => ({ arrowRecoverDouble: true }),
         // Блокирование
-        "3-1": () => ({ shieldBlocksArrows: true }),
+        "3-1": () => ({ shieldBlocksArrows: true }), // считает мастер: gm.js gmPlayerIncomingResist читает perkStates skill3-perk1 (флаг — отметка для аудита перков)
         "3-2": () => ({ shieldBash: true }),
-        "3-4": () => ({ shieldElemResist50: true }),
+        "3-4": () => ({ shieldElemResist50: true }), // считает мастер: gm.js gmPlayerIncomingResist, perkStates skill3-perk4
         "3-5": () => ({ shieldBashX5: true }),
         "3-7": () => ({ shieldBashDisarm: true }),
         // Броня
@@ -154,7 +154,7 @@
         "8-1": () => ({ sleepTheftBonus: 2 }),
         "8-3": () => ({ pickpocketBonus: 1 }),
         "8-5": () => ({ keyThiefAuto: true }),
-        "8-6": () => ({ lockpickGoldBonus: true }),
+        "8-6": () => ({ pickpocketGoldBonus: 2 }), // «Карманник» (раньше здесь стоял дубль «Золотоискателя» из Взлома)
         "9-3": () => ({ sellAnything: true }),
         "9-5": () => ({ intimidateBonus: 2 }),
         // Зачарование
@@ -170,7 +170,7 @@
         "10-11": () => ({ shockLowHpDisintegrate: true }),
         // Восстановление
         "11-5": () => ({ restorePhysBuff: true }),
-        "11-7": () => ({ wardAbsorbMana: true }),
+        "11-7": () => ({ wardAbsorbMana: true }), // считает мастер: gm.js applyGmAttackDamage (оберег), perkStates skill11-perk7
         "11-8": () => ({ necromage: true }),
         // Колдовство
         "10-1": () => ({ dualDestr: true }),
@@ -215,6 +215,9 @@
             powerAttackHitBonus: 0,
             twoHandedPowerAttackHitBonus: 0,
             standingPowerAttackDamage: 0,
+            oneHandStandingPower: 0, twoHandStandingPower: 0, oneHandDecapChance: 0, twoHandDecapChance: 0,
+            oneHandSprintDouble: false, twoHandSprintDouble: false,
+            martialArtsHitBonus: 0, martialArtsTrueDmg: 0, pikeBleedDamage: 0, pikeResistDamage: 0,
             decapitationChance: 0,
             sprintPowerAttackDouble: false,
             swordPowerAttackHitBonus: 0,
@@ -266,7 +269,7 @@
             enchantFrostBonus: 0, enchantSkillBonus: 0, enchantShockBonus: 0, enchantLifeBonus: 0,
             restorationManaBonus: 0,
             resistMagicPercent: 0,
-            magicArmorMult: 1,
+            magicArmorMult: 0, // 0 = перка нет; числа суммируются, со стартовой 1 «Магическая броня» давала ×3/×3.5/×4 вместо ×2/×2.5/×3
             lockpickNoviceUnlocked: false, lockpickApprenticeUnlocked: false, lockpickAdeptUnlocked: false, lockpickExpertUnlocked: false,
             lockpickSilent: false, lockpickWaxKey: false, lockpickGoldBonus: false, lockpickTreasureBonus: false
         };
