@@ -2052,3 +2052,6 @@ body.st-desk-layout #st-desk-dmg-slot > .vital-bar { margin-top: 0 !important; }
 .st-swap-box { border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; margin-bottom: 6px; font-size: 14px; }
 .st-swap-box > summary { cursor: pointer; }
 .st-pets-panel > summary { list-style-position: inside; }
+
+/* Кнопка «✖ Снять» у занятого слота экипировки */
+.slot-row .slot-unequip-btn { flex: 0 0 auto; width: auto; margin: 0; padding: 2px 8px; font-size: 12px; white-space: nowrap; }

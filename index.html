@@ -547,7 +547,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap">
 
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -976,7 +976,7 @@
                         <option value="twohand_pike">Пика (без штрафа к кубам, двуручная)</option>
                         <option value="twohand_staff">Боевой посох (-3 к кубам, двуручный)</option>
                     </select>
-                    <select id="slot-melee-picker" class="slot-picker" onchange="equipToSlotDirect('melee', this.value, 'slot-melee-picker')"></select>
+                    <select id="slot-melee-picker" class="slot-picker" onchange="equipToSlotDirect('melee', this.value, 'slot-melee-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-meleeWeapon" onclick="unequipSlot('meleeWeapon')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button>
                 </div>
                 <div id="slot-melee-enchant-info" class="slot-enchant-info"></div>
 
@@ -984,7 +984,7 @@
                 <div class="slot-row">
                     <input type="text" id="wep-melee-offhand-name" placeholder="Название (необязательно)" onchange="saveLocalStorage()">
                     <input type="number" id="wep-melee-offhand-dmg" value="0" placeholder="Баз. урон" readonly tabindex="-1" title="Берётся из надетой вещи / считается автоматически">
-                    <select id="slot-melee-offhand-picker" class="slot-picker" onchange="equipToSlotDirect('melee_offhand', this.value, 'slot-melee-offhand-picker')"></select>
+                    <select id="slot-melee-offhand-picker" class="slot-picker" onchange="equipToSlotDirect('melee_offhand', this.value, 'slot-melee-offhand-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-meleeWeaponOffhand" onclick="unequipSlot('meleeWeaponOffhand')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button>
                 </div>
                 <div id="slot-melee-offhand-enchant-info" class="slot-enchant-info"></div>
 
@@ -996,7 +996,7 @@
                         <option value="bow">Лук (Обычный)</option>
                         <option value="crossbow">Арбалет (1 ход на КД)</option>
                     </select>
-                    <select id="slot-ranged-picker" class="slot-picker" onchange="equipToSlotDirect('ranged', this.value, 'slot-ranged-picker')"></select>
+                    <select id="slot-ranged-picker" class="slot-picker" onchange="equipToSlotDirect('ranged', this.value, 'slot-ranged-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-rangedWeapon" onclick="unequipSlot('rangedWeapon')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button>
                 </div>
 
                 <label>Заряженные боеприпасы (списываются при выстреле — без них нельзя стрелять)</label>
@@ -1055,25 +1055,25 @@
             <!-- Детальные слоты Брони -->
             <div class="panel">
                 <h2>Слоты защитной экипировки и Украшений</h2>
-                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-helmet-picker" class="slot-picker" onchange="equipToSlotDirect('helmet', this.value, 'slot-helmet-picker')"></select></div>
+                <div class="slot-row"><span>🪖 Шлем:</span><input type="text" id="slot-helm-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-helm-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-helmet-picker" class="slot-picker" onchange="equipToSlotDirect('helmet', this.value, 'slot-helmet-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-helmet" onclick="unequipSlot('helmet')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-helmet-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-chest-picker" class="slot-picker" onchange="equipToSlotDirect('chest', this.value, 'slot-chest-picker')"></select></div>
+                <div class="slot-row"><span>🛡️ Кираса:</span><input type="text" id="slot-chest-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-chest-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-chest-picker" class="slot-picker" onchange="equipToSlotDirect('chest', this.value, 'slot-chest-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-chest" onclick="unequipSlot('chest')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-chest-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🥋 Одеяние:</span><input type="text" id="slot-robe-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-robe-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-robe-picker" class="slot-picker" onchange="equipToSlotDirect('robe', this.value, 'slot-robe-picker')"></select></div>
+                <div class="slot-row"><span>🥋 Одеяние:</span><input type="text" id="slot-robe-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-robe-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-robe-picker" class="slot-picker" onchange="equipToSlotDirect('robe', this.value, 'slot-robe-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-robe" onclick="unequipSlot('robe')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-robe-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-gloves-picker" class="slot-picker" onchange="equipToSlotDirect('gloves', this.value, 'slot-gloves-picker')"></select></div>
+                <div class="slot-row"><span>🧤 Перчатки:</span><input type="text" id="slot-gloves-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-gloves-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-gloves-picker" class="slot-picker" onchange="equipToSlotDirect('gloves', this.value, 'slot-gloves-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-gloves" onclick="unequipSlot('gloves')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-gloves-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-boots-picker" class="slot-picker" onchange="equipToSlotDirect('boots', this.value, 'slot-boots-picker')"></select></div>
+                <div class="slot-row"><span>🥾 Сапоги:</span><input type="text" id="slot-boots-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-boots-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-boots-picker" class="slot-picker" onchange="equipToSlotDirect('boots', this.value, 'slot-boots-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-boots" onclick="unequipSlot('boots')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-boots-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-shield-picker" class="slot-picker" onchange="equipToSlotDirect('shield', this.value, 'slot-shield-picker')"></select></div>
+                <div class="slot-row"><span>🛡️ Щит в левой:</span><input type="text" id="slot-shield-name" placeholder="Название" onchange="saveLocalStorage()"><input type="number" id="slot-shield-armor" value="0" readonly tabindex="-1" title="Броня надетой вещи"><select id="slot-shield-picker" class="slot-picker" onchange="equipToSlotDirect('shield', this.value, 'slot-shield-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-shield" onclick="unequipSlot('shield')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 <div id="slot-shield-enchant-info" class="slot-enchant-info"></div>
-                <div class="slot-row"><span>🎒 Подсумок:</span><input type="text" id="slot-pouch-name" placeholder="Название" readonly style="width:45%;"><select id="slot-pouch-picker" class="slot-picker" onchange="equipToSlotDirect('pouch', this.value, 'slot-pouch-picker')"></select></div>
+                <div class="slot-row"><span>🎒 Подсумок:</span><input type="text" id="slot-pouch-name" placeholder="Название" readonly style="width:45%;"><select id="slot-pouch-picker" class="slot-picker" onchange="equipToSlotDirect('pouch', this.value, 'slot-pouch-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-pouch" onclick="unequipSlot('pouch')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 
                 <h3 style="margin-top:6px; margin-bottom:4px;">💍 Активная ювелирные изделия</h3>
-                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-ring-picker" class="slot-picker" onchange="equipToSlotDirect('ring', this.value, 'slot-ring-picker')"></select></div>
-                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-neck-picker" class="slot-picker" onchange="equipToSlotDirect('amulet', this.value, 'slot-neck-picker')"></select></div>
-                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-circlet-picker" class="slot-picker" onchange="equipToSlotDirect('circlet', this.value, 'slot-circlet-picker')"></select></div>
-                <div class="slot-row"><span>🎒 Рюкзак:</span><input type="text" id="slot-backpack-name" placeholder="Нет рюкзака" style="width:65%;" readonly><select id="slot-backpack-picker" class="slot-picker" onchange="equipToSlotDirect('backpack', this.value, 'slot-backpack-picker')"></select></div>
+                <div class="slot-row"><span>💍 Кольцо:</span><input type="text" id="slot-ring-name" placeholder="Эффект кольца" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-ring-picker" class="slot-picker" onchange="equipToSlotDirect('ring', this.value, 'slot-ring-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-ring" onclick="unequipSlot('ring')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
+                <div class="slot-row"><span>📿 Ожерелье:</span><input type="text" id="slot-neck-name" placeholder="Эффект ожерелья" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-neck-picker" class="slot-picker" onchange="equipToSlotDirect('amulet', this.value, 'slot-neck-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-neck" onclick="unequipSlot('neck')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
+                <div class="slot-row"><span>👑 Обруч:</span><input type="text" id="slot-circlet-name" placeholder="Эффект обруча" style="width:65%;" onchange="saveLocalStorage()"><select id="slot-circlet-picker" class="slot-picker" onchange="equipToSlotDirect('circlet', this.value, 'slot-circlet-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-circlet" onclick="unequipSlot('circlet')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
+                <div class="slot-row"><span>🎒 Рюкзак:</span><input type="text" id="slot-backpack-name" placeholder="Нет рюкзака" style="width:65%;" readonly><select id="slot-backpack-picker" class="slot-picker" onchange="equipToSlotDirect('backpack', this.value, 'slot-backpack-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-backpack" onclick="unequipSlot('backpack')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button></div>
                 
                 <div class="checkbox-group" style="margin-top:8px;">
                     <select id="eq-armor" onchange="updateAll(); saveLocalStorage();" style="width:100px; display:inline; margin-right:10px;">
@@ -7464,6 +7464,46 @@ window.toggleSkillPanel = function (idx) {
         if (picker) picker.value = '';
     };
 
+    // Снять вещь со слота. Надетое и так числится в инвентаре (слот лишь ссылается на itemId), поэтому вещь просто
+    // перестаёт быть надетой; броня, урон, скорость, вес и полные комплекты пересчитывает updateAll.
+    // Раньше вещь можно было только сменить на другую — снять броню целиком было нельзя.
+    // В бою убрать оружие/щит из рук — действие хода, как и взять (см. applyItemToSlot).
+    const UNEQUIP_HAND_KEYS = ['meleeWeapon', 'meleeWeaponOffhand', 'rangedWeapon', 'shield'];
+    window.unequipSlot = function (key) {
+        if (!equippedSlots[key]) return;
+        const handKey = UNEQUIP_HAND_KEYS.indexOf(key) !== -1;
+        if (handKey && !combatActionAllowed('swap')) return;
+        const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        const it = playerInventory.find(i => i.itemId === equippedSlots[key]);
+        if (key === 'pouch') {
+            pouchContents.forEach(entry => addToInventory(entry.itemId, entry.name, 1, 0.25, pouchEntryCategory(entry), entry.effect, pouchExtra(entry)));
+            pouchContents = [];
+            setV('slot-pouch-name', '');
+            equippedSlots.pouch = null;
+            if (typeof renderPouchPanel === 'function') renderPouchPanel();
+        } else if (key === 'meleeWeapon' || key === 'meleeWeaponOffhand' || key === 'shield') {
+            unequipHand(key);
+            if (key === 'meleeWeapon') { const t = document.getElementById('wep-melee-type'); if (t) t.dataset.prev = 'unarmed'; }
+        } else if (key === 'rangedWeapon') {
+            equippedSlots.rangedWeapon = null;
+            setV('wep-ranged-name', ''); setV('wep-ranged-dmg', 0);
+            const act = document.getElementById('active-combat-weapon'); if (act && act.value === 'ranged') act.value = 'melee';
+        } else if (SLOT_FIELD_MAP[key]) {
+            equippedSlots[key] = null;
+            setV(SLOT_FIELD_MAP[key][0], ''); setV(SLOT_FIELD_MAP[key][1], 0);
+        } else if (key === 'ring' || key === 'neck' || key === 'circlet' || key === 'backpack') {
+            equippedSlots[key] = null;
+            setV('slot-' + key + '-name', '');
+        } else return;
+        renderEquippedSummary();
+        renderAllSlotPickers();
+        updateAll();
+        if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
+        if (handKey) { markCombatAction('swap'); try { refreshEnhancedButtons(); } catch (e) { } if (typeof window.renderWeaponSwapBox === 'function') window.renderWeaponSwapBox(); }
+        saveLocalStorage();
+        if (it && typeof alchToast === 'function') { try { alchToast('🎽 Снято: ' + it.name + ' — лежит в инвентаре'); } catch (e) { } }
+    };
+
     const SLOT_PICKER_MAP = {
         'slot-helmet-picker': 'helmet', 'slot-chest-picker': 'chest', 'slot-robe-picker': 'robe',
         'slot-gloves-picker': 'gloves', 'slot-boots-picker': 'boots', 'slot-shield-picker': 'shield',
@@ -7494,6 +7534,10 @@ window.toggleSkillPanel = function (idx) {
         return s + ']';
     }
 
+    // Кнопки «✖ Снять» видны только у занятых слотов (id кнопки — unequip-<ключ equippedSlots>)
+    function syncUnequipButtons() {
+        document.querySelectorAll('.slot-unequip-btn').forEach(b => { b.style.display = equippedSlots[b.id.slice(8)] ? '' : 'none'; });
+    }
     function renderAllSlotPickers() {
         Object.keys(SLOT_PICKER_MAP).forEach(pickerId => {
             const select = document.getElementById(pickerId);
@@ -7504,6 +7548,7 @@ window.toggleSkillPanel = function (idx) {
             select.innerHTML = '<option value="">Надеть...</option>' +
                 items.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)}${i.enchantment ? ' 🔮' : ''}${escHtml(compareLabel(i, wantedSlot))}</option>`).join('');
         });
+        syncUnequipButtons();
         renderSlotEnchantInfoLines();
     }
 
@@ -15086,6 +15131,7 @@ function updateHungerPenalty() {
         const bootsArmorVal = parseInt(document.getElementById('slot-boots-armor').value) || 0;
         const shieldArmorVal = parseInt(document.getElementById('slot-shield-armor').value) || 0;
         try { syncArmorClassSelect(); } catch (e) { }
+        try { syncUnequipButtons(); } catch (e) { }
         const armorType = document.getElementById('eq-armor').value;
 
         // Джаггернаут (тяжёлая) / Ловкость в обороне (лёгкая): % к броне ТЯЖЁЛЫХ / ЛЁГКИХ частей —
