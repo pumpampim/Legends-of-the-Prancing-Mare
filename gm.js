@@ -1287,6 +1287,14 @@
                         <span style="font-size:11px; opacity:.6; white-space:nowrap;">${s.curHp || 0}/${s.maxHp || 0}</span>
                     </div>`;
                 }).join('')}
+                ${(p.pets || []).map(pt => {
+                    const ptPct = Math.max(0, Math.min(100, (pt.hp || 0) / (pt.maxHp || 1) * 100));
+                    return `<div style="display:flex; align-items:center; gap:4px; margin-top:4px; padding-left:8px; border-left:2px solid var(--border-color);">
+                        <span style="font-size:11px; opacity:.75; white-space:nowrap;">${escapeHtml(pt.icon || '🐾')} ${escapeHtml(pt.name)}</span>
+                        <div class="bar-track" style="flex:1; margin-bottom:0;"><div class="bar-fill-hp" style="width:${ptPct}%;"></div></div>
+                        <span style="font-size:11px; opacity:.6; white-space:nowrap;">${pt.hp || 0}/${pt.maxHp || 0}</span>
+                    </div>`;
+                }).join('')}
             </div>`;
         }).join('');
     }
@@ -1883,6 +1891,12 @@
         if (!pendingGmAttack) { out.textContent = ''; return; }
         const { targetUid, dmg, dmgType } = pendingGmAttack;
         if (!dmg) { out.textContent = 'Урона нет — только эффект/статус.'; return; }
+        if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') {
+            const cd = gmCompanionDamage(pendingGmAttack);
+            out.textContent = `Ожидаемый урон по существу: ${cd.finalDmg} (базовый ${dmg}${cd.resist ? ', защита ' + cd.resist + '%' : ''})` +
+                (cd.comp ? (cd.left <= 0 ? ` → «${cd.comp.name}» погибает` : ` → останется ${cd.left}/${cd.maxHp} HP`) : '') + '.';
+            return;
+        }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
@@ -4925,23 +4939,43 @@
 
         const uids = Object.keys(lastData.participants || {});
         const prevTgt = targetSelect.value;
-        targetSelect.innerHTML = uids.length
-            ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
-            : '<option value="">Нет игроков в сессии</option>';
-        if (uids.includes(prevTgt)) targetSelect.value = prevTgt;
+        // Цели: игроки, их призванные существа (summon:uid:id) и животные (pet:uid:id).
+        const tgtOpts = [];
+        uids.forEach(uid => {
+            const p = lastData.participants[uid] || {};
+            tgtOpts.push(`<option value="${uid}">${escapeHtml(p.name || uid)}</option>`);
+            (p.summons || []).filter(sm => (sm.curHp || 0) > 0).forEach(sm => tgtOpts.push(`<option value="summon:${uid}:${escapeHtml(sm.id)}">　👻 ${escapeHtml(sm.name)} (${escapeHtml(p.name || uid)}, HP ${sm.curHp}/${sm.maxHp})</option>`));
+            (p.pets || []).filter(pt => (pt.hp || 0) > 0).forEach(pt => tgtOpts.push(`<option value="pet:${uid}:${escapeHtml(pt.id)}">　${escapeHtml(pt.icon || '🐾')} ${escapeHtml(pt.name)} (${escapeHtml(p.name || uid)}, HP ${pt.hp}/${pt.maxHp})</option>`));
+        });
+        targetSelect.innerHTML = tgtOpts.length ? tgtOpts.join('') : '<option value="">Нет игроков в сессии</option>';
+        if (Array.from(targetSelect.options).some(o => o.value === prevTgt)) targetSelect.value = prevTgt;
 
         onGmAttackAttackerPicked();
+    }
+    window.populateGmAttackSelects = populateGmAttackSelects; // для боевой сетки (кнопка «Цель для атаки противника»)
+
+    // Цель атаки врага: игрок (uid) или его существо — 'summon:uid:id' (призванное) / 'pet:uid:id' (животное).
+    function gmResolveAttackTarget(val) {
+        const m = /^(summon|pet):([^:]+):(.+)$/.exec(String(val || ''));
+        const parts = (lastData && lastData.participants) || {};
+        if (!m) return { kind: 'player', uid: val, name: (parts[val] || {}).name || val };
+        const owner = parts[m[2]] || {};
+        const list = m[1] === 'summon' ? (owner.summons || []) : (owner.pets || []);
+        const c = list.find(x => x.id === m[3]);
+        return { kind: m[1], uid: m[2], id: m[3], ownerName: owner.name || m[2], comp: c || null, name: c ? c.name : '?' };
     }
 
     window.rollGmAttack = function () {
         const attackerId = el('gm-attack-attacker-select').value;
-        const targetUid = el('gm-attack-target-select').value;
+        const tgt = gmResolveAttackTarget(el('gm-attack-target-select').value);
+        const targetUid = tgt.uid;
         const actionVal = el('gm-attack-action-select').value;
         const resultBox = el('gm-attack-roll-result');
         const textEl = el('gm-attack-roll-text');
         const enemy = (lastData.enemies || []).find(e => e.id === attackerId);
-        const targetName = (lastData.participants[targetUid] || {}).name || targetUid;
+        const targetName = tgt.kind === 'player' ? tgt.name : tgt.name + ' (' + tgt.ownerName + ')';
         if (!enemy || !targetUid || !actionVal) { alert('Выбери атакующего, цель и действие.'); return; }
+        if (tgt.kind !== 'player' && !tgt.comp) { alert('Этого существа уже нет — обнови список целей.'); populateGmAttackSelects(); return; }
         if (actionVal.indexOf('spell:') === 0) {
             const hands = gmEnemyHands(enemy);
             if (hands === 'two' || hands === 'both') { alert(`«${enemy.name}» не может колдовать: в руках ${GM_HANDS_LABEL[hands].replace(/^\S+\s/, '')}. Смени у врага «В руках» на «руки свободны» или «одно одноручное» — это его действие в этом ходу.`); return; }
@@ -4958,7 +4992,8 @@
             const mode = actionVal === 'weapon' ? (enemy.isRanged ? 'ranged' : 'melee') : actionVal.indexOf('spell:') === 0 ? 'spell' : null;
             if (mode) {
                 const reach = /копь|пик[аи]|посох|молот|алебард/i.test(String(enemy.weaponNote || '') + ' ' + enemy.name) ? 10 : 5;
-                gridChk = Gc.attackCheck(lastData.grid, Gc.tokenOf(lastData.grid, 'e', enemy.id), Gc.tokenOf(lastData.grid, 'p', targetUid), mode, reach);
+                const tgtTok = tgt.kind === 'player' ? Gc.tokenOf(lastData.grid, 'p', targetUid) : Gc.tokenOf(lastData.grid, 's', tgt.id, targetUid); // существо на сетке — фигура 's'
+                gridChk = Gc.attackCheck(lastData.grid, Gc.tokenOf(lastData.grid, 'e', enemy.id), tgtTok, mode, reach);
                 if (gridChk.onGrid && !gridChk.ok && !confirm('«' + enemy.name + '» не достаёт «' + targetName + '»: ' + gridChk.reason + '.\n\nВсё равно атаковать?')) return;
             }
         }
@@ -5019,7 +5054,7 @@
         // обеих костей). Раньше тут был просто один голый d20 без всякого сравнения — по сути,
         // "бросок ради галочки", не влиявший ни на что.
         // «Бардовская баллада» (играет другой игрок): защищающемуся +1 к кубам.
-        const defBonus = (lastData.bardSong && lastData.bardSong.uid && lastData.bardSong.uid !== targetUid) ? 1 : 0;
+        const defBonus = (tgt.kind === 'player' && lastData.bardSong && lastData.bardSong.uid && lastData.bardSong.uid !== targetUid) ? 1 : 0;
         if (gridChk && gridChk.onGrid && gridChk.penalty) { atkMod += gridChk.penalty; actionLabel += ` (дальность ${gridChk.feet} фт: ${gridChk.penalty})`; }
         else if (gridChk && gridChk.onGrid) actionLabel += ` (${gridChk.feet} фт)`;
         if (enemyFlags.rollPenalty) { atkMod += enemyFlags.rollPenalty; actionLabel += ` (статусы на враге: ${enemyFlags.rollPenalty} к кубам)`; }
@@ -5040,16 +5075,17 @@
 
         pendingGmAttack = {
             targetUid, enemyId: enemy.id, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
+            targetKind: tgt.kind, compId: tgt.id || null, // существо игрока: урон идёт ему, а не хозяину
             isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
             enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|гончая смерти|жрец-дракон|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
             carrierOfDisease: hit ? gmEnemyDisease(enemy).name : null, diseaseChance: hit ? gmEnemyDisease(enemy).chance : 0,
-            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs игрок ${playerRollShown}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
+            logTextBase: `👹 ${enemy.name} атакует ${targetName} ${actionLabel}: враг ${enemyTotal} (к20 ${enemyRoll}${atkMod >= 0 ? '+' : ''}${atkMod}) vs ${tgt.kind === 'player' ? 'игрок' : 'существо'} ${playerRollShown}${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? 'ПОПАДАНИЕ' : 'ПРОМАХ'}`
         };
         textEl.innerHTML = `<strong>${escapeHtml(enemy.name)}</strong> атакует <strong>${escapeHtml(targetName)}</strong> ${actionLabel}<br>` +
-            `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs Игрок: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRollShown}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
+            `Враг: 1d20 (${enemyRoll}) ${atkMod >= 0 ? '+' : ''}${atkMod} = <strong style="color:var(--accent-color, #c9a86c);">${enemyTotal}</strong> vs ${tgt.kind === 'player' ? 'Игрок' : 'Существо'}: 1d20 = <strong style="color:var(--accent-color, #c9a86c);">${playerRollShown}</strong>${rerolls ? `<br><span style="opacity:.7;">Перекид из-за ничьей: ×${rerolls}</span>` : ''}<br>` +
             (!hit ? `<strong style="color:#7a7a7a;">❌ Промах — урона нет.</strong>` :
                 dmg ? `<strong style="color:#2ecc71;">✅ Попадание!</strong> Базовый урон: <span style="color:#e74c3c; font-size:16px; font-weight:bold;">${dmg}</span> ед.${dmgBreakdown} (резист цели вычтется автоматически при применении)` :
                     `<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">${statusKey && GM_STATUS_EFFECTS[statusKey] ? 'Без урона — при применении на цель ляжет «' + GM_STATUS_EFFECTS[statusKey].name + '».' : 'Эффект без прямого урона — примени вручную по описанию.'}</span>`);
@@ -5084,8 +5120,50 @@
         }).catch(e => console.error(e));
     }
 
+    // Урон по существу игрока. Призванное: защита — ауры призыва хозяина (participants.<uid>.summons[].res, броня 10 ед. = 1%).
+    // Животное: своей защиты нет. Статусы, болезни и защиты хозяина (щит, барьер, боги) на существо не действуют.
+    function gmCompanionDamage(pa) {
+        const owner = ((lastData && lastData.participants) || {})[pa.targetUid] || {};
+        const isSummon = pa.targetKind === 'summon';
+        const comp = (isSummon ? (owner.summons || []) : (owner.pets || [])).find(x => x.id === pa.compId) || null;
+        const resist = isSummon && comp ? Math.max(0, Math.min(85, parseInt((comp.res || {})[pa.dmgType]) || 0)) : 0;
+        const finalDmg = Math.max(0, Math.round((pa.dmg || 0) * (1 - resist / 100)));
+        const hpNow = comp ? (parseInt(isSummon ? comp.curHp : comp.hp) || 0) : 0;
+        return { comp, isSummon, resist, finalDmg, hpNow, left: Math.max(0, hpNow - finalDmg), maxHp: comp ? comp.maxHp : 0, owner };
+    }
+    function gmApplyAttackToCompanion() {
+        const pa = pendingGmAttack;
+        const cd = gmCompanionDamage(pa);
+        const done = logExtra => {
+            gmPostLogEntryText(pa.logTextBase + logExtra + '.');
+            alert('Применено.');
+            pendingGmAttack = null;
+            el('gm-attack-roll-result').style.display = 'none';
+        };
+        if (!cd.comp) { alert('Этого существа уже нет в сессии.'); return; }
+        if (!pa.dmg) { done(pa.statusKey ? ` (статус «${(GM_STATUS_EFFECTS[pa.statusKey] || {}).name || pa.statusKey}» на существо не ложится — учти вручную)` : ''); return; }
+        const patch = {};
+        let logExtra = `, урон ${cd.finalDmg}${cd.resist ? ` (защита существа ${cd.resist}%, было бы ${pa.dmg})` : ''}`;
+        if (cd.isSummon) {
+            // Хозяин применяет удар у себя (то же, что удар руны по существу): ХП, смерть, возврат костей/оружия.
+            patch['participants.' + pa.targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'sh-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'aoeHit', dmg: cd.finalDmg, dmgType: pa.dmgType, summonId: pa.compId, final: true, from: pa.enemyName });
+            // сразу показать мастеру новое ХП (лист хозяина пришлёт точное значение при синхронизации)
+            patch['participants.' + pa.targetUid + '.summons'] = (cd.owner.summons || []).map(x => x.id === pa.compId ? Object.assign({}, x, { curHp: cd.left }) : x).filter(x => x.id !== pa.compId || cd.left > 0);
+            patch['participants.' + pa.targetUid + '.summonNames'] = patch['participants.' + pa.targetUid + '.summons'].map(x => x.name);
+        } else {
+            patch['participants.' + pa.targetUid + '.pets'] = (cd.owner.pets || []).map(x => x.id === pa.compId ? Object.assign({}, x, { hp: cd.left }) : x).filter(x => x.id !== pa.compId || cd.left > 0);
+        }
+        if (cd.left <= 0) logExtra += `, 💀 «${cd.comp.name}» ${cd.isSummon ? 'погибает и исчезает' : 'погибает'}`;
+        else logExtra += ` (HP ${cd.left}/${cd.maxHp})`;
+        if (pa.statusKey) logExtra += ` (статус «${(GM_STATUS_EFFECTS[pa.statusKey] || {}).name || pa.statusKey}» на существо не ложится — учти вручную)`;
+        const chores = [db.collection('sessions').doc(currentCode).update(patch)];
+        if (!cd.isSummon) chores.push(db.collection('characters').doc(pa.targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-pa' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'petHp', petId: pa.compId, delta: -cd.finalDmg }) }));
+        Promise.all(chores).then(() => done(logExtra)).catch(e => alert('Ошибка: ' + e.message));
+    }
+
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
+        if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') { gmApplyAttackToCompanion(); return; }
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
         if (!dmg && !statusKey) {

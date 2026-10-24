@@ -259,10 +259,16 @@
                     // имена (для порядка ходов), без ХП, поэтому мастер не видел их в панели "Отряд"
                     // с полосками жизни как у самих игроков. Оружие (category:'weapon') не входит —
                     // это экипируемый предмет, не боевой юнит сам по себе.
+                    // armor/res — защита существа (ауры призыва): по ней мастер считает урон, когда враг бьёт существо.
+                    const sDef = typeof window.getSummonDefense === 'function' ? window.getSummonDefense() : { armor: 0, res: {} };
                     patch['participants.' + currentUser.uid + '.summons'] = summons.map(s => ({
                         id: s.id, name: s.name, curHp: s.curHp || 0, maxHp: s.maxHp || 1, dmgType: s.dmgType || '',
-                        curMp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, speed: s.speed || 30 // для подписей и лимита хода на боевой сетке мастера
+                        curMp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, speed: s.speed || 30, // для подписей и лимита хода на боевой сетке мастера
+                        armor: sDef.armor || 0, res: sDef.res || {}
                     }));
+                    // Живые животные игрока — тоже цель для атаки врага (у мастера в «Атаке противника» и на сетке).
+                    patch['participants.' + currentUser.uid + '.pets'] = (Array.isArray(data.pets) ? data.pets : []).filter(pt => pt && !pt.dead)
+                        .map(pt => ({ id: pt.id, name: pt.name || 'Животное', icon: pt.icon || '🐾', hp: parseInt(pt.hp) || 0, maxHp: parseInt(pt.maxHp) || 1, rideable: !!pt.rideable }));
                     // Урон игрока (итоговый урон оружия) — подпись над фигурой на боевой сетке мастера
                     { const dEl = el('main-panel-dmg'); patch['participants.' + currentUser.uid + '.dmg'] = dEl ? (parseInt(dEl.value) || 0) : 0; }
                     { const sEl = el('val-speed'); patch['participants.' + currentUser.uid + '.speed'] = sEl ? (parseInt(sEl.value) || 0) : 30; } // скорость — лимит перемещения на сетке

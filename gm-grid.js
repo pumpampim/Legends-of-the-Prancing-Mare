@@ -51,6 +51,11 @@
                 const ks = G().tokenKey('s', s.id, uid);
                 out[ks] = { key: ks, kind: 's', ref: s.id, owner: uid, name: s.name, ownerName: p.name, hp: s.curHp || 0, maxHp: s.maxHp || 0, mp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, dead: (s.curHp || 0) <= 0, speed: parseInt(s.speed) || 30 };
             });
+            // животные игрока — фигуры того же вида 's' (удар руны/площади по ним хозяин применяет к животному)
+            (p.pets || []).forEach(pt => {
+                const kp = G().tokenKey('s', pt.id, uid);
+                out[kp] = { key: kp, kind: 's', pet: true, ref: pt.id, owner: uid, name: (pt.icon || '🐾') + ' ' + pt.name, ownerName: p.name, hp: pt.hp || 0, maxHp: pt.maxHp || 0, mp: 0, maxMp: 0, dmg: 0, dead: (pt.hp || 0) <= 0, speed: 30 };
+            });
         });
         return out;
     }
@@ -259,6 +264,7 @@
                 html += `<br><span class="gg-note">Скорость: </span><input type="number" min="0" max="200" value="${spd}" style="width:60px; margin:2px 0;" onchange="GmGrid.setSpeed('${selKey}', this.value)">`;
                 if (en.kind === 'e') html += `<br><span class="gg-note">Размер: </span>${[1, 2, 3, 4].map(n => `<button type="button" style="width:auto; margin:1px; padding:1px 7px;${G().size(t) === n ? ' outline:2px solid #f1c40f;' : ''}" onclick="GmGrid.setSize('${selKey}', ${n})">${n}×${n}</button>`).join('')}`;
             }
+            if (en.kind !== 'e' && !en.dead) html += `<br><button type="button" style="width:100%; margin-top:4px;" onclick="GmGrid.targetForEnemy('${selKey}')">🎯 Цель для атаки противника</button>`;
             html += `<br><span class="gg-note">Клик по клетке — переместить (зелёным — куда дойдёт в этом ходу). Наведи — расстояние.</span><br><button type="button" class="btn-danger" style="width:100%; margin-top:4px;" onclick="GmGrid.removeToken('${selKey}')">Убрать с поля</button></div>`;
         }
         const runes = Object.keys(grid.runes);
@@ -505,6 +511,15 @@
         pickToPlace(key) { placing = (placing && placing.key === key) ? null : { type: 'token', key }; tool = 'select'; refresh(); },
         pickRune(id) { placing = (placing && placing.id === id) ? null : { type: 'pending', id }; tool = 'select'; refresh(); },
         pickZone(id) { placing = (placing && placing.id === id) ? null : { type: 'zone', id }; tool = 'select'; refresh(); },
+        // Выставить фигуру целью в панели «Атака противника» (игрок — uid, существо — summon:uid:id, животное — pet:uid:id).
+        targetForEnemy(key) {
+            const en = entities()[key]; const sel = $('gm-attack-target-select'); if (!en || !sel) return;
+            if (typeof window.populateGmAttackSelects === 'function') window.populateGmAttackSelects();
+            const v = en.kind === 'p' ? en.ref : (en.pet ? 'pet:' : 'summon:') + en.owner + ':' + en.ref;
+            if (!Array.from(sel.options).some(o => o.value === v)) { alert('«' + en.name + '» нет среди целей атаки (нет ХП?).'); return; }
+            sel.value = v;
+            try { sel.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+        },
         removeToken(key) { delete grid.tokens[key]; if (selKey === key) selKey = null; save(); refresh(); },
         removeRune(id) { delete grid.runes[id]; save(); refresh(); },
         removeZone(id) { delete grid.zones[id]; save(); refresh(); },

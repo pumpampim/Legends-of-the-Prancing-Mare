@@ -3834,6 +3834,15 @@ window.toggleSkillPanel = function (idx) {
         });
         return t;
     }
+    // Защита призванного существа от вражеских атак: своей брони у призывов нет, только ауры призыва
+    // (броня: 10 ед. = 1% физ. резиста, как у игрока). Синхронизируется в сессию — мастер считает урон по существу.
+    function summonDefense() {
+        const au = getSummonAuras();
+        const cap = v => Math.max(0, Math.min(85, Math.round(v || 0)));
+        const elem = au.resElem + au.resPct + au.resMagic;
+        return { armor: au.armor, res: { physical: cap(au.armor / 10 + au.resPct), fire: cap(elem), frost: cap(elem), shock: cap(elem), magic: cap(au.resMagic), poison: 0 } };
+    }
+    window.getSummonDefense = summonDefense;
 
 
     // ===== «Дух огня/мороза/молнии» (Разрушение): наделяют ОРУЖИЕ дополнительным стихийным уроном =====
@@ -9576,12 +9585,20 @@ window.toggleSkillPanel = function (idx) {
     function gridAoeHit(e) {
         const who = e.from ? '«' + e.from + '»' : 'Взрыв';
         if (e.summonId) {
-            const sm = activeSummons.find(x => x.id === e.summonId); if (!sm) return;
+            const sm = activeSummons.find(x => x.id === e.summonId);
+            if (!sm) { // на сетке животные игрока стоят рядом с призванными — удар по ним идёт тем же путём
+                const pet = playerPets.find(x => x.id === e.summonId && !x.dead);
+                if (pet && !e.knock && e.dmg) { const m = applyPetHpDelta(pet.id, -(parseInt(e.dmg) || 0)); alertSafe('💥 ' + who + ': ' + m + '.'); updateAll(); saveLocalStorage(true); if (window.renderPetsPanel) window.renderPetsPanel(); }
+                return;
+            }
             if (e.knock) { alchToast('💦 ' + who + ' подбрасывает «' + escHtml(sm.name) + '».'); return; }
-            sm.curHp = Math.max(0, (sm.curHp || 0) - (e.dmg || 0));
-            alchToast('💥 ' + who + ': «' + escHtml(sm.name) + '» −' + (e.dmg || 0));
+            // e.final — урон уже посчитан мастером с защитой существа (атака врага); иначе (руна, площадь) — резист тут
+            const resS = e.final ? 0 : ((summonDefense().res || {})[e.dmgType || 'physical'] || 0);
+            const dmgS = Math.max(0, Math.round((parseInt(e.dmg) || 0) * (1 - resS / 100)));
+            sm.curHp = Math.max(0, (sm.curHp || 0) - dmgS);
+            alchToast('💥 ' + who + ': «' + escHtml(sm.name) + '» −' + dmgS + (resS ? ' (защита ' + resS + '%)' : ''));
             if (sm.curHp <= 0) { alertSafe('💀 «' + sm.name + '» погибает (' + who + ').'); window.dismissSummon(sm.id); }
-            else renderActiveSummonsList();
+            else { renderActiveSummonsList(); saveLocalStorage(true); }
             return;
         }
         if (e.knock) {
@@ -9664,6 +9681,7 @@ window.toggleSkillPanel = function (idx) {
     }
     window.armorHitProgress = armorHitProgress; window.wornArmorClasses = wornArmorClasses;
 
+    var aoeHitsSeen = [];
     window.applyIncomingStatusEffects = function (effects) {
         let names = [], removedNames = [], ignoredNames = [];
         effects.forEach(e => {
@@ -9679,7 +9697,11 @@ window.toggleSkillPanel = function (idx) {
             if (e.cmd === 'dungeonLoot') { handleDungeonLootCmd(e); return; } // ТЗ-2 2.4: мастер отдал контейнер данжа
             if (e.cmd === 'death') { handleGmDeathCmd(e); return; } // команды мастера: потеря вещей / воскрешение / жизни
             // мастер нанёс урон — проверка концентрации. Команда старше 2 минут (игрок был офлайн) уже не актуальна — не бросаем «задним числом».
-            if (e.cmd === 'aoeHit') { gridAoeHit(e); return; } // руна/площадное заклинание задело меня или моё существо
+            if (e.cmd === 'aoeHit') { // руна/площадное заклинание или атака врага задели меня или моё существо
+                // очередь читается на каждом снимке сессии, пока не очищена, — один удар применяем один раз
+                if (e.id) { if (aoeHitsSeen.indexOf(e.id) !== -1) return; aoeHitsSeen.push(e.id); if (aoeHitsSeen.length > 200) aoeHitsSeen.shift(); }
+                gridAoeHit(e); return;
+            }
             if (e.cmd === 'damaged') {
                 if (!e.ts || Date.now() - e.ts < 120000) window.concentrationCheck(e.dmg);
                 armorHitProgress(e.dmgType); // опыт брони засчитываем и задним числом — попадание было
@@ -17400,7 +17422,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=34"></script>
+<script src="cloud.js?v=35"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
