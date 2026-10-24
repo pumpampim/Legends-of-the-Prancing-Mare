@@ -558,7 +558,7 @@
     <script src="cooking-data.js?v=9"></script>
     <script src="smithing-data.js?v=12"></script>
     <script src="enchant-data.js?v=5"></script>
-    <script src="spell-data.js?v=6"></script>
+    <script src="spell-data.js?v=7"></script>
     <script src="alchemy-data.js?v=6"></script>
     <script src="fish-data.js?v=3"></script>
     <script src="hunt-data.js?v=3"></script>
@@ -3920,7 +3920,8 @@ window.toggleSkillPanel = function (idx) {
 
     // ========================================================================
     // ЗАХВАТ ДУШ (заклинание, зачарование оружия «Захват души», перк «Похититель душ»)
-    // Игрок выбирает мёртвое существо (не позже 5 ходов после смерти) — его душа заполняет
+    // Цель — живое существо (метка: если оно умрёт в течение 5 ходов, кто бы его ни убил, душа уйдёт
+    // в камень заклинателя — как у «Посоха захвата душ» по таблице магии) или труп не старше 5 ходов. Душа заполняет
     // камень душ. Сначала камень ТОГО ЖЕ размера, затем больший: мелкий камень не вмещает
     // сильную душу (в крохотный/обычный не попадёт великая, в великий — попадёт любая, кроме чёрной).
     // Чёрная душа (люди, вампиры, дремора) — только в чёрный камень; чёрный камень обычные души не берёт.
@@ -3960,6 +3961,13 @@ window.toggleSkillPanel = function (idx) {
         const currentTurn = (session && session.sessionTurnCounter) || 0;
         return session ? (session.enemies || []).filter(e => soulCorpseEligible(e, currentTurn)) : [];
     }
+    // Живые существа, на которых можно наложить метку захвата.
+    function soulLivingEligible(e) { return !!e && (e.curHp || 0) > 0 && !e.soulTaken && e.soul !== 'none'; }
+    function getSoulLivingTargets() {
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        return session ? (session.enemies || []).filter(soulLivingEligible) : [];
+    }
+    function myCurrentUid() { return window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null; }
     // Размер души существа; для существ без данных спрашивает игрока (0 — нет души). null — отмена/нет души.
     function resolveSoulSize(enemy) {
         if (enemy.soul === 'none') return 'none';
@@ -3974,10 +3982,11 @@ window.toggleSkillPanel = function (idx) {
     }
     // Проверка ДО траты маны. {ok, msg}
     function precheckSoulTrap(enemy) {
-        if (!enemy) return { ok: false, msg: 'Захват душ: выбери цель — мёртвое существо («Цель: душа …» в списке целей). Доступны трупы не старше ' + SOUL_WINDOW_TURNS + ' ходов.' };
+        if (!enemy) return { ok: false, msg: 'Захват душ: выбери цель — врага (метка: если умрёт за ' + SOUL_WINDOW_TURNS + ' ходов, душа уйдёт в камень) или труп не старше ' + SOUL_WINDOW_TURNS + ' ходов («Цель: душа …»).' };
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const currentTurn = (session && session.sessionTurnCounter) || 0;
-        if (!soulCorpseEligible(enemy, currentTurn)) return { ok: false, msg: `Душа «${enemy.name}» недоступна: существо ещё живо, умерло больше ${SOUL_WINDOW_TURNS} ходов назад, не имеет души или она уже захвачена.` };
+        const living = soulLivingEligible(enemy);
+        if (!living && !soulCorpseEligible(enemy, currentTurn)) return { ok: false, msg: `Душа «${enemy.name}» недоступна: существо умерло больше ${SOUL_WINDOW_TURNS} ходов назад, не имеет души или она уже захвачена.` };
         const size = resolveSoulSize(enemy);
         if (size === null) return { ok: false, msg: 'Размер души не указан — захват отменён.' };
         if (size === 'none') return { ok: false, msg: `У «${enemy.name}» нет души — захватывать нечего.` };
@@ -3986,8 +3995,50 @@ window.toggleSkillPanel = function (idx) {
                 ? `Чёрная душа «${enemy.name}» помещается только в пустой Чёрный камень душ — его нет в инвентаре.`
                 : `Нет подходящего пустого камня душ для ${SOUL_LABEL_GEN[size]} души «${enemy.name}» (нужен ${SOUL_GEM_WORD[size]} или больший, кроме чёрного).` };
         }
-        return { ok: true, size };
+        return { ok: true, size, living };
     }
+    // Метка на живом существе: душа заполнит камень, если оно умрёт в течение SOUL_WINDOW_TURNS ходов.
+    // Сам камень заполняет processSoulTraps, когда в снимке сессии существо оказывается мёртвым.
+    function markLivingSoulTrap(enemy, size) {
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const until = ((session && session.sessionTurnCounter) || 0) + SOUL_WINDOW_TURNS;
+        const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+        const trap = { uid: myCurrentUid(), name: myName, size, until };
+        delete soulTrapSeen[enemy.id];
+        if (window.CloudSync && typeof window.CloudSync.markSoulTrapTarget === 'function') {
+            window.CloudSync.markSoulTrapTarget(enemy.id, trap).then(ok => {
+                if (ok === false) alert(`Метка захвата душ на «${enemy.name}» не легла: существо уже мертво или его душу забрали. Если оно умерло недавно — прочитай заклинание на его душу.`);
+                else if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`🔮 ${myName} накладывает захват душ на «${enemy.name}» (до ${until}-го хода).`, myName);
+            }).catch(e => console.error(e));
+        }
+        return `🔮 На «${enemy.name}» наложен захват душ: если существо умрёт в течение ${SOUL_WINDOW_TURNS} ходов (кто бы его ни убил), его душа (${SOUL_LABEL[size]}) заполнит твой камень душ.`;
+    }
+    // Захват по цели из списка: живое — метка, труп — сразу в камень.
+    function castSoulTrapOn(enemy, chk) {
+        return chk.living ? { ok: true, message: markLivingSoulTrap(enemy, chk.size) } : trapSoul(enemy, 'spell', { size: chk.size });
+    }
+    // Снимок сессии: мои помеченные существа умерли в срок — заполняем камни.
+    let soulTrapSeen = {}; // id существа → уже обработано (не повторять сообщения)
+    window.processSoulTraps = function (data) {
+        const uid = myCurrentUid();
+        if (!uid || !data) return;
+        (data.enemies || []).forEach(e => {
+            const t = e.soulTrap;
+            if (!t || t.uid !== uid || (e.curHp || 0) > 0 || soulTrapSeen[e.id]) return;
+            soulTrapSeen[e.id] = true;
+            if (e.soulTaken || soulTakenLocal[e.id]) return;
+            if (e.diedAtTurn !== undefined && e.diedAtTurn > t.until) return; // умерло после окончания метки
+            const r = trapSoul(e, 'spell', { size: t.size });
+            if (typeof window.alchToast === 'function') window.alchToast(escHtml(r.message)); else alertSafe(r.message);
+        });
+        // Открытые списки целей «Захвата душ» — обновить (onfocus не срабатывает, если список уже в фокусе).
+        document.querySelectorAll('.spell-target-select').forEach(sel => {
+            if (sel === document.activeElement) return;
+            const card = sel.closest ? sel.closest('[id^="card-"]') : null;
+            const nm = card ? ((card.querySelector('.spell-name-custom') || {}).value || (card.querySelector('.spell-name-select') || {}).value) : '';
+            if (nm === 'Захват душ') window.populateSpellTargetSelect(sel);
+        });
+    };
     // Сам захват. via: 'spell' | 'weapon'. Инвентарь меняется сразу; метка «душа забрана» — в облаке.
     function trapSoul(enemy, via, opts) {
         opts = opts || {};
@@ -4030,10 +4081,10 @@ window.toggleSkillPanel = function (idx) {
     }
     // Выбор трупа для свитка (там нет списка целей).
     function pickSoulCorpseByPrompt() {
-        const list = getSoulCorpses();
+        const list = getSoulCorpses().concat(getSoulLivingTargets());
         if (!list.length) return null;
         if (list.length === 1) return list[0];
-        const ans = prompt('Чью душу захватить?\n' + list.map((e, i) => `${i + 1} — ${e.name}`).join('\n'), '1');
+        const ans = prompt('Чью душу захватить?\n' + list.map((e, i) => `${i + 1} — ${e.name}${(e.curHp || 0) > 0 ? ' (живой — метка на ' + SOUL_WINDOW_TURNS + ' х.)' : ' (труп)'}`).join('\n'), '1');
         const n = parseInt(ans);
         return (n >= 1 && n <= list.length) ? list[n - 1] : null;
     }
@@ -4060,6 +4111,11 @@ window.toggleSkillPanel = function (idx) {
             const turn2 = (session2 && session2.sessionTurnCounter) || 0;
             getSoulCorpses().forEach(e => {
                 opts += `<option value="corpse:${escHtml(e.id)}">Цель: душа «${escHtml(e.name)}» (умер ${e.diedAtTurn !== undefined ? (turn2 - e.diedAtTurn) + ' х. назад' : 'недавно'})</option>`;
+            });
+            const myUidS = myCurrentUid();
+            getSoulLivingTargets().forEach(e => {
+                const t = e.soulTrap, on = t && t.uid === myUidS && turn2 <= t.until;
+                opts += `<option value="corpse:${escHtml(e.id)}">Цель: «${escHtml(e.name)}» (HP ${e.curHp}/${e.maxHp}) — душа в камень, если умрёт за ${SOUL_WINDOW_TURNS} х.${on ? ' · метка уже стоит' : ''}</option>`;
             });
         }
         if (spNameEl === 'Трансмутация смерти') {
@@ -4168,11 +4224,11 @@ window.toggleSkillPanel = function (idx) {
             extraMsg = ' ' + castGridZone(spellName, desc, !!enhanced, isFree, (sb.pct && isStrengthCls) ? sb.mult : 1);
         } else if (spellName === 'Захват душ') {
             const corpseS = targetVal.indexOf('corpse:') === 0 && session ? (session.enemies || []).find(e => e.id === targetVal.slice(7)) : null;
-            targetLabel = corpseS ? 'на душу «' + corpseS.name + '»' : 'на душу';
+            targetLabel = corpseS ? ((corpseS.curHp || 0) > 0 ? 'на «' + corpseS.name + '»' : 'на душу «' + corpseS.name + '»') : 'на душу';
             const chkS = precheckSoulTrap(corpseS);
             if (!chkS.ok) extraMsg = ' ⚠ ' + chkS.msg;
             else {
-                const rS = trapSoul(corpseS, 'spell', { size: chkS.size });
+                const rS = castSoulTrapOn(corpseS, chkS);
                 extraMsg = ' ' + rS.message;
             }
         } else if (spellName === 'Невидимость') {
@@ -5092,7 +5148,7 @@ window.toggleSkillPanel = function (idx) {
         if (spellName === 'Захват душ') {
             const cz = pickSoulCorpseByPrompt();
             const chZ = precheckSoulTrap(cz);
-            if (!chZ.ok) { alert(cz ? chZ.msg : 'Нет подходящих мёртвых существ (не старше ' + SOUL_WINDOW_TURNS + ' ходов, с неприсвоенной душой). Свиток не потрачен.'); return; }
+            if (!chZ.ok) { alert(cz ? chZ.msg : 'Нет подходящих целей: ни живых врагов, ни трупов не старше ' + SOUL_WINDOW_TURNS + ' ходов с неприсвоенной душой. Свиток не потрачен.'); return; }
             scrollTarget = 'corpse:' + cz.id;
         }
         { // Свиток призыва скелета требует «Кучку костей», как и заклинание; без неё свиток не тратится.
@@ -17427,7 +17483,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=36"></script>
+<script src="cloud.js?v=37"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

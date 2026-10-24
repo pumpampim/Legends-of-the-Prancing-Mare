@@ -6939,7 +6939,7 @@
         if (!enemies.length) { alert('Врагов нет — нечего сохранять.'); return; }
         const name = (prompt('Название заготовки:', enemies.length + ' врагов') || '').trim(); if (!name) return;
         // Сохраняем «свежими»: полное здоровье, без статусов/меток трупа — заготовка описывает встречу, а не её ход.
-        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; return e; });
+        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; delete e.soulTaken; delete e.soulTrap; return e; });
         const encs = lsGet(ENC_KEY, {}); encs['enc_' + Date.now()] = { name, enemies: copy };
         lsSet(ENC_KEY, encs); renderEncounterSelect();
     };

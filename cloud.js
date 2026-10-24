@@ -1334,6 +1334,21 @@
             })).then(r => r !== false); // false — кто-то успел раньше (душа/пепел уже есть)
         },
 
+        // Метка «Захват душ» на живом существе: {uid, name, size, until}. false — существо уже мертво или без души.
+        markSoulTrapTarget: function (enemyId, trap) {
+            if (!currentSessionCode || !db) return Promise.resolve(true);
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) return false;
+                const enemies = Array.isArray(doc.data().enemies) ? doc.data().enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1 || (enemies[idx].curHp || 0) <= 0 || enemies[idx].soulTaken) return false;
+                enemies[idx] = Object.assign({}, enemies[idx], { soulTrap: trap });
+                tx.update(ref, { enemies: enemies });
+                return true;
+            })).then(r => r !== false);
+        },
+
         // Флаг «игрок в городе»: хранится в участнике сессии, чтобы его могли менять и сам игрок, и мастер.
         setMyInTown: function (flag) {
             if (!currentSessionCode || !db || !currentUser) return Promise.resolve();
@@ -1691,6 +1706,7 @@
         if (typeof window.renderAttackTargetSelect === 'function') window.renderAttackTargetSelect();
         if (typeof window.updateWeatherDisplay === 'function') window.updateWeatherDisplay();
         if (typeof window.renderCorpseRaiseSelect === 'function') window.renderCorpseRaiseSelect();
+        if (typeof window.processSoulTraps === 'function') { try { window.processSoulTraps(data); } catch (e) { console.error(e); } }
         if (typeof window.renderBuyList === 'function') window.renderBuyList();
         if (typeof window.renderSellList === 'function') window.renderSellList();
         if (typeof window.renderGroupCheckPlayerPanel === 'function') window.renderGroupCheckPlayerPanel();
