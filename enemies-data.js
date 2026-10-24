@@ -143,8 +143,8 @@ const enemiesData = [
     },
     {
         name: "Ледяное приведение", category: "Монстры", soul: "lesser", hp: 230,
-        weaponDmg: 50, weaponNote: "",
-        resist: {  },
+        weaponDmg: 50, weaponNote: "Уязвимость к огню: получает на 33% больше урона от огня",
+        resist: { fire: -33 },
         spells: [],
         shouts: [],
         loot: "Зубы ледяного привидения, Эссенция ледяного привидения"
