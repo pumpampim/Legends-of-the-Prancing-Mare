@@ -260,7 +260,7 @@
                 const items = Array.isArray(d.partyStash) ? d.partyStash : [], gold = parseInt(d.partyGold) || 0;
                 if (!items.length && gold <= 0) return;
                 items.forEach(it => {
-                    const ex = out.stash.find(x => x.itemId === it.itemId);
+                    const ex = typeof window.findSameStack === 'function' ? window.findSameStack(out.stash, it) : out.stash.find(x => x.itemId === it.itemId);
                     if (ex) ex.count = (ex.count || 0) + (it.count || 0); else out.stash.push(Object.assign({}, it));
                 });
                 out.gold += gold; out.refs.push(doc.ref);
@@ -2469,7 +2469,9 @@
     function gmMergeInvItem(inv, base, qty, extra) {
         const ex = extra || {};
         let id = base.itemId;
-        const existing = inv.find(i => i.itemId === id && !i.temperTier && (!i.enchantment || !!ex.enchantment));
+        const potKey = ex.alchemyEffects && typeof window.alchemyStackKey === 'function' ? window.alchemyStackKey(Object.assign({}, base, ex, { itemId: id })) : null;
+        const existing = inv.find(i => i.itemId === id && !i.temperTier && (!i.enchantment || !!ex.enchantment)) ||
+            (potKey ? inv.find(i => window.alchemyStackKey(i) === potKey) : null); // одинаковые сваренные зелья с разными itemId
         if (existing) {
             existing.count = (existing.count || 0) + qty;
             Object.keys(ex).forEach(k => { if (existing[k] === undefined) existing[k] = ex[k]; });
@@ -4755,7 +4757,11 @@
     function renderGmStash(data) {
         const g = el('gm-stash-gold'); if (!g) return;
         g.textContent = formatNumber(parseInt(data.partyGold) || 0);
-        const items = Array.isArray(data.partyStash) ? data.partyStash : [];
+        const items = [];
+        (Array.isArray(data.partyStash) ? data.partyStash : []).forEach(s => {
+            const same = typeof window.findSameStack === 'function' ? window.findSameStack(items, s) : null;
+            if (same) same.count = (same.count || 0) + (s.count || 0); else items.push(Object.assign({}, s));
+        });
         el('gm-stash-list').innerHTML = items.length
             ? items.map(i => `<div style="font-size:14px;">• ${escapeHtml(i.name)} × ${i.count}</div>`).join('')
             : '<span style="opacity:.6; font-size:13px;">Предметов нет.</span>';
@@ -4772,7 +4778,11 @@
             const d = doc.data() || {};
             const gold = parseInt(d.partyGold) || 0;
             const perGold = Math.floor(gold / n);
-            const st = Array.isArray(d.partyStash) ? d.partyStash : [];
+            const st = [];
+            (Array.isArray(d.partyStash) ? d.partyStash : []).forEach(s => { // одинаковые зелья с разными itemId — одной стопкой
+                const same = typeof window.findSameStack === 'function' ? window.findSameStack(st, s) : null;
+                if (same) same.count = (same.count || 0) + (s.count || 0); else st.push(Object.assign({}, s));
+            });
             const give = [];
             const rest = st.map(s => {
                 const per = Math.floor((s.count || 0) / n);

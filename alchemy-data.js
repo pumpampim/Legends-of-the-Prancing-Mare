@@ -384,3 +384,22 @@ window.getSharedAlchemyEffectsFor = getSharedAlchemyEffectsFor;
     }
     window.alchemyPremadePotions = out;
 })();
+
+// Ключ стопки для сваренных зелий/ядов: у каждой варки свой itemId («Зелье: …#<время>»), поэтому одинаковые зелья
+// разных игроков (или из разных варок) не складывались — в общем сундуке, при взятии из него и при раздаче мастером.
+// Одинаковые = то же название, категория и те же эффекты с той же силой/длительностью. Краденое — только с краденым;
+// заточенное/зачарованное сюда не попадает. null — предмет не сваренное зелье, сравнивать по itemId.
+window.alchemyStackKey = function (it) {
+    if (!it || !Array.isArray(it.alchemyEffects) || !it.alchemyEffects.length) return null;
+    if (!/^(Зелье|Яд)/.test(it.category || '') || it.temperTier || it.enchantment) return null;
+    const stolen = /#stolen$/.test(String(it.itemId || '')) || !!it.stolen;
+    const eff = it.alchemyEffects.map(e => [e.name, e.magnitude, e.duration, e.unit || '', e.kind || ''].join(':')).join('|');
+    return [String(it.name || '').trim(), it.category, stolen ? 'stolen' : '', eff].join('¦');
+};
+// Та же вещь в списке: сначала по itemId, для сваренных зелий — по ключу стопки.
+window.findSameStack = function (list, it) {
+    const byId = list.find(x => x.itemId === it.itemId);
+    if (byId) return byId;
+    const k = window.alchemyStackKey(it);
+    return k ? list.find(x => window.alchemyStackKey(x) === k) || null : null;
+};

@@ -1059,6 +1059,18 @@
         // ---------- Сундук отряда (sessions/{code}.partyStash / partyGold) ----------
         // Всё меняется ТРАНЗАКЦИЕЙ над документом сессии: если двое берут одно и то же одновременно, успевает один (второй получит «уже забрали»).
         // Предмет/золото убираются у отправителя ТОЛЬКО после успеха (вызывающий код), а у получателя добавляются по результату транзакции.
+        // Одинаковые сваренные зелья лежат одной стопкой, даже если у них разные itemId (см. alchemyStackKey в alchemy-data.js).
+        // Разрозненные стопки, положенные до исправления, сливаются при следующем изменении сундука.
+        _mergeStash: function (stash) {
+            const keyOf = typeof window.alchemyStackKey === 'function' ? window.alchemyStackKey : () => null;
+            const seen = {}, out = [];
+            stash.forEach(s => {
+                const k = keyOf(s);
+                if (k && seen[k]) { seen[k].count = (seen[k].count || 0) + (s.count || 0); return; }
+                const c = Object.assign({}, s); out.push(c); if (k) seen[k] = c;
+            });
+            return out;
+        },
         stashItem: function (item, qty, authorName) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
@@ -1066,8 +1078,8 @@
             return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 if ((doc.data() || {}).status !== 'active') throw new Error('Сессия закрыта мастером — сундук недоступен.');
-                const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
-                const ex = stash.find(s => s.itemId === item.itemId);
+                const stash = window.CloudSync._mergeStash(Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash : []);
+                const ex = typeof window.findSameStack === 'function' ? window.findSameStack(stash, item) : stash.find(s => s.itemId === item.itemId);
                 if (ex) ex.count = (ex.count || 0) + qty;
                 else stash.push(Object.assign({}, stripUndefinedForCloud(item), { count: qty }));
                 tx.update(ref, {
@@ -1084,8 +1096,11 @@
             return db.runTransaction(tx => tx.get(ref).then(doc => {
                 if (!doc.exists) throw new Error('Сессия не найдена.');
                 if ((doc.data() || {}).status !== 'active') throw new Error('Сессия закрыта мастером — сундук недоступен.');
-                const stash = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash.slice() : [];
-                const idx = stash.findIndex(s => s.itemId === itemId);
+                const raw = Array.isArray((doc.data() || {}).partyStash) ? doc.data().partyStash : [];
+                const want = raw.find(s => s.itemId === itemId);
+                const key = want && typeof window.alchemyStackKey === 'function' ? window.alchemyStackKey(want) : null;
+                const stash = window.CloudSync._mergeStash(raw);
+                const idx = stash.findIndex(s => s.itemId === itemId || (key && window.alchemyStackKey(s) === key));
                 if (idx === -1 || (stash[idx].count || 0) < qty) throw new Error('Этого уже нет в сундуке (кто-то успел раньше).');
                 taken = Object.assign({}, stash[idx], { count: qty });
                 if (stash[idx].count - qty <= 0) stash.splice(idx, 1); else stash[idx] = Object.assign({}, stash[idx], { count: stash[idx].count - qty });
@@ -1704,22 +1719,25 @@
         try { localStorage.setItem('rumorMarks:' + currentSessionCode, JSON.stringify(m)); } catch (e) { }
         if (window._lastJournal) renderJournal(window._lastJournal, window._lastJournalCtx);
     };
+    window.refreshJournalView = function () { if (window._lastJournal) renderJournal(window._lastJournal, window._lastJournalCtx); };
     window.rumorToDiary = function (id) {
         const r = (window._journalRumors || []).find(x => x.id === id);
         if (!r || !window.addRumorDiaryEntry) return;
         window.addRumorDiaryEntry(r);
+        if (window._lastJournal) renderJournal(window._lastJournal, window._lastJournalCtx); // кнопка → «✔ в дневнике»
     };
     function rumorHtml(r, marks) {
         const VERD = { true: ['✔ подтвердилось', '#2ecc71'], twist: ['≈ правда, но приукрашена', '#e0a030'], false: ['✘ оказалось ложью', '#e74c3c'] };
         const v = r.verdict && VERD[r.verdict];
         const mk = marks[r.id];
+        const inDiary = !!(window.isRumorInDiary && window.isRumorInDiary(r));
         return '<div style="border-left:3px solid var(--accent-color); padding:3px 8px; margin-bottom:5px;">' +
             (r.hold ? '<span style="opacity:.65; font-size:11px;">' + escapeHtml(r.hold) + (r.day ? ' · день ' + r.day : '') + '</span><br>' : '') +
             escapeHtml(r.text || '') +
             (v ? ' <span style="font-size:12px; color:' + v[1] + ';">' + v[0] + '</span>' : '') +
             '<div style="margin-top:3px; display:flex; gap:6px; flex-wrap:wrap;">' +
             '<button type="button" style="width:auto; padding:1px 8px; font-size:12px; min-height:0;" onclick="cycleRumorMark(\'' + r.id + '\')">' + (mk === 't' ? '✔ верю' : mk === 'f' ? '✘ не верю' : '❔ сомневаюсь') + '</button>' +
-            '<button type="button" style="width:auto; padding:1px 8px; font-size:12px; min-height:0;" onclick="rumorToDiary(\'' + r.id + '\')">📌 в дневник</button></div></div>';
+            '<button type="button" style="width:auto; padding:1px 8px; font-size:12px; min-height:0;" onclick="rumorToDiary(\'' + r.id + '\')"' + (inDiary ? ' disabled title="Уже записан в «Мои записи»">✔ в дневнике' : '>📌 в дневник') + '</button></div></div>';
     }
     function renderJournal(j, ctx) {
         window._lastJournal = j; window._lastJournalCtx = ctx || {};

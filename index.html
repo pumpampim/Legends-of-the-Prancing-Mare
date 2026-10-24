@@ -559,7 +559,7 @@
     <script src="smithing-data.js?v=12"></script>
     <script src="enchant-data.js?v=5"></script>
     <script src="spell-data.js?v=6"></script>
-    <script src="alchemy-data.js?v=5"></script>
+    <script src="alchemy-data.js?v=6"></script>
     <script src="fish-data.js?v=3"></script>
     <script src="hunt-data.js?v=3"></script>
     <script src="holidays-data.js?v=3"></script>
@@ -5372,7 +5372,10 @@ window.toggleSkillPanel = function (idx) {
         // Firestore отвергает ЛЮБОЕ поле undefined — а вызовы вида { armorValue: it.armor, weaponDmg: it.dmg, capacity: it.capacity }
         // кладут в предмет undefined-свойства у вещей без брони/урона. Выбрасываем их здесь.
         if (extra) Object.keys(extra).forEach(k => { if (extra[k] === undefined) delete extra[k]; });
-        const existing = playerInventory.find(i => i.itemId === itemId);
+        // Сваренное зелье из сундука/от другого игрока имеет свой itemId — кладём его на такую же стопку (alchemyStackKey).
+        const existing = playerInventory.find(i => i.itemId === itemId) ||
+            (extra && extra.alchemyEffects && typeof window.findSameStack === 'function'
+                ? window.findSameStack(playerInventory, Object.assign({ itemId, name, category }, extra)) : null);
         if (existing) {
             existing.count += qty;
             if (effect) existing.effect = effect;
@@ -12201,7 +12204,7 @@ window.toggleSkillPanel = function (idx) {
         const gold = parseInt(s.partyGold) || 0;
         const g = document.getElementById('party-stash-gold'); if (g) g.textContent = formatNumber(gold);
         const list = document.getElementById('party-stash-list');
-        const allStash = Array.isArray(s.partyStash) ? s.partyStash : [];
+        const allStash = Array.isArray(s.partyStash) ? window.CloudSync._mergeStash(s.partyStash) : [];
         const stCat = (document.getElementById('stash-category-filter') || {}).value || 'all';
         const stQ = String((document.getElementById('stash-search') || {}).value || '').trim().toLowerCase().replace(/ё/g, 'е');
         const items = allStash.filter(it => (stCat === 'all' || classifyItemBroad(it) === stCat) &&
@@ -12241,7 +12244,7 @@ window.toggleSkillPanel = function (idx) {
     };
     window.partyStashTake = function (itemId) {
         const s = window.CloudSync.getSessionData();
-        const it = ((s && s.partyStash) || []).find(i => i.itemId === itemId);
+        const it = window.CloudSync._mergeStash((s && s.partyStash) || []).find(i => i.itemId === itemId);
         if (!it) { alchToast('Этого уже нет в сундуке.'); return; }
         const doTake = n => {
             window.CloudSync.takeFromStash(itemId, n, stashMyName()).then(taken => {
@@ -15402,16 +15405,26 @@ function updateHungerPenalty() {
         playerDiary.unshift({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), title: '📍 Прибыли в ' + (pos.name || pos.hold || 'новое место'), text: '[' + date + '] Прибыли в ' + place + '.', pinned: false, auto: 'travel' });
         renderDiary(); saveLocalStorage();
     };
+    // Слух уже записан? Старые записи без rumorId узнаём по тексту.
+    window.isRumorInDiary = function (r) {
+        if (!r) return false;
+        return playerDiary.some(d => (r.id && d.rumorId === r.id) || (d.title || '').indexOf('🗣 Слух') === 0 && d.text === (r.text || ''));
+    };
     window.addRumorDiaryEntry = function (r) {
-        playerDiary.unshift({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), title: '🗣 Слух' + (r.hold ? ' · ' + r.hold : ''), text: r.text || '', pinned: false });
+        // Раньше запись молча добавлялась в «Мои записи» внизу вкладки, а подсказка мигала на скрытой кнопке вкладки —
+        // казалось, что кнопка не работает, и повторные нажатия плодили дубли.
+        if (window.isRumorInDiary(r)) { alchToast('📌 Этот слух уже в «Моих записях».'); return false; }
+        playerDiary.unshift({ id: 'd' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), title: '🗣 Слух' + (r.hold ? ' · ' + r.hold : ''), text: r.text || '', pinned: false, rumorId: r.id || '' });
         renderDiary(); saveLocalStorage();
-        const b = document.getElementById('tab14-btn'); if (b) { const o = b.textContent; b.textContent = '📖 Записано ✔'; setTimeout(() => { b.textContent = o; }, 1200); }
+        alchToast('📌 Слух записан в «Мои записи» (внизу вкладки «Дневник»).');
+        return true;
     };
     window.deleteDiaryEntry = function (id) {
         const e = playerDiary.find(d => d.id === id);
         if (!e || !confirm('Удалить запись' + (e.title ? ' «' + e.title + '»' : '') + '?')) return;
         playerDiary = playerDiary.filter(d => d.id !== id);
         renderDiary(); saveLocalStorage();
+        if (e.rumorId && typeof window.refreshJournalView === 'function') window.refreshJournalView();
     };
     window.toggleDiaryPin = function (id) {
         const e = playerDiary.find(d => d.id === id); if (!e) return;
@@ -17332,7 +17345,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=32"></script>
+<script src="cloud.js?v=33"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
