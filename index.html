@@ -554,7 +554,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
     <script src="perks.js?v=11"></script>
-    <script src="items-data.js?v=19"></script>
+    <script src="items-data.js?v=20"></script>
     <script src="cooking-data.js?v=9"></script>
     <script src="smithing-data.js?v=12"></script>
     <script src="enchant-data.js?v=5"></script>
@@ -9602,7 +9602,7 @@ window.toggleSkillPanel = function (idx) {
     const ARMOR_SLOTS_FOR_SKILL = ['helmet', 'chest', 'gloves', 'boots', 'shield'];
     function armorPieceClass(item) {
         if (!item) return null;
-        // Одежда (капюшоны и сапоги мага): класс брони не задаёт и навык брони не качает.
+        // Одежда (капюшоны, сапоги и перчатки мага, колпак повара): класс брони не задаёт и навык брони не качает.
         // Смотрим и в базу — у вещей, купленных до правки, в инвентаре поля armorType нет.
         const base = (window.allItems || []).find(x => x.name === item.name) || {};
         if (/^(cloth|одежда)$/i.test(String(item.armorType || base.armorType || ''))) return 'cloth';
