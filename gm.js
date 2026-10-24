@@ -3052,7 +3052,7 @@
             paid = Math.ceil(fine * tg.mult); note = tg.note;
             const have = parseInt(data.gold) || 0;
             if (have < paid) throw new Error(`У игрока только ${have} зол., к оплате ${paid}${note ? ' (' + note + ')' : ''}. Отметь отказ платить или отправь в тюрьму.`);
-            tx.update(ref, { gold: firebase.firestore.FieldValue.increment(-paid), crimeState: cleared });
+            tx.update(ref, { gold: have - paid, crimeState: cleared });
         })).then(() => {
             currentCrimeState = cleared;
             renderCrimePanel();
@@ -3640,7 +3640,7 @@
     window.tournChargeEntryFee = function () {
         const uid = currentInvPlayerUid;
         if (!uid) { alert('Выбери игрока.'); return; }
-        db.collection('characters').doc(uid).set({ gold: firebase.firestore.FieldValue.increment(-200) }, { merge: true }).then(() => {
+        gmAddGold(uid, -200).then(() => {
             el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Залог 200 золота списан.</span>`;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -3662,7 +3662,7 @@
             const goldMatch = rewardText.match(/^(\d+)\s*золота/);
             const patch = {};
             if (goldMatch) {
-                patch.gold = firebase.firestore.FieldValue.increment(parseInt(goldMatch[1]));
+                return gmAddGold(uid, parseInt(goldMatch[1]));
             } else {
                 inv.push({ itemId: rewardText + '_tourn_' + Date.now(), name: rewardText, count: 1, weight: 1, category: 'Награда турнира', effect: `Приз группы «${bracket}» Бойцовского клуба` });
                 patch.inventory = inv;
@@ -3737,8 +3737,7 @@
             const patch = {};
             patch['guildsData.Коллегия бардов.orders'] = firebase.firestore.FieldValue.increment(1);
             patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
-            patch['gold'] = firebase.firestore.FieldValue.increment(800);
-            return db.collection('characters').doc(req.uid).set(patch, { merge: true });
+            return db.collection('characters').doc(req.uid).set(patch, { merge: true }).then(() => gmAddGold(req.uid, 800));
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -4169,18 +4168,39 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Прибавить/списать золото игроку относительно того, что у него СЕЙЧАС в облаке, не ниже 0.
+    // Не FieldValue.increment: лист игрока долго сохранял золото строкой ("150"), а increment по
+    // нечисловому полю Firestore не прибавляет, а ЗАМЕНЯЕТ значение — «+50» превращало 150 в 50.
+    // Транзакция читает текущее значение (parseInt понимает и строку) и пишет число.
+    function gmAddGold(uid, delta) {
+        const ref = db.collection('characters').doc(uid);
+        let res = null;
+        return db.runTransaction(tx => tx.get(ref).then(doc => {
+            const before = parseInt((doc.data() || {}).gold) || 0;
+            const after = Math.max(0, before + (parseInt(delta) || 0));
+            res = { before, after };
+            if (doc.exists) tx.update(ref, { gold: after }); else tx.set(ref, { gold: after }, { merge: true });
+        })).then(() => res);
+    }
+    window.gmAddGold = gmAddGold;
+
     window.applyGoldDelta = function (sign) {
         if (!currentInvPlayerUid) return;
+        const uid = currentInvPlayerUid;
         const amount = parseInt(el('inv-gold-delta').value) || 0;
-        if (amount <= 0) { alert('Укажи положительную сумму.'); return; }
-        // Та же гонка, что и в grantPartyReward — currentPlayerInvData.gold мог отстать от
-        // реального значения в Firestore (если игрок только что что-то залутал/продал, а его
-        // автосохранение ещё не долетело). Атомарный increment не читает старое значение вообще.
-        const delta = sign * amount;
-        db.collection('characters').doc(currentInvPlayerUid).update({ gold: firebase.firestore.FieldValue.increment(delta) }).then(() => {
+        if (sign !== 0 && amount <= 0) { alert('Укажи положительную сумму.'); return; }
+        if (sign === 0 && amount < 0) { alert('Золото не может быть меньше 0.'); return; }
+        const pname = (lastData.participants[uid] || {}).name || uid;
+        const ref = db.collection('characters').doc(uid);
+        // sign 0 — «Установить»: записать ровно эту сумму
+        const op = sign === 0
+            ? ref.update({ gold: amount }).then(() => ({ after: amount }))
+            : gmAddGold(uid, sign * amount);
+        op.then(r => {
             el('inv-gold-delta').value = '';
-            const pname = (lastData.participants[currentInvPlayerUid] || {}).name || currentInvPlayerUid;
-            gmPostLogEntryText(`💰 Мастер ${sign > 0 ? 'выдал' : 'списал'} ${amount} золота игроку ${pname}.`);
+            if (uid === currentInvPlayerUid) { currentPlayerInvData.gold = r.after; el('inv-gold-current').textContent = formatNumber(r.after); }
+            const verb = sign > 0 ? `выдал ${amount}` : sign < 0 ? `списал ${r.before - r.after}` : `установил ${amount}`;
+            gmPostLogEntryText(`💰 Мастер ${verb} золота игроку ${pname}` + (sign !== 0 ? ` (теперь ${r.after}).` : '.'));
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -4690,8 +4710,8 @@
         // Firestore сам прибавляет к тому, что там СЕЙЧАС, никакой гонки для золота больше нет.
         Promise.all(uids.map(uid => {
             const update = {};
-            if (gold) update.gold = firebase.firestore.FieldValue.increment(gold);
-            if (!sourceItem) return db.collection('characters').doc(uid).update(update);
+            const addGold = () => gold ? gmAddGold(uid, gold) : null;
+            if (!sourceItem) return addGold();
             // Предмет по-прежнему требует прочитать текущий инвентарь (нужно проверить, есть ли
             // уже такой стек) — тут гонка технически остаётся, но она намного уже без золота
             // в этой же операции, и out-of-band риск метаться отдельно от inventory игрока.
@@ -4702,7 +4722,7 @@
                 gmMergeInvItem(inv, { itemId: invId, name: sourceItem.name, weight: sourceItem.weight || 0, category: sourceItem.category || '', effect: sourceItem.effect || '' }, itemQty, Object.assign({}, itemExtra));
                 update.inventory = inv;
                 return db.collection('characters').doc(uid).update(update);
-            });
+            }).then(addGold);
         })).then(() => {
             const parts = [];
             if (gold) parts.push(`${gold} золота`);
@@ -4797,8 +4817,8 @@
             return Promise.all(uids.map(uid => {
                 const cref = db.collection('characters').doc(uid);
                 const upd = {};
-                if (plan.perGold) upd.gold = firebase.firestore.FieldValue.increment(plan.perGold);
-                if (!plan.give.length) return cref.update(upd);
+                const addGold = () => plan.perGold ? gmAddGold(uid, plan.perGold) : null;
+                if (!plan.give.length) return addGold();
                 return cref.get().then(doc => {
                     const inv = Array.isArray((doc.data() || {}).inventory) ? doc.data().inventory.slice() : [];
                     // Заточенное/зачарованное — всегда своей строкой; остальное по правилам gmMergeInvItem
@@ -4815,7 +4835,7 @@
                     });
                     upd.inventory = stripUndefinedDeep(inv);
                     return cref.update(upd);
-                });
+                }).then(addGold);
             })).then(() => {
                 const parts = [];
                 if (plan.perGold) parts.push(plan.perGold + ' зол.');

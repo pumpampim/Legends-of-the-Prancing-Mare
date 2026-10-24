@@ -866,15 +866,16 @@
         <!-- ===== ИНВЕНТАРЬ И ДЕНЬГИ ИГРОКОВ ===== -->
         <div class="panel" data-gm-tab="rewards">
             <h2>🎒 Инвентарь и деньги игрока</h2>
-            <p style="font-size:14px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить или списать.</p>
+            <p style="font-size:14px; opacity:.8;">Полный список вещей выбранного игрока — можно удалить любую. Ниже — золото: можно добавить, списать (от текущего, не ниже 0) или установить точную сумму.</p>
             <select id="inv-player-select" style="width:100%; margin-bottom:10px;" onchange="loadPlayerInventoryForGm()"></select>
 
             <div id="inv-gold-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
                 <div>💰 Золото: <strong id="inv-gold-current">0</strong> септимов</div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
-                    <input type="number" id="inv-gold-delta" placeholder="Сумма" style="flex:1;">
+                    <input type="number" id="inv-gold-delta" placeholder="Сумма" min="0" style="flex:1;">
                     <button class="btn-success" style="width:auto;" onclick="applyGoldDelta(1)">Добавить</button>
                     <button class="btn-danger" style="width:auto;" onclick="applyGoldDelta(-1)">Списать</button>
+                    <button style="width:auto;" onclick="applyGoldDelta(0)" title="Записать ровно эту сумму вместо текущей">= Установить</button>
                 </div>
             </div>
 
@@ -1366,7 +1367,7 @@
 <script src="enemy-loot.js?v=6"></script>
 <script src="grid-core.js?v=4"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=52"></script>
+<script src="gm.js?v=53"></script>
 <script src="gm-grid.js?v=3"></script>
 </body>
 </html>

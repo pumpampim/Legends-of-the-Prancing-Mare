@@ -15841,7 +15841,7 @@ function updateHungerPenalty() {
             marketBought: marketBought,
             restState: restState,
             deathState: { fallen: !!deathState.fallen, rolled: !!deathState.rolled, deaths: deathState.deaths || 0, minimized: !!deathState.minimized },
-            gold: document.getElementById('char-gold').value,
+            gold: Math.max(0, parseInt(document.getElementById('char-gold').value) || 0), // числом: increment у мастера по строке не прибавляет, а заменяет
             starve: document.getElementById('food-starve').value,
             faithGod: document.getElementById('faith-god').value,
             penanceAllowed: penanceAllowed,
