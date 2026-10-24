@@ -20,6 +20,23 @@
     let cloudDataReady = false; // true только после того, как персонаж загружен из облака хотя бы раз —
                                  // защищает от перезаписи реальных данных дефолтными при входе с нового устройства.
     const SESSION_KEY = 'ttrpg_session_code';
+    // Защита от «устаревшей вкладки»: лист открыт на двух устройствах (телефон + ПК) или в двух вкладках.
+    // Раньше вкладка, которую давно не обновляли, при первой же правке писала в облако свой старый лист целиком —
+    // дата, золото и инвентарь откатывались назад. Теперь каждая запись игрока ставит метку saveSeq/saveBy,
+    // и если в облаке появилась чужая метка, эта вкладка больше не пишет, а предлагает загрузить свежий лист.
+    const TAB_ID = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    let lastSaveStamp = null;   // метка последней записи, которую эта вкладка загрузила или сделала сама
+    let lastSaveSeq = 0;
+    let sheetIsStale = false;   // вкладки перекидываются листом по кругу — сохранение отсюда остановлено (showStaleSheetBanner)
+    let awaitingOwnDoc = false; // вкладка вернулась из фона — не пишем, пока не сверимся с облаком
+    let lastSaveHash = null;    // отпечаток содержимого этого листа (saveHash) — чужая запись того же содержимого не считается устареванием
+    function sheetHash(d) { // FNV-1a по JSON без меток записи
+        const c = Object.assign({}, d); delete c.saveSeq; delete c.saveBy; delete c.saveHash; delete c.saveBase;
+        const str = JSON.stringify(c); let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+        return (h >>> 0).toString(36) + '.' + str.length.toString(36);
+    }
+    function saveStampOf(d) { return (d && d.saveBy) ? (parseInt(d.saveSeq) || 0) + ':' + d.saveBy : null; }
 
     function el(id) { return document.getElementById(id); }
 
@@ -164,14 +181,72 @@
     function subscribeToOwnGmFields(uid) {
         if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
         unsubSelfGmFields = db.collection('characters').doc(uid).onSnapshot(doc => {
-            if (!doc.exists) return;
+            if (!doc.exists) { awaitingOwnDoc = false; return; }
             const data = doc.data();
+            const resumed = awaitingOwnDoc;
+            awaitingOwnDoc = false;
+            if (cloudDataReady) checkStaleSheet(data, resumed);
+            if (resumed && !sheetIsStale) window.CloudSync.flushSave();
             if (window.applyGmControlledFields) window.applyGmControlledFields(data);
         }, e => console.error('Ошибка подписки на поля мастера:', e));
     }
 
+    // Чужая метка записи в облаке = лист записала другая вкладка/устройство. Мастер метку не трогает (пишет только свои поля).
+    // Каждая запись несёт saveBase — метку, которую писавшая вкладка видела последней. Решаем, чей лист главнее:
+    //  - у нас есть ещё не отправленные правки (игрок прямо сейчас играет здесь) — оставляем свой лист и пишем его заново;
+    //  - та вкладка видела нашу последнюю запись (saveBase совпадает) — её лист новее: берём его;
+    //  - не видела, а последняя запись была наша — та вкладка устарела и затёрла облако старым листом
+    //    (откат даты, золота, вещей): сразу пишем свой лист обратно, та вкладка увидит его и подтянет;
+    //  - иначе мы сами отстали (долго были в фоне) — берём свежий лист.
+    // Вкладка, вернувшаяся из фона, своих отложенных правок не отстаивает: они построены на старом листе.
+    let staleActs = [];
+    function checkStaleSheet(data, resumed) {
+        const st = saveStampOf(data);
+        if (!st || st === lastSaveStamp || data.saveBy === TAB_ID || sheetIsStale) return;
+        // тот же самый лист (другая вкладка просто пересохранила его) — только запоминаем метку
+        if (data.saveHash && data.saveHash === lastSaveHash && !(!resumed && (pendingSave || window._dirty))) { lastSaveStamp = st; lastSaveSeq = Math.max(lastSaveSeq, parseInt(data.saveSeq) || 0); return; }
+        // Предохранитель: если вкладки почему-то перекидываются листом без конца — останавливаемся и просим закрыть лишние.
+        const now = Date.now();
+        staleActs = staleActs.filter(t => now - t < 60000); staleActs.push(now);
+        if (staleActs.length > 8) {
+            sheetIsStale = true; clearTimeout(saveTimer); pendingSave = null;
+            showStaleSheetBanner();
+            return;
+        }
+        const hasPending = !resumed && (!!pendingSave || !!window._dirty);
+        const lastWasMine = !!lastSaveStamp && lastSaveStamp.endsWith(':' + TAB_ID);
+        const keepMine = hasPending || (data.saveBase !== lastSaveStamp && lastWasMine);
+        lastSaveSeq = Math.max(lastSaveSeq, parseInt(data.saveSeq) || 0);
+        lastSaveStamp = st;
+        if (keepMine) {
+            console.warn('Облако затёрто листом с другой вкладки/устройства — записываем текущий лист обратно.');
+            lastSaveHash = null;
+            if (typeof window.stForceSave === 'function') window.stForceSave();
+            return;
+        }
+        clearTimeout(saveTimer); pendingSave = null; // наша отложенная запись построена на старом листе — в облако она не уйдёт
+        lastSaveHash = data.saveHash || null;
+        console.warn('Лист персонажа изменён на другом устройстве — подтягиваем свежую версию.');
+        if (window.applyCharacterData) {
+            window.applyCharacterData(data);
+            if (window.updateAll) window.updateAll();
+            if (typeof window.stMarkSynced === 'function') window.stMarkSynced();
+        }
+    }
+    function showStaleSheetBanner() {
+        if (el('stale-sheet-banner')) return;
+        const b = document.createElement('div');
+        b.id = 'stale-sheet-banner';
+        b.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:100000;max-width:520px;width:calc(100% - 32px);padding:12px 14px;border-radius:6px;background:#3a1f1f;color:#fff;border:2px solid #e67e22;box-shadow:0 4px 18px rgba(0,0,0,.5);font-size:14px;';
+        b.innerHTML = '<div style="margin-bottom:8px;"><strong>Лист открыт и меняется сразу в нескольких вкладках или на нескольких устройствах.</strong> Чтобы они не затирали друг друга, сохранение отсюда остановлено. Закрой лишние вкладки и обнови страницу.</div>'
+            + '<button type="button" id="stale-sheet-reload" class="btn-success" style="width:100%;margin:0;">🔄 Обновить страницу</button>';
+        document.body.appendChild(b);
+        el('stale-sheet-reload').onclick = () => { try { localStorage.removeItem('skyrim_dirty'); localStorage.removeItem('skyrim_recovery'); } catch (e) { } location.reload(); };
+    }
+
     function loadCharacterFromCloud(uid) {
         db.collection('characters').doc(uid).get().then(doc => {
+            if (doc.exists) { lastSaveStamp = saveStampOf(doc.data()); lastSaveSeq = parseInt(doc.data().saveSeq) || 0; lastSaveHash = doc.data().saveHash || null; }
             if (doc.exists && window.applyCharacterData) {
                 window.applyCharacterData(doc.data());
                 if (window.updateAll) window.updateAll();
@@ -231,8 +306,13 @@
         // ещё-старые данные из Firestore и своей записью (или наоборот, задержанной записью
         // игрока чуть позже) стирал только что залутанное золото/предметы.
         saveCharacter: function (data, immediate) {
-            if (!currentUser || !db || !cloudDataReady) return;
+            if (!currentUser || !db || !cloudDataReady || sheetIsStale) return;
             const doSave = () => {
+                if (sheetIsStale) return;
+                if (awaitingOwnDoc) { pendingSave = doSave; return; } // запишем, когда сверимся с облаком
+                data.saveHash = lastSaveHash = sheetHash(data);
+                data.saveBase = lastSaveStamp || null;
+                data.saveSeq = ++lastSaveSeq; data.saveBy = TAB_ID; lastSaveStamp = saveStampOf(data);
                 // Страховка: Firestore целиком отвергает запись, если где-то внутри есть undefined
                 // («Unsupported field value: undefined»). Убираем такие поля (в массивах — null).
                 data = stripUndefinedForCloud(data);
@@ -1396,6 +1476,7 @@
         if (document.hidden) {
             if (unsubSession) { unsubSession(); unsubSession = null; }
             if (unsubSelfGmFields) { unsubSelfGmFields(); unsubSelfGmFields = null; }
+            if (cloudDataReady && currentUser) awaitingOwnDoc = true; // пока вкладка в фоне, лист могли поменять с другого устройства
         } else {
             if (currentUser && !unsubSelfGmFields) subscribeToOwnGmFields(currentUser.uid);
             if (currentSessionCode && !unsubSession) subscribeToSession(currentSessionCode);

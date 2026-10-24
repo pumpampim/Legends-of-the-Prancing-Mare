@@ -15829,7 +15829,7 @@ function updateHungerPenalty() {
         _localSaveTimer = setTimeout(() => _buildAndSaveData(false), 300);
     }
 
-    function _buildAndSaveData(immediate, recoveryOnly) {
+    function _buildAndSaveData(immediate, recoveryOnly, localOnly) {
         // 6.6: пока висит вопрос «Восстановить?», обычное сохранение молчит — иначе pagehide перед перезагрузкой затёрло бы копию текущим (старым) состоянием формы
         if (window.__stRecoveryPending && !recoveryOnly) return;
         let perkStates = {};
@@ -15992,13 +15992,18 @@ function updateHungerPenalty() {
         localStorage.setItem('skyrim_ttrpg_save_v3_6', json);
         try { localStorage.setItem('skyrim_save_ts', String(Date.now())); } catch (e) { }
         stSetDirty(false);
-        if (window.CloudSync) window.CloudSync.saveCharacter(data, immediate);
+        if (window.CloudSync && !localOnly) window.CloudSync.saveCharacter(data, immediate);
     }
 
     setInterval(function () {
         if (window._dirty && !window.__stRecoveryPending) { try { _buildAndSaveData(false, true); } catch (e) { } }
     }, 30000);
     window.stSnapshotRecovery = function () { _buildAndSaveData(false, true); };
+    // Для защиты от устаревшей вкладки (cloud.js, checkStaleSheet):
+    // stForceSave — записать лист в облако заново, даже если он не менялся (облако затёрла старая вкладка — восстанавливаем);
+    // stMarkSynced — лист только что взят из облака: запомнить его как сохранённый, в облако не отправлять (иначе вкладки пересохраняли бы друг друга).
+    window.stForceSave = function () { clearTimeout(_localSaveTimer); _lastLocalSaveHash = ''; _buildAndSaveData(true); };
+    window.stMarkSynced = function () { clearTimeout(_localSaveTimer); _lastLocalSaveHash = ''; _buildAndSaveData(true, false, true); };
 
     // Сохранить всё, что ещё ждёт таймера (локально — 300 мс, облако — 800 мс), когда вкладка закрывается или уходит в фон.
     // Раньше правка за долю секунды до закрытия терялась. pagehide/visibilitychange — для мобильных браузеров, где beforeunload не срабатывает.
@@ -17422,7 +17427,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=35"></script>
+<script src="cloud.js?v=36"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
