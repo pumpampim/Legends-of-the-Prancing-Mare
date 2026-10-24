@@ -769,6 +769,57 @@
             })).then(() => got);
         },
 
+        // Карманная кража у противника в сцене: золото или одна вещь из его заранее брошенной добычи (corpseLoot),
+        // чтобы украденное потом не выпало ещё раз с трупа. Транзакция — как у обыска трупа.
+        // want: null — кошелёк; строка — конкретная вещь; { min, max } — случайная вещь этой цены (добыча ещё не брошена).
+        pickpocketEnemy: function (enemyId, want) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            let got = { gold: 0, item: null };
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const enemies = Array.isArray(doc.data().enemies) ? doc.data().enemies.slice() : [];
+                const idx = enemies.findIndex(e => e.id === enemyId);
+                if (idx === -1) throw new Error('Противник не найден.');
+                let loot = enemies[idx].corpseLoot;
+                // У врагов из базы добыча бросается только при обыске трупа — бросаем её сейчас по тексту лута,
+                // чтобы украденное не выпало потом ещё раз.
+                if (!loot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) loot = window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: window.allItems || [], level: enemies[idx].level || 1 });
+                if (!loot) throw new Error('Карманы оказались пусты.');
+                const nl = JSON.parse(JSON.stringify({ gold: loot.gold || 0, items: loot.items || [] })); // без undefined — Firestore их не принимает
+                if (!want) { got.gold = nl.gold; nl.gold = 0; }
+                else {
+                    const fit = it => it && !it.slot && (typeof want === 'string' ? it.name === want : ((it.price || 0) >= want.min && (it.price || 0) <= want.max));
+                    const cand = nl.items.map((it, k) => fit(it) ? k : -1).filter(k => k >= 0);
+                    const i = cand.length ? cand[Math.floor(Math.random() * cand.length)] : -1;
+                    if (i === -1 && typeof want === 'string') throw new Error('Этой вещи в карманах уже нет.');
+                    if (i === -1) { enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: nl }); tx.update(ref, { enemies: enemies }); return; }
+                    const it = Object.assign({}, nl.items[i]);
+                    const q = parseInt(it.qty) || 1;
+                    if (q > 1) nl.items[i] = Object.assign({}, it, { qty: q - 1 }); else nl.items.splice(i, 1);
+                    delete it.qty;
+                    got.item = it;
+                }
+                enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: nl });
+                tx.update(ref, { enemies: enemies });
+            })).then(() => got);
+        },
+
+        // Пойман на карманной краже: заявка мастеру (gm.js renderTheftCases) с предложенным штрафом.
+        reportTheftCaught: function (c) {
+            if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const list = Array.isArray((doc.data() || {}).theftCases) ? doc.data().theftCases.slice() : [];
+                const p = ((doc.data() || {}).participants || {})[uid] || {};
+                list.push({ id: 't' + Date.now() + Math.random().toString(36).slice(2, 5), uid: uid, name: p.name || 'Игрок', ts: Date.now(),
+                    victim: String(c.victim || ''), what: String(c.what || ''), fine: Math.max(0, parseInt(c.fine) || 0), hold: String(c.hold || '') });
+                tx.update(ref, { theftCases: list });
+            }));
+        },
+
         // Задача K: +1 к прогрессу гильдии на СВОЁМ ЖЕ документе персонажа при выполнении квеста
         // этой гильдии. Атомарный инкремент (не read-then-write) — на своём документе игрок
         // может писать и без сессии.

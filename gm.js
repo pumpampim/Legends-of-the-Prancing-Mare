@@ -370,6 +370,7 @@
         try { gmEnemyTickWatch(lastData); } catch (e) { console.error(e); }
         try { if (window.GmGrid) window.GmGrid.onSnapshot(lastData); } catch (e) { console.error(e); }
         try { renderMuseumRequests(); renderQuestClaims(); renderPlayerLimits(); } catch (e) { console.error(e); }
+        try { renderTheftCases(); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.
@@ -3736,6 +3737,49 @@
             patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
             patch['gold'] = firebase.firestore.FieldValue.increment(800);
             return db.collection('characters').doc(req.uid).set(patch, { merge: true });
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    // Пойманные на карманной краже (index.html attemptTheft → CloudSync.reportTheftCaught): штраф предложен по правилу
+    // «25 + ½ цены вещи, у стражи и знати ×2»; мастер выписывает его одной кнопкой (сумма и владение правятся) или отпускает.
+    function renderTheftCases() {
+        const box = el('theft-cases'); if (!box) return;
+        const list = Array.isArray(lastData.theftCases) ? lastData.theftCases : [];
+        box.innerHTML = list.length ? '<div style="margin-bottom:10px; padding:6px; border:1px solid #e74c3c; border-radius:4px;"><strong>🚨 Пойманы на карманной краже</strong>' + list.map(c =>
+            `<div class="party-row" style="display:block;"><div>${escapeHtml(c.name || '?')} — ${escapeHtml(c.victim || '?')}, ${escapeHtml(c.what || '')}</div>` +
+            `<div style="display:flex; gap:4px; align-items:center; flex-wrap:wrap; margin-top:4px;"><input type="number" id="theft-fine-${escapeHtml(c.id)}" value="${parseInt(c.fine) || 0}" style="width:80px;">` +
+            `<select id="theft-hold-${escapeHtml(c.id)}">${REPUTATION_HOLDS.map(h => `<option value="${escapeHtml(h)}"${h === c.hold ? ' selected' : ''}>${escapeHtml(h)}</option>`).join('')}</select>` +
+            `<button style="width:auto; padding:2px 8px;" onclick="resolveTheftCase('${jsq(c.id)}', true)">⚖️ Выписать штраф</button>` +
+            `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resolveTheftCase('${jsq(c.id)}', false)">Отпустить</button></div></div>`).join('') + '</div>' : '';
+    }
+    window.resolveTheftCase = function (caseId, fineIt) {
+        const ref = db.collection('sessions').doc(currentCode);
+        const amount = Math.max(0, parseInt((el('theft-fine-' + caseId) || {}).value) || 0);
+        const holdSel = (el('theft-hold-' + caseId) || {}).value || '';
+        let c = null;
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const list = Array.isArray((doc.data() || {}).theftCases) ? doc.data().theftCases.slice() : [];
+            const i = list.findIndex(r => r.id === caseId);
+            if (i < 0) throw new Error('Заявка уже обработана.');
+            c = list[i]; list.splice(i, 1);
+            tx.update(ref, { theftCases: list });
+        })).then(() => {
+            if (!fineIt) { gmPostLogEntryText(`🤝 ${c.name} пойман(а) на краже (${c.victim}), но отпущен(а) без штрафа.`); return; }
+            if (amount <= 0) return;
+            const cref = db.collection('characters').doc(c.uid);
+            const reason = `карманная кража: ${c.victim}`;
+            let next = null;
+            return db.runTransaction(tx => tx.get(cref).then(doc => {
+                const cs = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, (doc.data() || {}).crimeState || {});
+                const prev = cs.fineAmount || 0;
+                next = Object.assign({}, cs, { fineAmount: prev + amount, fineHold: prev > 0 && cs.fineHold ? cs.fineHold : holdSel,
+                    fineReason: prev > 0 ? [cs.fineReason, reason].filter(Boolean).join('; ') : reason, refused: false });
+                tx.update(cref, { crimeState: next });
+            })).then(() => {
+                if (currentInvPlayerUid === c.uid) { currentCrimeState = next; renderCrimePanel(); }
+                gmPostLogEntryText(`⚖️ ${c.name}: штраф ${amount} септимов (${next.fineHold}) за карманную кражу${next.fineAmount > amount ? ` — всего к оплате ${next.fineAmount}` : ''}.`);
+                try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: reason, hold: next.fineHold || undefined, who: [c.name].filter(Boolean) }); } catch (e) { }
+            });
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 

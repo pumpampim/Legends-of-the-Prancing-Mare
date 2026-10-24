@@ -189,12 +189,12 @@
             ],
             "Карманные кражи": [
                 { name: "Ловкие пальчики", steps: 5, desc: "Вы получаете +1 к кубам к проверке на кражу с каждой стадией (в сумме +5 к кубам)", req: { skill: "Карманные кражи", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
-                { name: "Ночной вор", steps: 1, desc: "+2 к кубам на кражу у спящих", req: { skill: "Карманные кражи", thresholds: [30], prereq: [["Ловкие пальчики"]] } },
+                { name: "Ночной вор", steps: 1, desc: "+2 к кубам на кражу у спящих; спящая жертва не настораживается от мелкого провала", req: { skill: "Карманные кражи", thresholds: [30], prereq: [["Ловкие пальчики"]] } },
                 { name: "Носитель яда", steps: 1, desc: "Вы можете скрытно наносить урон врагам подбрасывая им яд в карманы", req: { skill: "Карманные кражи", thresholds: [40], prereq: [["Ночной вор"]] } },
                 { name: "Щипач", steps: 1, desc: "Карманные кражи становятся еще легче (+1 к кубам)", req: { skill: "Карманные кражи", thresholds: [40], prereq: [["Ночной вор"]] } },
                 { name: "Накладные карманы", steps: 1, desc: "Грузоподъемность увеличивается на 50", req: { skill: "Карманные кражи", thresholds: [50], prereq: [["Ночной вор"]] } },
-                { name: "Ключник", steps: 1, desc: "Вам почти всегда удается стащить ключ из чужого кармана", req: { skill: "Карманные кражи", thresholds: [60], prereq: [["Щипач"]] } },
-                { name: "Дезориентация", steps: 1, desc: "Вы можете красть экипированное оружие", req: { skill: "Карманные кражи", thresholds: [70], prereq: [["Щипач"]] } }
+                { name: "Ключник", steps: 1, desc: "Вам почти всегда удается стащить ключ из чужого кармана (успех всегда, кроме натуральной 1)", req: { skill: "Карманные кражи", thresholds: [60], prereq: [["Щипач"]] } },
+                { name: "Дезориентация", steps: 1, desc: "Вы можете красть экипированное оружие (вне боя, после проверки Скрытности; сложность 19)", req: { skill: "Карманные кражи", thresholds: [70], prereq: [["Щипач"]] } }
             ],
             "Красноречие": [
                 { name: "Торговец", steps: 5, desc: "Цены при купле и продаже выгоднее на 10% (+5 % за каждый уровень навыка макс 30%)", req: { skill: "Красноречие", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
@@ -553,7 +553,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-    <script src="perks.js?v=10"></script>
+    <script src="perks.js?v=11"></script>
     <script src="items-data.js?v=18"></script>
     <script src="cooking-data.js?v=9"></script>
     <script src="smithing-data.js?v=12"></script>
@@ -568,10 +568,11 @@
     <script src="spell-tomes-data.js?v=5"></script>
 <script src="powers-data.js?v=8"></script>
     <script src="enemies-data.js?v=10"></script>
+    <script src="enemy-loot.js?v=6"></script>
     <script src="pets-data.js?v=1"></script>
     <script src="holds-map.js?v=4"></script>
     <script src="combat-bonuses.js?v=6"></script>
-    <script src="builds-data.js?v=2"></script>
+    <script src="builds-data.js?v=3"></script>
 </head>
 <body>
 
@@ -1881,6 +1882,40 @@
             </div>
             <div id="chest-gold-note" style="font-size:13px; opacity:.8; margin-top:4px;"></div>
         </div>
+        </div>
+
+        <!-- Карманные кражи: сложность по ступени вещи (как замки «Взлома»), добыча по типу жертвы, поимка → штраф через мастера -->
+        <div class="panel" id="theft-panel">
+            <h2>🤏 Карманная кража</h2>
+            <p style="font-size:14px; opacity:.8;">к20 + Ловкость + перки и снаряжение «Карманных краж». Сложность зависит от того, что крадёшь; навык ниже порога даёт штраф. Провал на 1–4 — не заметили, но жертва настороже до конца дня; провал на 5+ или натуральная 1 — пойман с поличным, мастеру уходит штраф.</p>
+            <div class="st-dice-grid">
+                <div><label>Жертва</label>
+                    <select id="theft-victim" onchange="updateTheftInfo()"></select></div>
+                <div id="theft-name-wrap"><label>Кто именно (имя)</label>
+                    <input type="text" id="theft-victim-name" placeholder="например, Бренуин" oninput="updateTheftInfo()"></div>
+                <div><label>Что делаем</label>
+                    <select id="theft-what" onchange="updateTheftInfo()">
+                        <option value="purse">Кошелёк (золото)</option>
+                        <option value="trinket">Случайная мелочь</option>
+                        <option value="valuable">Случайная ценная вещь</option>
+                        <option value="precious">Случайная дорогая вещь</option>
+                        <option value="key">Ключ</option>
+                        <option value="named">Вещь, которую назвал мастер</option>
+                        <option value="weapon">Надетое оружие («Дезориентация»)</option>
+                        <option value="plant">Подкинуть свою вещь</option>
+                        <option value="poison">Подкинуть яд («Носитель яда»)</option>
+                    </select></div>
+                <div id="theft-extra-wrap"></div>
+            </div>
+            <div style="margin:4px 0;">
+                <label style="display:inline-block; margin-right:12px;"><input type="checkbox" id="theft-asleep" onchange="updateTheftInfo()"> 😴 Жертва спит</label>
+                <label style="display:inline-block; margin-right:12px;"><input type="checkbox" id="theft-seen" onchange="updateTheftInfo()"> 👁 Я не скрыт (−5)</label>
+                <label style="display:inline-block;"><input type="checkbox" id="theft-town" checked onchange="updateTheftInfo()"> 🏘 В поселении (поимка = штраф)</label>
+            </div>
+            <div id="theft-info" style="font-size:14px; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
+            <button class="btn-success" style="width:100%;" onclick="attemptTheft()">🤏 Украсть</button>
+            <div id="theft-result" style="margin-top:10px; font-size:15px; text-align:center;"></div>
+            <div id="theft-alert-list" style="font-size:12px; opacity:.75; margin-top:6px;"></div>
         </div>
 
         <div class="panel">
@@ -3320,6 +3355,7 @@ window.toggleSkillPanel = function (idx) {
         if (tabId === 'tab7') { initTab7IfNeeded(); renderForageBars(); }
         if (tabId === 'tab13' && typeof window.renderPlayerMap === 'function') { if (typeof window.markPlacesSeen === 'function') window.markPlacesSeen(); window.renderPlayerMap(true); }
         if (tabId === 'tab5' && typeof renderTradePanel === 'function') renderTradePanel();
+        if (tabId === 'tab10' && typeof window.renderTheftVictims === 'function') window.renderTheftVictims();
         if (tabId === 'tab14') { if (typeof window.markJournalSeen === 'function') window.markJournalSeen(); renderDiary(); }
         // Пересчитываем всё заново при каждом переключении вкладки — защита от любых
         // рассинхронов между панелями (например «Ветки перков» и «Проверка»/прокачка). Через
@@ -10859,7 +10895,7 @@ window.toggleSkillPanel = function (idx) {
               if (thB) helpNote += ` (+${thB} «Ловкие пальчики»/«Щипач»)`;
               if (asleepD && asleepD.checked && pbD.sleepTheftBonus) { thB += pbD.sleepTheftBonus; helpNote += ` (+${pbD.sleepTheftBonus} «Ночной вор»)`; }
               statMod += thB;
-              if (keyD && keyD.checked && pbD.keyThiefAuto) { keyThiefAutoWin = true; helpNote += ' (🔑 «Ключник»: ключ достаётся почти всегда)'; }
+              if (keyD && keyD.checked && pbD.keyThiefAuto) { keyThiefAutoWin = true; helpNote += ' (🔑 «Ключник»: ключ достаётся всегда, кроме натуральной 1)'; }
           }
           if ((speechKind === 'intimidate' || speechKind === 'threat') && pbD.intimidateBonus) { statMod += pbD.intimidateBonus; helpNote += ` (+${pbD.intimidateBonus} «Запугивание»)`; }
         }
@@ -10898,7 +10934,7 @@ window.toggleSkillPanel = function (idx) {
         const verdictEl = document.getElementById('dice-result-verdict');
         let verdict = null;
         if (hasDc) {
-            verdict = total >= dc || keyThiefAutoWin;
+            verdict = total >= dc || (keyThiefAutoWin && roll !== 1); // «Ключник»: почти всегда — кроме натуральной 1
             verdictEl.textContent = verdict ? (total >= dc ? `✅ Успех (нужно было ${dc})` : `✅ Успех — «Ключник» (нужно было ${dc})`) : `❌ Провал (нужно было ${dc})`;
             verdictEl.style.color = verdict ? '#2ecc71' : '#e74c3c';
         } else {
@@ -11067,6 +11103,296 @@ window.toggleSkillPanel = function (idx) {
         renderDiceHistory();
         saveLocalStorage();
     };
+
+    // ========================================================================
+    // КАРМАННЫЕ КРАЖИ (согласовано с пользователем 2026-10-24)
+    // ========================================================================
+    // Сложность — по ступени того, что крадём (как замки «Взлома»); навык ниже порога ступени даёт штраф.
+    // Пороги совпадают с порогами перков ветки. Провал на 1–4 — жертва настороже до конца игрового дня;
+    // провал на 5+ или натуральная 1 — пойман: штраф 25 + ½ цены (стража/знать ×2) уходит мастеру заявкой.
+    const THEFT_TIERS = {
+        trinket:  { name: 'Мелочь', dc: 9, threshold: 0, penalty: -2, minPrice: 0, maxPrice: 10 },
+        purse:    { name: 'Кошелёк', dc: 12, threshold: 20, penalty: -3 },
+        valuable: { name: 'Ценная вещь', dc: 15, threshold: 40, penalty: -4, minPrice: 11, maxPrice: 100 },
+        precious: { name: 'Дорогая вещь', dc: 17, threshold: 60, penalty: -5, minPrice: 101, maxPrice: Infinity },
+        key:      { name: 'Ключ', dc: 15, threshold: 40, penalty: -4 },
+        weapon:   { name: 'Надетое оружие', dc: 19, threshold: 70, penalty: 0, perk: 'pickpocketWeapon' },
+        plant:    { name: 'Подкинуть вещь', dc: 12, threshold: 0, penalty: -2 },
+        poison:   { name: 'Подкинуть яд', dc: 12, threshold: 0, penalty: -2, perk: 'poisonPlant' }
+    };
+    const THEFT_WEAPON_STEALTH_DC = 15; // «Дезориентация»: сначала отдельная проверка Скрытности (только вне боя)
+    const THEFT_FINE_BASE = 25;
+    // Карманы по типу жертвы: кошелёк (NкM+K), категории вещей из базы предметов, модификатор внимательности.
+    const THEFT_VICTIMS = {
+        beggar:   { name: 'Нищий', purse: [1, 6, -1], mod: 0, maxPrice: 10, cats: ['food', 'ingredients'] },
+        peasant:  { name: 'Крестьянин, работник', purse: [1, 10, 0], mod: 0, maxPrice: 100, cats: ['food', 'ingredients', 'household'] },
+        citizen:  { name: 'Горожанин', purse: [2, 10, 0], mod: 0, maxPrice: 300, cats: ['food', 'household', 'potions', 'jewelry'] },
+        merchant: { name: 'Торговец, трактирщик', purse: [3, 10, 10], mod: -1, cats: ['food', 'household', 'potions', 'gems', 'jewelry'] },
+        mage:     { name: 'Маг', purse: [2, 10, 0], mod: -1, cats: ['scrolls', 'potions', 'soulgems', 'ingredients'] },
+        guard:    { name: 'Стражник', purse: [2, 10, 0], mod: -2, cats: ['food', 'lockpick'], fineMult: 2 },
+        noble:    { name: 'Знать, управитель, ярл', purse: [5, 10, 20], mod: -2, cats: ['jewelry', 'gems', 'household', 'potions'], fineMult: 2 }
+    };
+    const THEFT_POOL_RE = {
+        food: /^(Готовые продукты|Сырые продукты|Напитки)$/, ingredients: /^Ингредиенты для алхимии$/, household: /^Бытовые предметы$/,
+        potions: /^(Зелья|Яды)$/, jewelry: /^Ювелирные изделия$/, gems: /^Драгоценные камни$/, soulgems: /^Камни душ$/,
+        scrolls: /^Свитки \(прописанные\)$/
+    };
+    function theftPocketPool(victimKey, tier) {
+        const v = THEFT_VICTIMS[victimKey]; if (!v || !tier || tier.maxPrice === undefined) return [];
+        const items = window.allItems || [];
+        const out = [];
+        v.cats.forEach(c => {
+            if (c === 'lockpick') { const lp = items.find(i => i.name === 'Отмычка'); if (lp) out.push(lp); return; }
+            const re = THEFT_POOL_RE[c]; if (!re) return;
+            items.forEach(i => { if (re.test(i.category || '') && !i.unique && (i.weight || 0) <= 1) out.push(i); });
+        });
+        const cap = v.maxPrice !== undefined ? v.maxPrice : Infinity; // у нищего не бывает самоцветов
+        return out.filter(i => (i.price || 0) >= tier.minPrice && (i.price || 0) <= Math.min(tier.maxPrice, cap));
+    }
+    function theftSessionEnemies() {
+        const s = window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() ? window.CloudSync.getSessionData() : null;
+        return s ? (s.enemies || []).filter(e => (e.curHp || 0) > 0) : [];
+    }
+    // Вещи врага, которые можно вытащить из карманов: из заранее брошенной добычи (corpseLoot), без надетого (у надетого есть slot).
+    function theftEnemyPocket(en, tier) {
+        const items = ((en && en.corpseLoot && en.corpseLoot.items) || []).filter(it => !it.slot);
+        return items.filter(it => (it.price || 0) >= tier.minPrice && (it.price || 0) <= tier.maxPrice);
+    }
+    function theftState() { const st = dayState(); if (!st.theft) st.theft = { alert: {}, wins: {} }; return st.theft; }
+    function theftVictimKey() {
+        const v = (document.getElementById('theft-victim') || {}).value || '';
+        if (v.indexOf('enemy:') === 0) return v;
+        const nm = ((document.getElementById('theft-victim-name') || {}).value || '').trim().toLowerCase();
+        return nm ? v + ':' + nm : '';
+    }
+    function theftVictimLabel() {
+        const v = (document.getElementById('theft-victim') || {}).value || '';
+        if (v.indexOf('enemy:') === 0) { const en = theftSessionEnemies().find(e => 'enemy:' + e.id === v); return en ? en.name : 'противник'; }
+        const nm = ((document.getElementById('theft-victim-name') || {}).value || '').trim();
+        return (nm ? nm + ', ' : '') + ((THEFT_VICTIMS[v] || {}).name || '').toLowerCase();
+    }
+    function theftPurseAvg(p) { return p[0] * (p[1] + 1) / 2 + p[2]; }
+    function theftStealthMod() {
+        const dexInput = document.getElementById('stat-dex');
+        let m = calcAbilityMod(dexInput ? (parseInt(dexInput.value) || 10) : 10) + getActiveRollPenalty() + getActiveSkillRollBonus('Скрытность');
+        const pb = window.perkBonuses || {};
+        if (pb.sneakDetectBonus) m += pb.sneakDetectBonus;
+        return m;
+    }
+    // Итоговая сложность и модификаторы броска — для подсказки и для самого броска.
+    function theftCalc() {
+        const what = (document.getElementById('theft-what') || {}).value || 'purse';
+        const vSel = (document.getElementById('theft-victim') || {}).value || '';
+        const isEnemy = vSel.indexOf('enemy:') === 0;
+        const victim = isEnemy ? null : THEFT_VICTIMS[vSel];
+        let tierKey = what;
+        if (what === 'named') tierKey = (document.getElementById('theft-named-tier') || {}).value || 'valuable';
+        const tier = THEFT_TIERS[tierKey];
+        const pb = window.perkBonuses || {};
+        const skill = getSkillRawValue('Карманные кражи');
+        const dexInput = document.getElementById('stat-dex');
+        const dexMod = calcAbilityMod(dexInput ? (parseInt(dexInput.value) || 10) : 10);
+        const parts = [`Ловкость ${dexMod >= 0 ? '+' : ''}${dexMod}`];
+        let mod = dexMod;
+        const add = (v, label) => { if (v) { mod += v; parts.push(`${v > 0 ? '+' : ''}${v} ${label}`); } };
+        add(skill < tier.threshold ? tier.penalty : 0, `навык ниже ${tier.threshold}`);
+        add(pb.pickpocketBonus || 0, '«Ловкие пальчики»/«Щипач»');
+        const asleep = !!(document.getElementById('theft-asleep') || {}).checked;
+        if (asleep) add(pb.sleepTheftBonus || 0, '«Ночной вор»');
+        if (what !== 'weapon' && (document.getElementById('theft-seen') || {}).checked) add(-5, 'не скрыт');
+        if (victim) add(victim.mod, 'внимательная жертва');
+        add(getActiveRollPenalty(), 'ошеломление/ослабление');
+        add(getActiveSkillRollBonus('Карманные кражи'), 'снаряжение/зелья/болезни');
+        const vk = theftVictimKey();
+        const wins = vk ? (theftState().wins[vk] || 0) : 0;
+        add(-2 * wins, `повтор у той же жертвы (${wins})`);
+        return { what, tierKey, tier, victim, isEnemy, vSel, mod, parts, asleep, boostPct: getSkillBoostPercent('Карманные кражи'), vk };
+    }
+    window.renderTheftVictims = function () {
+        const sel = document.getElementById('theft-victim'); if (!sel) return;
+        const cur = sel.value;
+        const ens = theftSessionEnemies();
+        sel.innerHTML = Object.keys(THEFT_VICTIMS).map(k => `<option value="${k}">${escHtml(THEFT_VICTIMS[k].name)}</option>`).join('') +
+            (ens.length ? '<optgroup label="Противники в сцене">' + ens.map(e => `<option value="enemy:${escHtml(e.id)}">${escHtml(e.name || 'противник')}</option>`).join('') + '</optgroup>' : '');
+        if (cur && Array.from(sel.options).some(o => o.value === cur)) sel.value = cur;
+        updateTheftInfo();
+    };
+    window.updateTheftInfo = function () {
+        const info = document.getElementById('theft-info'); if (!info) return;
+        const c = theftCalc();
+        const nameWrap = document.getElementById('theft-name-wrap');
+        if (nameWrap) nameWrap.style.display = c.isEnemy ? 'none' : '';
+        const town = document.getElementById('theft-town');
+        const extra = document.getElementById('theft-extra-wrap');
+        if (extra && (extra.dataset.mode !== c.what || c.what === 'plant' || c.what === 'poison')) { // список вещей пересобираем каждый раз — инвентарь мог измениться
+            const keepSel = (document.getElementById('theft-plant-item') || {}).value;
+            extra.dataset.mode = c.what;
+            if (c.what === 'named') extra.innerHTML = '<label>Что за вещь и её ступень</label><input type="text" id="theft-named-name" placeholder="название"><select id="theft-named-tier" onchange="updateTheftInfo()"><option value="trinket">Мелочь (до 10)</option><option value="valuable" selected>Ценная (до 100)</option><option value="precious">Дорогая (больше 100)</option></select>';
+            else if (c.what === 'weapon') extra.innerHTML = '<label>Какое оружие (скажет мастер)</label><input type="text" id="theft-weapon-name" placeholder="например, Стальной меч">';
+            else if (c.what === 'plant' || c.what === 'poison') {
+                const list = playerInventory.filter(i => i.count > 0 && (c.what === 'poison' ? potionKindOf(i) === 'poison' : true));
+                extra.innerHTML = `<label>${c.what === 'poison' ? 'Какой яд' : 'Какую вещь'}</label><select id="theft-plant-item">${list.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (×${i.count})</option>`).join('') || '<option value="">— нечего —</option>'}</select>`;
+                const ps = document.getElementById('theft-plant-item'); if (ps && keepSel && Array.from(ps.options).some(o => o.value === keepSel)) ps.value = keepSel;
+            } else extra.innerHTML = '';
+        }
+        const lines = [`<strong>${escHtml(c.tier.name)}</strong>: сложность ${c.tier.dc}, порог навыка ${c.tier.threshold}. Модификатор ${c.mod >= 0 ? '+' : ''}${c.mod} (${escHtml(c.parts.join(', '))})${c.boostPct ? `, +${c.boostPct}% от куба` : ''}.`];
+        if (c.tier.perk && !(window.perkBonuses || {})[c.tier.perk]) lines.push(`<span style="color:#e74c3c;">Нужен перк «${c.what === 'weapon' ? 'Дезориентация' : 'Носитель яда'}».</span>`);
+        if (c.what === 'weapon') lines.push(c.isEnemy || inCombatNow() ? '<span style="color:#e74c3c;">Надетое оружие в бою не украсть.</span>' : `Сначала проверка Скрытности (сложность ${THEFT_WEAPON_STEALTH_DC}), потом сама кража.`);
+        if (c.what === 'key' && (window.perkBonuses || {}).keyThiefAuto) lines.push('🔑 «Ключник»: ключ достаётся всегда, кроме натуральной 1.');
+        if (c.vk && theftState().alert[c.vk]) lines.push('<span style="color:#e67e22;">Эта жертва настороже до конца дня — красть у неё нельзя.</span>');
+        if (c.victim && c.what === 'purse') lines.push(`В кошельке обычно ${c.victim.purse[0]}к${c.victim.purse[1]}${c.victim.purse[2] ? (c.victim.purse[2] > 0 ? '+' : '') + c.victim.purse[2] : ''} септимов.`);
+        if (c.tier.maxPrice !== undefined) {
+            const en0 = c.isEnemy ? theftSessionEnemies().find(e => 'enemy:' + e.id === c.vSel) : null;
+            const n = (c.isEnemy && en0 && !en0.corpseLoot) ? 1 : c.isEnemy ? theftEnemyPocket(theftSessionEnemies().find(e => 'enemy:' + e.id === c.vSel), c.tier).length : theftPocketPool(c.vSel, c.tier).length;
+            if (c.what !== 'named' && !n) lines.push('<span style="color:#e67e22;">У такой жертвы в карманах нет вещей этой ступени.</span>');
+        }
+        if (c.isEnemy && town) town.checked = false;
+        info.innerHTML = lines.join('<br>');
+        const al = document.getElementById('theft-alert-list');
+        if (al) { const keys = Object.keys(theftState().alert); al.textContent = keys.length ? 'Настороже сегодня: ' + keys.map(k => k.replace(/^enemy:/, '').replace(/^[a-z]+:/, '')).join(', ') : ''; }
+    };
+    function theftRollD20() { return Math.floor(Math.random() * 20) + 1; }
+
+    window.attemptTheft = function () {
+        const resultEl = document.getElementById('theft-result');
+        const c = theftCalc();
+        const pb = window.perkBonuses || {};
+        const say = (html) => { resultEl.innerHTML = html; };
+        if (!c.vk) { say('<span style="color:#e67e22;">Впиши имя жертвы — так сайт помнит, кто настороже.</span>'); return; }
+        const st = theftState();
+        if (st.alert[c.vk]) { say('<span style="color:#e67e22;">Эта жертва настороже до конца дня.</span>'); return; }
+        if (c.tier.perk && !pb[c.tier.perk]) { say(`<span style="color:#e74c3c;">Нужен перк «${c.what === 'weapon' ? 'Дезориентация' : 'Носитель яда'}».</span>`); return; }
+        if (c.what === 'weapon' && (c.isEnemy || inCombatNow())) { say('<span style="color:#e74c3c;">Надетое оружие в бою не украсть.</span>'); return; }
+        const enemy = c.isEnemy ? theftSessionEnemies().find(e => 'enemy:' + e.id === c.vSel) : null;
+        if (c.isEnemy && !enemy) { say('Противник не найден.'); return; }
+        let pickName = '', plantItem = null;
+        if (c.what === 'named') { pickName = ((document.getElementById('theft-named-name') || {}).value || '').trim(); if (!pickName) { say('Впиши, какую вещь назвал мастер.'); return; } }
+        if (c.what === 'weapon') { pickName = ((document.getElementById('theft-weapon-name') || {}).value || '').trim(); if (!pickName) { say('Впиши, какое оружие у жертвы (скажет мастер).'); return; } }
+        if (c.what === 'plant' || c.what === 'poison') {
+            const id = (document.getElementById('theft-plant-item') || {}).value;
+            plantItem = playerInventory.find(i => i.itemId === id && i.count > 0);
+            if (!plantItem) { say(c.what === 'poison' ? 'В инвентаре нет яда.' : 'Выбери, что подкинуть.'); return; }
+        }
+        let pocket = null;
+        if (c.tier.maxPrice !== undefined && c.what !== 'named') {
+            pocket = c.isEnemy ? (enemy.corpseLoot ? theftEnemyPocket(enemy, c.tier) : null) : theftPocketPool(c.vSel, c.tier);
+            if (pocket && !pocket.length) { say('<span style="color:#e67e22;">У этой жертвы нет вещей такой ступени — попробуй другое.</span>'); return; }
+        }
+        if (c.what === 'purse' && c.isEnemy && enemy.corpseLoot && !(enemy.corpseLoot.gold > 0)) { say('<span style="color:#e67e22;">Кошелёк у этого противника пуст.</span>'); return; }
+        if (inCombatNow()) { if (!combatActionAllowed('attack')) return; markCombatAction('attack'); }
+
+        const sb = getSessionRollBonus(true);
+        const mod = c.mod + sb.value;
+        const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+        const victimLabel = theftVictimLabel();
+        const town = !c.isEnemy && !!(document.getElementById('theft-town') || {}).checked;
+        let html = '';
+        // «Дезориентация»: сначала отдельная проверка Скрытности.
+        if (c.what === 'weapon') {
+            const sr = theftRollD20(), sBoost = getSkillBoostPercent('Скрытность'), sMod = theftStealthMod();
+            const sTot = sr + sMod + (sBoost ? Math.round(sr * sBoost / 100) : 0);
+            html += `Скрытность: к20 ${sr} ${sMod >= 0 ? '+' : ''}${sMod}${sBoost ? ` +${Math.round(sr * sBoost / 100)} (${sBoost}%)` : ''} = <strong>${sTot}</strong> (нужно ${THEFT_WEAPON_STEALTH_DC})<br>`;
+            diceHistory.unshift({ roll: sr, dieSize: 20, statLabel: 'Ловкость', statMod: sMod, skillLabel: 'Скрытность (подобраться к оружию)', total: sTot, dc: THEFT_WEAPON_STEALTH_DC, verdict: sTot >= THEFT_WEAPON_STEALTH_DC });
+            if (sr === 1 || sTot < THEFT_WEAPON_STEALTH_DC) {
+                st.alert[c.vk] = true;
+                say(html + '<span style="color:#e67e22;">❌ Подобраться незаметно не вышло — жертва насторожилась, до конца дня у неё не украсть.</span>');
+                diceHistory = diceHistory.slice(0, 20); renderDiceHistory(); updateTheftInfo(); saveLocalStorage();
+                return;
+            }
+        }
+        const roll = theftRollD20();
+        const boost = c.boostPct ? Math.round(roll * c.boostPct / 100) : 0;
+        const total = roll + mod + boost;
+        const keyAuto = c.what === 'key' && pb.keyThiefAuto && roll !== 1;
+        const success = roll !== 1 && (roll === 20 || total >= c.tier.dc || keyAuto);
+        html += `к20: ${roll}${boost ? ` +${boost} (усиление ${c.boostPct}%)` : ''} ${mod >= 0 ? '+' : ''}${mod} = <strong>${total}</strong> (нужно ${c.tier.dc})${sb.notes.length ? ' · ' + escHtml(sb.notes.join(', ')) : ''}<br>`;
+        diceHistory.unshift({ roll, dieSize: 20, statLabel: 'Ловкость', statMod: mod, skillLabel: `Карманные кражи (${c.tier.name})`, total, dc: c.tier.dc, verdict: success });
+        diceHistory = diceHistory.slice(0, 20); renderDiceHistory();
+
+        if (success) {
+            st.wins[c.vk] = (st.wins[c.vk] || 0) + 1;
+            const xp = () => { if (practiceXpAllowed('Карманные кражи')) logSkillSuccessByName('Карманные кражи'); else html += '<br><span style="opacity:.7;font-size:12px;">(опыт навыка за сегодня уже получен)</span>'; };
+            const finish = (msg) => { say(html + `<span style="color:#2ecc71;">✅ ${msg}</span>`); xp(); renderInventoryList(); updateAll(); updateTheftInfo(); saveLocalStorage(true); };
+            const giveStolen = (it, qty) => {
+                addToInventory(it.name + '#stolen', it.name, qty || 1, it.weight || 0, it.category || '', it.effect || '', { price: it.price || 0, alchemyEffects: it.alchemyEffects });
+            };
+            const goldEl = document.getElementById('char-gold');
+            if (c.what === 'plant' || c.what === 'poison') {
+                removeFromInventoryByName(plantItem.itemId.replace(/#stolen$/, ''), 1);
+                if (c.what === 'poison' && plantItem.alchemyEffects && plantItem.alchemyEffects.length && enemy && window.CloudSync.applyAlchemyToEnemy) {
+                    const effs = plantItem.alchemyEffects.map(e => ({ name: e.name, magnitude: (typeof e.magnitude === 'number' ? (pb.alchemyConcentratedPoison ? Math.round(e.magnitude * 1.2 * 100) / 100 : e.magnitude) : null), duration: e.duration || null, unit: e.unit || '' }));
+                    window.CloudSync.applyAlchemyToEnemy(enemy.id, effs, plantItem.name, myName)
+                        .then(pr => { say(resultEl.innerHTML + `<br>☠ ${escHtml(pr.notes.join('; ') || '—')}`); })
+                        .catch(e => alert('Яд не удалось нанести: ' + e.message));
+                    finish(`Яд «${escHtml(plantItem.name)}» незаметно подброшен — он уже действует на «${escHtml(enemy.name)}».`);
+                } else {
+                    if (window.CloudSync && window.CloudSync.sendWhisperToGm) window.CloudSync.sendWhisperToGm(`🤏 ${myName} незаметно подкинул(а) «${plantItem.name}» жертве: ${victimLabel}.${c.what === 'poison' ? ' Яд действует на жертву: ' + (plantItem.effect || 'эффект яда') + '.' : ''}`, myName);
+                    finish(`«${escHtml(plantItem.name)}» незаметно подброшено (${escHtml(victimLabel)}). Мастеру ушло сообщение.`);
+                }
+                return;
+            }
+            if (c.what === 'key') { giveStolen({ name: 'Ключ: ' + (((document.getElementById('theft-victim-name') || {}).value || '').trim() || victimLabel), weight: 0, category: 'Ключи', price: 0 }); finish('Ключ у тебя.'); return; }
+            if (c.what === 'named' || c.what === 'weapon') {
+                const db0 = (window.allItems || []).find(i => i.name.toLowerCase() === pickName.toLowerCase());
+                giveStolen(db0 || { name: pickName, weight: c.what === 'weapon' ? 5 : 0.5, category: c.what === 'weapon' ? 'Оружие (краденое)' : 'Краденое' });
+                if (!db0 && window.CloudSync && window.CloudSync.sendWhisperToGm) window.CloudSync.sendWhisperToGm(`🤏 ${myName} украл(а) «${pickName}» (${victimLabel}) — вещи нет в базе, поправь характеристики, если нужно.`, myName);
+                finish(`«${escHtml(pickName)}» у тебя (краденое).`);
+                return;
+            }
+            if (c.isEnemy) {
+                const want = c.what === 'purse' ? null : pocket ? pocket[Math.floor(Math.random() * pocket.length)].name : { min: c.tier.minPrice, max: c.tier.maxPrice };
+                window.CloudSync.pickpocketEnemy(enemy.id, want).then(got => {
+                    if (got.gold) { goldEl.value = (parseInt(goldEl.value) || 0) + got.gold; finish(`Вытащил(а) ${got.gold} септимов.`); }
+                    else if (got.item) { giveStolen(got.item, 1); finish(`Вытащил(а) «${escHtml(got.item.name)}».`); }
+                    else finish('Карманы оказались пусты.');
+                }).catch(e => say(html + `<span style="color:#e67e22;">${escHtml(e.message)}</span>`));
+                return;
+            }
+            if (c.what === 'purse') {
+                const p = c.victim.purse; let g = p[2]; for (let i = 0; i < p[0]; i++) g += 1 + Math.floor(Math.random() * p[1]);
+                g = Math.max(0, g);
+                goldEl.value = (parseInt(goldEl.value) || 0) + g;
+                finish(g ? `Вытащил(а) ${g} септимов.` : 'Кошелёк оказался пуст.');
+                return;
+            }
+            const it = pocket[Math.floor(Math.random() * pocket.length)];
+            giveStolen(it, 1);
+            finish(`Вытащил(а) «${escHtml(it.name)}» (${it.price || 0} септ.).`);
+            return;
+        }
+
+        // Провал.
+        const caught = roll === 1 || total <= c.tier.dc - 5;
+        const sleeperKeeps = c.asleep && pb.sleepTheftBonus; // «Ночной вор»: спящая жертва не настораживается от мелкого провала
+        if (!caught) {
+            if (!sleeperKeeps) st.alert[c.vk] = true;
+            say(html + `<span style="color:#e67e22;">❌ Не вышло, но тебя не заметили.${sleeperKeeps ? ' Жертва спит дальше («Ночной вор»).' : ' Жертва настороже до конца дня.'}</span>`);
+            updateTheftInfo(); saveLocalStorage();
+            return;
+        }
+        st.alert[c.vk] = true;
+        if (!town) {
+            say(html + `<span style="color:#e74c3c;">🚨 Пойман(а) с поличным! Вне поселения стражи нет — ${escHtml(victimLabel)} нападает, бой начинается с её хода.</span>`);
+            if (window.CloudSync && window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`🚨 ${myName} пойман(а) при карманной краже (${victimLabel}) — жертва нападает первой.`, myName);
+            updateTheftInfo(); saveLocalStorage();
+            return;
+        }
+        let price = 0;
+        if (c.what === 'purse') price = c.victim ? theftPurseAvg(c.victim.purse) : 0;
+        else if (c.tier.maxPrice !== undefined && pocket && pocket.length) price = pocket.reduce((s, i) => s + (i.price || 0), 0) / pocket.length;
+        else if (c.what === 'named' || c.what === 'weapon') { const db0 = (window.allItems || []).find(i => i.name.toLowerCase() === pickName.toLowerCase()); price = db0 ? (db0.price || 0) : ({ trinket: 10, valuable: 50, precious: 150, weapon: 100 }[c.tierKey] || 0); }
+        const fine = Math.round((THEFT_FINE_BASE + price / 2) * ((c.victim && c.victim.fineMult) || 1));
+        const sess = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
+        const hold = (sess && (sess.currentHold || (sess.partyPos && sess.partyPos.hold))) || '';
+        const whatLabel = c.what === 'named' || c.what === 'weapon' ? `${c.tier.name}: ${pickName}` : c.tier.name;
+        say(html + `<span style="color:#e74c3c;">🚨 Пойман(а) с поличным! Предложенный штраф — ${fine} септимов${hold ? ' (' + escHtml(hold) + ')' : ''}. Решает мастер.</span>`);
+        if (window.CloudSync && window.CloudSync.reportTheftCaught && window.CloudSync.isInSession && window.CloudSync.isInSession()) {
+            window.CloudSync.reportTheftCaught({ victim: victimLabel, what: whatLabel, fine: fine, hold: hold }).catch(e => console.error(e));
+            window.CloudSync.postCombatLog(`🚨 ${myName} пойман(а) при карманной краже (${victimLabel}, ${whatLabel}).`, myName);
+        } else say(resultEl.innerHTML + '<br><span style="opacity:.75;">Ты не в сессии — скажи мастеру сам.</span>');
+        updateTheftInfo(); saveLocalStorage();
+    };
+    try { window.renderTheftVictims(); } catch (e) { }
 
     // ========================================================================
     // ПРОКАЧКА ПЕРСОНАЖА
@@ -17006,7 +17332,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=31"></script>
+<script src="cloud.js?v=32"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

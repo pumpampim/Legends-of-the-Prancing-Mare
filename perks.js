@@ -151,9 +151,11 @@
         "5-2": () => ({ lightArmorWeightless: true }),
         // Карманные кражи / Красноречие
         "8-0": (step) => ({ pickpocketBonus: step }),
-        "8-1": () => ({ sleepTheftBonus: 2 }),
+        "8-1": () => ({ sleepTheftBonus: 2 }), // + спящая жертва не настораживается от мелкого провала (index.html attemptTheft)
+        "8-2": () => ({ poisonPlant: true }),   // «Носитель яда»: подкинуть яд (панель «Карманная кража»)
         "8-3": () => ({ pickpocketBonus: 1 }),
-        "8-5": () => ({ keyThiefAuto: true }),
+        "8-5": () => ({ keyThiefAuto: true }),  // «Ключник»: ключ — автоуспех, кроме натуральной 1
+        "8-6": () => ({ pickpocketWeapon: true }), // «Дезориентация»: кража надетого оружия вне боя, после проверки Скрытности
         "9-3": () => ({ sellAnything: true }),
         "9-5": () => ({ intimidateBonus: 2 }),
         // Зачарование
