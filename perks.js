@@ -53,7 +53,7 @@
         "15-7": () => ({ alchemyPoisonResist50: true }),
 
         // ==================== КРАСНОРЕЧИЕ (skillIdx = 9) ====================
-        "9-0": (step) => ({ merchantPriceBonus: 0.05 * (step + 1) }),
+        "9-0": (step) => ({ merchantPriceBonus: 0.05 * (step + 2) }), // 10% +5% за ступень, макс. 30%
         "9-1": () => ({ hasCharmPerk: true }),
 
         // ==================== СТРЕЛЬБА (skillIdx = 2) ====================
@@ -110,7 +110,7 @@
         "6-0": (step) => ({ sneakDetectBonus: step }),
         "6-2": () => ({ backstabUnlocked: true }),
         "6-4": () => ({ assassinBladeUnlocked: true }),
-        "6-5": () => ({ sneakBowTriple: true }),
+        "6-5": () => ({ sneakBowTriple: true }), // «Верный прицел»: скрытный выстрел ×4
         "11-2": () => ({ regenPerk: true }),
 
         // ==================== КАРМАННЫЕ КРАЖИ (skillIdx = 8) ====================
@@ -154,7 +154,6 @@
         "8-1": () => ({ sleepTheftBonus: 2 }),
         "8-3": () => ({ pickpocketBonus: 1 }),
         "8-5": () => ({ keyThiefAuto: true }),
-        "8-6": () => ({ pickpocketGoldBonus: 2 }), // «Карманник» (раньше здесь стоял дубль «Золотоискателя» из Взлома)
         "9-3": () => ({ sellAnything: true }),
         "9-5": () => ({ intimidateBonus: 2 }),
         // Зачарование

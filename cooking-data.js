@@ -141,7 +141,7 @@ const recipes = [
         weight: 0.5,
         price: 25,
         needsWater: false,
-        ingredients: [{ name: "Круг эйдарского сыра", qty: 2 }, { name: "Лунный сахар", qty: 1 }],
+        ingredients: [{ name: "Круг эйдарского сыра", qty: 2 }, { name: "Лунный сахар", qty: 1 }, { name: "Аргонианский эль", qty: 1 }], // эль — по таблице; в игре он один
         effect: "Запас магии увеличен на 25 на 75 ходов"
     },
     {

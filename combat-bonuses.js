@@ -50,6 +50,7 @@
         const infoNotes = [];
         let enchantDmgMain = 0, offhandDmg = 0, offhandEnchantDmg = 0, statModForFormula = 0, statLabelForFormula = 'Сила';
         let trueDmg = 0;      // урон «сквозь сопротивление» (Копейщик/Пикосажатель/Боевые искусства): идёт отдельным ударом без резиста
+        let decapChance = 0; // «Безжалостный/Сокрушительный удар»: шанс обезглавить силовой атакой
         let armorIgnore = 0;  // доля брони (физ. резиста) цели, которую удар игнорирует: 0.45 = 45%
 
         const strMod = Math.floor((str - 10) / 2);
@@ -143,7 +144,7 @@
                     if (isDualWield && !isTwoHanded && perks.dualWieldPowerAttackDamage) powerMult += perks.dualWieldPowerAttackDamage;
                     mul('силовая атака', powerMult);
                     const decap = isTwoHanded ? (perks.twoHandDecapChance || 0) : (perks.oneHandDecapChance || 0);
-                    if (decap) infoNotes.push(`💀 Шанс обезглавливания: ${Math.round(decap * 100)}%`);
+                    if (decap) { decapChance = decap; infoNotes.push(`💀 Шанс обезглавливания: ${Math.round(decap * 100)}% — бросается автоматически при «Применить»`); }
                 }
             } else if (isSprintAttack) {
                 infoNotes.push('⚠️ Рывок-атака засчитывается только вместе с «Силовой атакой»');
@@ -172,7 +173,7 @@
             steps.push({ source: 'оружие', op: 'set', value: baseDmg }, { source: statLabelForFormula, op: 'add', value: statModForFormula }, { source: 'стрела', op: 'add', value: ammoDmg });
             add('зачарование оружия', enchantDmgMain);
 
-            if (perks.rangedDamagePercent) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent));
+            if (perks.rangedDamagePercent && wepType === 'bow' && !ranged.isStaff) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent)); // только базовый урон лука
             if (perks.criticalShotStrFraction) {
                 const strBonus = Math.round(str * perks.criticalShotStrFraction); // доля значения Силы (¼/½/полная), не модификатора
                 if (strBonus) {
@@ -210,13 +211,15 @@
         if (gb('weaponDmg')) { mul('бог: оружие', 1 + gb('weaponDmg') / 100); godDmgNotes.push(`оружие +${gb('weaponDmg')}%`); }
         if (mode === 'melee' && gb('meleeDmg')) { mul('бог: ближний бой', 1 + gb('meleeDmg') / 100); godDmgNotes.push(`ближний бой +${gb('meleeDmg')}%`); }
         if (mode !== 'melee' && gb('rangedDmg')) { mul('бог: дальний бой', 1 + gb('rangedDmg') / 100); godDmgNotes.push(`дальний бой +${gb('rangedDmg')}%`); }
-        if (gb('pureDmg')) { mul('бог: чистый урон', 1 + gb('pureDmg') / 100); godDmgNotes.push(`чистый урон (Намира) +${gb('pureDmg')}%`); }
+        if (gb('pureDmg')) godDmgNotes.push(`🩸 Намира: +${gb('pureDmg')} чистого урона (отдельным ударом)`);
+        if (gb('poisonFlatDmg')) godDmgNotes.push(`☠ Намира: +${gb('poisonFlatDmg')} урона ядом (отдельным ударом)`);
+        if (gb('fireWeaponDmg')) godDmgNotes.push(`🔥 Мерунес Дагон: +${gb('fireWeaponDmg')} урона огнём (отдельным ударом)`);
         if (mode === 'melee' && gb('axeDmg') && (wepType === 'twohand_axe' || String(melee.name || '').toLowerCase().match(/топор|секир/))) {
             mul('бог: топор', 1 + gb('axeDmg') / 100); godDmgNotes.push(`топор/секира (Талос) +${gb('axeDmg')}%`);
         }
-        if (enchantDmgMain && gb('elementalWeaponDmg')) { // Азура: стихийное оружие бьёт сильнее
+        if (enchantDmgMain && gb('elementalWeaponDmg')) { // Азура: зачарованное стихийное оружие +10 урона (плоско)
             if ((I.elementalEnchant || {})[mode === 'melee' ? 'melee' : 'ranged']) {
-                const bEl = Math.round(enchantDmgMain * gb('elementalWeaponDmg') / 100);
+                const bEl = gb('elementalWeaponDmg');
                 add('бог: стихийное оружие', bEl); godDmgNotes.push(`стихийное оружие (Азура) +${bEl}`);
             }
         }
@@ -232,23 +235,22 @@
             mul('Шеогорат', I.sheogorathMult);
             godDmgNotes.push(`Шеогорат: урон ×${I.sheogorathMult} на этот ход`);
         }
-        if (isPowerAttack && gb('powerAttackHeal') && mode === 'melee') {
-            godDmgNotes.push(`⚕️ силовая атака лечит ${gb('powerAttackHeal')}% от урона (применится автоматически при "Применить" в бою)`);
+        if (isPowerAttack && gb('powerAttackHeal')) {
+            godDmgNotes.push(`⚕️ Малакат: убийство силовой атакой вернёт ${gb('powerAttackHeal')}% ХП`);
         }
-        if (isPowerAttack && gb('instantKillChance') && mode === 'melee') {
+        if (gb('instantKillChance')) {
             godDmgNotes.push(`💀 Шанс мгновенного убийства (Мерунес Дагон): ${gb('instantKillChance')}% — бросается автоматически при «Применить»`);
         }
-        if (gb('fearChance')) godDmgNotes.push(`😱 Доп. шанс обратить цель в бегство: +${gb('fearChance')}% — бросается автоматически при «Применить»`);
 
         // Множитель скрытности считается, но НЕ применяется здесь: его включает галочка/заклинание при броске.
         let sneakMult = 2;
         if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
         else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
-        else if (mode !== 'melee' && wepType === 'bow' && perks.sneakBowTriple) sneakMult = 3; // «Верный прицел»
+        else if (mode !== 'melee' && perks.sneakBowTriple) sneakMult = 4; // «Верный прицел»: скрытный выстрел ×4 (луки и арбалеты; без перка ×2)
         sneakMult += gb('sneakMult'); // Боэтия/Ноктюрнал
 
         return {
-            totalDmg, hitModifier, sneakMult, mode, wepType, baseDmg, trueDmg, armorIgnore,
+            totalDmg, hitModifier, sneakMult, mode, wepType, baseDmg, trueDmg, armorIgnore, decapChance,
             enchantDmgMain, offhandDmg, offhandEnchantDmg, statModForFormula, statLabelForFormula,
             weaponDmgPct, weaponBoostPct, boostSkillKey, weaponDmgFlat,
             infoNotes, godDmgNotes, steps

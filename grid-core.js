@@ -106,7 +106,9 @@
     }
     // Проверка атаки. mode: 'melee' | 'ranged' | 'spell'. reachFt — досягаемость ближнего боя (5 или 10).
     // Если кого-то нет на сетке — ограничений нет (сетку используют не всегда).
-    function attackCheck(grid, from, to, mode, reachFt) {
+    // opts.ammo: 'arrow' | 'bolt' (Sistema: стрелы — −1 за клетку дальше 30 фт, дальше 80 фт (90 с «Орлиным взором») не долетают;
+    // болты — −1 за клетку дальше 80 фт). Без ammo — общее правило (заклинания, существа, враги у мастера).
+    function attackCheck(grid, from, to, mode, reachFt, opts) {
         if (!from || !to) return { onGrid: false, ok: true, penalty: 0, feet: null, label: '' };
         const c = cells(from, to), f = c * FT;
         if (!losFigures(grid, from, to)) return { onGrid: true, ok: false, penalty: 0, feet: f, reason: 'цель за препятствием — нет прямой видимости', label: f + ' фт · за препятствием' };
@@ -114,6 +116,17 @@
             const r = reachFt || 5;
             if (f > r) return { onGrid: true, ok: false, penalty: 0, feet: f, reason: 'слишком далеко для ближнего боя (' + f + ' фт, оружие достаёт на ' + r + ' фт)', label: f + ' фт · не достать' };
             return { onGrid: true, ok: true, penalty: 0, feet: f, label: f + ' фт · ✓' };
+        }
+        const ammo = opts && opts.ammo;
+        if (mode === 'ranged' && ammo === 'arrow') {
+            const maxFt = (opts && opts.maxFt) || 80;
+            if (f > maxFt) return { onGrid: true, ok: false, penalty: 0, feet: f, reason: 'стрела не долетит дальше ' + maxFt + ' фт (' + f + ' фт)', label: f + ' фт · не долетит' };
+            const pA = f > 30 ? -(c - 30 / FT) : 0;
+            return { onGrid: true, ok: true, penalty: pA, feet: f, label: f + ' фт' + (pA ? ' · ' + pA + ' к попаданию' : ' · ✓') };
+        }
+        if (mode === 'ranged' && ammo === 'bolt') {
+            const pB = f > 80 ? -(c - 80 / FT) : 0;
+            return { onGrid: true, ok: true, penalty: pB, feet: f, label: f + ' фт' + (pB ? ' · ' + pB + ' к попаданию' : ' · ✓') };
         }
         const over = c - RANGED_BASE_CELLS;
         const penalty = over > 0 ? -Math.ceil(over / 2) : 0; // за каждые 2 клетки дальше 60 футов −1

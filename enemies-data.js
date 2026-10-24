@@ -118,7 +118,7 @@ const enemiesData = [
         loot: "Палец великана, Шкуры"
     },
     {
-        name: "Ворожея", category: "Монстры", soul: "common", hp: 500,
+        name: "Ворожея", category: "Монстры", soul: "common", hp: 500, mana: 340, carrierOfDisease: "Разжижение мозга", diseaseChance: 20,
         weaponDmg: 35, weaponNote: "",
         resist: {  },
         spells: [{ name: "Огненная стрела", dmg: 25, cost: 20 }, { name: "Огненный шар", dmg: 40, cost: 60 }, { name: "Быстрое лечение", dmg: 50, cost: 30 }],
@@ -150,7 +150,7 @@ const enemiesData = [
         loot: "Зубы ледяного привидения, Эссенция ледяного привидения"
     },
     {
-        name: "Сприган", category: "Монстры", soul: "lesser", hp: 200,
+        name: "Сприган", category: "Монстры", soul: "lesser", hp: 200, mana: 150,
         weaponDmg: 35, weaponNote: "",
         resist: {  },
         spells: [{ name: "Невидимость", dmg: 1, cost: 30 }, { name: "Быстрое лечение", dmg: 200, cost: 1 }, { name: "Рой спригана", dmg: 30, cost: 30 }],
@@ -158,7 +158,7 @@ const enemiesData = [
         loot: "Стержневой корень, Живица сприггана"
     },
     {
-        name: "Сприган-матрона", category: "Монстры", soul: "common", hp: 500,
+        name: "Сприган-матрона", category: "Монстры", soul: "common", hp: 500, mana: 250,
         weaponDmg: 45, weaponNote: "",
         resist: {  },
         spells: [{ name: "Невидимость", dmg: 1, cost: 30 }, { name: "Быстрое лечение", dmg: 200, cost: 1 }, { name: "Рой спригана", dmg: 30, cost: 30 }],
@@ -190,7 +190,7 @@ const enemiesData = [
         loot: "Древне нордское оружие, Костная мука 1-2"
     },
     {
-        name: "Скелет-маг", category: "Монстры", soul: "petty", hp: 50,
+        name: "Скелет-маг", category: "Монстры", soul: "petty", hp: 50, mana: 100,
         weaponDmg: 12, weaponNote: "",
         resist: {  },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }],
@@ -359,7 +359,7 @@ const enemiesData = [
     },
     {
         name: "Фалмер-сумрачный страж (воин)", category: "Воины", soul: "common", hp: 250,
-        weaponDmg: 35, weaponNote: "35 и 25 урона ядом",
+        weaponDmg: 20, weaponNote: "20 и 25 урона ядом",
         resist: { physical: 10 },
         spells: [],
         shouts: [],
@@ -367,14 +367,14 @@ const enemiesData = [
     },
     {
         name: "Фалмер-ночной охотник (воин)", category: "Воины", soul: "greater", hp: 350,
-        weaponDmg: 40, weaponNote: "40 и 25 урона ядом",
+        weaponDmg: 25, weaponNote: "25 и 25 урона ядом",
         resist: { physical: 15 },
         spells: [],
         shouts: [],
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер (шаман)", category: "Шаманы", soul: "lesser", hp: 150,
+        name: "Фалмер (шаман)", category: "Шаманы", soul: "lesser", hp: 150, mana: 120,
         weaponDmg: null, weaponNote: "",
         resist: {  },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Малый оберег", dmg: 0, cost: 17 }, { name: "Дубовая плоть", dmg: 0, cost: 50 }],
@@ -382,7 +382,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-мастер укрытий (шаман)", category: "Шаманы", soul: "lesser", hp: 200,
+        name: "Фалмер-мастер укрытий (шаман)", category: "Шаманы", soul: "lesser", hp: 200, mana: 190,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 5 },
         spells: [{ name: "Молния", dmg: 25, cost: 25 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }, { name: "Каменная плоть", dmg: 0, cost: 77 }],
@@ -390,7 +390,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-сумрачный страж (шаман)", category: "Шаманы", soul: "common", hp: 250,
+        name: "Фалмер-сумрачный страж (шаман)", category: "Шаманы", soul: "common", hp: 250, mana: 290,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 10 },
         spells: [{ name: "Плащ молний", dmg: 20, cost: 140 }, { name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }],
@@ -398,7 +398,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-ночной охотник (шаман)", category: "Шаманы", soul: "common", hp: 350,
+        name: "Фалмер-ночной охотник (шаман)", category: "Шаманы", soul: "common", hp: 350, mana: 350,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 15 },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Быстрое лечение", dmg: 0, cost: 35 }, { name: "Устойчивый оберег", dmg: 0, cost: 27 }, { name: "Каменная плоть", dmg: 0, cost: 77 }],
@@ -406,7 +406,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 150,
+        name: "Фалмер (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 150, mana: 180,
         weaponDmg: null, weaponNote: "",
         resist: {  },
         spells: [{ name: "Обморожение", dmg: 15, cost: 15 }, { name: "Лечение", dmg: 0, cost: 10 }],
@@ -414,7 +414,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-мастер укрытий (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 200,
+        name: "Фалмер-мастер укрытий (боевой маг)", category: "Боевые маги", soul: "lesser", hp: 200, mana: 200,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 5 },
         spells: [{ name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Лечение", dmg: 0, cost: 10 }],
@@ -422,7 +422,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-сумрачный страж (боевой маг)", category: "Боевые маги", soul: "common", hp: 250,
+        name: "Фалмер-сумрачный страж (боевой маг)", category: "Боевые маги", soul: "common", hp: 250, mana: 220,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 10 },
         spells: [{ name: "Морозный плащ", dmg: 0, cost: 135 }, { name: "Молния", dmg: 25, cost: 25 }, { name: "Обморожение", dmg: 15, cost: 15 }, { name: "Лечение", dmg: 0, cost: 10 }],
@@ -430,7 +430,7 @@ const enemiesData = [
         loot: "Ухо фалмера,золото,яды,фалмерское оружие"
     },
     {
-        name: "Фалмер-ночной охотник (боевой маг)", category: "Боевые маги", soul: "greater", hp: 350,
+        name: "Фалмер-ночной охотник (боевой маг)", category: "Боевые маги", soul: "greater", hp: 350, mana: 200,
         weaponDmg: null, weaponNote: "",
         resist: { physical: 15 },
         spells: [{ name: "Цепная молния", dmg: 32, cost: 77 }, { name: "Ледяной шип", dmg: 22, cost: 22 }, { name: "Искры", dmg: 15, cost: 17 }, { name: "Лечение", dmg: 0, cost: 10 }],

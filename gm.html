@@ -931,6 +931,10 @@
                 <button class="btn-success" style="width:100%; margin-top:4px;" onclick="gmTeachSpell()">📖 Обучить (заклинание навсегда в книге игрока)</button>
                 <label style="font-size:14px; margin-top:8px;">Животные игрока</label>
                 <div id="inv-pets-list" style="font-size:13px;"></div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button style="flex:1;" onclick="gmPenance()" title="Даэдропоклонник сможет один раз снова выбрать бога-аэдра">🙏 Покаяние</button>
+                    <button style="flex:1;" onclick="gmHourPassed()" title="Всем игрокам сессии: облик зверя −1 час">🕐 Прошёл час</button>
+                </div>
                 <div id="inv-gm-edit-msg" style="font-size:13px; margin-top:4px;"></div>
             </div>
 
@@ -1338,9 +1342,9 @@
 </div>
 
 <script src="firebase-config.js?v=3"></script>
-<script src="items-data.js?v=15"></script>
-<script src="smithing-data.js?v=11"></script>
-<script src="enchant-data.js?v=4"></script>
+<script src="items-data.js?v=18"></script>
+<script src="smithing-data.js?v=12"></script>
+<script src="enchant-data.js?v=5"></script>
 <script src="holidays-data.js?v=3"></script>
 <script src="random-events-data.js?v=3"></script>
 <script src="skill-books-data.js?v=4"></script>
@@ -1349,19 +1353,19 @@
 <script src="rumors-data.js?v=3"></script>
 <script src="holds-map.js?v=4"></script>
 <script src="spell-tomes-data.js?v=5"></script>
-<script src="cooking-data.js?v=8"></script>
-<script src="alchemy-data.js?v=4"></script>
+<script src="cooking-data.js?v=9"></script>
+<script src="alchemy-data.js?v=5"></script>
 <script src="fish-data.js?v=3"></script>
-<script src="spell-data.js?v=5"></script>
-<script src="enemies-data.js?v=8"></script>
+<script src="spell-data.js?v=6"></script>
+<script src="enemies-data.js?v=10"></script>
 <script src="pets-data.js?v=1"></script>
 <script src="traps-data.js?v=1"></script>
-<script src="combat-bonuses.js?v=4"></script>
+<script src="combat-bonuses.js?v=6"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="enemy-loot.js?v=6"></script>
-<script src="grid-core.js?v=3"></script>
+<script src="grid-core.js?v=4"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=47"></script>
-<script src="gm-grid.js?v=2"></script>
+<script src="gm.js?v=50"></script>
+<script src="gm-grid.js?v=3"></script>
 </body>
 </html>

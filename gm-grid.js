@@ -133,6 +133,7 @@
                 if (z.dmg) {
                     const pv = window.StCombat ? window.StCombat.previewDamage(e, z.dmg, z.noResist ? '' : (z.dmgType || ''), 0) : { finalDmg: z.dmg };
                     const was = e.curHp || 0; e.curHp = Math.max(0, was - pv.finalDmg);
+                    if (pv.finalDmg > 0 && Array.isArray(e.statusEffects)) e.statusEffects = e.statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
                     if (z.mpDmg) e.curMp = Math.max(0, (e.curMp || 0) - z.mpDmg);
                     if (was > 0 && e.curHp <= 0) e.diedAtTurn = d.sessionTurnCounter || 0;
                     names.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
@@ -370,36 +371,50 @@
         const t = grid.tokens[key]; if (!t) return [];
         return Object.keys(grid.runes).filter(id => G().cells(grid.runes[id], t) <= 1);
     }
+    // Урон рун считается по свежему списку врагов в транзакции: раньше список целиком перезаписывался
+    // из локальной копии и мог стереть удар игрока, нанесённый в ту же секунду.
+    function breakOnDamageStatuses(e) {
+        if (Array.isArray(e.statusEffects) && e.statusEffects.some(st => st && st.breakOnDamage)) e.statusEffects = e.statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
+    }
     function explodeRunes(ids) {
         const b = B(), ents = entities();
-        const enemies = (data.enemies || []).map(e => Object.assign({}, e));
-        const logs = []; const playerHits = [];
-        ids.forEach(id => {
-            const r = grid.runes[id]; if (!r) return; const R = RUNES[r.spell] || {};
-            const hit = [];
-            G().tokensInRadius(grid, r, 5).forEach(t => {
-                const en = ents[t.key]; if (!en || en.dead) return;
-                if (en.kind === 'e') {
-                    const e = enemies.find(x => x.id === en.ref); if (!e || (e.curHp || 0) <= 0) return;
-                    if (R.undeadOnly && !isUndead(e)) return;
-                    if (R.knock) { e.statusEffects = (e.statusEffects || []).concat([{ id: 'knock' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Подброшен', desc: 'Подброшен гейзером — пропускает ход', turns: 1, noAttack: true }]); hit.push(e.name + ' подброшен'); return; }
-                    const pv = window.StCombat ? window.StCombat.previewDamage(e, r.dmg || 0, R.dmgType || '', 0) : { finalDmg: r.dmg || 0 };
-                    const was = e.curHp || 0; e.curHp = Math.max(0, was - pv.finalDmg);
-                    if (was > 0 && e.curHp <= 0) e.diedAtTurn = data.sessionTurnCounter || 0;
-                    hit.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
-                } else if (!R.undeadOnly) {
-                    playerHits.push({ uid: en.kind === 'p' ? en.ref : en.owner, summonId: en.kind === 's' ? en.ref : '', dmg: R.knock ? 0 : (r.dmg || 0), dmgType: R.dmgType || '', knock: !!R.knock, from: r.spell });
-                    hit.push(en.name + (R.knock ? ' подброшен' : ' −' + (r.dmg || 0) + ' (до резистов)'));
-                }
+        const runes = ids.map(id => ({ id, r: grid.runes[id] })).filter(x => x.r);
+        runes.forEach(x => { delete grid.runes[x.id]; });
+        const targets = runes.map(x => ({ r: x.r, toks: G().tokensInRadius(grid, x.r, 5) }));
+        Object.keys(grid.tokens).forEach(k => { if (!ents[k]) delete grid.tokens[k]; }); // как в save()
+        const ref = b.db().collection('sessions').doc(b.code());
+        let logs = [];
+        b.db().runTransaction(tx => tx.get(ref).then(doc => {
+            const dd = doc.data() || {};
+            const enemies = (Array.isArray(dd.enemies) ? dd.enemies : []).map(e => Object.assign({}, e));
+            logs = []; const playerHits = [];
+            targets.forEach(({ r, toks }) => {
+                const R = RUNES[r.spell] || {};
+                const hit = [];
+                toks.forEach(t => {
+                    const en = ents[t.key]; if (!en || en.dead) return;
+                    if (en.kind === 'e') {
+                        const e = enemies.find(x => x.id === en.ref); if (!e || (e.curHp || 0) <= 0) return;
+                        if (R.undeadOnly && !isUndead(e)) return;
+                        if (R.knock) { e.statusEffects = (e.statusEffects || []).concat([{ id: 'knock' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Подброшен', desc: 'Подброшен гейзером — пропускает ход', turns: 1, noAttack: true }]); hit.push(e.name + ' подброшен'); return; }
+                        const pv = window.StCombat ? window.StCombat.previewDamage(e, r.dmg || 0, R.dmgType || '', 0) : { finalDmg: r.dmg || 0 };
+                        const was = e.curHp || 0; e.curHp = Math.max(0, was - pv.finalDmg);
+                        if (pv.finalDmg > 0) breakOnDamageStatuses(e);
+                        if (was > 0 && e.curHp <= 0) e.diedAtTurn = dd.sessionTurnCounter || 0;
+                        hit.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
+                    } else if (!R.undeadOnly) {
+                        playerHits.push({ uid: en.kind === 'p' ? en.ref : en.owner, summonId: en.kind === 's' ? en.ref : '', dmg: R.knock ? 0 : (r.dmg || 0), dmgType: R.dmgType || '', knock: !!R.knock, from: r.spell });
+                        hit.push(en.name + (R.knock ? ' подброшен' : ' −' + (r.dmg || 0) + ' (до резистов)'));
+                    }
+                });
+                logs.push(`💥 ${r.spell} (${r.ownerName || 'мастер'}) срабатывает: ${hit.length ? hit.join(', ') : 'никого не задело'}.`);
             });
-            logs.push(`💥 ${r.spell} (${r.ownerName || 'мастер'}) срабатывает: ${hit.length ? hit.join(', ') : 'никого не задело'}.`);
-            delete grid.runes[id];
-        });
-        const extra = { enemies: b.strip(enemies) };
-        Object.assign(extra, hitsPatch(playerHits));
-        extra.combatLog = firebase.firestore.FieldValue.arrayUnion(...logs.map((t, i) => ({ ts: Date.now() + i, author: 'Мастер', text: t })));
-        save(extra);
-        if (logs.length) setTimeout(() => alert(logs.join('\n')), 30);
+            const patch = Object.assign({ grid: b.strip(grid), enemies: b.strip(enemies) }, hitsPatch(playerHits));
+            if (logs.length) patch.combatLog = firebase.firestore.FieldValue.arrayUnion(...logs.map((t, i) => ({ ts: Date.now() + i, author: 'Мастер', text: t })));
+            tx.update(ref, patch);
+        })).then(() => {
+            if (logs.length) setTimeout(() => alert(logs.join('\n')), 30);
+        }).catch(e => alert('Руны не сработали: ' + e.message));
     }
     // удары по игрокам/их существам — в очереди игроков (одним arrayUnion на игрока)
     function hitsPatch(hits) {

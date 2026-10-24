@@ -284,7 +284,7 @@ const armorRecipes = [
     {
         name: "Нордский резной шлем", armorType: "Тяжелая броня", slot: "Шлема",
         resistance: 26, weight: 5, price: 550, upgradeMaterial: "Ртутный слиток",
-        perkHint: "Эбонитовые доспехи",
+        perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 4 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -350,7 +350,7 @@ const armorRecipes = [
     {
         name: "Нордские резные перчатки", armorType: "Тяжелая броня", slot: "Наручи и перчатки",
         resistance: 19, weight: 4, price: 220, upgradeMaterial: "Ртутный слиток",
-        perkHint: "Эбонитовые доспехи",
+        perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 3 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -434,7 +434,7 @@ const armorRecipes = [
     {
         name: "Нордская резная броня", armorType: "Тяжелая броня", slot: "Доспехи",
         resistance: 49, weight: 16, price: 1600, upgradeMaterial: "Ртутный слиток",
-        perkHint: "Эбонитовые доспехи",
+        perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Стальной слиток", qty: 6 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -482,7 +482,7 @@ const armorRecipes = [
     {
         name: "Нордские резные сапоги", armorType: "Тяжелая броня", slot: "Сапоги и ботинки",
         resistance: 19, weight: 5, price: 220, upgradeMaterial: "Ртутный слиток",
-        perkHint: "Эбонитовые доспехи",
+        perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 3 }, { name: "Ртутный слиток", qty: 1 }, { name: "Эбонитовый слиток", qty: 1 }]
     },
     {
@@ -542,7 +542,7 @@ const armorRecipes = [
     {
         name: "Нордский щит", armorType: "Тяжелая броня", slot: "Щиты",
         resistance: 34, weight: 5, price: 335, upgradeMaterial: "Ртутный слиток",
-        perkHint: "Стальные доспехи",
+        perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 4 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -629,7 +629,7 @@ const weaponRecipes = [
     {
         name: "Нордский кинжал", category: "Одноручное", subcat: "Кинжалы",
         damage: 9, weight: 5.0, price: 115, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -683,7 +683,7 @@ const weaponRecipes = [
     {
         name: "Нордский меч", category: "Одноручное", subcat: "Мечи",
         damage: 12, weight: 6.0, price: 290, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Кожа", qty: 1 }, { name: "Стальной слиток", qty: 2 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -737,7 +737,7 @@ const weaponRecipes = [
     {
         name: "Нордский боевой топор", category: "Одноручное", subcat: "Боевые топоры",
         damage: 13, weight: 7.0, price: 350, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 2 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -785,7 +785,7 @@ const weaponRecipes = [
     {
         name: "Нордская булава", category: "Одноручное", subcat: "Булавы",
         damage: 14, weight: 6.0, price: 410, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 1 }, { name: "Стальной слиток", qty: 1 }, { name: "Ртутный слиток", qty: 2 }]
     },
     {
@@ -839,7 +839,7 @@ const weaponRecipes = [
     {
         name: "Нордский двуручный меч", category: "Двуручное", subcat: "Двуручные мечи",
         damage: 24, weight: 8.0, price: 585, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Стальной слиток", qty: 5 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -893,7 +893,7 @@ const weaponRecipes = [
     {
         name: "Нордская секира", category: "Двуручное", subcat: "Секиры",
         damage: 25, weight: 8.0, price: 650, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 5 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -947,7 +947,7 @@ const weaponRecipes = [
     {
         name: "Нордский боевой молот", category: "Двуручное", subcat: "Молоты",
         damage: 27, weight: 16.0, price: 700, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Стальной слиток", qty: 5 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -970,19 +970,19 @@ const weaponRecipes = [
     },
     {
         name: "Огненная стрела", category: "Стрелы", subcat: "Стрелы (эффект)",
-        damage: 1, weight: 0.08, price: 280, slot: null, isAmmo: true,
+        damage: 35, weight: 0.08, price: 280, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Огненная соль", qty: 2 }, { name: "Железная стрела", qty: 20 }]
     },
     {
         name: "Морозная стрела", category: "Стрелы", subcat: "Стрелы (эффект)",
-        damage: 10, weight: 0.08, price: 350, slot: null, isAmmo: true,
+        damage: 35, weight: 0.08, price: 350, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Морозная соль", qty: 2 }, { name: "Железная стрела", qty: 20 }]
     },
     {
         name: "Электрическая стрела", category: "Стрелы", subcat: "Стрелы (эффект)",
-        damage: 0, weight: 0.08, price: 400, slot: null, isAmmo: true,
+        damage: 35, weight: 0.08, price: 400, slot: null, isAmmo: true,
         yieldCount: 20, perkHint: null,
         ingredients: [{ name: "Соль пустоты", qty: 2 }, { name: "Железная стрела", qty: 20 }]
     },
@@ -1043,7 +1043,7 @@ const weaponRecipes = [
     {
         name: "Нордская стрела", category: "Стрелы", subcat: "Стрелы (материал)",
         damage: 14, weight: 0.08, price: 4, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        yieldCount: 20, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Полено", qty: 1 }, { name: "Железный слиток", qty: 1 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -1090,50 +1090,50 @@ const weaponRecipes = [
     },
     {
         name: "Стальной болт огня", category: "Болты", subcat: "Болты",
-        damage: 10, weight: 0.1, price: 100, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 30, weight: 0.1, price: 100, slot: null, isAmmo: true, effect: "Урон 20 + 10 огнём (в сумме 30)",
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Огненная соль", qty: 2 }, { name: "Стальной болт", qty: 20 }]
     },
     {
         name: "Стальной болт льда", category: "Болты", subcat: "Болты",
-        damage: 10, weight: 0.1, price: 100, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 30, weight: 0.1, price: 100, slot: null, isAmmo: true, effect: "Урон 20 + 10 холодом (в сумме 30)",
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Морозная соль", qty: 2 }, { name: "Стальной болт", qty: 20 }]
     },
     {
         name: "Стальной болт электричества", category: "Болты", subcat: "Болты",
-        damage: 10, weight: 0.1, price: 100, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 30, weight: 0.1, price: 100, slot: null, isAmmo: true, effect: "Урон 20 + 10 электричеством (в сумме 30)",
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Соль пустоты", qty: 2 }, { name: "Стальной болт", qty: 20 }]
     },
     {
         name: "Стальной болт яда", category: "Болты", subcat: "Болты",
         damage: 20, weight: 0.1, price: 100, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        yieldCount: 20, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Паслён", qty: 20 }, { name: "Стальной болт", qty: 20 }]
     },
     {
         name: "Двемерский болт огня", category: "Болты", subcat: "Болты",
-        damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 39, weight: 0.1, price: 140, slot: null, isAmmo: true, effect: "Урон 24 + 15 огнём (в сумме 39)",
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Огненная соль", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
         name: "Двемерский болт льда", category: "Болты", subcat: "Болты",
-        damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 39, weight: 0.1, price: 140, slot: null, isAmmo: true, effect: "Урон 24 + 15 холодом (в сумме 39)",
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Морозная соль", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
         name: "Двемерский болт электричества", category: "Болты", subcat: "Болты",
-        damage: 15, weight: 0.1, price: 140, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        damage: 39, weight: 0.1, price: 140, slot: null, isAmmo: true, effect: "Урон 24 + 15 электричеством (в сумме 39)",
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Соль пустоты", qty: 2 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
         name: "Двемерский болт яда", category: "Болты", subcat: "Болты",
         damage: 24, weight: 0.1, price: 140, slot: null, isAmmo: true,
-        yieldCount: 20, perkHint: null,
+        yieldCount: 20, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Паслён", qty: 20 }, { name: "Двемерский болт", qty: 20 }]
     },
     {
@@ -1187,7 +1187,7 @@ const weaponRecipes = [
     {
         name: "Нордский лук", category: "Луки", subcat: "Луки (обычные)",
         damage: 16, weight: 6.0, price: 580, slot: 'ranged', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи",
+        yieldCount: 1, perkHint: "Сложные типы брони",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
@@ -1235,12 +1235,12 @@ const weaponRecipes = [
     {
         name: "Ламеллярные боевые наручи", category: "Кастеты", subcat: "Кастеты",
         damage: 14, weight: 4.0, price: 75, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: null, ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
     },
     {
         name: "Пластинчатые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 15, weight: 4.0, price: 150, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: null, ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
     },
     {
         name: "Эльфийские боевые перчатки", category: "Кастеты", subcat: "Кастеты",
@@ -1265,7 +1265,7 @@ const weaponRecipes = [
     {
         name: "Нордские боевые рукавицы", category: "Кастеты", subcat: "Кастеты",
         damage: 20, weight: 4.0, price: 245, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
     },
     {
         name: "Эбонитовые боевые перчатки", category: "Кастеты", subcat: "Кастеты",

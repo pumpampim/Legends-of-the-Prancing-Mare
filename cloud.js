@@ -216,6 +216,14 @@
         return out;
     }
 
+    // Статусы «спадают от урона» (Полиморф, Поцелуй любовника, Благословенное Слово…): флаг на статусе или правило по имени.
+    function stBreaksOnDamage(st) {
+        if (!st) return false;
+        if (st.breakOnDamage) return true;
+        return !!(window.StCombat && window.StCombat.statusRule && window.StCombat.statusRule(st.name).breakOnDamage);
+    }
+    window.stBreaksOnDamage = stBreaksOnDamage;
+
     window.CloudSync = {
         // immediate:true — обходит обычную задержку 800мс и пишет сразу. Нужно для действий,
         // после которых мастер может СРАЗУ ЖЕ что-то записать поверх (обыск трупа игроком,
@@ -340,8 +348,8 @@
                 // Штампуем момент смерти (номер общего счётчика ходов сессии) — труп поднимаемый
                 // заклинанием только первые 5 ходов после этого.
                 if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
-                if (finalDmg > 0 && Array.isArray(enemies[idx].statusEffects) && enemies[idx].statusEffects.some(st => st && st.breakOnDamage)) {
-                    patch.statusEffects = enemies[idx].statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
+                if (finalDmg > 0 && Array.isArray(enemies[idx].statusEffects) && enemies[idx].statusEffects.some(stBreaksOnDamage)) {
+                    patch.statusEffects = enemies[idx].statusEffects.filter(st => !stBreaksOnDamage(st)); // Полиморф и т.п. спадают от урона
                 }
                 enemies[idx] = Object.assign({}, enemies[idx], patch);
                 const update = { enemies: enemies };
@@ -484,6 +492,7 @@
                 const newMp = Math.max(0, Math.min(en.maxMp || en.curMp || 0, (en.curMp || 0) + (dMp || 0)));
                 const patch = { curHp: newHp, curMp: newMp };
                 if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
+                if (newHp < (en.curHp || 0) && Array.isArray(en.statusEffects) && en.statusEffects.some(stBreaksOnDamage)) patch.statusEffects = en.statusEffects.filter(st => !stBreaksOnDamage(st));
                 enemies[idx] = Object.assign({}, en, patch);
                 const update = { enemies: enemies };
                 if (logText) update.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: authorName || 'Игрок', text: logText });
@@ -510,6 +519,7 @@
                 const poisonResist = (en.resist && en.resist.poison) || 0;
                 const statuses = Array.isArray(en.statusEffects) ? en.statusEffects.slice() : [];
                 const notes = [];
+                const pendingHpDmg = [];
                 (effects || []).forEach(e => {
                     if (!e || !e.name) return;
                     const info = baseFx[e.name] || {};
@@ -526,10 +536,7 @@
                         notes.push(text);
                     };
                     switch (kind) {
-                        case 'dmg_hp': {
-                            const d = Math.max(0, Math.round((mag || 0) * (1 - poisonResist / 100)));
-                            en.curHp = Math.max(0, (en.curHp || 0) - d); notes.push(`−${d} хп${poisonResist ? ` (сопротивление яду ${poisonResist}%)` : ''}`); break;
-                        }
+                        case 'dmg_hp': pendingHpDmg.push(mag || 0); break; // после статусов: уязвимость/сопротивление ядам из этого же яда тоже считаются
                         case 'dmg_mp': en.curMp = Math.max(0, (en.curMp || 0) - (mag || 0)); notes.push(`−${mag || 0} маны`); break;
                         case 'heal_hp': en.curHp = Math.min(en.maxHp || en.curHp || 0, (en.curHp || 0) + (mag || 0)); notes.push(`+${mag || 0} хп`); break;
                         case 'heal_mp': en.curMp = Math.min(en.maxMp || en.curMp || 0, (en.curMp || 0) + (mag || 0)); notes.push(`+${mag || 0} маны`); break;
@@ -564,6 +571,17 @@
                             add({});
                     }
                 });
+                if (pendingHpDmg.length) {
+                    const stRes = statuses.reduce((t, st) => t + ((st && st.res && st.res.poison) || 0), 0);
+                    const totRes = Math.min(100, poisonResist + stRes);
+                    let dealt = 0;
+                    pendingHpDmg.forEach(m => {
+                        const d = Math.max(0, Math.round(m * (1 - totRes / 100)));
+                        en.curHp = Math.max(0, (en.curHp || 0) - d); dealt += d;
+                        notes.push(`−${d} хп${totRes ? ` (сопротивление яду ${totRes}%)` : ''}`);
+                    });
+                    if (dealt > 0) for (let k = statuses.length - 1; k >= 0; k--) if (stBreaksOnDamage(statuses[k])) statuses.splice(k, 1);
+                }
                 if (wasAlive && (en.curHp || 0) <= 0) en.diedAtTurn = data.sessionTurnCounter || 0;
                 en.statusEffects = statuses;
                 enemies[idx] = en;
@@ -646,11 +664,25 @@
         // Задача C: игровой день, синхронизированный в сессию (календарь живёт только у игрока,
         // но мастеру нужно знать, сколько игровых дней прошло с последнего обновления
         // ассортимента торговца — "раз в неделю" не бывает без общего счётчика дней).
+        // «Следующий день» жмёт каждый игрок, а день у партии один: считаем, сколько дней прошёл каждый
+        // (gameDayByUid), и двигаем общий счётчик, только когда кто-то ушёл дальше всех (gameDayPlayerMax).
+        // Отметка игрока ставится при входе в сессию (текущий максимум). Кнопка мастера по-прежнему прибавляет день напрямую.
         bumpGameDayCounter: function () {
-            if (!currentSessionCode || !db) return Promise.resolve();
-            return db.collection('sessions').doc(currentSessionCode).update({
-                gameDayCounter: firebase.firestore.FieldValue.increment(1)
-            }).catch(e => console.error('Ошибка счётчика игровых дней:', e));
+            if (!currentSessionCode || !db || !currentUser) return Promise.resolve();
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) return;
+                const d = doc.data() || {};
+                const byUid = Object.assign({}, d.gameDayByUid || {});
+                const max = parseInt(d.gameDayPlayerMax) || 0;
+                // нет отметки (вошёл до этой версии) — считаем, что он на том же дне, что и лидер, и делает тот же переход
+                const mine = (byUid[uid] != null ? parseInt(byUid[uid]) || 0 : Math.max(0, max - 1)) + 1;
+                byUid[uid] = mine;
+                const upd = { gameDayByUid: byUid };
+                if (mine > max) { upd.gameDayPlayerMax = mine; upd.gameDayCounter = (parseInt(d.gameDayCounter) || 0) + 1; }
+                tx.update(ref, upd);
+            })).catch(e => console.error('Ошибка счётчика игровых дней:', e));
         },
 
         // Обыскивает труп самим игроком (раньше это умел делать только мастер) — забирает
@@ -671,6 +703,17 @@
         },
 
         // Ловушку обезвредил сам игрок (бросок на его листе) — отмечаем в сессии, чтобы мастер видел.
+        // Обезвредить не вышло — ловушка сработала на игроке: состояние как после «Сработала» у мастера (failState считает мастер).
+        setTrapTriggered: function (trapId, failState) {
+            if (!currentSessionCode || !db || !currentUser || !failState) return Promise.resolve();
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                const list = ((doc.data() || {}).placedTraps || []).map(t => t && t.id === trapId && t.state === 'ready'
+                    ? Object.assign({}, t, { state: failState.state || 'off', left: failState.left || 0, victims: failState.state === 'active' ? [uid] : [] }) : t);
+                tx.update(ref, { placedTraps: list });
+            }));
+        },
         setTrapDisarmed: function (trapId) {
             if (!currentSessionCode || !db) return Promise.resolve();
             const ref = db.collection('sessions').doc(currentSessionCode);
@@ -731,7 +774,9 @@
         // может писать и без сессии.
         // Задача C: покупка у живого торговца — убирает купленный товар из ассортимента (он
         // штучный, не бесконечный) и добавляет цену к золоту торговца в сессии.
-        buyFromMerchantStock: function (key, itemIdx, price, qty) {
+        // expect = { name, sig, price } выбранного товара: если другой игрок успел купить вещь выше по списку,
+        // номера сдвинулись — тогда ищем товар по имени, а не списываем соседний.
+        buyFromMerchantStock: function (key, itemIdx, price, qty, expect) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             // ТРАНЗАКЦИЯ: иначе два одновременных покупателя (или двойной клик) получали одну и ту же вещь дважды.
@@ -740,7 +785,10 @@
                 const data = doc.data();
                 const stocks = Object.assign({}, data.merchantStocks || {});
                 const stock = stocks[key];
-                if (!stock || !stock.items[itemIdx]) throw new Error('Товар уже не в наличии.');
+                if (!stock || !Array.isArray(stock.items)) throw new Error('Товар уже не в наличии.');
+                const same = i => i && i.name === expect.name && (i.sig || '') === (expect.sig || '') && i.price === expect.price;
+                if (expect && !same(stock.items[itemIdx])) itemIdx = stock.items.findIndex(same);
+                if (!stock.items[itemIdx]) throw new Error('Товар уже не в наличии — обнови список.');
                 const items = stock.items.slice();
                 const want = Math.max(1, parseInt(qty) || 1);
                 const have = items[itemIdx].qty || 1;
@@ -867,7 +915,7 @@
                     if (!d.participants || !d.participants[targetUid]) throw new Error('Цели нет в сессии.');
                     if (d.inspire && d.inspire[targetUid]) throw new Error('Эта цель уже воодушевлена.');
                     const patch = {};
-                    patch['inspire.' + targetUid] = { value: 4, fromName: String(fromName || 'Бард').slice(0, 40), grantedAt: Date.now() };
+                    patch['inspire.' + targetUid] = { value: 3, fromName: String(fromName || 'Бард').slice(0, 40), grantedAt: Date.now() };
                     tx.update(ref, patch);
                 });
             });
@@ -1237,6 +1285,8 @@
             const patch = {};
             const pref = 'participants.' + currentUser.uid + '.';
             Object.assign(patch, { [pref + 'name']: name, [pref + 'curHp']: curHp, [pref + 'curMp']: curMp, [pref + 'maxHp']: maxHp, [pref + 'maxMp']: maxMp, [pref + 'updatedAt']: firebase.firestore.FieldValue.serverTimestamp() });
+            // Новый в сессии игрок стоит на текущем дне партии — от этой точки считаются его «Следующий день» (bumpGameDayCounter).
+            if (!(doc.data().gameDayByUid || {}).hasOwnProperty(currentUser.uid)) patch['gameDayByUid.' + currentUser.uid] = parseInt(doc.data().gameDayPlayerMax) || 0;
 
             db.collection('sessions').doc(code).update(patch).then(() => {
                 el('session-join-block').style.display = 'none';

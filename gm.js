@@ -365,6 +365,7 @@
         try { rumOnSnapshot(lastData); } catch (e) { console.error(e); }
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
+        try { gmJailDayWatch(lastData); } catch (e) { console.error(e); }
         try { gmNotifyWatch(lastData); } catch (e) { console.error(e); }
         try { gmEnemyTickWatch(lastData); } catch (e) { console.error(e); }
         try { if (window.GmGrid) window.GmGrid.onSnapshot(lastData); } catch (e) { console.error(e); }
@@ -1587,19 +1588,20 @@
         const gold = Math.max(0, parseInt((el('enemy-gear-gold') || {}).value) || 0);
         if (!enemyGearDraft.length && !gold) return null;
         const items = [];
-        let weapon = null, armorSum = 0; const armorNames = [];
+        let weapon = null; const armorNames = []; const armorBySlot = {}; // на враге одна вещь на слот: 2 шлема не складываются
         enemyGearDraft.forEach(d => {
             const it = gmFindItemByName(d.name);
             if (!it) return;
             const role = enemyGearRole(it);
             if (role === 'weapon' && (!weapon || gmItemDmg(it) > gmItemDmg(weapon))) weapon = it;
-            if (role === 'armor') { armorSum += gmItemArmor(it) * d.qty; armorNames.push(it.name); }
+            if (role === 'armor') { const sl = it.slot || it.name; armorBySlot[sl] = Math.max(armorBySlot[sl] || 0, gmItemArmor(it) || 0); armorNames.push(it.name); }
             if (Math.random() * 100 < d.chance) {
                 const loot = window.EnemyLoot ? window.EnemyLoot.toLoot(it, d.qty) : { name: it.name, price: it.price || 0, weight: it.weight || 0, category: it.category || '', qty: d.qty };
                 if (loot.enchantment && (loot.slot === 'melee' || loot.slot === 'ranged') && typeof loot.chargeDaysLeft !== 'number') loot.chargeDaysLeft = 3;
                 items.push(loot);
             }
         });
+        const armorSum = Object.keys(armorBySlot).reduce((a, k) => a + armorBySlot[k], 0);
         const noteParts = [];
         if (weapon) noteParts.push(weapon.name + (weapon.effect ? ' (' + String(weapon.effect).slice(0, 80) + ')' : ''));
         if (armorNames.length) noteParts.push('надето: ' + armorNames.join(', '));
@@ -1854,6 +1856,7 @@
         const notes = [];
         let r = res[dmgType] || 0;
         if (r) notes.push('резист ' + r + '%');
+        if (opts && opts.isRangedAtk && dmgType === 'physical' && res.arrow) { r += res.arrow; notes.push('резист стрелам/болтам +' + res.arrow + '%'); }
         const elem = GM_ELEM_TYPES.indexOf(dmgType) !== -1;
         if (elem && res.magic) { r += res.magic; notes.push('сопр. магии +' + res.magic + '%'); }
         let zero = false;
@@ -2015,7 +2018,8 @@
                 let poisonRes = (copy.resist && copy.resist.poison) || 0;
                 copy.statusEffects.forEach(s => { if (s.res && s.res.poison) poisonRes += s.res.poison; });
                 copy.statusEffects.forEach(s => {
-                    if (s.dotHp) dHp -= Math.max(0, Math.round(s.dotHp * (s.dotNoResist ? 1 : (1 - poisonRes / 100))));
+                    if (s.dotHp && s.dotType && window.StCombat) dHp -= window.StCombat.previewDamage(copy, s.dotHp, s.dotType, 0).finalDmg; // горение — огнём, с резистом и уязвимостью
+                    else if (s.dotHp) dHp -= Math.max(0, Math.round(s.dotHp * (s.dotNoResist ? 1 : (1 - poisonRes / 100))));
                     if (s.dotMp) dMp -= s.dotMp;
                     if (s.regenHp) dHp += s.regenHp;
                     if (s.regenMp) dMp += s.regenMp;
@@ -2025,6 +2029,7 @@
                     copy.curHp = Math.max(0, Math.min(copy.maxHp || oldHp, oldHp + dHp));
                     copy.curMp = Math.max(0, Math.min(copy.maxMp || oldMp, oldMp + dMp));
                     if (oldHp > 0 && copy.curHp <= 0) copy.diedAtTurn = turnNow || 0;
+                    if (copy.curHp < oldHp) copy.statusEffects = copy.statusEffects.filter(st => !(st && (st.breakOnDamage || (window.StCombat && window.StCombat.statusRule(st.name).breakOnDamage)))); // урон по ходу тоже снимает «спадающие от урона»
                     const parts = [];
                     if (copy.curHp !== oldHp) parts.push(`${copy.curHp - oldHp > 0 ? '+' : ''}${copy.curHp - oldHp} хп`);
                     if (copy.curMp !== oldMp) parts.push(`${copy.curMp - oldMp > 0 ? '+' : ''}${copy.curMp - oldMp} маны`);
@@ -2475,6 +2480,40 @@
         return it;
     }
 
+    // Поля предмета базы, которые нужны игроку, чтобы вещь работала (надеть, урон, броня, чары, зелья).
+    // Общая для «Передать» и «Награды группе» — раньше награда теряла чары, эффекты зелий, посох и бонус веса,
+    // а урон брался только из dmg (у уникального оружия он в damage → приходило с уроном 0).
+    function gmItemExtraFromSource(sourceItem) {
+        const extra = {};
+        if (sourceItem.slot) extra.slot = sourceItem.slot;
+        if (typeof sourceItem.armor === 'number') extra.armorValue = sourceItem.armor;
+        const dmg = typeof sourceItem.dmg === 'number' ? sourceItem.dmg : typeof sourceItem.damage === 'number' ? sourceItem.damage : null;
+        if (dmg !== null) extra.weaponDmg = dmg;
+        if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
+        if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
+        if (typeof sourceItem.carryBonus === 'number') extra.carryBonus = sourceItem.carryBonus;
+        if (sourceItem.unique) extra.unique = true;
+        // уже зачарованная вещь из базы (ожерелье «Повышение здоровья» и т.п.) должна нести зачарование,
+        // иначе игрок получает только текст в описании, а бонус не работает
+        if (sourceItem.enchantment) extra.enchantment = JSON.parse(JSON.stringify(sourceItem.enchantment));
+        if (typeof sourceItem.maxUses === 'number') { extra.maxUses = sourceItem.maxUses; extra.usesLeft = sourceItem.maxUses; }
+        if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
+        // Зелья/яды: игрок получает реальные эффекты (применяются автоматически при использовании) и единую категорию.
+        if (Array.isArray(sourceItem.alchemyEffects)) extra.alchemyEffects = sourceItem.alchemyEffects;
+        if (/^Яд/i.test(sourceItem.category || '')) extra.category = 'Яд';
+        else if (/^Зель/i.test(sourceItem.category || '')) extra.category = 'Зелье';
+        return extra;
+    }
+    // Зачарованное оружие и посохи разряжаются; срок заряда выдаваемой вещи решает мастер.
+    // Возвращает false, если мастер нажал «Отмена».
+    function gmAskChargeDays(extra, itemName) {
+        if (!extra.enchantment && !extra.isStaff) return true;
+        if (!extra.isStaff && extra.slot !== 'melee' && extra.slot !== 'ranged') return true;
+        const v = prompt(`Сколько дней держится заряд «${itemName}»? (камни душ дают 1/3/5/7/10)`, '5');
+        if (v === null) return false;
+        extra.chargeDaysLeft = Math.max(0, parseInt(v) || 0);
+        return true;
+    }
     window.gmGiveItemFromTable = function(itemId) {
         const sourceItem = gmAllItemsByKey.get(itemId); // O(1) вместо O(n) — см. loadGmItems
         if (!sourceItem) { alert('Предмет не найден.'); return; }
@@ -2503,25 +2542,8 @@
         // Задача C: краденое можно продать только скупщику Гильдии воров.
         const isStolen = confirm('Это краденый предмет? (ОК — да, краденое; Отмена — обычный предмет)');
 
-        // Переносим слот/броню/урон/цену, чтобы игрок мог сразу надеть/взять в руки предмет
-        // и видеть его цену.
-        const extra = {};
-        if (sourceItem.slot) extra.slot = sourceItem.slot;
-        if (typeof sourceItem.armor === 'number') extra.armorValue = sourceItem.armor;
-        if (typeof sourceItem.dmg === 'number') extra.weaponDmg = sourceItem.dmg;
-        if (typeof sourceItem.price === 'number') extra.price = sourceItem.price;
-        if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
-        if (typeof sourceItem.carryBonus === 'number') extra.carryBonus = sourceItem.carryBonus;
-        // уже зачарованная вещь из базы (ожерелье «Повышение здоровья» и т.п.) должна нести зачарование,
-        // иначе игрок получает только текст в описании, а бонус не работает
-        if (sourceItem.enchantment) extra.enchantment = JSON.parse(JSON.stringify(sourceItem.enchantment));
-        if (typeof sourceItem.maxUses === 'number') { extra.maxUses = sourceItem.maxUses; extra.usesLeft = sourceItem.maxUses; }
-        if (sourceItem.type === 'staff') { extra.isStaff = true; extra.slot = 'ranged'; }
+        const extra = gmItemExtraFromSource(sourceItem);
         if (isStolen) extra.stolen = true;
-        // Зелья/яды: игрок получает реальные эффекты (применяются автоматически при использовании) и единую категорию.
-        if (Array.isArray(sourceItem.alchemyEffects)) extra.alchemyEffects = sourceItem.alchemyEffects;
-        if (/^Яд/i.test(sourceItem.category || '')) extra.category = 'Яд';
-        else if (/^Зель/i.test(sourceItem.category || '')) extra.category = 'Зелье';
 
         // Мастер видит и может применить ЛЮБОЕ зачарование (не только то, что игрок уже узнал
         // разрушив вещь — у мастера, в отличие от игрока, ограничения "только узнанное" нет).
@@ -2530,7 +2552,7 @@
         if (sourceItem.slot && enchantableSlots.includes(sourceItem.slot) && !sourceItem.enchantment &&
             confirm(`Зачаровать «${sourceItem.name}» перед выдачей?`)) {
             const isWeapon = sourceItem.slot === 'melee' || sourceItem.slot === 'ranged';
-            const armorSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' };
+            const armorSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
             const wantedSlot = armorSlotMap[sourceItem.slot] || sourceItem.slot;
             const pool = isWeapon ? (window.enchantWeaponEffects || []) : (window.enchantArmorEffects || []).filter(e => e.slots.includes(wantedSlot));
             if (!pool.length) {
@@ -2548,6 +2570,8 @@
                 }
             }
         }
+
+        if (!gmAskChargeDays(extra, sourceItem.name)) return;
 
         // Краденое, зачарованное мастером и обычное — разные стопки. Раньше всё ложилось в одну стопку по названию,
         // и Object.assign перетирал её: чистые слитки становились краденными, заточенный меч терял урон.
@@ -2716,7 +2740,7 @@
         { name: 'Звериная сила III', threshold: 11, desc: '+75% урона в форме зверя' },
         { name: 'Звериная сила IV', threshold: 21, desc: '+100% урона в форме зверя' },
         { name: 'Тотем ледяных братьев', threshold: 15, desc: 'Тотем Братства воем созывает снежных волков' },
-        { name: 'Тотем ужаса', threshold: 15, desc: 'Жуткий вой действует даже на существ выше уровнем (до 16 lvl)' },
+        { name: 'Тотем ужаса', threshold: 15, desc: 'Жуткий вой действует даже на существ выше уровнем (до 18 lvl)' },
         { name: 'Вечный голод', threshold: 15, desc: 'Время превращения увеличено вдвое (8 часов)' },
         { name: 'Тотем хищника', threshold: 20, desc: 'Тотем Охоты охватывает весь данж/200 футов, показывает состояние врагов' },
         { name: 'Жадность в еде', threshold: 20, desc: 'Пожирание трупа восстанавливает вдвое больше здоровья' },
@@ -2734,7 +2758,7 @@
         { name: 'Сила Могилы', desc: '+50 к здоровью и магии в форме вампира-лорда', prereq: null },
         { name: 'Хватка вампира', desc: 'Магия крови — притянуть и придушить живое существо с < 10% здоровья', prereq: 'Сила Могилы' },
         { name: 'Вызов гаргульи', desc: 'Магия крови — призвать гаргулью-союзника', prereq: 'Сила Могилы, Хватка вампира' },
-        { name: 'Трупное проклятье', desc: 'Магия крови — парализовать противника на 4 его хода (Сл. спасброска 14+мудрость)', prereq: 'Сила Могилы, Вызов гаргульи' },
+        { name: 'Трупное проклятье', desc: 'Магия крови — парализовать противника на 4 его хода (Сл. спасброска 17+мудрость)', prereq: 'Сила Могилы, Вызов гаргульи' },
         { name: 'Обнаружение существ', desc: 'Сила ночи — обнаружение всех существ, включая двемерских автоматонов', prereq: 'Сила Могилы' },
         { name: 'Туманная форма', desc: 'Сила ночи — неуязвимое туманное облако на 3 ваших хода (нельзя наносить/получать урон)', prereq: 'Сила Могилы, Обнаружение существ' },
         { name: 'Сверхъестественные рефлексы', desc: 'Сила ночи — следующие 4 атаки получают +4 к кубам', prereq: 'Сила Могилы, Туманная форма' },
@@ -2812,7 +2836,7 @@
         },
         'Коллегия бардов': {
             givers: [{ name: 'Музей коллегии', note: 'Сдать историческое/мифическое оружие или броню = 1 легендарная песня + 800 септимов. За 25 сданных предметов — 5000 септимов + титул тана Солитьюда + возможность купить дом.' }],
-            perks: 'Кнопка «Выступить» в профессиях (для членов): 10 × 2к10 × (0.1 + 0.005 × репутация во владении) × Красноречие, округление вверх, минимум 30 септимов; лимит выступлений в день задаётся в «Лимитах игроков» (по умолч. 3). За 4 легендарные песни — «Бардовская баллада» (Особые способности: пока бард играет, остальные игроки +1 к кубам — атака, защита, проверки; бард не атакует). За 12 — «Сила слова» (+2 к проверке убеждения, цены продажи выгоднее на 10%). За 18 — «Воодушевление» (Особые способности: 3 раза в день на себя/союзника, один раз +4 к кубам на любое действие).',
+            perks: 'Кнопка «Выступить» в профессиях (для членов): 10 × 2к10 × (0.1 + 0.005 × репутация во владении) × Красноречие, округление вверх, минимум 30 септимов; лимит выступлений в день задаётся в «Лимитах игроков» (по умолч. 3). За 4 легендарные песни — «Бардовская баллада» (Особые способности: пока бард играет, остальные игроки +1 к кубам — атака, защита, проверки; бард не атакует). За 12 — «Сила слова» (+1 к убеждению и +1 к попытке скидки). За 18 — «Воодушевление» (нужны ещё 2 исторических артефакта; Особые способности: 2 раза в день, +3 ко всем навыкам союзников).',
             armorRewards: [],
             note: 'Прогресс этой гильдии считается ЛЕГЕНДАРНЫМИ ПЕСНЯМИ, не заказами — использует то же поле orders (не отдельный счётчик, но пороги рангов пересчитаны на реальные 4/12/18). Сдача в музей — кнопка на листе игрока (donateToBardMuseum, +1 orders +1 artifacts +800 золота атомарно через CloudSync.donateBardArtifact). Баллада, Сила слова и Воодушевление подключены механически.'
         }
@@ -2950,7 +2974,7 @@
                 <button class="btn-success" style="width:100%;" onclick="releaseFromJail()">Освободить</button>`;
         } else if (c.fineAmount > 0) {
             html += `<p>💰 Штраф: <strong>${c.fineAmount}</strong> септимов (${escapeHtml(c.fineHold)}) — ${escapeHtml(c.fineReason || 'без причины')}${c.refused ? '<br><span style="color:#e74c3c;">Игрок отказался платить.</span>' : ''}</p>
-                <button class="btn-danger" style="width:100%;" onclick="clearFine()">Списать штраф (оплачен/прощён)</button>
+                <button class="btn-danger" style="width:100%;" onclick="clearFine()">💰 Оплатить штраф из кошелька игрока</button>
                 ${!c.refused ? `<button style="width:100%; margin-top:4px;" onclick="markFineRefused()">🙅 Отметить отказ платить</button>` : ''}
                 <label style="margin-top:6px;">Отправить в тюрьму на (дней)</label>
                 <input type="number" id="jail-days-input" value="3" min="1" style="width:70px; display:inline;">
@@ -2978,13 +3002,16 @@
         if (!currentInvPlayerUid) return;
         const amount = parseInt(el('fine-amount-input').value) || 0;
         if (amount <= 0) { alert('Укажи сумму штрафа.'); return; }
+        // Неоплаченный штраф не затирается новым, а растёт на новую сумму.
+        const prevFine = currentCrimeState.fineAmount || 0;
+        const newReason = el('fine-reason-input').value.trim();
         currentCrimeState = Object.assign({}, currentCrimeState, {
-            fineAmount: amount, fineHold: el('fine-hold-select').value,
-            fineReason: el('fine-reason-input').value.trim(), refused: false
+            fineAmount: prevFine + amount, fineHold: prevFine > 0 && currentCrimeState.fineHold ? currentCrimeState.fineHold : el('fine-hold-select').value,
+            fineReason: prevFine > 0 ? [currentCrimeState.fineReason, newReason].filter(Boolean).join('; ') : newReason, refused: false
         });
         saveCrimeState().then(() => {
             renderCrimePanel();
-            gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${currentCrimeState.fineHold})${currentCrimeState.fineReason ? ': ' + currentCrimeState.fineReason : ''}.`);
+            gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${currentCrimeState.fineHold})${newReason ? ': ' + newReason : ''}${prevFine > 0 ? ` — всего к оплате ${currentCrimeState.fineAmount}` : ''}.`);
             try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: currentCrimeState.fineReason, hold: currentCrimeState.fineHold || undefined, who: [((lastData.participants || {})[currentInvPlayerUid] || {}).name].filter(Boolean) }); } catch (e) { }
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -2998,10 +3025,36 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Оплата штрафа: сумма списывается из кошелька игрока (атомарный increment, как в наградах),
+    // не хватает золота — штраф остаётся (тогда отказ/тюрьма).
+    // Гильдия воров (Фракции.xlsx): член гильдии откупается у стражи за половину штрафа, после 5 заказов (особых заданий) — за четверть.
+    function thievesGuildFineMult(data) {
+        const g = ((data && data.guildsData) || {})['Гильдия воров'];
+        const member = typeof g === 'number' ? g > 0 : !!(g && g.member);
+        const orders = typeof g === 'number' ? g : (parseInt(g && g.orders) || 0);
+        const bribe = !!((data && data.perkStates) || {})['skill9-perk2-step1']; // перк «Подкуп» (Красноречие): стража берёт половину, репутация не страдает
+        if (!member) return bribe ? { mult: 0.5, note: '«Подкуп»: стража берёт половину, репутацию не снижать' } : { mult: 1, note: '' };
+        if (bribe && orders < 5) return { mult: 0.5, note: 'Гильдия воров / «Подкуп»: половина штрафа, репутацию не снижать' };
+        return orders >= 5 ? { mult: 0.25, note: 'Гильдия воров: откуп в четверть штрафа' } : { mult: 0.5, note: 'Гильдия воров: откуп в половину штрафа' };
+    }
     window.clearFine = function () {
         if (!currentInvPlayerUid) return;
-        currentCrimeState = Object.assign({}, currentCrimeState, { fineAmount: 0, fineHold: '', fineReason: '', refused: false });
-        saveCrimeState().then(renderCrimePanel).catch(e => alert('Ошибка: ' + e.message));
+        const uid = currentInvPlayerUid, fine = currentCrimeState.fineAmount || 0, hold = currentCrimeState.fineHold;
+        const ref = db.collection('characters').doc(uid);
+        const cleared = Object.assign({}, currentCrimeState, { fineAmount: 0, fineHold: '', fineReason: '', refused: false });
+        let paid = fine, note = '';
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const data = doc.data() || {};
+            const tg = thievesGuildFineMult(data);
+            paid = Math.ceil(fine * tg.mult); note = tg.note;
+            const have = parseInt(data.gold) || 0;
+            if (have < paid) throw new Error(`У игрока только ${have} зол., к оплате ${paid}${note ? ' (' + note + ')' : ''}. Отметь отказ платить или отправь в тюрьму.`);
+            tx.update(ref, { gold: firebase.firestore.FieldValue.increment(-paid), crimeState: cleared });
+        })).then(() => {
+            currentCrimeState = cleared;
+            renderCrimePanel();
+            gmPostLogEntryText(`💰 Штраф ${fine} септимов${hold ? ' (' + hold + ')' : ''} оплачен${paid !== fine ? `: ${paid} зол. — ${note}` : ''}.`);
+        }).catch(e => alert(e.message));
     };
 
     window.sendToJail = function () {
@@ -3026,6 +3079,41 @@
             gmPostLogEntryText('🔓 Игрок освобождён из тюрьмы.');
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+
+    // Срок в тюрьме убывает с каждым новым игровым днём сессии (gameDayCounter). jailDayDone в сессии —
+    // чтобы два открытых окна мастера не списали один день дважды. Срок вышел — игрок свободен.
+    let _gmJailBusy = false;
+    function gmJailDayWatch(d) {
+        if (!currentCode || !d || _gmJailBusy) return;
+        const day = parseInt(d.gameDayCounter) || 0;
+        const ref = db.collection('sessions').doc(currentCode);
+        if (d.jailDayDone == null) { ref.update({ jailDayDone: day }).catch(() => { }); return; }
+        if (day <= (parseInt(d.jailDayDone) || 0)) return;
+        _gmJailBusy = true;
+        let passed = 0;
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const dd = doc.data() || {};
+            const t0 = parseInt(dd.gameDayCounter) || 0, d0 = parseInt(dd.jailDayDone) || 0;
+            passed = 0;
+            if (t0 <= d0) return;
+            passed = t0 - d0;
+            tx.update(ref, { jailDayDone: t0 });
+        })).then(() => {
+            if (!passed) return;
+            const parts = (lastData && lastData.participants) || {};
+            return Promise.all(Object.keys(parts).map(uid => {
+                const cref = db.collection('characters').doc(uid);
+                let freed = false;
+                return db.runTransaction(tx => tx.get(cref).then(doc => {
+                    const cs = (doc.data() || {}).crimeState;
+                    if (!cs || !cs.inJail) return;
+                    const left = Math.max(0, (parseInt(cs.jailDaysRemaining) || 0) - passed);
+                    freed = left <= 0;
+                    tx.update(cref, { crimeState: Object.assign({}, cs, freed ? { inJail: false, jailHold: '', jailDaysRemaining: 0 } : { jailDaysRemaining: left }) });
+                })).then(() => { if (freed) gmPostLogEntryText(`🔓 ${(parts[uid] || {}).name || 'Игрок'}: срок в тюрьме вышел — на свободе.`); });
+            }));
+        }).catch(e => console.error('Тюрьма — смена дня:', e)).then(() => { _gmJailBusy = false; });
+    }
 
     function defaultSupernaturalState() {
         return {
@@ -3464,8 +3552,8 @@
         }).join('');
     }
 
-    // disposition конкретного торговца (-2 Вражда .. +2 Союзник) — отношение влияет на цены у
-    // игрока (computeBuyPrice/computeSellPrice, index.html) и может полностью заблокировать
+    // disposition конкретного торговца (-2 Вражда .. +2 Союзник) — отношение влияет на цены, по которым
+    // торговец ПРОДАЁТ свои вещи игроку (buyFromMerchant, index.html; цену скупки не меняет) и может полностью заблокировать
     // торговлю при -2. Меняется отдельно от ассортимента, без нужды его перегенерировать.
     window.setMerchantDisposition = function (key, value) {
         db.collection('sessions').doc(currentCode).update({ ['merchantStocks.' + key + '.disposition']: parseInt(value) || 0 })
@@ -3749,7 +3837,7 @@
                 </select>
                 <p style="font-size:12px; opacity:.85; margin:4px 0;">Голод: обычный вампир −2 ко всем хар-кам и холод +10% / огонь −10% за каждый день; вампир-лорд только −1 ко всем хар-кам за день. ${s.vampire.hungerStage >= 4 ? '<strong style="color:#e74c3c;">🚨 4-й день: стража нападает, жители бегут или нападают.</strong>' : ''}</p>
                 <button class="btn-success" style="width:100%; margin-top:4px;" onclick="feedVampire()">🩸 Покормить (стадия → 0)</button>
-                <p style="font-size:12px; opacity:.75; margin-top:6px;">Пока стоит галочка «Вампиризм»: +3 Хар, +3 Тел, +2 Лов, +2 Сил, холод +50%, яды/болезни — иммунитет, огонь −50%, ×2 урон днём; бесплатные заклинания «Вампирское высасывание» и «Подъём сильного трупа». Рангов у обычных вампиров нет.</p>
+                <p style="font-size:12px; opacity:.75; margin-top:6px;">Пока стоит галочка «Вампиризм»: +2 Хар, +1 Лов, +1 Сил, холод +50%, яды/болезни — иммунитет, огонь −50%, ×2 урон днём; бесплатные заклинания «Вампирское высасывание» и «Подъём сильного трупа». Рангов у обычных вампиров нет.</p>
                 <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp-lord" ${s.vampire.isLord ? 'checked' : ''} onchange="toggleVampireLord(this.checked)"><label for="sn-vamp-lord"><strong>Вампир-лорд</strong> (открывает игроку ветку перков вампира-лорда и форму лорда)</label></div>
                 ${s.vampire.isLord ? `<div style="font-size:12px; margin-top:4px;">Форма лорда: <strong>${s.vampire.lordForm ? 'включена' : 'выключена'}</strong> · Взято перков: ${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length}/11${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length ? '<br>' + Object.keys(s.vampire.lordPerks).filter(k => s.vampire.lordPerks[k]).map(escapeHtml).join(', ') : ''}</div>` : ''}
             </div>`;
@@ -3944,6 +4032,15 @@
                 return true;
             }).catch(e => { alert('Ошибка: ' + e.message); return false; });
     }
+    // «Покаяние»: игрок-даэдропоклонник получает право один раз снова выбрать бога-аэдра.
+    window.gmPenance = function () { gmSendCmd({ type: 'penance' }, 'игрок {p} прошёл покаяние — может вернуться к аэдра.'); };
+    // Прошёл игровой час — у всех игроков сессии тает облик зверя (4 ч, с «Вечным голодом» 8).
+    window.gmHourPassed = function () {
+        const parts = Object.keys((lastData && lastData.participants) || {});
+        if (!parts.length) { alert('В сессии нет игроков.'); return; }
+        Promise.all(parts.map(uid => db.collection('characters').doc(uid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-hr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'hourPassed', hours: 1 }) }).catch(() => { })))
+            .then(() => gmPostLogEntryText('🕐 Мастер: прошёл игровой час.'));
+    };
     window.gmChangePlayerSkill = function (sign) {
         const skillIdx = parseInt(el('inv-skill-decrease-select').value) || 0;
         const amount = Math.max(1, parseInt(el('inv-skill-decrease-amount').value) || 1);
@@ -4078,7 +4175,7 @@
             effects = window.enchantWeaponEffects;
         } else if ((cat === 'armor' || cat === 'jewelry') && window.enchantArmorEffects) {
             const slot = cat === 'armor' ? el('ci-armor-slot').value : el('ci-jewelry-slot').value;
-            const enchantSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet' };
+            const enchantSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
             const wantedSlot = enchantSlotMap[slot] || slot;
             effects = window.enchantArmorEffects.filter(e => e.slots.includes(wantedSlot));
         }
@@ -4194,7 +4291,10 @@
         'Каменная подагра': { desc: '−2 к броскам Тяжёлой/Лёгкой брони.' },
         'Заумь': { desc: '−2 к броскам школ магии (Разрушение/Восстановление/Колдовство/Иллюзия/Изменение).' },
         'Кровавая лихорадка': { desc: '−10 к максимальному здоровью, пока не вылечена.' },
-        'Насморк Пелиниала': { desc: '−2 к броскам Скрытности и Карманных краж.' }
+        'Насморк Пелиниала': { desc: '−2 к броскам Скрытности и Карманных краж.' },
+        'Разжижение мозга': { desc: '−25 к максимальному здоровью, пока не вылечена.' },
+        'Костоломная лихорадка': { desc: '−5 фт скорости, пока не вылечена.' },
+        'Хрипунец': { desc: '−10% сопротивления стихиям, пока не вылечен.' }
     };
 
     const GM_STATUS_EFFECTS = {
@@ -4206,7 +4306,7 @@
         calm: { name: 'Успокоение', desc: 'Не атакует 1 ход.', turns: 1 },
         // Ниже — только для врагов (массовая кнопка «Статус»): работают сами — блок атаки, штраф к кубам, урон по ходам.
         stun: { name: 'Оглушение', desc: 'Оглушён — не действует.', turns: 1 },
-        burning: { name: 'Горение', desc: 'Горит: 5 урона огнём в начале каждого хода.', turns: 3, dotHp: 5, dotNoResist: true },
+        burning: { name: 'Горение', desc: 'Горит: 5 урона огнём в начале каждого хода (сопротивление огню учитывается).', turns: 3, dotHp: 5, dotType: 'fire' },
         bleeding: { name: 'Кровотечение', desc: 'Истекает кровью: 5 урона в начале каждого хода.', turns: 3, dotHp: 5, dotNoResist: true },
         blind: { name: 'Ошеломление', desc: '−3 к кубам.', turns: 1, rollPenalty: -3 }
     };
@@ -4231,7 +4331,7 @@
         const raw = (Array.isArray(data.skills) ? parseInt(data.skills[skillIdx]) : null) || 10;
         const skillName = SKILL_NAMES_BY_IDX[skillIdx];
         const bonus = (RACE_SKILL_BONUSES[data.race] && RACE_SKILL_BONUSES[data.race][skillName]) || 0;
-        return raw + bonus;
+        return Math.min(100, raw + bonus); // как на листе игрока: потолок навыка 100 вместе с расовым бонусом
     }
 
     function getMaxStepFromStates(perkStates, skillIdx, perkIdx) {
@@ -4320,6 +4420,8 @@
                 shared.forEach(effName => {
                     const e = window.calcAlchemyEffect(effName, Object.assign({ mode }, ctxBase));
                     if (!e) return;
+                    const godPP = ((data.godGM || {}).potionPower) || 0; // Намира: зелья сильнее — как при варке у игрока
+                    if (godPP && e.magnitude !== null) e.magnitude = Math.round(e.magnitude * (1 + godPP / 100));
                     html += `<div>${e.polarity === 'negative' ? '☠' : '🧪'} <strong>${escapeHtml(effName)}</strong>: ${escapeHtml(window.describeAlchemyEffect(e).slice(effName.length + 2) || '—')}</div>`;
                 });
             });
@@ -4504,16 +4606,9 @@
         if (!gold && !itemId) { resultEl.innerHTML = '<span style="color:#e74c3c;">Укажи золото или предмет.</span>'; return; }
 
         const sourceItem = itemId ? gmAllItemsByKey.get(itemId) : null; // O(1) вместо O(n) — см. loadGmItems
-        const itemExtra = {};
         const toStash = !!(el('party-reward-to-stash') && el('party-reward-to-stash').checked);
-        if (sourceItem) {
-            if (sourceItem.slot) itemExtra.slot = sourceItem.slot;
-            if (typeof sourceItem.armor === 'number') itemExtra.armorValue = sourceItem.armor;
-            if (typeof sourceItem.dmg === 'number') itemExtra.weaponDmg = sourceItem.dmg;
-            if (typeof sourceItem.price === 'number') itemExtra.price = sourceItem.price;
-            if (typeof sourceItem.capacity === 'number') itemExtra.capacity = sourceItem.capacity;
-            if (typeof sourceItem.maxUses === 'number') { itemExtra.maxUses = sourceItem.maxUses; itemExtra.usesLeft = sourceItem.maxUses; }
-        }
+        const itemExtra = sourceItem ? gmItemExtraFromSource(sourceItem) : {};
+        if (sourceItem && !gmAskChargeDays(itemExtra, sourceItem.name)) return;
 
         // Эпик 2.1: раньше награда уходила каждому игроку напрямую, теперь по умолчанию — в общий сундук отряда,
         // потому что группа сама решает, кому что нужно; галочка снята — старое поведение (всем поровну напрямую).
@@ -4652,9 +4747,17 @@
                 if (!plan.give.length) return cref.update(upd);
                 return cref.get().then(doc => {
                     const inv = Array.isArray((doc.data() || {}).inventory) ? doc.data().inventory.slice() : [];
+                    // Заточенное/зачарованное — всегда своей строкой; остальное по правилам gmMergeInvItem
+                    // (краденое «имя#stolen» не смешивается с чистым, обычное не ложится на заточенное).
                     plan.give.forEach(g => {
-                        const ex = inv.find(i => i.itemId === g.itemId);
-                        if (ex) ex.count = (ex.count || 0) + g.count; else inv.push(Object.assign({}, g));
+                        if (g.temperTier || g.enchantment) {
+                            const it = Object.assign({}, g);
+                            if (inv.some(i => i.itemId === it.itemId)) it.itemId = it.itemId + '#' + Date.now() + Math.floor(Math.random() * 1000);
+                            inv.push(it);
+                            return;
+                        }
+                        const extra = Object.assign({}, g); delete extra.itemId; delete extra.count;
+                        gmMergeInvItem(inv, { itemId: g.itemId, name: g.name }, g.count, extra);
                     });
                     upd.inventory = stripUndefinedDeep(inv);
                     return cref.update(upd);
@@ -4862,9 +4965,9 @@
         if (!statusKey && actionVal.indexOf('spell:') === 0) statusKey = gmEnemyControlStatus(enemy.spells[parseInt(actionVal.slice(6))]);
 
         pendingGmAttack = {
-            targetUid, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
+            targetUid, enemyId: enemy.id, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
             isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
-            enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|дремора|атронах|даэдр/i.test(enemy.name || '')),
+            enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|гончая смерти|жрец-дракон|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
@@ -4894,9 +4997,23 @@
         return 'magic';
     }
 
+    // Вермина (2–3): если враг атакует последователя, с шансом 10/20% (д100) он в страхе на 3 хода.
+    function gmVerminaFearCheck(targetUid, enemyId, enemyName) {
+        if (!currentCode || !enemyId) return;
+        db.collection('characters').doc(targetUid).get().then(doc => {
+            const chance = ((doc.exists && doc.data().godGM) || {}).fearChance || 0;
+            if (!chance) return;
+            const r = 1 + Math.floor(Math.random() * 100);
+            if (r <= 100 - chance) return;
+            const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? { ...e, statusEffects: [...(e.statusEffects || []).filter(x => x.name !== 'Страх (Вермина)'), { id: 'vrm-' + Date.now(), name: 'Страх (Вермина)', desc: 'Бежит в ужасе — не атакует', turns: 3, noAttack: true }] } : e);
+            return db.collection('sessions').doc(currentCode).update({ enemies }).then(() => gmPostLogEntryText(`😱 Вермина: «${enemyName}» напал(а) на её последователя и в ужасе бежит 3 хода (д100 = ${r}).`));
+        }).catch(e => console.error(e));
+    }
+
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
+        gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
         if (!dmg && !statusKey) {
             gmPostLogEntryText(logTextBase + '.');
             pendingGmAttack = null;
@@ -4909,17 +5026,19 @@
             const resist = ir.resist;
             let finalDmg = (dmg && !ir.zero) ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
             const defNotes = ir.notes.filter(n => /Отбивание|Защита от стихий|сопр\. магии/.test(n));
-            { // Бонусы богов игрока: Стендарр — резист урону от даэдра/нежити; Мефала — уязвимость к яду
+            { // Бонусы богов игрока: Стендарр — резист урону от даэдра/нежити; Дибелла — шанс поглотить заклинание; Азура — игнор урона заклинаний
                 const gg = data.godGM || {};
                 if (finalDmg && gg.daedraUndeadResist && pendingGmAttack.enemyUndeadDaedra) {
                     const cutG = Math.round(finalDmg * gg.daedraUndeadResist / 100);
                     finalDmg = Math.max(0, finalDmg - cutG);
                     defNotes.push('🕊 Бог: резист урону от даэдра/нежити ' + gg.daedraUndeadResist + '% (−' + cutG + ')');
                 }
-                if (finalDmg && dmgType === 'poison' && gg.poisonVulnerability) {
-                    const plusG = Math.round(finalDmg * gg.poisonVulnerability / 100);
-                    finalDmg += plusG;
-                    defNotes.push('☠ Бог: уязвимость к яду +' + gg.poisonVulnerability + '% (+' + plusG + ')');
+                if (finalDmg && pendingGmAttack.isSpell && gg.spellAbsorb && Math.random() * 100 < gg.spellAbsorb) {
+                    finalDmg = 0; defNotes.push('🌸 Дибелла: заклинание поглощено (' + gg.spellAbsorb + '%)');
+                }
+                if (finalDmg && pendingGmAttack.isSpell && gg.ignoreMagicDmg) {
+                    const cutA = Math.min(finalDmg, gg.ignoreMagicDmg);
+                    finalDmg -= cutA; defNotes.push('🌙 Азура: −' + cutA + ' урона заклинания');
                 }
             }
             { // «Вихревой плащ»: часть урона стрел и болтов игнорируется
@@ -4990,6 +5109,10 @@
                     chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'wardHit', effId: wEff.id || null, name: wEff.name, absorbed }) }).catch(() => { }));
                 }
             }
+            // «Контрудар» (Одноручное): попадания по игроку считаются по врагу — +1 к кубам за каждые 2 до его смерти (счёт в листе игрока).
+            if ((data.perkStates || {})['skill0-perk5-step1'] && pendingGmAttack.enemyId) {
+                chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'hitTaken', enemyId: pendingGmAttack.enemyId }) }).catch(() => { }));
+            }
             // Верхом (лист игрока: riding + живая лошадь): 70% урона принимает лошадь, 30% — всадник.
             // ХП лошади меняется командой в лист игрока (gmCmds), как и другие правки мастера.
             let horseNote = '';
@@ -5004,11 +5127,11 @@
                 }
             }
             let logExtra = '', newHp, newMp;
-            // Заклинание «Барьер» (Изменение): pct% ВСЕГО входящего урона уходит в ману (rate маны за 1 урона).
+            // Заклинание «Барьер» (Изменение): pct% ФИЗИЧЕСКОГО входящего урона уходит в ману (rate маны за 1 урона) — по таблице магии.
             // Мана кончилась — барьер падает: ошеломление (−2 к кубам на 2 хода) и снятие всех положительных эффектов.
             let barrierBroke = false;
             let barrierMpSpent = 0;
-            if (finalDmg > 0) {
+            if (finalDmg > 0 && dmgType === 'physical') {
                 const bEff = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).find(x => x && x.barrier && x.turnsRemaining !== 0);
                 if (bEff) {
                     const vit = Array.isArray(data.vitals) ? data.vitals : [0, 0, 0, 0];
@@ -5110,10 +5233,12 @@
                 patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
                     id: 'st-' + Date.now() + Math.random().toString(36).slice(2, 8),
                     name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns,
-                    rollPenalty: statusDef.rollPenalty || 0, fromGm: true
+                    rollPenalty: statusDef.rollPenalty || 0, fromGm: true,
+                    // паралич и страх: игрок бросает спасбросок на своём листе (Телосложение / Мудрость, СЛ 13)
+                    save: statusKey === 'paralyze' ? { stat: 'con', dc: 13 } : statusKey === 'fear' ? { stat: 'wis', dc: 13 } : null
                 });
                 chores.push(db.collection('sessions').doc(currentCode).update(patch));
-                logExtra += `, наложен статус «${statusDef.name}» (${statusDef.turns} х.)`;
+                logExtra += `, статус «${statusDef.name}» (${statusDef.turns} х.)${statusKey === 'paralyze' || statusKey === 'fear' ? ' — игрок бросает спасбросок (СЛ 13)' : ''}`;
             }
             return Promise.all(chores).then(() => ({ newHp, newMp, logExtra }));
         }).then(({ newHp, newMp, logExtra }) => {
@@ -5858,7 +5983,7 @@
     };
     window.gmNewGameDay = function () {
         if (!currentCode) return;
-        db.collection('sessions').doc(currentCode).update({ gameDayCounter: firebase.firestore.FieldValue.increment(1) }).catch(e => alert('Ошибка: ' + e.message));
+        db.collection('sessions').doc(currentCode).update({ gameDayCounter: firebase.firestore.FieldValue.increment(1), gameDayPlayerMax: firebase.firestore.FieldValue.increment(1) }) /* день у партии один: «Следующий день» игроков за этот же день счётчик уже не двигает */.catch(e => alert('Ошибка: ' + e.message));
     };
 
     // ---------- Эпик 5.5/5.6: уведомления мастера и «Позвать» ----------
@@ -7309,6 +7434,12 @@
     function gmTrapVictims(id, kind) {
         return Array.from(document.querySelectorAll(`input[data-trap="${id}"][data-kind="${kind || 'main'}"]:checked`)).map(c => c.value);
     }
+    // Состояние ловушки после срабатывания (кнопка «Сработала» или проваленное обезвреживание).
+    function gmTrapStateAfterTrigger(t, tr) {
+        if (t.perTurn) return { state: 'active', left: t.perTurn.activeTurns || 0 }; // 0 = бьёт, пока не заберут камень
+        if (t.id === 'tar' && tr.ignited) return { state: 'active', left: 0 };
+        return { state: t.id === 'tar' ? 'ready' : 'off', left: 0 }; // разовые ловушки после срабатывания — разряжены
+    }
     window.gmTriggerTrap = function (id) {
         const tr = trapsArr().find(x => x.id === id); if (!tr) return;
         const t = trapType(tr.type); if (!t) return;
@@ -7320,11 +7451,7 @@
         const names = u => (parts[u] || {}).name || 'игрок';
         victims.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited })));
         around.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { radius: true })));
-        const upd = Object.assign({}, tr, { victims: victims.slice() });
-        if (t.perTurn) { upd.state = 'active'; upd.left = t.perTurn.activeTurns || 0; } // 0 = бьёт, пока не заберут камень
-        if (t.id === 'tar' && tr.ignited) { upd.state = 'active'; upd.left = 0; }
-        if (!t.perTurn && !(t.id === 'tar' && tr.ignited)) upd.state = t.id === 'tar' ? 'ready' : 'off'; // разовые ловушки после срабатывания — разряжены
-        gmSaveTraps(trapsArr().map(x => x.id === id ? upd : x));
+        gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, tr, gmTrapStateAfterTrigger(t, tr), { victims: victims.slice() }) : x));
         gmPostLogEntryText(`🪤 Срабатывает ${t.icon} ${t.name}${tr.label ? ' (' + tr.label + ')' : ''}: ${victims.map(names).join(', ')}${around.length ? (victims.length ? '; рядом — ' : 'рядом — ') + around.map(names).join(', ') : ''}.${t.alarm ? ' 🔔 Враги знают, где вы!' : ''}`);
     };
     window.gmIgniteTar = function (id) {
@@ -7338,7 +7465,7 @@
         const tr = trapsArr().find(x => x.id === id); if (!tr) return;
         const t = trapType(tr.type); const uid = (el('gm-trap-disarm-' + id) || {}).value; if (!uid) { alert('Выбери игрока.'); return; }
         const dc = t.disarmDc || parseInt((el('gm-trap-dc-' + id) || {}).value) || 15;
-        gmSendTrapCmd(uid, { type: 'trapDisarm', trapId: id, trapName: t.name, icon: t.icon, dc, onFail: gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited }) });
+        gmSendTrapCmd(uid, { type: 'trapDisarm', trapId: id, trapName: t.name, icon: t.icon, dc, onFail: gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited }), failState: gmTrapStateAfterTrigger(t, tr) });
         gmPostLogEntryText(`🪤 ${(((lastData || {}).participants || {})[uid] || {}).name || 'Игрок'} пытается обезвредить «${t.name}» (сл. ${dc}).`);
     };
     window.gmTrapTakeStone = function (id) {
