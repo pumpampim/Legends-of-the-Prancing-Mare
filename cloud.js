@@ -1351,6 +1351,8 @@
             const patch = {};
             const pref = 'participants.' + currentUser.uid + '.';
             Object.assign(patch, { [pref + 'name']: name, [pref + 'curHp']: curHp, [pref + 'curMp']: curMp, [pref + 'maxHp']: maxHp, [pref + 'maxMp']: maxMp, [pref + 'updatedAt']: firebase.firestore.FieldValue.serverTimestamp() });
+            // Аватар сразу при входе — иначе он появлялся в отряде только после следующего сохранения листа.
+            if (typeof window.getPortraitThumb === 'function') patch[pref + 'portraitThumb'] = window.getPortraitThumb();
             // Новый в сессии игрок стоит на текущем дне партии — от этой точки считаются его «Следующий день» (bumpGameDayCounter).
             if (!(doc.data().gameDayByUid || {}).hasOwnProperty(currentUser.uid)) patch['gameDayByUid.' + currentUser.uid] = parseInt(doc.data().gameDayPlayerMax) || 0;
 
@@ -1687,6 +1689,18 @@
         return result;
     }
 
+    // Аватар игрока в списке отряда: миниатюра портрета с листа (portraitThumb, JPEG 48×48),
+    // без портрета — кружок с первой буквой имени. Берём только data:image, чтобы чужая
+    // строка из сессии не попала в src как произвольный адрес.
+    function playerAvatarData(p) {
+        const t = typeof p.portraitThumb === 'string' ? p.portraitThumb : '';
+        if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(t)) return t;
+        const letter = String(p.name || '?').trim().charAt(0).toUpperCase() || '?';
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="#2a2218"/>' +
+            '<text x="24" y="31" text-anchor="middle" font-family="Georgia,serif" font-size="22" fill="#c8a566">' + escapeHtml(letter) + '</text></svg>';
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
     function barRow(name, curHp, maxHp, curMp, maxMp, avatar) {
         const hpPct = maxHp > 0 ? Math.max(0, Math.min(100, (curHp / maxHp) * 100)) : 0;
         const mpPct = maxMp > 0 ? Math.max(0, Math.min(100, (curMp / maxMp) * 100)) : 0;
@@ -1846,7 +1860,7 @@
         if (uids.length === 0) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Пока никого нет.</p>'; return; }
         target.innerHTML = uids.map(uid => {
             const p = participants[uid] || {};
-            return barRow(p.name || '?', p.curHp || 0, p.maxHp || 0, p.curMp || 0, p.maxMp || 0);
+            return barRow(p.name || '?', p.curHp || 0, p.maxHp || 0, p.curMp || 0, p.maxMp || 0, playerAvatarData(p));
         }).join('');
     }
 

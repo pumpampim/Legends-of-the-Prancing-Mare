@@ -7676,6 +7676,7 @@ window.toggleSkillPanel = function (idx) {
         r.readAsDataURL(f);
         input.value = '';
     };
+    window.getPortraitThumb = function () { return playerPortraitThumb || ''; }; // cloud.js: аватар в списке отряда сразу при входе в сессию
     window.clearPortrait = function () { playerPortrait = ''; playerPortraitThumb = ''; renderPortrait(); saveLocalStorage(true); };
     function renderPortrait() {
         const p = document.getElementById('st-portrait-preview'); if (p) p.style.backgroundImage = playerPortrait ? 'url(' + playerPortrait + ')' : '';
@@ -17399,7 +17400,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=33"></script>
+<script src="cloud.js?v=34"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
