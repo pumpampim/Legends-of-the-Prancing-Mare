@@ -1018,6 +1018,8 @@ button, input, select, textarea, .tab-link, .panel, .profession-header {
 html, body {
     font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
 }
+/* iOS Safari при повороте телефона сам раздувает часть текста — размеры прыгали от блока к блоку. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 body {
     padding: 22px;
@@ -1753,6 +1755,10 @@ input[type="number"] {
     .stat-block:has(button) { flex-direction: column; align-items: stretch; }
     .stat-block:has(button) > span { max-width: 100%; }
     .stat-block:has(button) > span:last-child { justify-content: flex-start !important; }
+    /* В колонке flex-basis из инлайна (например, flex:0 1 300px у названия в «Купить у торговца»)
+       становится ВЫСОТОЙ — между названием и ценой/кнопкой зияла пустота в 300px. */
+    .stat-block:has(button) { gap: 6px !important; }
+    .stat-block:has(button) > * { flex: 0 0 auto !important; }
     .stat-block button { padding: 6px 10px !important; font-size: 13px !important; }
     .party-row, .enemy-row { padding: 7px 8px; }
     .party-row .row-name, .enemy-row .row-name { flex-wrap: wrap; gap: 4px; }
@@ -1771,6 +1777,16 @@ input[type="number"] {
     div[style*="display:flex"] > div { min-width: 0; }
     #skill-progress-list > div { grid-template-columns: 1fr !important; }
     #skill-progress-list .party-row > span { flex: 1 1 auto !important; }
+
+    /* Шрифты: основной текст на листе 18px (html, см. stApplyFontSize), а пояснения и описания
+       предметов вписаны в разметку как 11–13px — на телефоне узкий Barlow Condensed в 11–12px
+       почти не читается, и разница с основным текстом бросается в глаза. Основной текст чуть
+       меньше (в rem, чтобы «Крупный/Огромный» продолжали работать), мелкий — чуть крупнее. */
+    html.st-font-normal body, html.st-font-large body, html.st-font-huge body { font-size: .9rem; }
+    [style*="font-size:11px"], [style*="font-size: 11px"] { font-size: 12.5px !important; }
+    [style*="font-size:12px"], [style*="font-size: 12px"] { font-size: 13.5px !important; }
+    [style*="font-size:13px"], [style*="font-size: 13px"] { font-size: 14px !important; }
+    .stat-block, .party-row, .enemy-row { line-height: 1.3; }
 }
 @media (max-width: 380px) {
     h1 { font-size: 14px; }
