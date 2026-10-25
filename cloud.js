@@ -868,7 +868,11 @@
                 if (idx === -1) throw new Error('Противник не найден.');
                 const me = (data.participants || {})[currentUser.uid] || {};
                 if (me.fallen || (me.curHp !== undefined && (parseInt(me.curHp) || 0) <= 0)) throw new Error('Павший персонаж не может обыскивать трупы.');
-                const corpseLoot = enemies[idx].corpseLoot;
+                let corpseLoot = enemies[idx].corpseLoot;
+                // Враг из базы: добыча ещё не брошена (как у мастера и у карманной кражи) — бросаем по тексту лута сейчас.
+                if (!corpseLoot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) {
+                    corpseLoot = JSON.parse(JSON.stringify(window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: window.allItems || [], level: enemies[idx].level || 1 }) || { gold: 0, items: [] }));
+                }
                 if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
                 enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
                 tx.update(ref, { enemies: enemies });
@@ -1088,14 +1092,16 @@
         incrementGuildProgress: function (guildName) {
             if (!currentUser || !db) return Promise.reject(new Error('Не авторизован.'));
             const ref = db.collection('characters').doc(currentUser.uid);
-            const patch = {};
-            patch['guildsData.' + guildName + '.orders'] = firebase.firestore.FieldValue.increment(1);
-            // Эпик 5.3: узнаём счёт ДО прибавления, чтобы понять, не пересечён ли порог ранга (само прибавление по-прежнему атомарное).
-            return ref.get().then(doc => {
+            // Транзакция: set(patch, {merge}) с ключом 'guildsData.X.orders' не разбирает точки — создавалось отдельное поле
+            // с точками в имени, а guildsData.X.orders не рос. update() разбирает путь; старый формат (число) приводим к объекту.
+            let before = 0;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
                 const gd = ((doc.exists ? doc.data() : {}).guildsData || {})[guildName];
-                const before = typeof gd === 'number' ? gd : (gd && parseInt(gd.orders)) || 0;
-                return ref.set(patch, { merge: true }).then(() => announceGuildRank(guildName, before, before + 1));
-            });
+                before = typeof gd === 'number' ? gd : (gd && parseInt(gd.orders)) || 0;
+                const next = Object.assign(typeof gd === 'number' ? { member: gd > 0 } : {}, (gd && typeof gd === 'object') ? gd : {}, { orders: before + 1 });
+                const patch = {}; patch['guildsData.' + guildName] = next;
+                if (doc.exists) tx.update(ref, patch); else tx.set(ref, { guildsData: { [guildName]: next } }, { merge: true });
+            })).then(() => announceGuildRank(guildName, before, before + 1));
         },
 
         // Сдача артефакта в музей коллегии бардов — +1 легендарная песня (orders), +1 к
@@ -2002,7 +2008,7 @@
         target.innerHTML = enemies.map(e => {
             let extra = '';
             if (e.isRaisable && (e.curHp || 0) <= 0) {
-                extra = e.corpseLoot
+                extra = (e.corpseLoot || (!e.looted && e.loot))
                     ? '<button style="width:100%; margin-top:2px; font-size:12px;" onclick="window.playerLootCorpse(\'' + e.id + '\')">💰 Обыскать труп</button>'
                     : '<div style="font-size:12px; opacity:.6; margin-top:2px;">Труп уже обыскан.</div>';
             }

@@ -405,12 +405,11 @@
     function populateBlockSelects() {
         const atkSel = el('block-attacker-select');
         const tgtSel = el('block-target-select');
-        if (atkSel && !atkSel.options.length) {
-            atkSel.innerHTML = (lastData.enemies || []).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('') || '<option value="">Нет врагов в бою</option>';
-        }
-        if (tgtSel && !tgtSel.options.length) {
-            tgtSel.innerHTML = Object.keys(lastData.participants || {}).map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('') || '<option value="">Нет игроков</option>';
-        }
+        // Пересобираем на каждом снимке (враги и игроки приходят и уходят), сохраняя выбранное значение.
+        // Раньше списки заполнялись один раз — новые враги в них не появлялись до перезагрузки.
+        const fill = (sel, html) => { if (!sel) return; const prev = sel.value; if (sel.innerHTML !== html) { sel.innerHTML = html; if (Array.from(sel.options).some(o => o.value === prev)) sel.value = prev; } };
+        fill(atkSel, (lastData.enemies || []).filter(e => (e.curHp || 0) > 0).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('') || '<option value="">Нет врагов в бою</option>');
+        fill(tgtSel, Object.keys(lastData.participants || {}).map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('') || '<option value="">Нет игроков</option>');
     }
 
     window.rollActiveBlock = function () {
@@ -551,21 +550,25 @@
                     }
                 }
                 restNotes.push(`${nm}: мана ${curMp} → ${v[1]}${atronach ? ' (Атронах — половина)' : ''}, ${hpNote}`);
-            }, Object.assign(extraRest, {
-                pendingStatusEffects: firebase.firestore.FieldValue.arrayUnion({
-                    id: 'rest-' + Date.now() + Math.random().toString(36).slice(2, 6),
-                    name: 'Лагерь', effectName: 'Полноценный отдых', description: '+1 к кубам на все проверки навыков (весь следующий игровой день).', turnsRemaining: 20
-                })
-            })).catch(e => console.error('Ошибка отдыха для', uid, e));
+            }, extraRest).catch(e => console.error('Ошибка отдыха для', uid, e));
+        });
+        // «Полноценный отдых» — через очередь сессии participants.{uid}.pendingStatusEffects (её читает игрок);
+        // раньше статус писался в characters/{uid}.pendingStatusEffects, которую никто не читает.
+        const restPatch = {};
+        uids.forEach(uid => {
+            restPatch['participants.' + uid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                id: 'rest-' + Date.now() + Math.random().toString(36).slice(2, 6),
+                name: 'Лагерь', effectName: 'Полноценный отдых', description: '+1 к кубам на все проверки навыков (весь следующий игровой день).', turnsRemaining: 20, rollPenalty: 1
+            });
         });
         Promise.all(writes).then(() => {
-            db.collection('sessions').doc(currentCode).update({
+            db.collection('sessions').doc(currentCode).update(Object.assign(restPatch, {
                 'campState.active': false,
                 combatLog: firebase.firestore.FieldValue.arrayUnion({
                     ts: Date.now(), author: 'Мастер',
                     text: `😴 Ночь прошла спокойно (бросок ${roll} > ${chance}%). ${restNotes.join('; ')}. Статус «Полноценный отдых» применён.`
                 })
-            });
+            }));
         });
     };
 
@@ -1205,7 +1208,47 @@
     }
     document.addEventListener('click', function (ev) { if (ev.target.closest && ev.target.closest('#prep-body')) prepOnClick(ev); });
 
-    function renderAll() {
+    // Панели перерисовываются на каждый снимок сессии (heartbeat, сохранения игроков). Недописанное в полях,
+    // которые пересоздаются innerHTML (лут/ХП врага, «Новый штраф»), и выбор в пересобранных списках
+    // («Порядок ходов → выбрать») раньше сбрасывались. Запоминаем и возвращаем.
+    function gmFormKey(f) {
+        if (f.id) return '#' + f.id;
+        const h = f.getAttribute('onchange') || f.getAttribute('oninput') || f.getAttribute('onblur') || '';
+        return h ? 'h:' + h + '|' + (f.getAttribute('name') || '') : '';
+    }
+    function gmFindByKey(key) {
+        if (key.charAt(0) === '#') return document.getElementById(key.slice(1));
+        const list = document.querySelectorAll('input, textarea, select');
+        for (let i = 0; i < list.length; i++) if (gmFormKey(list[i]) === key) return list[i];
+        return null;
+    }
+    function gmKeepForms(fn) {
+        const saved = [];
+        const act = document.activeElement;
+        document.querySelectorAll('input, textarea, select').forEach(f => {
+            if (/^(checkbox|radio|file|button|submit|hidden)$/.test(f.type)) return;
+            const key = gmFormKey(f); if (!key) return;
+            const dirty = f.tagName === 'SELECT' ? true : (f === act || f.value !== f.defaultValue);
+            if (!dirty) return;
+            saved.push({ f, key, value: f.value, focus: f === act, sel: f === act && typeof f.selectionStart === 'number' ? [f.selectionStart, f.selectionEnd] : null });
+        });
+        try { fn(); } finally {
+            saved.forEach(x => {
+                const replaced = !document.body.contains(x.f);
+                if (x.f.tagName === 'SELECT' && !replaced) {
+                    if (x.f.value !== x.value && Array.from(x.f.options).some(o => o.value === x.value)) x.f.value = x.value;
+                    return;
+                }
+                if (!replaced) return;
+                const nf = gmFindByKey(x.key); if (!nf || nf.tagName !== x.f.tagName) return;
+                if (nf.tagName === 'SELECT' && !Array.from(nf.options).some(o => o.value === x.value)) return;
+                nf.value = x.value;
+                if (x.focus) { try { nf.focus(); if (x.sel) nf.setSelectionRange(x.sel[0], x.sel[1]); } catch (e) { } }
+            });
+        }
+    }
+    function renderAll() { gmKeepForms(renderAllInner); }
+    function renderAllInner() {
         renderPrep();
         rumRender();
         renderJournalGm();
@@ -1669,7 +1712,7 @@
             const gen = window.EnemyGear.generate(pick, enemyLootCtx(pick.level));
             if (gen) {
                 extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
-                extra.corpseLoot = { gold: gen.gold, items: gen.lootItems };
+                extra.corpseLoot = { gold: gen.gold, items: gen.lootItems }; extra.lootKit = JSON.parse(JSON.stringify(extra.corpseLoot));
                 extra.loot = genLootText(gen);
             }
         }
@@ -1697,17 +1740,18 @@
         const manualResist = Number(el('enemy-resist-input').value) || 0;
         const manualLoot = el('enemy-loot-input').value.trim();
         const extra = {};
-        if (manualDmg) extra.weaponDmg = manualDmg;
-        if (manualResist) extra.resist = { physical: manualResist };
-        if (manualLoot) extra.loot = manualLoot;
+        // Сначала значения базы, поверх — то, что мастер ввёл руками (раньше база перетирала ручные урон, резист и лут).
         if (currentEnemyDbPick && currentEnemyDbPick.name === name) Object.assign(extra, gmEnemyExtraFromDb(currentEnemyDbPick));
+        if (manualDmg) extra.weaponDmg = manualDmg;
+        if (manualResist) extra.resist = Object.assign({}, extra.resist || {}, { physical: manualResist });
+        if (manualLoot) extra.loot = manualLoot;
         // Снаряжение/добыча по выбору мастера главнее и значений из базы, и автоматического генератора.
         const gearExtra = buildEnemyGearExtra();
         if (gearExtra) {
             if (gearExtra.weaponDmg && !manualDmg) extra.weaponDmg = gearExtra.weaponDmg;
             if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; }
             if (gearExtra.physResist && !manualResist) extra.resist = Object.assign({}, extra.resist || {}, { physical: gearExtra.physResist });
-            extra.corpseLoot = gearExtra.corpseLoot;
+            extra.corpseLoot = gearExtra.corpseLoot; extra.lootKit = JSON.parse(JSON.stringify(gearExtra.corpseLoot || null));
             extra.loot = genLootText(gearExtra.corpseLoot);
         }
         enemies.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
@@ -2587,7 +2631,7 @@
         if (sourceItem.slot && enchantableSlots.includes(sourceItem.slot) && !sourceItem.enchantment &&
             confirm(`Зачаровать «${sourceItem.name}» перед выдачей?`)) {
             const isWeapon = sourceItem.slot === 'melee' || sourceItem.slot === 'ranged';
-            const armorSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
+            const armorSlotMap = { chest: 'armor', robe: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
             const wantedSlot = armorSlotMap[sourceItem.slot] || sourceItem.slot;
             const pool = isWeapon ? (window.enchantWeaponEffects || []) : (window.enchantArmorEffects || []).filter(e => e.slots.includes(wantedSlot));
             if (!pool.length) {
@@ -3698,9 +3742,9 @@
     window.tournChargeEntryFee = function () {
         const uid = currentInvPlayerUid;
         if (!uid) { alert('Выбери игрока.'); return; }
-        gmAddGold(uid, -200).then(() => {
-            el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Залог 200 золота списан.</span>`;
-        }).catch(e => alert('Ошибка: ' + e.message));
+        gmAddGold(uid, -200, { requireEnough: true }).then(r => {
+            el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Залог 200 золота списан (было ${r.before}, стало ${r.after}).</span>`;
+        }).catch(e => { el('tourn-result').innerHTML = `<span style="color:#e74c3c;">Залог не списан: ${escapeHtml(e.message)}.</span>`; });
     };
 
     window.tournGrantReward = function () {
@@ -3792,10 +3836,16 @@
             tx.update(ref, { museumRequests: list });
         })).then(() => {
             if (!ok) return;
-            const patch = {};
-            patch['guildsData.Коллегия бардов.orders'] = firebase.firestore.FieldValue.increment(1);
-            patch['guildsData.Коллегия бардов.artifacts'] = firebase.firestore.FieldValue.increment(1);
-            return db.collection('characters').doc(req.uid).set(patch, { merge: true }).then(() => gmAddGold(req.uid, 800));
+            // update(), а не set(merge): set не разбирает точки в ключе — песня и артефакт не засчитывались.
+            const refC = db.collection('characters').doc(req.uid), GN = 'Коллегия бардов';
+            return db.runTransaction(tx => tx.get(refC).then(doc => {
+                const gd = ((doc.exists ? doc.data() : {}).guildsData || {})[GN];
+                const base = typeof gd === 'number' ? { member: gd > 0, orders: gd } : Object.assign({}, gd || {});
+                base.orders = (parseInt(base.orders) || 0) + 1;
+                base.artifacts = (parseInt(base.artifacts) || 0) + 1;
+                const patch = {}; patch['guildsData.' + GN] = base;
+                if (doc.exists) tx.update(refC, patch); else tx.set(refC, { guildsData: { [GN]: base } }, { merge: true });
+            })).then(() => gmAddGold(req.uid, 800));
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -4021,6 +4071,7 @@
             };
             renderGmPlayerPerks(data.takenPerks);
             renderGmPlayerPets(data.pets);
+            renderGmPlayerEffects(data.activeTimedEffects);
             if (typeof window.gmRenderTeachSpells === 'function') window.gmRenderTeachSpells();
             { const ss = el('inv-skill-decrease-select'); if (ss) { const cur = ss.value; ss.innerHTML = SKILL_NAMES_BY_IDX.map((n, i) => `<option value="${i}">${escapeHtml(n)} — ${getEffectiveSkillFromData(currentPlayerInvData, i)}</option>`).join(''); /* как у игрока: с расовым бонусом */ if (cur !== '') ss.value = cur; } }
             el('inv-gold-block').style.display = 'block';
@@ -4041,10 +4092,9 @@
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
                 vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} })
             } : defaultSn;
-            renderGuildsPanel();
-            renderSupernaturalPanel();
             currentCrimeState = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, data.crimeState || {});
-            renderCrimePanel();
+            // Снимок листа игрока приходит на каждое его сохранение — недописанная сумма штрафа и прочие поля не теряются.
+            gmKeepForms(() => { renderGuildsPanel(); renderSupernaturalPanel(); renderCrimePanel(); });
             // Репутация копится ЛОКАЛЬНО до явного "Сохранить" (см. панель Задачи D) — если
             // перезатирать её на каждом чужом снапшоте, можно потерять несохранённые правки
             // мастера. Подтягиваем из облака только при первом выборе этого игрока.
@@ -4230,11 +4280,13 @@
     // Не FieldValue.increment: лист игрока долго сохранял золото строкой ("150"), а increment по
     // нечисловому полю Firestore не прибавляет, а ЗАМЕНЯЕТ значение — «+50» превращало 150 в 50.
     // Транзакция читает текущее значение (parseInt понимает и строку) и пишет число.
-    function gmAddGold(uid, delta) {
+    // opts.requireEnough — списание только если золота хватает (иначе ошибка, ничего не меняется).
+    function gmAddGold(uid, delta, opts) {
         const ref = db.collection('characters').doc(uid);
         let res = null;
         return db.runTransaction(tx => tx.get(ref).then(doc => {
             const before = parseInt((doc.data() || {}).gold) || 0;
+            if (opts && opts.requireEnough && (parseInt(delta) || 0) < 0 && before < -(parseInt(delta) || 0)) throw new Error('у игрока только ' + before + ' золота, нужно ' + (-(parseInt(delta) || 0)));
             const after = Math.max(0, before + (parseInt(delta) || 0));
             res = { before, after };
             if (doc.exists) tx.update(ref, { gold: after }); else tx.set(ref, { gold: after }, { merge: true });
@@ -4299,7 +4351,7 @@
             effects = window.enchantWeaponEffects;
         } else if ((cat === 'armor' || cat === 'jewelry') && window.enchantArmorEffects) {
             const slot = cat === 'armor' ? el('ci-armor-slot').value : el('ci-jewelry-slot').value;
-            const enchantSlotMap = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
+            const enchantSlotMap = { chest: 'armor', robe: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
             const wantedSlot = enchantSlotMap[slot] || slot;
             effects = window.enchantArmorEffects.filter(e => e.slots.includes(wantedSlot));
         }
@@ -4951,6 +5003,19 @@
         gmUpdateEnemies(enemies).catch(e => console.error(e));
         return { ok: true, tracked: true, left: enemy.curMp - cost };
     }
+    // Атакующее заклинание: при броске только проверяем, хватает ли маны; списываем при «Применить» (gmChargePendingMana) —
+    // раньше каждый переброс той же атаки снова снимал МП.
+    function gmEnemyManaCheck(enemy, cost) {
+        if (!cost || !(enemy.maxMp > 0) || typeof enemy.curMp !== 'number') return { ok: true, tracked: false };
+        if (enemy.curMp < cost) return { ok: false };
+        return { ok: true, tracked: true, left: enemy.curMp - cost };
+    }
+    function gmChargePendingMana(pa) {
+        if (!pa || !pa.manaDue) return;
+        const en = (lastData.enemies || []).find(e => e.id === pa.enemyId);
+        if (en) gmEnemyPayMana(en, Math.min(pa.manaDue, typeof en.curMp === 'number' ? en.curMp : pa.manaDue));
+        pa.manaDue = 0;
+    }
     window.onGmAttackAttackerPicked = function () {
         const attackerId = el('gm-attack-attacker-select').value;
         const actionSelect = el('gm-attack-action-select');
@@ -5064,7 +5129,7 @@
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             const costS = s ? (parseInt(s.cost) || 0) : 0;
             const sup = gmEnemySupportSpell(s);
-            const pay = gmEnemyPayMana(enemy, costS);
+            const pay = sup ? gmEnemyPayMana(enemy, costS) : gmEnemyManaCheck(enemy, costS); // заклинание на себя срабатывает сразу
             if (!pay.ok) { alert(`У «${enemy.name}» не хватает маны на «${s.name}»: нужно ${costS}, есть ${enemy.curMp}.`); return; }
             if (sup) { // заклинание на себя — не атака по игроку
                 const parts = [];
@@ -5123,6 +5188,7 @@
             isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
             enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|гончая смерти|жрец-дракон|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
+            manaDue: (isSpellAttack && spellCost && enemy.maxMp > 0 && typeof enemy.curMp === 'number') ? spellCost : 0, // мана — при «Применить», и при промахе тоже
             // Теги болезни (carrierOfDisease/diseaseChance) — для автоматического броска на
             // заражение при попадании физической атакой, см. applyGmAttackDamage.
             carrierOfDisease: hit ? gmEnemyDisease(enemy).name : null, diseaseChance: hit ? gmEnemyDisease(enemy).chance : 0,
@@ -5207,6 +5273,7 @@
 
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
+        gmChargePendingMana(pendingGmAttack);
         if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') { gmApplyAttackToCompanion(); return; }
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
@@ -5601,22 +5668,22 @@
         if (!lastGeneratedLoot) { alert('Сначала сгенерируй лут.'); return; }
         const targetUid = el('loot-gen-target-player').value;
         if (!targetUid) { alert('Выбери игрока.'); return; }
-        db.collection('characters').doc(targetUid).get().then(doc => {
+        // Транзакция: инвентарь и золото пишутся вместе, автосохранение игрока в этот момент не затирает добычу.
+        const charRefG = db.collection('characters').doc(targetUid);
+        db.runTransaction(tx => tx.get(charRefG).then(doc => {
             const data = doc.exists ? doc.data() : {};
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
             lastGeneratedLoot.items.forEach(it => {
                 const itemId = it.name; // а не id документа базы — иначе стек не сливается с одноимённым предметом игрока
-                const extra = {};
-                if (it.slot) extra.slot = it.slot;
-                if (typeof it.armor === 'number') extra.armorValue = it.armor;
-                if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
-                if (typeof it.price === 'number') extra.price = it.price;
+                // Как при «Передать»: эффекты зелий и ядов, чары, единая категория «Зелье»/«Яд» (а не «Яд (лут)»).
+                const extra = gmItemExtraFromSource(it);
                 const q = it.qty || 1; // валюта сундука (Дракры/Думаки) приходит стопкой, не по одной штуке
                 gmMergeInvItem(inv, { itemId, name: it.name, weight: it.weight || 0, category: it.category || '', effect: it.effect || '' }, q, extra);
             });
-            const newGold = (parseInt(data.gold) || 0) + lastGeneratedLoot.gold;
-            return db.collection('characters').doc(targetUid).update({ inventory: inv, gold: newGold });
-        }).then(() => {
+            const newGold = (parseInt(data.gold) || 0) + (parseInt(lastGeneratedLoot.gold) || 0);
+            const patchG = { inventory: stripUndefinedDeep(inv), gold: newGold };
+            if (doc.exists) tx.update(charRefG, patchG); else tx.set(charRefG, patchG, { merge: true });
+        })).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
             if (lastGeneratedLoot.trap) { // сундук с ловушкой: игрок открывает его — бросок на обезвреживание, провал = ловушка
                 const tt = trapType(lastGeneratedLoot.trap.id);
@@ -5688,8 +5755,9 @@
 
     function getBanditGearPool(level) {
         const tiers = getBanditTierRegexes(level);
+        // Ближний бой: без луков, арбалетов и боеприпасов (стрелы/болты раньше попадали сюда как «оружие»).
         const weapons = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).filter(w =>
-            !/лук/i.test(w.name) && tiers.weaponMats.some(re => re.test(w.name)));
+            !w.isAmmo && !/лук|арбалет|стрел|болт/i.test(w.name) && tiers.weaponMats.some(re => re.test(w.name)));
         const armors = (window.armorRecipes || []).concat(window.armorNonCraftable || []).filter(a =>
             tiers.armorMats.some(re => re.test(a.name)));
         const bowNames = tiers.bows;
@@ -5806,11 +5874,11 @@
     function getBanditMageSpellPool(level) {
         if (!window.spellsData) return [];
         const maxRank = level >= 45 ? 4 : level >= 25 ? 3 : level >= 10 ? 2 : 1;
-        const schools = ['destr', 'restor', 'conjur']; // разрушение/восстановление/колдовство — боевые школы
+        const schools = ['destr', 'restor', 'conj']; // разрушение/восстановление/колдовство — боевые школы (ключ колдовства в spell-data — 'conj')
         const pool = [];
         schools.forEach(school => {
             for (let r = 1; r <= maxRank; r++) {
-                (window.spellsData[school] && window.spellsData[school][r] || []).forEach(s => pool.push(Object.assign({ school }, s)));
+                (window.spellsData[school] && window.spellsData[school][r] || []).forEach(s => { if (/барьер/i.test(s.name)) return; pool.push(Object.assign({ school }, s)); });
             }
         });
         return pool;
@@ -5854,8 +5922,9 @@
 
         const levelDmgMult = 1 + (level - 1) * 0.05;
         const spells = pickedSpells.map(s => {
-            const dmg = (typeof parseSpellDamageFromDesc === 'function') ? parseSpellDamageFromDesc(s.desc) : null;
-            return { name: s.name, dmg: dmg ? Math.round(dmg * levelDmgMult) + intMod : 0, cost: s.cost || 20, school: s.school };
+            // Колдовство (призывы, ауры, проклятия) урона по цели не наносит — числа в описании про существо; мастер применяет по описанию.
+            const dmg = (s.school !== 'conj' && typeof parseSpellDamageFromDesc === 'function') ? parseSpellDamageFromDesc(s.desc) : null;
+            return { name: s.name, dmg: dmg ? Math.round(dmg * levelDmgMult) + intMod : 0, cost: parseInt(s.baseCost) || parseInt(s.cost) || 20, school: s.school }; // цена — baseCost из spell-data
         });
 
         const robePool = getBanditMageRobePool(level);
@@ -5869,7 +5938,8 @@
         const trinket = Math.random() < 0.4 && trinketPool.length ? trinketPool[Math.floor(Math.random() * trinketPool.length)] : null;
 
         const lootItems = [];
-        if (robe && Math.random() < 0.7) lootItems.push({ name: robe.name, price: robe.price || 0, weight: robe.weight || 2, slot: 'body', category: 'Магическое одеяние (с трупа)', effect: robe.effect || '' });
+        // Слот — как у вещи в базе (одеяние — robe, капюшон — helmet, сапоги — boots…), иначе снятое не надеть.
+        if (robe && Math.random() < 0.7) lootItems.push({ name: robe.name, price: robe.price || 0, weight: robe.weight || 2, slot: robe.slot || 'robe', armor: typeof robe.armor === 'number' ? robe.armor : 0, category: robe.category || 'Магические одеяния', effect: robe.effect || '' });
         if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
         if (Math.random() < 0.5) lootItems.push({ name: 'Отмычка', price: 5, weight: 0.1, category: 'Инструменты' });
 
@@ -5897,7 +5967,7 @@
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
             weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [],
-            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
     function mageBanditEnemyObj(b) {
@@ -5905,7 +5975,7 @@
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             con: b.con, int: b.int, wis: b.wis,
             weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
-            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
+            isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
     window.addGeneratedBanditToCombat = function () {
@@ -5989,16 +6059,15 @@
         const loot = enemy.corpseLoot || rollEnemyCorpseLoot(enemy);
         const items = loot.items || [];
         const gold = loot.gold || 0;
-        db.collection('characters').doc(targetUid).get().then(doc => {
+        const charRefL = db.collection('characters').doc(targetUid);
+        db.runTransaction(tx => tx.get(charRefL).then(doc => { // инвентарь и золото — одной транзакцией (гонка с автосохранением игрока)
             const data = doc.exists ? doc.data() : {};
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
             items.forEach((it, idx) => {
                 const qty = Math.max(1, parseInt(it.qty) || 1);
-                const extra = {};
-                if (it.slot) extra.slot = it.slot;
-                if (typeof it.armor === 'number') extra.armorValue = it.armor;
-                if (typeof it.dmg === 'number') extra.weaponDmg = it.dmg;
-                if (typeof it.price === 'number') extra.price = it.price;
+                // Эффекты зелий/ядов с трупа (enemy-loot.js кладёт alchemyEffects) и категория «Зелье»/«Яд» — как при «Передать».
+                const extra = gmItemExtraFromSource(it);
+                delete extra.enchantment; // зачарование с трупа — ниже, отдельной записью
                 const effect = it.effect || '';
                 if (it.enchantment) {
                     // Зачарованная вещь — отдельной записью (имя#время, как у вещей игрока), чтобы её можно было разрушить и узнать зачарование.
@@ -6010,8 +6079,9 @@
                 gmMergeInvItem(inv, { itemId: it.name, name: it.name, weight: it.weight || 0, category: it.category || '', effect }, qty, extra);
             });
             const newGold = (parseInt(data.gold) || 0) + gold;
-            return db.collection('characters').doc(targetUid).update({ inventory: stripUndefinedDeep(inv), gold: newGold });
-        }).then(() => {
+            const patchL = { inventory: stripUndefinedDeep(inv), gold: newGold };
+            if (doc.exists) tx.update(charRefL, patchL); else tx.set(charRefL, patchL, { merge: true });
+        })).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
             const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? Object.assign({}, e, { corpseLoot: null, looted: true }) : e);
             const summary = [gold ? gold + ' септ.' : '', describeLootItems(items)].filter(Boolean).join(', ') || 'ничего ценного';
@@ -6077,7 +6147,7 @@
             str: gen.str, dex: gen.dex, con: gen.con,
             weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist,
             spells: gen.spells, shouts: gen.shouts, soul: gen.soul, level: gen.level, kind: gen.kind,
-            loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }
+            loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }, lootKit: { gold: gen.gold, items: gen.lootItems }
         });
     }
 
@@ -6688,19 +6758,32 @@
             db.collection('characters').doc(p1).get(),
             db.collection('characters').doc(p2).get()
         ]).then(([d1, d2]) => {
-            const data1 = d1.exists ? d1.data() : {};
-            const data2 = d2.exists ? d2.data() : {};
-            const dmg1 = parseInt(data1.wepMDmg) || 0;
-            const dmg2 = parseInt(data2.wepMDmg) || 0;
-            const totalDmg = dmg1 + dmg2;
-            const roll = Math.floor(Math.random() * 20) + 1;
-            const name1 = (lastData.participants[p1] || {}).name || p1;
-            const name2 = (lastData.participants[p2] || {}).name || p2;
             const target = (lastData.enemies || []).find(e => e.id === targetId);
-            pendingCoopAttack = { targetId, dmg: totalDmg, name1, name2, targetName: target ? target.name : '?' };
-            resultEl.innerHTML = `<strong>${escapeHtml(name1)} + ${escapeHtml(name2)}</strong> атакуют «${escapeHtml(target ? target.name : '?')}» одновременно.<br>` +
-                `Бросок: 1d20 = <strong>${roll}</strong><br>Суммарный урон при попадании: <span style="color:#e74c3c; font-weight:bold;">${totalDmg}</span> (${dmg1}+${dmg2})<br>` +
-                `<button class="btn-success" style="width:100%; margin-top:6px;" onclick="applyCoopAttackDamage()">✅ Применить урон</button>`;
+            if (!target) { alert('Цель уже не найдена.'); return; }
+            // Каждый бьёт тем, что у него в руках: лук/арбалет — урон дальнего оружия и ЛОВ, иначе ближнее и СИЛ.
+            const side = (data, uid) => {
+                const ranged = data.activeWep === 'ranged' && (parseInt(data.wepRDmg) || 0) > 0;
+                const es = data.effectiveStats && !Array.isArray(data.effectiveStats) ? data.effectiveStats : {};
+                const stat = parseInt(ranged ? es.dex : es.str) || 10;
+                return { uid, name: (lastData.participants[uid] || {}).name || uid, ranged, dmg: parseInt(ranged ? data.wepRDmg : data.wepMDmg) || 0, mod: calcAbilityMod(stat) };
+            };
+            const a = side(d1.exists ? d1.data() : {}, p1), b = side(d2.exists ? d2.data() : {}, p2);
+            // Встречный бросок, как у обычной атаки: к20 + лучший модификатор из двух против голого к20 цели; ничья — перекид.
+            const mod = Math.max(a.mod, b.mod);
+            let roll, total, enemyRoll, rerolls = 0;
+            do { roll = Math.floor(Math.random() * 20) + 1; total = roll + mod; enemyRoll = Math.floor(Math.random() * 20) + 1; if (total !== enemyRoll) break; rerolls++; } while (rerolls < 20);
+            const hit = total > enemyRoll;
+            // Резисты цели — по каждому удару отдельно (физический урон), как при обычной атаке игрока.
+            const pv = x => window.StCombat && window.StCombat.previewDamage ? window.StCombat.previewDamage(target, x.dmg, 'physical', 0) : { finalDmg: x.dmg, resist: 0 };
+            const fa = pv(a), fb = pv(b);
+            const totalDmg = hit ? fa.finalDmg + fb.finalDmg : 0;
+            const killer = (fa.finalDmg >= fb.finalDmg ? a : b).uid;
+            pendingCoopAttack = { targetId, dmg: totalDmg, hit, name1: a.name, name2: b.name, targetName: target.name, killer };
+            const part = (x, f) => `${escapeHtml(x.name)}: ${x.ranged ? 'дальнее' : 'ближнее'} ${x.dmg}${f.resist ? ` → ${f.finalDmg} (резист ${f.resist}%)` : ''}`;
+            resultEl.innerHTML = `<strong>${escapeHtml(a.name)} + ${escapeHtml(b.name)}</strong> атакуют «${escapeHtml(target.name)}» одновременно.<br>` +
+                `Бросок: 1d20 (${roll}) ${mod >= 0 ? '+' : ''}${mod} = <strong>${total}</strong> vs цель 1d20 = <strong>${enemyRoll}</strong>${rerolls ? ` (перекид ×${rerolls})` : ''} — ${hit ? '<strong style="color:#2ecc71;">ПОПАДАНИЕ</strong>' : '<strong style="color:#7a7a7a;">ПРОМАХ</strong>'}<br>` +
+                (hit ? `Урон: <span style="color:#e74c3c; font-weight:bold;">${totalDmg}</span> (${part(a, fa)}; ${part(b, fb)})<br>` : '') +
+                `<button class="btn-success" style="width:100%; margin-top:6px;" onclick="applyCoopAttackDamage()">✅ ${hit ? 'Применить урон' : 'Записать промах'}</button>`;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -6708,16 +6791,23 @@
 
     window.applyCoopAttackDamage = function () {
         if (!pendingCoopAttack) return;
-        const { targetId, dmg, name1, name2, targetName } = pendingCoopAttack;
+        const { targetId, dmg, hit, name1, name2, targetName, killer } = pendingCoopAttack;
+        if (!hit) {
+            gmPostLogEntryText(`⚔️ ${name1} + ${name2} совместно атакуют «${targetName}» — промах.`);
+            el('coop-attack-result').innerHTML = ''; pendingCoopAttack = null; return;
+        }
         // Мастер сам пишет в сессию напрямую через свой db — моста к cloud.js не нужно
         // (gm.html вообще его не подключает).
         const enemies = (lastData.enemies || []).slice();
         const idx = enemies.findIndex(e => e.id === targetId);
         if (idx === -1) { alert('Цель уже не найдена.'); return; }
         const newHp = Math.max(0, (enemies[idx].curHp || 0) - dmg);
-        enemies[idx] = Object.assign({}, enemies[idx], { curHp: newHp });
+        // Кто ранил/добил — для добычи с трупа (gmCorpseKiller): игрок с бóльшим уроном в этом ударе.
+        const upd = { curHp: newHp, lastHitBy: killer };
+        if (newHp <= 0 && (enemies[idx].curHp || 0) > 0) { upd.killedBy = killer; upd.diedAtTurn = (lastData && lastData.sessionTurnCounter) || 0; }
+        enemies[idx] = Object.assign({}, enemies[idx], upd);
         gmUpdateEnemies(enemies).then(() => {
-            gmPostLogEntryText(`⚔️ ${name1} + ${name2} совместно бьют «${targetName}»: −${dmg} урона.`);
+            gmPostLogEntryText(`⚔️ ${name1} + ${name2} совместно бьют «${targetName}»: −${dmg} урона${newHp <= 0 ? ' — повержен(а)' : ''}.`);
             el('coop-attack-result').innerHTML = '';
             pendingCoopAttack = null;
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -7024,12 +7114,27 @@
         sel.innerHTML = '<option value="">— заготовки (' + Object.keys(encs).length + ') —</option>' + Object.keys(encs).map(id => `<option value="${escapeHtml(id)}">${escapeHtml(encs[id].name)} (${encs[id].enemies.length})</option>`).join('');
         if (encs[cur]) sel.value = cur;
     }
+    // Заготовки (встречи, шаблоны NPC) хранят «снаряжение» врага (lootKit), а не уже брошенную добычу:
+    // при каждой загрузке добыча бросается заново — золото ±50%, каждая вещь с шансом 75%. Раньше каждый
+    // загруженный бандит нёс один и тот же лут, а встреча, сохранённая после обыска, — пустой труп.
+    function gmTemplateClean(e) {
+        const kit = e.lootKit || e.corpseLoot || null;
+        delete e.corpseLoot;
+        if (kit) e.lootKit = JSON.parse(JSON.stringify(kit)); else delete e.lootKit;
+        return e;
+    }
+    function gmTemplateRollLoot(e) {
+        if (!e.lootKit) return e;
+        const k = e.lootKit;
+        e.corpseLoot = stripUndefinedDeep({ gold: Math.round((parseInt(k.gold) || 0) * (0.5 + Math.random())), items: (k.items || []).filter(() => Math.random() < 0.75).map(i => Object.assign({}, i)) });
+        return e;
+    }
     window.gmSaveEncounter = function () {
         const enemies = lastData.enemies || [];
         if (!enemies.length) { alert('Врагов нет — нечего сохранять.'); return; }
         const name = (prompt('Название заготовки:', enemies.length + ' врагов') || '').trim(); if (!name) return;
         // Сохраняем «свежими»: полное здоровье, без статусов/меток трупа — заготовка описывает встречу, а не её ход.
-        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; delete e.soulTaken; delete e.soulTrap; delete e.killedBy; delete e.lastHitBy; return e; });
+        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; delete e.soulTaken; delete e.soulTrap; delete e.killedBy; delete e.lastHitBy; return gmTemplateClean(e); });
         const encs = lsGet(ENC_KEY, {}); encs['enc_' + Date.now()] = { name, enemies: copy };
         lsSet(ENC_KEY, encs); renderEncounterSelect();
     };
@@ -7037,7 +7142,7 @@
         const id = el('gm-encounter-select').value; const enc = lsGet(ENC_KEY, {})[id];
         if (!enc) { alert('Выбери заготовку.'); return; }
         const enemies = (lastData.enemies || []).slice();
-        enc.enemies.forEach(e => enemies.push(Object.assign({}, JSON.parse(JSON.stringify(e)), { id: genId('e') })));
+        enc.enemies.forEach(e => enemies.push(gmTemplateRollLoot(gmTemplateClean(Object.assign({}, JSON.parse(JSON.stringify(e)), { id: genId('e') })))));
         gmUpdateEnemies(enemies).then(() => gmPostLogEntryText('⚔ Мастер выставляет встречу «' + enc.name + '».')).catch(e => alert('Ошибка: ' + e.message));
     };
     window.gmDeleteEncounter = function () {
@@ -7090,7 +7195,7 @@
         if (list.length >= 20) { alert('Шаблонов уже 20 — удали один.'); return; }
         const name = (prompt('Название шаблона:', data.name) || '').trim(); if (!name) return;
         delete data.id;
-        list.push({ id: 'tpl' + Date.now(), name, kind, data: JSON.parse(JSON.stringify(data)) });
+        list.push({ id: 'tpl' + Date.now(), name, kind, data: gmTemplateClean(JSON.parse(JSON.stringify(data))) });
         lsSet(TPL_KEY, list); renderNpcTemplateSelect();
         alert('Шаблон «' + name + '» сохранён.');
     };
@@ -7098,7 +7203,7 @@
         const id = el('gm-npc-template-select').value; const t = lsGet(TPL_KEY, []).find(x => x.id === id);
         if (!t) { alert('Выбери шаблон.'); return; }
         const enemies = (lastData.enemies || []).slice();
-        enemies.push(Object.assign(JSON.parse(JSON.stringify(t.data)), { id: genId('e') }));
+        enemies.push(gmTemplateRollLoot(gmTemplateClean(Object.assign(JSON.parse(JSON.stringify(t.data)), { id: genId('e') }))));
         gmUpdateEnemies(enemies).catch(e => alert('Ошибка: ' + e.message));
     };
     window.gmDeleteNpcTemplate = function () {
@@ -7607,6 +7712,18 @@
             }).catch(e => alert('Ошибка: ' + e.message));
     };
     // Животные выбранного в панели инвентаря игрока: ХП ± (команда petHp), чтобы ранить/лечить/убить.
+    // Эффекты на игроке: вредное (болезнь, яд, статус) игрок сам не снимает — это делает мастер.
+    function renderGmPlayerEffects(effects) {
+        const box = el('inv-effects-list'); if (!box) return;
+        const list = (Array.isArray(effects) ? effects : []).filter(e => e && (e.turnsRemaining === null || e.turnsRemaining === undefined || e.turnsRemaining !== 0));
+        if (!list.length) { box.innerHTML = '<p style="opacity:.6;">Нет активных эффектов.</p>'; return; }
+        box.innerHTML = list.map(e => `<div style="display:flex; justify-content:space-between; gap:6px; align-items:center; padding:2px 0; border-bottom:1px solid var(--border-color);">
+            <span>${escapeHtml(e.effectName || e.name || '?')}${e.name && e.effectName && e.name !== e.effectName ? ' <span style="opacity:.6;">(' + escapeHtml(e.name) + ')</span>' : ''}</span>
+            <button class="btn-danger" style="width:auto; padding:1px 6px; font-size:12px;" onclick="gmRemovePlayerEffect('${jsq(e.id || '')}', '${jsq(e.effectName || e.name || '')}')">Снять</button></div>`).join('');
+    }
+    window.gmRemovePlayerEffect = function (effId, name) {
+        gmSendCmd({ type: 'removeEffect', effId: effId || null, name: name || '' }, 'снимает с {p} эффект «' + name + '».');
+    };
     function renderGmPlayerPets(pets) {
         const box = el('inv-pets-list'); if (!box) return;
         const list = Array.isArray(pets) ? pets : [];
