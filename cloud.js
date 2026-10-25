@@ -434,6 +434,7 @@
                 // Штампуем момент смерти (номер общего счётчика ходов сессии) — труп поднимаемый
                 // заклинанием только первые 5 ходов после этого.
                 if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
+                markEnemyHitBy(patch, finalDmg > 0, wasAlive && newHp <= 0);
                 if (finalDmg > 0 && Array.isArray(enemies[idx].statusEffects) && enemies[idx].statusEffects.some(stBreaksOnDamage)) {
                     patch.statusEffects = enemies[idx].statusEffects.filter(st => !stBreaksOnDamage(st)); // Полиморф и т.п. спадают от урона
                 }
@@ -578,6 +579,7 @@
                 const newMp = Math.max(0, Math.min(en.maxMp || en.curMp || 0, (en.curMp || 0) + (dMp || 0)));
                 const patch = { curHp: newHp, curMp: newMp };
                 if (wasAlive && newHp <= 0) patch.diedAtTurn = data.sessionTurnCounter || 0;
+                markEnemyHitBy(patch, newHp < (en.curHp || 0), wasAlive && newHp <= 0);
                 if (newHp < (en.curHp || 0) && Array.isArray(en.statusEffects) && en.statusEffects.some(stBreaksOnDamage)) patch.statusEffects = en.statusEffects.filter(st => !stBreaksOnDamage(st));
                 enemies[idx] = Object.assign({}, en, patch);
                 const update = { enemies: enemies };
@@ -669,6 +671,7 @@
                     if (dealt > 0) for (let k = statuses.length - 1; k >= 0; k--) if (stBreaksOnDamage(statuses[k])) statuses.splice(k, 1);
                 }
                 if (wasAlive && (en.curHp || 0) <= 0) en.diedAtTurn = data.sessionTurnCounter || 0;
+                markEnemyHitBy(en, true, wasAlive && (en.curHp || 0) <= 0); // яд тикает и дальше у мастера — убийцей считается отравитель
                 en.statusEffects = statuses;
                 enemies[idx] = en;
                 const logText = `☠ ${authorName || 'Игрок'} отравляет «${en.name}» («${sourceName || 'яд'}»): ${notes.join('; ') || '—'}`;
@@ -847,6 +850,8 @@
                 const enemies = Array.isArray(data.enemies) ? data.enemies.slice() : [];
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден.');
+                const me = (data.participants || {})[currentUser.uid] || {};
+                if (me.fallen || (me.curHp !== undefined && (parseInt(me.curHp) || 0) <= 0)) throw new Error('Павший персонаж не может обыскивать трупы.');
                 const corpseLoot = enemies[idx].corpseLoot;
                 if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
                 enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
@@ -1749,6 +1754,14 @@
 
     // Очередь эффектов от мастера/союзников. Пока персонаж не загружен из облака, НЕ применяем и НЕ чистим —
     // иначе загрузка персонажа затирала эффект (болезнь, полученная, пока игрок был офлайн, терялась).
+    // Кто последним ранил врага и кто его добил: добыча с трупа по умолчанию уходит убийце (gm.js, lootCorpse).
+    // Если врага добил мастер (яд по ходу, массовый урон), убийцей считается последний ранивший игрок.
+    function markEnemyHitBy(target, hurt, died) {
+        if (!currentUser || !target) return;
+        if (hurt || died) target.lastHitBy = currentUser.uid;
+        if (died) target.killedBy = currentUser.uid;
+    }
+
     function processMyPendingEffects(data) {
         if (!data || !currentUser || !data.participants || !data.participants[currentUser.uid]) return;
         if (!cloudDataReady) return; // применим сразу после загрузки персонажа (loadCharacterFromCloud)

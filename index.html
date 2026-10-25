@@ -15670,11 +15670,15 @@ function updateHungerPenalty() {
 
     window.reviveByQuest = function (fromGm) {
         if (!fromGm && !confirm('Квест божества выполнен и мастер подтвердил воскрешение?')) return;
+        const wasFallen = !!deathState.fallen;
         deathState.fallen = false; deathState.minimized = false;
-        deathState.deaths = (deathState.deaths || 0) + 1;
+        if (wasFallen || !fromGm) deathState.deaths = (deathState.deaths || 0) + 1;
         const maxHp = parseInt(document.getElementById('max-hp').value) || 1;
-        document.getElementById('cur-hp').value = Math.max(1, Math.ceil(maxHp * WAKE_HP_FRACTION));
-        _dLog('✨ ' + _dName() + ' воскрешён(а) божеством' + (_dGodName() ? ' (' + _dGodName() + ')' : '') + ' после выполненного квеста.');
+        const hpEl = document.getElementById('cur-hp');
+        // мастер мог уже записать ХП в лист (и живой листенер их подставил) — не опускаем, если их больше
+        hpEl.value = Math.max(parseInt(hpEl.value) || 0, 1, Math.ceil(maxHp * WAKE_HP_FRACTION));
+        if (fromGm) _dLog('✨ ' + _dName() + ' воскрешён(а) мастером (ХП ' + hpEl.value + '/' + maxHp + ').');
+        else _dLog('✨ ' + _dName() + ' воскрешён(а) божеством' + (_dGodName() ? ' (' + _dGodName() + ')' : '') + ' после выполненного квеста.');
         updateVitalBars(); updateAll();
         renderDeathUi();
         saveLocalStorage(true);
@@ -15740,13 +15744,18 @@ function updateHungerPenalty() {
     setInterval(checkDeath, 1500);
 
     // Команды мастера из панели «Отряд» (приходят через очередь pendingStatusEffects)
+    // Очередь команд читается на каждом снимке сессии, пока игрок её не очистил, — одну команду применяем один раз
+    // (раньше «Воскресить», «+❤» и «Потеря вещей» могли сработать два-три раза подряд).
+    var gmDeathCmdsSeen = [];
     function handleGmDeathCmd(e) {
+        if (e.id) { if (gmDeathCmdsSeen.indexOf(e.id) !== -1) return; gmDeathCmdsSeen.push(e.id); if (gmDeathCmdsSeen.length > 100) gmDeathCmdsSeen.shift(); }
         if (e.action === 'loseItems') {
             const lost = loseRandomItems(Math.max(1, parseInt(e.n) || (Math.floor(Math.random() * 4) + 1)));
             _dLog('🎒 ' + _dName() + ' теряет вещи: ' + (lost.length ? lost.join(', ') : 'терять нечего') + '.');
             alert('Мастер: ты теряешь часть вещей — ' + (lost.length ? lost.join(', ') : 'терять нечего') + '.');
         } else if (e.action === 'revive') {
             reviveByQuest(true);
+            alert('✨ Мастер воскресил тебя. ХП: ' + document.getElementById('cur-hp').value + '.');
         } else if (e.action === 'addLives') {
             _dSetLives(_dLives() + (parseInt(e.n) || 0));
             alert('Мастер изменил число свободных жизней: теперь ' + _dLives() + '.');
@@ -17483,7 +17492,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=3"></script>
 <script src="combat-calc.js?v=4"></script>
 <script src="grid-core.js?v=4"></script>
-<script src="cloud.js?v=37"></script>
+<script src="cloud.js?v=38"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

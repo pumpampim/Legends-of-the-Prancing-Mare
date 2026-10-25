@@ -1307,6 +1307,19 @@
         const cmd = { id: 'death-' + Date.now() + Math.random().toString(36).slice(2, 6), cmd: 'death', action: action, fromGm: true };
         if (n !== undefined) cmd.n = n;
         const patch = {};
+        if (action === 'revive') {
+            // Воскрешение мастер записывает сам — в лист персонажа (ХП, «пал») и в сессию. Раньше уходила только команда
+            // игроку: если его лист закрыт или не успел её прочитать, персонаж так и оставался павшим у всех.
+            const maxHp = parseInt(p.maxHp) || 0;
+            const hpNow = parseInt(p.curHp) || 0;
+            const hp = Math.max(hpNow, 1, Math.ceil((maxHp || 1) * 0.5)); // как у игрока: половина максимума (WAKE_HP_FRACTION)
+            cmd.hp = hp;
+            patch['participants.' + uid + '.curHp'] = hp;
+            patch['participants.' + uid + '.fallen'] = false;
+            updateCharacterVitals(uid, v => { const mx = parseInt(v[2]) || maxHp || 1; v[0] = Math.max(parseInt(v[0]) || 0, 1, Math.ceil(mx * 0.5)); },
+                { 'deathState.fallen': false, 'deathState.minimized': false })
+                .catch(e => console.error('Ошибка записи воскрешения в лист персонажа:', e));
+        }
         patch['participants.' + uid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(cmd);
         patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '⚰️ ' + (p.name || '?') + ': ' + label + '.' });
         db.collection('sessions').doc(currentCode).update(patch).catch(e => alert('Ошибка: ' + e.message));
@@ -1483,7 +1496,7 @@
                     return '<div style="margin-top:4px; padding:4px; background:var(--input-bg); border-radius:3px; font-size:12px;">' +
                         '💀 Труп' + (e.corpseRace ? ' (' + escapeHtml(e.corpseRace) + ', знак «' + escapeHtml(e.corpseSign || '') + '»)' : '') +
                         (e.ashes ? '<div style="opacity:.75;">🔥 Обращён в пепел (Трансмутация смерти) — обыскать и поднять нельзя.</div>'
-                            : canLoot ? '<button style="width:100%; margin-top:2px;" onclick="lootCorpse(\'' + e.id + '\')">Обыскать (выдать добычу игроку из селектора ниже)</button>'
+                            : canLoot ? gmCorpseLootControls(e)
                             : e.looted ? '<div style="opacity:.6;">Уже обыскан.</div>' : '<div style="opacity:.6;">Здесь нечего брать.</div>') +
                         (e.isRaisable ? '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' : '') +
                         '</div>';
@@ -1721,7 +1734,12 @@
     };
     window.setEnemyField = function (id, field, value) {
         const finalVal = TEXT_ENEMY_FIELDS.includes(field) ? value : (Number(value) || 0);
-        const enemies = (lastData.enemies || []).map(e => e.id === id ? { ...e, [field]: finalVal } : e);
+        const enemies = (lastData.enemies || []).map(e => {
+            if (e.id !== id) return e;
+            const c = { ...e, [field]: finalVal };
+            if (field === 'curHp' && finalVal > 0) delete c.killedBy; // мастер поднял врага — прошлый убийца уже не в счёт
+            return c;
+        });
         gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
@@ -5588,11 +5606,11 @@
     function populateLootTargetSelect() {
         const select = el('loot-gen-target-player');
         if (!select) return;
-        const uids = Object.keys(lastData.participants || {});
+        const uids = gmLivingPlayers(); // павшим добыча не уходит
         const prev = select.value;
         select.innerHTML = uids.length
             ? uids.map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('')
-            : '<option value="">Нет игроков</option>';
+            : '<option value="">' + (Object.keys(lastData.participants || {}).length ? 'Все игроки пали' : 'Нет игроков') + '</option>';
         if (uids.includes(prev)) select.value = prev;
     }
 
@@ -5903,12 +5921,44 @@
         return [gen.gold ? gen.gold + ' зол.' : '', describeLootItems(gen.lootItems || gen.items)].filter(Boolean).join(', ');
     }
 
+    // Добыча с трупа: по умолчанию тому, кто добил врага (killedBy, а если добил мастер — последний ранивший, lastHitBy),
+    // мастер может выбрать другого. Павшим игрокам добыча не уходит. Раньше бралась первая строка селектора
+    // генератора лута — каждый раз первый игрок в сессии, даже павший.
+    function gmLivingPlayers() {
+        const parts = (lastData && lastData.participants) || {};
+        return Object.keys(parts).filter(uid => { const p = parts[uid] || {}; return !p.fallen && (p.curHp === undefined || (parseInt(p.curHp) || 0) > 0); });
+    }
+    const gmCorpseLootTo = {}; // выбор мастера по трупу (переживает перерисовку списка)
+    function gmCorpseKiller(enemy) { return (enemy && (enemy.killedBy || enemy.lastHitBy)) || ''; }
+    function gmCorpseLootTarget(enemy) {
+        const living = gmLivingPlayers();
+        const picked = gmCorpseLootTo[enemy.id];
+        if (picked && living.includes(picked)) return picked;
+        const killer = gmCorpseKiller(enemy);
+        if (killer && living.includes(killer)) return killer;
+        return living[0] || '';
+    }
+    function gmCorpseLootControls(e) {
+        const parts = (lastData && lastData.participants) || {};
+        const living = gmLivingPlayers();
+        if (!living.length) return '<div style="opacity:.75; margin-top:2px;">Все игроки пали — добычу отдать некому.</div>';
+        const killer = gmCorpseKiller(e), cur = gmCorpseLootTarget(e);
+        const killerName = killer && parts[killer] ? parts[killer].name || '?' : '';
+        return '<div style="display:flex; gap:4px; margin-top:2px; align-items:center;">' +
+            '<select style="flex:1; font-size:12px;" title="Кому уйдёт добыча (только живые игроки)" onchange="gmSetCorpseLootTo(\'' + e.id + '\', this.value)">' +
+            living.map(uid => '<option value="' + escapeHtml(uid) + '"' + (uid === cur ? ' selected' : '') + '>' + escapeHtml((parts[uid] || {}).name || uid) + (uid === killer ? ' ⚔ добил' : '') + '</option>').join('') +
+            '</select>' +
+            '<button style="margin:0; font-size:12px;" onclick="lootCorpse(\'' + e.id + '\')">💰 Обыскать</button></div>' +
+            (killerName && !living.includes(killer) ? '<div style="opacity:.7; font-size:11px;">Добил(а) ' + escapeHtml(killerName) + ', но персонаж пал — выбери живого.</div>' : '');
+    }
+    window.gmSetCorpseLootTo = function (enemyId, uid) { gmCorpseLootTo[enemyId] = uid; };
+
     window.lootCorpse = function (enemyId) {
         const enemy = (lastData.enemies || []).find(e => e.id === enemyId);
         if (!enemy) { alert('Противник не найден.'); return; }
         if (enemy.looted) { alert('Этот труп уже обыскан.'); return; }
-        const targetUid = el('loot-gen-target-player').value;
-        if (!targetUid) { alert('Выбери игрока (внизу, в генераторе лута) — ему уйдёт добыча.'); return; }
+        const targetUid = gmCorpseLootTarget(enemy);
+        if (!targetUid) { alert('Все игроки пали — добычу с трупа отдать некому.'); return; }
         // Готовая добыча (бандиты, драугры, изгои) или бросок по тексту лута из базы врагов
         const loot = enemy.corpseLoot || rollEnemyCorpseLoot(enemy);
         const items = loot.items || [];
@@ -6939,7 +6989,7 @@
         if (!enemies.length) { alert('Врагов нет — нечего сохранять.'); return; }
         const name = (prompt('Название заготовки:', enemies.length + ' врагов') || '').trim(); if (!name) return;
         // Сохраняем «свежими»: полное здоровье, без статусов/меток трупа — заготовка описывает встречу, а не её ход.
-        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; delete e.soulTaken; delete e.soulTrap; return e; });
+        const copy = JSON.parse(JSON.stringify(enemies)).map(e => { e.curHp = e.maxHp; e.curMp = e.maxMp; delete e.statusEffects; delete e.looted; delete e.ashes; delete e.diedAtTurn; delete e.soulTaken; delete e.soulTrap; delete e.killedBy; delete e.lastHitBy; return e; });
         const encs = lsGet(ENC_KEY, {}); encs['enc_' + Date.now()] = { name, enemies: copy };
         lsSet(ENC_KEY, encs); renderEncounterSelect();
     };
