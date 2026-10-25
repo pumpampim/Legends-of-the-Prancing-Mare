@@ -77,7 +77,9 @@
             'auth/invalid-credential': 'Неверный email или пароль.',
             'auth/too-many-requests': 'Слишком много попыток. Подожди немного.',
             'auth/popup-blocked': 'Браузер заблокировал всплывающее окно — разреши всплывающие окна для этого сайта.',
-            'auth/account-exists-with-different-credential': 'Этот email уже привязан к аккаунту с другим способом входа.'
+            'auth/account-exists-with-different-credential': 'Этот email уже привязан к аккаунту с другим способом входа.',
+            'auth/network-request-failed': 'Нет связи с сервером входа. Проверь интернет (или включи/выключи VPN) и попробуй ещё раз.',
+            'st/timeout': 'Сервер входа не ответил за 20 секунд. Проверь интернет (или включи/выключи VPN), обнови страницу и попробуй ещё раз — или продолжи офлайн.'
         };
         return map[e.code] || ('Ошибка: ' + e.message);
     }
@@ -97,12 +99,18 @@
         return auth.setPersistence(mode);
     }
 
+    // На iPhone вход иногда «висит» без ответа и без ошибки — игрок жмёт «Войти» и ничего не происходит.
+    // Через 20 с показываем понятную ошибку, чтобы было видно, что дело в связи, а не в пароле.
+    function withAuthTimeout(p) {
+        return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'st/timeout' }), 20000))]);
+    }
+
     window.cloudRegister = function () {
         if (!window.FIREBASE_CONFIGURED) { showAuthError('Firebase ещё не настроен — см. README-FIREBASE.md'); return; }
         const email = el('auth-email').value.trim();
         const pass = el('auth-password').value;
         showAuthError('');
-        applyAuthPersistence().then(() => auth.createUserWithEmailAndPassword(email, pass)).catch(e => showAuthError(translateAuthError(e)));
+        withAuthTimeout(applyAuthPersistence().then(() => auth.createUserWithEmailAndPassword(email, pass))).catch(e => showAuthError(translateAuthError(e)));
     };
 
     window.cloudLogin = function () {
@@ -110,7 +118,7 @@
         const email = el('auth-email').value.trim();
         const pass = el('auth-password').value;
         showAuthError('');
-        applyAuthPersistence().then(() => auth.signInWithEmailAndPassword(email, pass)).catch(e => showAuthError(translateAuthError(e)));
+        withAuthTimeout(applyAuthPersistence().then(() => auth.signInWithEmailAndPassword(email, pass))).catch(e => showAuthError(translateAuthError(e)));
     };
 
     window.cloudLoginGoogle = function () {
@@ -152,7 +160,15 @@
         auth = firebase.auth();
         db = firebase.firestore();
 
+        // Пока Firebase не сказал, входил ли игрок раньше, под формой висит «Проверяем…»; если долго — подсказка про связь.
+        let authKnown = false;
+        setTimeout(() => {
+            const c = el('auth-checking');
+            if (!authKnown && c) c.textContent = '⚠ Сервер входа долго не отвечает. Проверь интернет (или включи/выключи VPN) и обнови страницу — или продолжи офлайн.';
+        }, 12000);
         auth.onAuthStateChanged(user => {
+            authKnown = true;
+            if (el('auth-checking')) el('auth-checking').style.display = 'none';
             currentUser = user;
             cloudDataReady = false;
             updateStatusBar();
@@ -2067,6 +2083,7 @@
         initAuth();
     } else {
         showOverlay(false);
+        if (el('auth-checking')) el('auth-checking').style.display = 'none';
         console.warn('Firebase не настроен — работаем в офлайн-режиме. См. README-FIREBASE.md');
     }
 })();

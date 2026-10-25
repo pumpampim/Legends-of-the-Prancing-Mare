@@ -921,7 +921,7 @@
     function prepPlayerText(desc) {
         const t = String(desc || '').trim();
         if (!t) return '';
-        const sentences = t.split(/(?<=[.!?])\s+/);
+        const sentences = t.replace(/([.!?])\s+/g, '$1\u0001').split('\u0001'); // без lookbehind: Safari до 16.4 не разбирал весь gm.js
         let out = '';
         for (const s of sentences) { if ((out + ' ' + s).trim().length > 300 && out) break; out = (out + ' ' + s).trim(); }
         return out.length > 360 ? out.slice(0, 357) + '…' : out;
