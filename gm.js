@@ -6032,7 +6032,21 @@
         };
         fill('draugr-gen-type', 'draugr');
         fill('forsworn-gen-type', 'forsworn');
+        // Четыре генератора живут в одном окне «Генератор врагов»: виден один, выбор помним в браузере мастера.
+        let kind = 'bandit';
+        try { kind = localStorage.getItem('gm_enemy_gen_kind') || 'bandit'; } catch (e) { }
+        gmShowEnemyGen(kind);
     }
+
+    function gmShowEnemyGen(kind) {
+        const panes = document.querySelectorAll('.enemy-gen-pane[data-enemy-gen]');
+        if (!Array.from(panes).some(p => p.dataset.enemyGen === kind)) kind = 'bandit';
+        panes.forEach(p => { p.style.display = p.dataset.enemyGen === kind ? '' : 'none'; });
+        const sel = el('enemy-gen-kind');
+        if (sel && sel.value !== kind) sel.value = kind;
+        try { localStorage.setItem('gm_enemy_gen_kind', kind); } catch (e) { }
+    }
+    window.gmShowEnemyGen = gmShowEnemyGen;
 
     function pickEnemyGenType(family, selectId, levelInputId) {
         const all = (window.enemiesData || []).filter(e => window.EnemyGear && window.EnemyGear.familyOf(e.name) === family);

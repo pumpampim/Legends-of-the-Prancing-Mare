@@ -1288,56 +1288,56 @@
             </div>
         </div>
 
-        <!-- ===== ГЕНЕРАТОР БАНДИТОВ ===== -->
+        <!-- ===== ГЕНЕРАТОР ВРАГОВ (бандит / бандит-маг / драугр / изгой в одном окне) ===== -->
         <div class="panel" data-gm-tab="combat">
-            <h2>🗡️ Генератор бандита</h2>
-            <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера + снаряжение, подобранное по уровню (чем выше уровень — тем лучше материал, до стекла/эбонита на 50-м, кап уровня). Есть шанс лука (охотничий/имперский/орочий/эльфийский/стеклянный/эбонитовый — тоже по уровню). ХП/мана/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает.</p>
-            <label>Средний уровень группы</label>
-            <input type="number" id="bandit-avg-level" value="5" min="1" max="50">
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
-            <div id="bandit-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
-            <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
-            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('bandit')">💾 Сохранить как шаблон</button>
-        </div>
-
-        <!-- ===== ГЕНЕРАТОР МАГОВ-БАНДИТОВ ===== -->
-        <div class="panel" data-gm-tab="combat">
-            <h2>🔮 Генератор мага-бандита</h2>
-            <p style="font-size:13px; opacity:.75;">Отдельный генератор — только заклинания (2-4 шт, реальные из книги заклинаний, ранг растёт с уровнем) и магическое одеяние вместо брони/оружия. Кап уровня — 60 (выше базовых бандитов). Мана в разы больше, чем у обычных бандитов.</p>
-            <label>Средний уровень группы</label>
-            <input type="number" id="bandit-mage-avg-level" value="10" min="1" max="60">
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateMageBandit()">🎲 Сгенерировать мага-бандита</button>
-            <div id="bandit-mage-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
-            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('mage')">💾 Сохранить как шаблон</button>
-            <button style="width:100%; margin-top:6px;" onclick="addGeneratedMageBanditToCombat()">Добавить в бой</button>
-        </div>
-
-        <!-- ===== ГЕНЕРАТОР ДРАУГРОВ ===== -->
-        <div class="panel" data-gm-tab="combat">
-            <h2>⚰️ Генератор драугра</h2>
-            <p style="font-size:13px; opacity:.75;">Как у бандитов: случайное древненордское оружие и броня (оружие и броня могут быть зачарованными — у старших типов зачарование почти всегда), заклинания и крики берутся из записи выбранного типа. С трупа выпадает не всё: часть снаряжения «потрёпана», плюс костная мука, золото, драгоценности и свитки. Зачарованные вещи игрок может разрушить и узнать зачарование.</p>
-            <label>Тип драугра</label>
-            <select id="draugr-gen-type"></select>
-            <label>Средний уровень группы (для случайного типа)</label>
-            <input type="number" id="draugr-avg-level" value="10" min="1" max="30">
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateDraugr()">🎲 Сгенерировать драугра</button>
-            <div id="draugr-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
-            <button style="width:100%; margin-top:6px;" onclick="addGeneratedDraugrToCombat()">Добавить в бой</button>
-            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('draugr')">💾 Сохранить как шаблон</button>
-        </div>
-
-        <!-- ===== ГЕНЕРАТОР ИЗГОЕВ ===== -->
-        <div class="panel" data-gm-tab="combat">
-            <h2>🌿 Генератор изгоя</h2>
-            <p style="font-size:13px; opacity:.75;">Случайные оружие и броня изгоев (топор или лук; у шамана — кинжал; у «Верескового сердца» броня ×2). Особые свойства (похищение ХП/МП, заклинания шаманов) берутся из записи выбранного типа.</p>
-            <label>Тип изгоя</label>
-            <select id="forsworn-gen-type"></select>
-            <label>Средний уровень группы (для случайного типа)</label>
-            <input type="number" id="forsworn-avg-level" value="8" min="1" max="30">
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateForsworn()">🎲 Сгенерировать изгоя</button>
-            <div id="forsworn-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
-            <button style="width:100%; margin-top:6px;" onclick="addGeneratedForswornToCombat()">Добавить в бой</button>
-            <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('forsworn')">💾 Сохранить как шаблон</button>
+            <h2>🎲 Генератор врагов</h2>
+            <label>Кого генерируем</label>
+            <select id="enemy-gen-kind" onchange="gmShowEnemyGen(this.value)">
+                <option value="bandit">🗡️ Бандит</option>
+                <option value="mage">🔮 Бандит-маг</option>
+                <option value="draugr">⚰️ Драугр</option>
+                <option value="forsworn">🌿 Изгой</option>
+            </select>
+            <div class="enemy-gen-pane" data-enemy-gen="bandit">
+                <p style="font-size:13px; opacity:.75;">Случайная раса/знак/вера + снаряжение, подобранное по уровню (чем выше уровень — тем лучше материал, до стекла/эбонита на 50-м, кап уровня). Есть шанс лука (охотничий/имперский/орочий/эльфийский/стеклянный/эбонитовый — тоже по уровню). ХП/мана/урон/золото растут с уровнем. После смерти труп можно поднять заклинанием (в течение 5 ходов) или обыскать — но не вся броня выпадает.</p>
+                <label>Средний уровень группы</label>
+                <input type="number" id="bandit-avg-level" value="5" min="1" max="50">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateBandit()">🎲 Сгенерировать бандита</button>
+                <div id="bandit-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+                <button style="width:100%; margin-top:6px;" onclick="addGeneratedBanditToCombat()">Добавить в бой</button>
+                <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('bandit')">💾 Сохранить как шаблон</button>
+            </div>
+            <div class="enemy-gen-pane" data-enemy-gen="mage" style="display:none;">
+                <p style="font-size:13px; opacity:.75;">Отдельный генератор — только заклинания (2-4 шт, реальные из книги заклинаний, ранг растёт с уровнем) и магическое одеяние вместо брони/оружия. Кап уровня — 60 (выше базовых бандитов). Мана в разы больше, чем у обычных бандитов.</p>
+                <label>Средний уровень группы</label>
+                <input type="number" id="bandit-mage-avg-level" value="10" min="1" max="60">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateMageBandit()">🎲 Сгенерировать мага-бандита</button>
+                <div id="bandit-mage-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+                <button style="width:100%; margin-top:6px;" onclick="addGeneratedMageBanditToCombat()">Добавить в бой</button>
+                <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('mage')">💾 Сохранить как шаблон</button>
+            </div>
+            <div class="enemy-gen-pane" data-enemy-gen="draugr" style="display:none;">
+                <p style="font-size:13px; opacity:.75;">Как у бандитов: случайное древненордское оружие и броня (оружие и броня могут быть зачарованными — у старших типов зачарование почти всегда), заклинания и крики берутся из записи выбранного типа. С трупа выпадает не всё: часть снаряжения «потрёпана», плюс костная мука, золото, драгоценности и свитки. Зачарованные вещи игрок может разрушить и узнать зачарование.</p>
+                <label>Тип драугра</label>
+                <select id="draugr-gen-type"></select>
+                <label>Средний уровень группы (для случайного типа)</label>
+                <input type="number" id="draugr-avg-level" value="10" min="1" max="30">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateDraugr()">🎲 Сгенерировать драугра</button>
+                <div id="draugr-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+                <button style="width:100%; margin-top:6px;" onclick="addGeneratedDraugrToCombat()">Добавить в бой</button>
+                <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('draugr')">💾 Сохранить как шаблон</button>
+            </div>
+            <div class="enemy-gen-pane" data-enemy-gen="forsworn" style="display:none;">
+                <p style="font-size:13px; opacity:.75;">Случайные оружие и броня изгоев (топор или лук; у шамана — кинжал; у «Верескового сердца» броня ×2). Особые свойства (похищение ХП/МП, заклинания шаманов) берутся из записи выбранного типа.</p>
+                <label>Тип изгоя</label>
+                <select id="forsworn-gen-type"></select>
+                <label>Средний уровень группы (для случайного типа)</label>
+                <input type="number" id="forsworn-avg-level" value="8" min="1" max="30">
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="generateForsworn()">🎲 Сгенерировать изгоя</button>
+                <div id="forsworn-gen-result" style="margin-top:8px; font-size:14px; line-height:1.5;"></div>
+                <button style="width:100%; margin-top:6px;" onclick="addGeneratedForswornToCombat()">Добавить в бой</button>
+                <button style="width:100%; margin-top:4px;" onclick="gmSaveNpcTemplate('forsworn')">💾 Сохранить как шаблон</button>
+            </div>
         </div>
     </div>
 </div>
@@ -1366,7 +1366,7 @@
 <script src="enemy-loot.js?v=6"></script>
 <script src="grid-core.js?v=4"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=57"></script>
+<script src="gm.js?v=58"></script>
 <script src="gm-grid.js?v=4"></script>
 </body>
 </html>
