@@ -543,7 +543,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
@@ -1974,6 +1974,12 @@
             <div id="dock-stats" class="st-dock-stats"></div>
             <div id="dock-toggles" class="st-dock-toggles"></div>
             <button type="button" id="dock-info-toggle" class="st-dock-info-toggle" onclick="dockToggleInfo()" title="Свернуть/развернуть сводку">▾</button>
+            <button type="button" id="dock-min-toggle" class="st-dock-info-toggle st-dock-min-btn" onclick="dockToggleMin()" title="Свернуть всю боевую панель в одну строку">⬇ Свернуть</button>
+        </div>
+        <!-- Свёрнутый док: одна строка с HP/MP и кнопкой развернуть (выбор игрока — в localStorage skyrim_dock_min) -->
+        <div class="st-dock-mini">
+            <span id="dock-mini-vitals" class="st-dock-mini-vitals"></span>
+            <button type="button" class="st-dock-info-toggle" onclick="dockToggleMin()" title="Развернуть боевую панель">⬆ Боевая панель</button>
         </div>
         <div class="st-dock-main">
         <div class="st-dock-left">
@@ -12428,6 +12434,8 @@ window.toggleSkillPanel = function (idx) {
         if (vit) vit.innerHTML = `<div><strong>${escHtml(nm)}</strong> <span class="st-dock-turn">· Ход ${gameTurn} · Круг ${gameRound}</span></div>` +
             `<div>❤ ${hp}/${maxHp}</div><div class="bar-track"><div class="bar-fill-hp" style="width:${pct(hp, maxHp)}%"></div></div>` +
             `<div>🔷 ${mp}/${maxMp}</div><div class="bar-track"><div class="bar-fill-mp" style="width:${pct(mp, maxMp)}%"></div></div>`;
+        const mini = document.getElementById('dock-mini-vitals');
+        if (mini) mini.innerHTML = `❤ ${hp}/${maxHp} · 🔷 ${mp}/${maxMp} <span class="st-dock-turn">· Ход ${gameTurn} · Круг ${gameRound}</span>`;
         const eff = document.getElementById('dock-effects');
         if (eff) {
             const list = (activeTimedEffects || []).filter(e => e.turnsRemaining > 0 || e.turnsRemaining === Infinity);
@@ -12470,6 +12478,14 @@ window.toggleSkillPanel = function (idx) {
         const b = document.getElementById('dock-info-toggle'); if (b) b.textContent = off ? '▸ Сводка' : '▾';
         document.body.style.setProperty('--st-dock-h', dock.offsetHeight + 'px');
     };
+    // Свернуть весь док в одну строку (на телефоне он занимает треть экрана, а нужен не всегда)
+    window.dockToggleMin = function () {
+        const dock = document.getElementById('combat-dock'); if (!dock) return;
+        const min = !dock.classList.contains('st-dock-min');
+        dock.classList.toggle('st-dock-min', min);
+        try { localStorage.setItem('skyrim_dock_min', min ? '1' : ''); } catch (e) { }
+        document.body.style.setProperty('--st-dock-h', dock.offsetHeight + 'px');
+    };
     let _dockInfoInit = false;
     function dockRenderInfo() {
         const dock = document.getElementById('combat-dock'); if (!dock) return;
@@ -12477,6 +12493,8 @@ window.toggleSkillPanel = function (idx) {
             _dockInfoInit = true;
             let off = false; try { off = localStorage.getItem('skyrim_dock_info_off') === '1'; } catch (e) { }
             if (off) { dock.classList.add('st-dock-info-off'); const b = document.getElementById('dock-info-toggle'); if (b) b.textContent = '▸ Сводка'; }
+            let min = false; try { min = localStorage.getItem('skyrim_dock_min') === '1'; } catch (e) { }
+            if (min) dock.classList.add('st-dock-min');
             const g = document.getElementById('char-gold'); if (g) g.addEventListener('input', () => updateCombatDock());
         }
         const v = id => (document.getElementById(id) || {}).value;

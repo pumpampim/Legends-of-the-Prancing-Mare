@@ -1812,6 +1812,12 @@ input[type="number"] {
 .st-combat-dock .st-dock-info-toggle { width: auto; margin: 0 0 0 auto; min-height: 24px; padding: 0 8px; font-size: 12px; background: transparent; border: 1px solid rgba(255,255,255,.18); color: #f0e6d2; }
 .st-dock-info-off .st-dock-stats, .st-dock-info-off .st-dock-toggles { display: none; }
 .st-dock-info-off .st-dock-info { border-bottom: none; padding-bottom: 0; }
+.st-combat-dock .st-dock-min-btn { margin-left: 0; }
+.st-dock-mini { display: none; align-items: center; gap: 8px; }
+.st-dock-mini-vitals { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-combat-dock .st-dock-mini .st-dock-info-toggle { margin: 0; min-height: 32px; }
+.st-combat-dock.st-dock-min .st-dock-info, .st-combat-dock.st-dock-min .st-dock-main { display: none; }
+.st-combat-dock.st-dock-min .st-dock-mini { display: flex; }
 .st-dock-left { flex: 0 0 190px; display: flex; gap: 8px; align-items: center; min-width: 0; }
 .st-dock-portrait { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #3b2f1d; border: 2px solid var(--accent-color, #c8a566); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; overflow: hidden; }
 .st-dock-portrait img { width: 100%; height: 100%; object-fit: cover; }
