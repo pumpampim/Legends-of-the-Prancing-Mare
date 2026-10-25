@@ -543,7 +543,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
@@ -1255,29 +1255,6 @@
                     <h4 style="margin:0 0 4px;">📋 Заказы</h4>
                     <div id="craft-orders-list"></div>
                 </div>
-                <div id="party-stash-box" style="display:none; border:1px solid var(--accent-color); border-radius:6px; padding:8px 10px; margin-bottom:10px;">
-                    <h4 style="margin:0 0 4px;">🎒 Сундук отряда</h4>
-                    <div style="font-size:13px; margin-bottom:6px;">💰 В сундуке: <strong id="party-stash-gold">0</strong> зол.
-                        <input type="number" id="party-stash-gold-input" min="1" value="10" style="width:80px; display:inline; margin:0 4px;">
-                        <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(1)">+ Положить</button>
-                        <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(-1)">− Взять</button></div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
-                        <input type="text" id="stash-search" placeholder="Поиск по названию…" oninput="renderPartyStash()" style="flex:2; min-width:140px; margin:0;">
-                        <select id="stash-category-filter" onchange="renderPartyStash()" style="flex:1; min-width:130px; margin:0;">
-                            <option value="all">Всё</option>
-                            <option value="weapon">Оружие</option>
-                            <option value="armor">Броня/одежда</option>
-                            <option value="potion">Зелья и яды</option>
-                            <option value="ingredient">Ингредиенты</option>
-                            <option value="food">Еда и напитки</option>
-                            <option value="magic">Свитки/книги/посохи/камни душ</option>
-                            <option value="jewelry">Ювелирные изделия</option>
-                            <option value="other">Прочее</option>
-                        </select>
-                    </div>
-                    <div id="stash-filter-count" style="font-size:12px; opacity:.65; margin-bottom:4px;"></div>
-                    <div id="party-stash-list" style="max-height:320px; overflow-y:auto;"></div>
-                </div>
                 <div id="price-multiplier-info" style="font-size:13px; opacity:.7; margin-bottom:6px;"></div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
                     <input type="text" id="inv-search" placeholder="Поиск по названию…" oninput="renderInventoryList()" style="flex:2; min-width:140px; margin:0;">
@@ -1350,6 +1327,37 @@
                 <div style="background:var(--input-bg); padding:6px; border-radius:4px; border:1px solid #363025;">
                     <label>📜 Походный блокнот (Рецепты алхимии, кузнечного дела и заметки квестов)</label>
                     <textarea id="char-notes" rows="5" placeholder="Записывайте открытые эффекты ингредиентов (например: Белянка + Уязвимость к холоду), рецепты кузнечных мастеров или важные долги/зацепки по квестам..." onchange="saveLocalStorage()"></textarea>
+                </div>
+            </div>
+
+            <!-- Сундук отряда: перенесён из левой колонки (там тесно), сворачивается — выбор в localStorage skyrim_stash_min -->
+            <div class="panel" id="party-stash-box" style="display:none;">
+                <div class="st-stash-head">
+                    <h2 style="margin:0;">🎒 Сундук отряда</h2>
+                    <span id="party-stash-mini" class="st-stash-mini"></span>
+                    <button type="button" id="stash-min-toggle" class="st-stash-toggle" onclick="stashToggleMin()" title="Свернуть/развернуть сундук">⬆ Свернуть</button>
+                </div>
+                <div id="party-stash-body" style="margin-top:8px;">
+                    <div style="font-size:13px; margin-bottom:6px;">💰 В сундуке: <strong id="party-stash-gold">0</strong> зол.
+                        <input type="number" id="party-stash-gold-input" min="1" value="10" style="width:80px; display:inline; margin:0 4px;">
+                        <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(1)">+ Положить</button>
+                        <button type="button" style="width:auto; padding:2px 8px; font-size:13px;" onclick="partyStashGold(-1)">− Взять</button></div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
+                        <input type="text" id="stash-search" placeholder="Поиск по названию…" oninput="renderPartyStash()" style="flex:2; min-width:140px; margin:0;">
+                        <select id="stash-category-filter" onchange="renderPartyStash()" style="flex:1; min-width:130px; margin:0;">
+                            <option value="all">Всё</option>
+                            <option value="weapon">Оружие</option>
+                            <option value="armor">Броня/одежда</option>
+                            <option value="potion">Зелья и яды</option>
+                            <option value="ingredient">Ингредиенты</option>
+                            <option value="food">Еда и напитки</option>
+                            <option value="magic">Свитки/книги/посохи/камни душ</option>
+                            <option value="jewelry">Ювелирные изделия</option>
+                            <option value="other">Прочее</option>
+                        </select>
+                    </div>
+                    <div id="stash-filter-count" style="font-size:12px; opacity:.65; margin-bottom:4px;"></div>
+                    <div id="party-stash-list" style="max-height:320px; overflow-y:auto;"></div>
                 </div>
             </div>
             </div><!-- /grid-col -->
@@ -12351,16 +12359,31 @@ window.toggleSkillPanel = function (idx) {
     // СУНДУК ОТРЯДА (эпик 2.1): общий склад группы в документе сессии. Любой игрок может класть и брать; в журнале видно, кто что взял.
     // ========================================================================
     function stashMyName() { return (document.getElementById('char-name') || {}).value || 'Игрок'; }
+    let _stashMinInit = false;
+    function stashApplyMin(min) {
+        const box = document.getElementById('party-stash-box'); if (!box) return;
+        box.classList.toggle('st-stash-min', min);
+        const b = document.getElementById('stash-min-toggle'); if (b) b.textContent = min ? '⬇ Развернуть' : '⬆ Свернуть';
+    }
+    window.stashToggleMin = function () {
+        const box = document.getElementById('party-stash-box'); if (!box) return;
+        const min = !box.classList.contains('st-stash-min');
+        stashApplyMin(min);
+        try { localStorage.setItem('skyrim_stash_min', min ? '1' : ''); } catch (e) { }
+    };
     window.renderPartyStash = function (session) {
         const box = document.getElementById('party-stash-box'); if (!box) return;
         const s = session || (window.CloudSync && window.CloudSync.getSessionData());
         const inS = !!(window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && s);
         box.style.display = inS ? 'block' : 'none';
         if (!inS) return;
+        if (!_stashMinInit) { _stashMinInit = true; let m = false; try { m = localStorage.getItem('skyrim_stash_min') === '1'; } catch (e) { } stashApplyMin(m); }
         const gold = parseInt(s.partyGold) || 0;
         const g = document.getElementById('party-stash-gold'); if (g) g.textContent = formatNumber(gold);
         const list = document.getElementById('party-stash-list');
         const allStash = Array.isArray(s.partyStash) ? window.CloudSync._mergeStash(s.partyStash) : [];
+        const mini = document.getElementById('party-stash-mini');
+        if (mini) mini.textContent = `💰 ${formatNumber(gold)} · 📦 ${allStash.reduce((n, it) => n + (parseInt(it.count) || 1), 0)}`;
         const stCat = (document.getElementById('stash-category-filter') || {}).value || 'all';
         const stQ = String((document.getElementById('stash-search') || {}).value || '').trim().toLowerCase().replace(/ё/g, 'е');
         const items = allStash.filter(it => (stCat === 'all' || classifyItemBroad(it) === stCat) &&

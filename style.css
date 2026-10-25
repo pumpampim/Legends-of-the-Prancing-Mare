@@ -2077,3 +2077,27 @@ body.st-desk-layout #st-desk-dmg-slot > .vital-bar { margin-top: 0 !important; }
 
 /* Кнопка «✖ Снять» у занятого слота экипировки */
 .slot-row .slot-unequip-btn { flex: 0 0 auto; width: auto; margin: 0; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+
+/* Сундук отряда в правой колонке листа игрока: шапка с кнопкой свернуть; в свёрнутом виде видна только
+   строка «🎒 Сундук отряда · 💰 золото · 📦 предметов». Выбор игрока — localStorage skyrim_stash_min. */
+.st-stash-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.st-stash-head h2 { flex: 0 1 auto; }
+.st-stash-mini {
+    flex: 1 1 auto;
+    font-size: 14px;
+    opacity: .8;
+    display: none;
+}
+.st-stash-toggle {
+    width: auto;
+    margin: 0 0 0 auto;
+    padding: 3px 10px;
+    font-size: 13px;
+}
+#party-stash-box.st-stash-min #party-stash-body { display: none; }
+#party-stash-box.st-stash-min .st-stash-mini { display: inline; }
