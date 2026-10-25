@@ -3181,6 +3181,8 @@
         // вообще. Добавлен по прямой просьбе, общий профиль (всякая всячина), плюс слитки ниже.
         pawnbrokerLive: { label: 'Барахольщик', gold: 1000, categories: ['Бытовые предметы', 'Сырые продукты', 'Ювелирные изделия'] }
     };
+    // Торговцы животными (pets-data.js: PET_MERCHANTS) — в общем списке типов; товар у них — животные, а не вещи.
+    Object.keys(window.PET_MERCHANTS || {}).forEach(k => { const d = window.PET_MERCHANTS[k]; LIVING_MERCHANT_TYPES[k] = { label: d.label, gold: d.gold, categories: [], pets: true }; });
     window.LIVING_MERCHANT_TYPES = LIVING_MERCHANT_TYPES;
 
     // Предметы, которые торговец не продаёт, даже если формально попадают в его категорию
@@ -3406,7 +3408,19 @@
     }
 
     window.__buildMerchantItems = (t, h) => buildMerchantItems(t, h); // для тестов
+    // Животные на прилавке: снимок шаблона (pet) едет с товаром, покупка у игрока создаёт животное, а не вещь в рюкзаке.
+    function buildPetMerchantItems(typeKey, hold) {
+        const def = (window.PET_MERCHANTS || {})[typeKey] || {}, q = def.qty || [1, 2];
+        const custom = (lastData && Array.isArray(lastData.customPets) && lastData.customPets.length) ? lastData.customPets : _gmPets;
+        return (window.petsForMerchant ? window.petsForMerchant(typeKey, hold, custom) : []).map(t => {
+            const hp = Math.max(1, parseInt(t.hp) || 1);
+            return { name: t.name, category: 'Животные', price: Math.max(0, parseInt(t.price) || 0), weight: 0, qty: randInt(q[0], q[1]),
+                effect: `${t.icon || '🐾'} ХП ${hp}${t.rideable ? ` · верховое: +${(window.PET_RIDING || {}).speed || 15} скорости, +${(window.PET_RIDING || {}).carry || 100} к весу` : ''}`,
+                pet: { id: t.id || '', icon: t.icon || '🐾', name: t.name, kind: t.kind || t.name, hp, loot: Array.isArray(t.loot) ? t.loot : [], rideable: !!t.rideable } };
+        });
+    }
     function buildMerchantItems(typeKey, hold) {
+        if (LIVING_MERCHANT_TYPES[typeKey] && LIVING_MERCHANT_TYPES[typeKey].pets) return buildPetMerchantItems(typeKey, hold);
         const C = merchantCatalogue(), out = [], used = new Set();
         const ALL = ((window.allItems && window.allItems.length ? window.allItems : gmAllItems) || []).filter(i => !gmIsSustainScroll(i));
         const STACK = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
@@ -3546,7 +3560,13 @@
         if (!hold) { alert('Выбери владение.'); return; }
         const def = LIVING_MERCHANT_TYPES[typeKey];
         const finalItems = buildMerchantItems(typeKey, hold);
-        if (!finalItems.length) { alert('Нет предметов в базе для этого типа торговца.'); return; }
+        if (!finalItems.length) {
+            if (def.pets) {
+                const places = window.petMerchantPlaces ? window.petMerchantPlaces(typeKey) : [];
+                alert(places.length ? `«${def.label}» в «${hold}» нет. Есть в: ${places.join(', ')}.` : 'Своих животных с продавцом в этом владении нет — добавь их в «🐾 Животные и питомцы» и укажи, где продаются.');
+            } else alert('Нет предметов в базе для этого типа торговца.');
+            return;
+        }
         const key = typeKey + '@' + hold;
         const stocks = Object.assign({}, lastData.merchantStocks || {});
         // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
@@ -3555,6 +3575,7 @@
         // необходимости перегенерировать весь ассортимент заново.
         const existingDisposition = (stocks[key] && stocks[key].disposition) || 0;
         stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold, disposition: existingDisposition };
+        if (def.pets) stocks[key].pets = true; // игрок не продаёт таким торговцам свои вещи
         db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
             el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${formatNumber(def.gold)}.</span>`;
             renderMerchantStaleness();
@@ -3612,7 +3633,12 @@
     function renderMerchantTypeSelect() {
         const sel = el('merchant-type-select');
         if (!sel || sel.options.length) return;
-        sel.innerHTML = Object.entries(LIVING_MERCHANT_TYPES).map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)} (база ${formatNumber(v.gold)} золота)</option>`).join('');
+        const opt = ([k, v]) => {
+            const places = v.pets && window.petMerchantPlaces ? window.petMerchantPlaces(k) : [];
+            return `<option value="${k}">${escapeHtml(v.label)} (${v.pets ? (places.length ? escapeHtml(places.join(', ')) : 'свои животные мастера') : 'база ' + formatNumber(v.gold) + ' золота'})</option>`;
+        };
+        const all = Object.entries(LIVING_MERCHANT_TYPES);
+        sel.innerHTML = all.filter(([, v]) => !v.pets).map(opt).join('') + '<optgroup label="🐾 Животные">' + all.filter(([, v]) => v.pets).map(opt).join('') + '</optgroup>';
     }
 
     let currentSupernaturalState = defaultSupernaturalState();

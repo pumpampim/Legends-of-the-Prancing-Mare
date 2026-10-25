@@ -565,7 +565,7 @@
 <script src="powers-data.js?v=8"></script>
     <script src="enemies-data.js?v=11"></script>
     <script src="enemy-loot.js?v=6"></script>
-    <script src="pets-data.js?v=1"></script>
+    <script src="pets-data.js?v=2"></script>
     <script src="holds-map.js?v=4"></script>
     <script src="combat-bonuses.js?v=6"></script>
     <script src="builds-data.js?v=3"></script>
@@ -5739,7 +5739,7 @@ window.toggleSkillPanel = function (idx) {
         if (!sel) return;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const stocks = (session && session.merchantStocks) || {};
-        const keys = Object.keys(stocks);
+        const keys = Object.keys(stocks).filter(k => !stocks[k].pets); // конюшни и продавцы животных вещи не скупают
         const prev = sel.value;
         let html = '';
         if (keys.length) html += '<optgroup label="🏪 Торговцы (общий ассортимент: проданное можно выкупить)">' +
@@ -5756,7 +5756,8 @@ window.toggleSkillPanel = function (idx) {
     function getSellBlockReason() {
         if (!isPlayerInTown()) return '🏕 Ты вне города — торговцев здесь нет, продавать некому. Отметь «Я в городе», когда доберёшься до поселения (или попроси мастера).';
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
-        const keys = Object.keys((session && session.merchantStocks) || {});
+        const ms = (session && session.merchantStocks) || {};
+        const keys = Object.keys(ms).filter(k => !ms[k].pets);
         if (!keys.length) return '🕓 Мастер ещё не завёз торговцев (ассортимент) — продавать пока некому.';
         return '';
     }
@@ -6074,7 +6075,8 @@ window.toggleSkillPanel = function (idx) {
     window.practiceXpAllowed = practiceXpAllowed;
 
     function computeBuyPrice(basePrice, category, merchantKey) {
-        let price = basePrice * 1.15; // торговец накидывает свою наценку сверху
+        // торговец накидывает свою наценку сверху; у животных цена из правил (лошадь 1000, собака 500) — без наценки
+        let price = basePrice * (category === 'Животные' ? 1 : 1.15);
         // Задача H: еда зимой дороже (меньше свежих продуктов, больше расходов на хранение).
         const foodCats = ['Готовые продукты', 'Сырые продукты', 'Напитки'];
         if (category && foodCats.includes(category) && getCurrentSeason().name === 'Зима') price *= 1.2;
@@ -6109,6 +6111,7 @@ window.toggleSkillPanel = function (idx) {
         const myGold = parseInt(goldInput.value) || 0;
         if (price > myGold) { alert('Не хватает золота.'); return; }
         if (!window.CloudSync || typeof window.CloudSync.buyFromMerchantStock !== 'function') { alert('Нет соединения с сессией.'); return; }
+        if (it.pet) { buyPetFromMerchant(key, idx, it, price); return; }
         const stockQty = it.qty || 1;
         const maxQty = Math.max(1, Math.min(stockQty, Math.floor(myGold / price)));
         // Несколько штук в наличии — спрашиваем, сколько именно взять.
@@ -6150,6 +6153,24 @@ window.toggleSkillPanel = function (idx) {
             alert(`Куплено: ${it.name}${qty > 1 ? ' ×' + qty : ''} за ${total} септимов.${speechSuccesses ? ' (+' + speechSuccesses + ' усп. Красноречия)' : ''}`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
+    // Животное у торговца (конюшни, продавец собак…): по одному, с кличкой; в рюкзак не кладётся, а идёт в «Животные».
+    function buyPetFromMerchant(key, idx, it, price) {
+        const name = prompt(`Купить «${it.name}» за ${formatNumber(price)} септимов? Как назовёшь?`, it.name);
+        if (name === null) return;
+        const goldInput = document.getElementById('char-gold');
+        const goldNow = parseInt(goldInput.value) || 0;
+        if (price > goldNow) { alert('Не хватает золота.'); return; }
+        const petName = (name || '').trim() || it.name;
+        goldInput.value = goldNow - price; saveLocalStorage(true);
+        window.CloudSync.buyFromMerchantStock(key, idx, price, 1, { name: it.name, sig: it.sig || '', price: it.price }).catch(e => { goldInput.value = (parseInt(goldInput.value) || 0) + price; updateAll(); saveLocalStorage(true); throw e; }).then(() => {
+            playerPets.push(makePetFromTemplate(it.pet, petName));
+            const speechSuccesses = trackSpeechTrade(price, true, false);
+            updateAll(); saveLocalStorage(true); window.renderPetsPanel();
+            const nm = (document.getElementById('char-name') || {}).value || 'Игрок';
+            if (window.CloudSync.postCombatLog) window.CloudSync.postCombatLog(`🐾 ${nm} покупает: ${it.name} «${petName}» за ${price} септимов.`, nm);
+            alert(`Куплено: ${it.pet.icon || '🐾'} ${it.name} «${petName}» за ${price} септимов. Животное — во вкладке «Инвентарь» → «Животные».${speechSuccesses ? ' (+' + speechSuccesses + ' усп. Красноречия)' : ''}`);
+        }).catch(e => alert('Ошибка: ' + e.message));
+    }
     function renderSellList() {
         const listEl = document.getElementById('sell-items-list');
         if (!listEl) return;
@@ -16579,17 +16600,6 @@ function updateHungerPenalty() {
         return playerPets.find(p => p.rideable && !p.dead) || null;
     }
     window.ridingHorse = ridingHorse;
-    function petLocationHere() {
-        const s = window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() ? window.CloudSync.getSessionData() : null;
-        if (!s) return null; // вне сессии — без проверки места
-        const pos = s.partyPos || {};
-        return { city: pos.name || '', hold: pos.hold || s.currentHold || '' };
-    }
-    function sellerMatches(seller, here) {
-        if (!here) return true;
-        if (seller.place) return seller.place === here.city || seller.place === here.hold; // свои животные мастера: город или владение
-        return (!!seller.city && seller.city === here.city) || (!seller.city && !!seller.hold && seller.hold === here.hold) || (!here.city && !!seller.hold && seller.hold === here.hold);
-    }
     function applyPetHpDelta(petId, delta) {
         const p = playerPets.find(x => x.id === petId); if (!p || p.dead) return '';
         p.hp = Math.max(0, Math.min(p.maxHp, (parseInt(p.hp) || 0) + delta));
@@ -16618,20 +16628,34 @@ function updateHungerPenalty() {
                     <button type="button" class="btn-danger" style="width:auto; padding:2px 8px;" onclick="releasePet('${jsq(p.id)}')">${p.dead ? 'Убрать' : 'Отпустить'}</button>
                 </div></div>`;
         }).join('') : '<p style="opacity:.6; font-size:14px;">Животных нет. Купить можно у продавцов ниже.</p>';
-        const here = petLocationHere();
+        const sess = window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() ? window.CloudSync.getSessionData() : null;
+        if (sess) { // в сессии животных продают живые торговцы, которых завозит мастер (конюшни, продавец собак…)
+            const stocks = sess.merchantStocks || {};
+            const rows = [];
+            Object.keys(stocks).filter(k => stocks[k] && stocks[k].pets).forEach(k => (stocks[k].items || []).forEach((it, idx) => {
+                if (!it.pet) return;
+                const disp = stocks[k].disposition || 0;
+                const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category, k) * getReputationPriceMult(stocks[k].hold) * ({ '-1': 1.25, '0': 1, '1': 0.9, '2': 0.8 }[String(disp)] || 1)));
+                rows.push(`<div class="party-row" style="padding:5px 8px; display:flex; justify-content:space-between; gap:8px; align-items:center;">
+                <span>${it.pet.icon || '🐾'} <strong>${escHtml(it.name)}</strong> — ХП ${parseInt(it.pet.hp) || 0}${it.pet.rideable ? ', верховое' : ''}${(it.qty || 1) > 1 ? ` (есть: ${it.qty})` : ''} · <span style="opacity:.7;">${escHtml(stocks[k].label || 'Продавец')}, ${escHtml(stocks[k].hold || '')}</span></span>
+                <button type="button" class="btn-success" style="width:auto; padding:2px 10px;" ${disp <= -2 ? 'disabled title="Торговец отказывается вести дела"' : ''} onclick="buyFromMerchant('${jsq(k)}', ${idx})">Купить за ${formatNumber(price)}</button></div>`);
+            }));
+            shop.innerHTML = '<div style="font-size:13px; opacity:.75; margin-bottom:4px;">Животных продают торговцы, которых завозит мастер (их же видно во вкладке торговли в списке торговцев). Покупать можно только в городе.</div>' +
+                (rows.length ? rows.join('') : '<p style="opacity:.6;">Мастер ещё не завёз торговцев животными. Собаки — в Маркарте, злокрысы — в Морфале, морозные пауки — в Рифтене, лошади — на конюшнях Вайтрана, Солитьюда, Виндхельма, Маркарта и Рифтена.</p>');
+            return;
+        }
+        // вне сессии — как раньше: справочник продавцов без проверки места
         const offers = [];
-        petTemplatesAll().forEach(t => (t.sellers || []).forEach(sel => { if (sellerMatches(sel, here)) offers.push({ t, sel }); }));
-        const where = here ? (here.city || here.hold || 'неизвестно где') : null;
-        shop.innerHTML = (here ? `<div style="font-size:13px; opacity:.75; margin-bottom:4px;">Партия сейчас: <strong>${escHtml(where)}</strong> (место ставит мастер на карте).</div>` : '<div style="font-size:13px; opacity:.75; margin-bottom:4px;">Вне сессии место не проверяется.</div>') +
-            (offers.length ? offers.map(o => `<div class="party-row" style="padding:5px 8px; display:flex; justify-content:space-between; gap:8px; align-items:center;">
+        petTemplatesAll().forEach(t => (t.sellers || []).forEach(sel => offers.push({ t, sel })));
+        shop.innerHTML = '<div style="font-size:13px; opacity:.75; margin-bottom:4px;">Вне сессии место не проверяется.</div>' +
+            offers.map(o => `<div class="party-row" style="padding:5px 8px; display:flex; justify-content:space-between; gap:8px; align-items:center;">
                 <span>${o.t.icon || '🐾'} <strong>${escHtml(o.t.name)}</strong> — ХП ${parseInt(o.t.hp) || 0}${o.t.rideable ? ', верховое' : ''} · <span style="opacity:.7;">${escHtml(o.sel.who || 'Продавец')}, ${escHtml(o.sel.city || o.sel.place || o.sel.hold || '')}</span></span>
-                <button type="button" class="btn-success" style="width:auto; padding:2px 10px;" onclick="buyPet('${jsq(o.t.id)}')">Купить за ${formatNumber(parseInt(o.t.price) || 0)}</button></div>`).join('')
-             : '<p style="opacity:.6;">Здесь животных не продают. Собаки — в Маркарте, злокрысы — в Морфале, морозные пауки — в Рифтене, лошади — на конюшнях Вайтрана, Солитьюда, Виндхельма, Маркарта и Рифтена.</p>');
+                <button type="button" class="btn-success" style="width:auto; padding:2px 10px;" onclick="buyPet('${jsq(o.t.id)}')">Купить за ${formatNumber(parseInt(o.t.price) || 0)}</button></div>`).join('');
     };
     window.buyPet = function (tplId) {
         const t = petTemplatesAll().find(x => x.id === tplId); if (!t) return;
-        const here = petLocationHere();
-        if (here && !(t.sellers || []).some(sel => sellerMatches(sel, here))) { alert('Здесь «' + t.name + '» не продают.'); return; }
+        // в сессии — только у живых торговцев (renderPetsPanel → buyFromMerchant), здесь покупка без сессии
+        if (window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession()) { alert('В сессии животных покупают у торговцев, которых завозит мастер (конюшни, продавец собак…).'); return; }
         const price = parseInt(t.price) || 0;
         const goldEl = document.getElementById('char-gold');
         const gold = parseInt(goldEl.value) || 0;
