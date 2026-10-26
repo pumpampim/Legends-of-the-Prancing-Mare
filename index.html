@@ -8916,7 +8916,16 @@ window.toggleSkillPanel = function (idx) {
     // «Плоть»-заклинания (Дубовая/Каменная/Железная/Эбонитовая) — это НАДБАВКА к броне поверх
     // того, что уже надето (как в ваниле), а не замена кирасы — реализованы отдельной веткой ниже,
     // через активные эффекты, а не через performSummon/экипировку.
-    function performSummon(t, enhanced) {
+    // Предел призванных существ (оружие и броня из плоти не в счёт; силы вампира-лорда и оборотня — тоже):
+    // без перков одно существо. «Приближение смерти»/«Дыхание смерти» — +1/+2 скелета, Одеяние атрономага — +1 атронах.
+    function summonCreatureCap(t, castCount) {
+        let cap = 1;
+        if (t.category === 'skeleton') cap += (window.perkBonuses || {}).extraSkeletons || 0;
+        if (t.category === 'atronach') cap += getGearSpecialBonuses().atronachExtra || 0;
+        return Math.max(cap, castCount || 1);
+    }
+    function isCountedSummon(s) { return s && s.category !== 'weapon' && s.category !== 'armor' && !s.boundToForm; }
+    function performSummon(t, enhanced, opts) {
         if (t.requiresItem) {
             if (countInInventory(t.requiresItem) <= 0) return { ok: false, message: `Нужен предмет «${t.requiresItem}» в инвентаре.` };
             removeFromInventoryByName(t.requiresItem, 1);
@@ -8994,6 +9003,18 @@ window.toggleSkillPanel = function (idx) {
             summonCount += (window.perkBonuses || {}).extraSkeletons;
             perkTxt += ` 💀 Перки призыва скелетов: +${(window.perkBonuses || {}).extraSkeletons} доп. скелет(а).`;
         }
+        // Лимит существ: лишние старые существа развеиваются (новый призыв заменяет старый), как в Скайриме.
+        let capTxt = '';
+        if (!(opts && opts.noCap) && isCountedSummon(entry)) {
+            const cap = summonCreatureCap(t, summonCount);
+            const counted = activeSummons.filter(isCountedSummon);
+            const extra = counted.length + summonCount - cap;
+            if (extra > 0) {
+                const gone = counted.slice(0, extra);
+                gone.forEach(g => window.dismissSummon(g.id));
+                capTxt = ` Предел существ — ${cap}: развеяно ${gone.map(g => '«' + g.name + '»').join(', ')}.`;
+            }
+        }
         if (summonCount > 1) {
             entry.name = t.name + ' №1';
             activeSummons.push(entry);
@@ -9008,7 +9029,7 @@ window.toggleSkillPanel = function (idx) {
         renderInventoryList();
         updateAll();
         saveLocalStorage();
-        return { ok: true, message: (summonCount > 1 ? `Призвано: ${summonCount} × «${t.name}».${boostTxt}` : `Призвано: «${t.name}».${boostTxt}`) + perkTxt };
+        return { ok: true, message: (summonCount > 1 ? `Призвано: ${summonCount} × «${t.name}».${boostTxt}` : `Призвано: «${t.name}».${boostTxt}`) + perkTxt + capTxt };
     }
 
     // Заклинания «плоти» — временная НАДБАВКА к броне (складывается с тем, что надето), а не
@@ -13457,7 +13478,7 @@ window.toggleSkillPanel = function (idx) {
                 else if (hearts >= 15) { nm = 'Снежный волк (питомец)'; hp = 160; dm = 30; }
                 const tpl = Object.assign({}, tpl0, { name: nm, hpBase: hp, hpEnh: hp, dmgBase: dm, dmgEnh: dm, permanent: true, durBase: 0, durEnh: 0, enhCount: 2 });
                 const before = activeSummons.length;
-                const res = performSummon(tpl, true);
+                const res = performSummon(tpl, true, { noCap: true });
                 if (!res.ok) { alert(res.message); return false; }
                 activeSummons.slice(before).forEach(s => { s.boundToForm = 'werewolf'; s.returnItem = null; });
                 renderActiveSummonsList();
@@ -13529,7 +13550,7 @@ window.toggleSkillPanel = function (idx) {
                 if (!corpse) { alert('Нет трупа, который можно поднять.'); return false; }
                 const hpR = parseInt(corpse.maxHp) || 100;
                 const tpl = { category: 'corpse', name: (corpse.name || 'Мертвец') + ' (поднят лордом)', hpBase: hpR, hpEnh: hpR, dmgBase: 30, dmgEnh: 30, dmgType: 'физический', durBase: 15, durEnh: 15 };
-                const res = performSummon(tpl, false);
+                const res = performSummon(tpl, false, { noCap: true });
                 if (!res.ok) { alert(res.message); return false; }
                 try { CS.markCorpseRaised(corpse.id); } catch (e) { }
                 snLog(`🦇 ${myName} воскрешает «${corpse.name}»: 30 урона, 15 ходов.`);
@@ -13542,7 +13563,7 @@ window.toggleSkillPanel = function (idx) {
                 const corpse = corpses.find(c => c.id === id) || corpses[0];
                 if (!corpse) { alert('Нет подходящего трупа (можно поднять в первые 5 ходов после смерти).'); return false; }
                 const tpl = { category: 'corpse', name: (corpse.name || 'Мертвец') + ' (поднят)', hpBase: 160, hpEnh: 160, dmgBase: 30, dmgEnh: 30, dmgType: 'физический', durBase: 30, durEnh: 30 };
-                const res = performSummon(tpl, false);
+                const res = performSummon(tpl, false, { noCap: true });
                 if (!res.ok) { alert(res.message); return false; }
                 try { CS.markCorpseRaised(corpse.id); } catch (e) { }
                 snLog(`🧛 ${myName} поднимает «${corpse.name}»: 160 ХП, 30 урона, 30 ходов.`);
@@ -13560,7 +13581,7 @@ window.toggleSkillPanel = function (idx) {
             case 'vamp_gargoyle': {
                 const tpl = { category: 'pet', name: 'Гаргулья', hpBase: 200, dmgBase: 40, dmgType: 'физический', durBase: 0, permanent: true, estimated: true };
                 const before = activeSummons.length;
-                const res = performSummon(tpl, false);
+                const res = performSummon(tpl, false, { noCap: true });
                 if (!res.ok) { alert(res.message); return false; }
                 activeSummons.slice(before).forEach(s => { s.boundToForm = 'lord'; s.returnItem = null; });
                 renderActiveSummonsList();
