@@ -1941,7 +1941,8 @@
                 if (!zero && !(elem && perk(4))) notes.push('щит: подходящего перка Блокирования для этой атаки нет');
             }
         }
-        r = Math.min(85, Math.max(0, r));
+        // Иммунитет (100%) — полный; уязвимости ниже нуля не обрезаются (урон растёт), потолок 85% — как на листе игрока.
+        r = (res[dmgType] || 0) >= 100 ? 100 : Math.max(-100, Math.min(85, r));
         return { resist: r, zero, notes };
     }
     function gmShieldBlockChecked() { const c = el('gm-attack-shield-block'); return !!(c && c.checked); }
@@ -2355,87 +2356,7 @@
         return window.isSustainSpell(item.effect || '') || window.isSustainSpell(gmSpellDescByName(item.name.replace(/^Свиток:\s*/, '')));
     }
     window.gmIsSustainScroll = gmIsSustainScroll;
-    function getSmithingGiveableItems() {
-        const out = [];
-        (window.armorRecipes || []).forEach(r => {
-            out.push({
-                name: r.name, category: r.armorType || 'Броня',
-                weight: r.weight, price: r.price, armor: r.resistance, dmg: null,
-                effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
-                slot: GM_SMITHING_SLOT_MAP[r.slot] || null
-            });
-        });
-        (window.jewelryRecipes || []).forEach(r => {
-            out.push({
-                name: r.name, category: 'Ювелирное изделие',
-                weight: r.weight || 0.1, price: r.price || 0, armor: null, dmg: null, effect: '',
-                slot: r.name.includes('кольцо') ? 'ring' : 'amulet'
-            });
-        });
-        (window.weaponRecipes || []).forEach(r => {
-            const wt = !r.isAmmo && window.SMITH_SUBCAT_TO_WEAPON_TYPE ? window.SMITH_SUBCAT_TO_WEAPON_TYPE[r.subcat] : null;
-            const o = {
-                name: r.name, category: (r.category || 'Оружие') + (r.subcat ? ' — ' + r.subcat : ''),
-                weight: r.weight, price: r.price, armor: null,
-                dmg: r.damage, effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
-                slot: r.isAmmo ? null : r.slot
-            };
-            if (wt) o.weaponType = wt; // тип оружия едет с вещью (иначе у игрока при экипировке «залипал» прошлый тип)
-            out.push(o);
-        });
-        (window.armorNonCraftable || []).forEach(a => {
-            out.push({
-                name: a.name, category: (a.armorType || 'Броня') + ' (лут)',
-                weight: a.weight, price: a.price, armor: a.resistance, dmg: null,
-                effect: 'Не куётся — только лут/покупка/квест', slot: a.slot
-            });
-        });
-        (window.weaponsNonCraftable || []).forEach(w => {
-            out.push({
-                name: w.name, category: (w.category || 'Оружие') + (w.subcat ? ' — ' + w.subcat : '') + ' (лут)',
-                weight: w.weight, price: w.price, armor: null,
-                dmg: w.damage, effect: 'Не куётся — только лут/покупка/квест',
-                slot: w.isAmmo ? null : w.slot
-            });
-        });
-        (window.recipes || []).forEach(r => {
-            out.push({
-                name: r.name, category: 'Блюдо (кулинария)',
-                weight: r.weight || 0.5, price: r.price || 0, armor: null, dmg: null,
-                effect: r.effect || '', slot: null
-            });
-        });
-        if (window.failedDish) {
-            out.push({
-                name: window.failedDish.name, category: 'Блюдо (кулинария)',
-                weight: window.failedDish.weight || 1, price: window.failedDish.price || 0,
-                armor: null, dmg: null, effect: window.failedDish.effect || '', slot: null
-            });
-        }
-        (window.alchemyPremadePotions || []).forEach(p => {
-            out.push({
-                name: p.name, category: p.category, weight: p.weight, price: p.price,
-                armor: null, dmg: null, effect: p.effect, slot: null, alchemyEffects: p.alchemyEffects
-            });
-        });
-        // Крафтящиеся свитки — все заклинания, которые игрок может выучить и записать сам.
-        const TIER_PRICE = { 1: 15, 2: 30, 3: 45, 4: 60 };
-        if (window.spellsData) {
-            Object.keys(window.spellsData).forEach(school => {
-                [1, 2, 3, 4].forEach(tier => {
-                    (window.spellsData[school][tier] || []).forEach(sp => {
-                        if (window.isSustainSpell && window.isSustainSpell(sp.desc)) return; // свитков заклинаний «на поддержании» нет
-                        out.push({
-                            name: 'Свиток: ' + sp.name, category: 'Свитки (крафтящиеся)',
-                            weight: 0.1, price: TIER_PRICE[tier], armor: null, dmg: null,
-                            effect: sp.desc || '', slot: null
-                        });
-                    });
-                });
-            });
-        }
-        return out;
-    }
+    function getSmithingGiveableItems() { return window.EnemyLoot && window.EnemyLoot.extraItems ? window.EnemyLoot.extraItems() : []; }
 
     // Одни и те же вещи приходят из двух источников (магазинная база + кузница/свитки) и показывались в списке мастера дважды.
     // Схлопываем ТОЛЬКО заведомо одинаковые пары категорий; вещи, у которых одно имя, но разные характеристики
@@ -4477,7 +4398,7 @@
         paralyze: { name: 'Паралич', desc: 'Не может действовать в свой ход.', turns: 1 },
         fear: { name: 'Страх', desc: 'Вынужден отступать/убегать 1 ход.', turns: 1 },
         frenzy: { name: 'Бешенство', desc: 'Атакует ближайшую цель без разбора 1 ход.', turns: 1 },
-        slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3 },
+        slow: { name: 'Замедление', desc: '-10 фт. скорости.', turns: 3, speed: -10 },
         weakened: { name: 'Ослабление', desc: '-2 к броскам атаки/проверок.', turns: 2, rollPenalty: -2 },
         calm: { name: 'Успокоение', desc: 'Не атакует 1 ход.', turns: 1 },
         // Ниже — только для врагов (массовая кнопка «Статус»): работают сами — блок атаки, штраф к кубам, урон по ходам.
@@ -4977,12 +4898,13 @@
     // остаток инициализации после этой строки просто не происходил.
     // Заклинания врага, которые НЕ атакуют игрока: лечение (dmg — сколько лечит), невидимость, обереги/броня, призыв.
     // Раньше они шли как атака: «Быстрое лечение» на 50 снимало игроку 50 ХП.
+    const ENEMY_HEAL_DEFAULT = { 'Лечение': 20, 'Быстрое лечение': 50, 'Исцеление': 50 };
     function gmEnemySupportSpell(s) {
         const n = String((s && s.name) || '').toLowerCase();
         if (/лечени|исцелени|восстановлени/.test(n)) return 'heal';
         if (/невидим/.test(n)) return 'invis';
         // Страх/Ярость/Успокоение — не на себя: накладываются на цель как статус (раньше считались кастом на себя и до игрока не доходили).
-        if (/оберег|броня|плоть|кож[аи]|призыв|вызов|оживлени|поднят|ускорени/.test(n) && !(s.dmg > 1)) return 'self';
+        if (/оберег|броня|плоть|кож[аи]|призыв|вызов|оживлени|поднят|ускорени|плащ/.test(n) && !(s.dmg > 1)) return 'self'; // «Морозный плащ» без урона — бафф на себя
         return null;
     }
     // Статус, который управляющее заклинание врага вешает на игрока.
@@ -5107,7 +5029,7 @@
             }
         }
         let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
-        let isSpellAttack = false, spellCost = 0, statusNote = '';
+        let isSpellAttack = false, spellCost = 0, statusNote = '', physShot = false;
         if (actionVal === 'weapon') {
             const wd = enemyWeaponDamage(enemy);
             dmg = wd.total;
@@ -5134,7 +5056,9 @@
             if (sup) { // заклинание на себя — не атака по игроку
                 const parts = [];
                 if (sup === 'heal') {
-                    const healed = Math.max(0, Math.min((enemy.maxHp || 0) - (enemy.curHp || 0), parseInt(s.dmg) || 0));
+                    // У шаманов в таблице лечение без числа (0) — берём базовое значение заклинания игрока (spell-data: Лечение 20, Быстрое лечение 50).
+                    const healAmt = parseInt(s.dmg) || ENEMY_HEAL_DEFAULT[s.name] || 0;
+                    const healed = Math.max(0, Math.min((enemy.maxHp || 0) - (enemy.curHp || 0), healAmt));
                     const after = (lastData.enemies || []).map(e => e.id === enemy.id ? Object.assign({}, e, { curHp: (e.curHp || 0) + healed, curMp: pay.tracked ? pay.left : e.curMp }) : e);
                     gmUpdateEnemies(after).catch(e => console.error(e));
                     parts.push(`восстанавливает ${healed} ХП`);
@@ -5147,11 +5071,13 @@
                 return;
             }
             dmg = s ? s.dmg : 0;
-            isSpellAttack = true; spellCost = costS;
-            if (pay.tracked) statusNote = ` (−${costS} МП, осталось ${pay.left})`;
             dmgType = mapEnemyDmgType(s ? s.name : '');
-            actionLabel = `заклинанием «${s ? s.name : '?'}»${statusNote}`;
-            atkMod = calcAbilityMod(enemy.int || 10);
+            // «Дальний выстрел» сферы — физический выстрел (болт), не заклинание: без поглощения магии и оберегов, мод. Ловкости.
+            physShot = /^дальний выстрел/i.test((s && s.name) || '');
+            isSpellAttack = !physShot; spellCost = physShot ? 0 : costS;
+            if (pay.tracked) statusNote = ` (−${costS} МП, осталось ${pay.left})`;
+            actionLabel = physShot ? `выстрелом «${s.name}»${statusNote}` : `заклинанием «${s ? s.name : '?'}»${statusNote}`;
+            atkMod = physShot ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.int || 10);
         } else if (actionVal.indexOf('shout:') === 0) {
             const s = enemy.shouts[parseInt(actionVal.slice(6))];
             dmg = 0;
@@ -5185,7 +5111,7 @@
         pendingGmAttack = {
             targetUid, enemyId: enemy.id, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
             targetKind: tgt.kind, compId: tgt.id || null, // существо игрока: урон идёт ему, а не хозяину
-            isRangedAtk: actionVal === 'weapon' && !!enemy.isRanged,
+            isRangedAtk: (actionVal === 'weapon' && !!enemy.isRanged) || physShot,
             enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|гончая смерти|жрец-дракон|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             manaDue: (isSpellAttack && spellCost && enemy.maxMp > 0 && typeof enemy.curMp === 'number') ? spellCost : 0, // мана — при «Применить», и при промахе тоже
@@ -5207,7 +5133,8 @@
     function mapEnemyDmgType(spellName) {
         const n = (spellName || '').toLowerCase();
         // Те же исключения, что на листе игрока (detectDmgTypeFromName): стихия не видна по слову в названии.
-        if (/^(пламя|клыки дракона|испепеление|запретное солнце|болид)/.test(n)) return 'fire';
+        if (/^(пламя|клыки дракона|испепеление|запретное солнце|болид|паровое дыхание|взрыв при гибели)/.test(n)) return 'fire'; // пар и взрыв двемерских машин — огонь
+        if (/^дальний выстрел/.test(n)) return 'physical'; // двемерская сфера стреляет болтом
         if (/^(обморожение|надлом)/.test(n)) return 'frost';
         if (/^(искры|нестабильное напряжение|раскаты грома)/.test(n)) return 'shock';
         if (/огн|пламен/.test(n)) return 'fire';
@@ -5327,6 +5254,14 @@
                     defNotes.push(`🌀 Атронах: спасбросок ${saveRoll} < ${dc} — магия не поглощена`);
                 }
             }
+            // Вещи с «поглощением магии» (Роба архимага и т.п.): шанс N% поглотить заклинание — урона нет, мана = стоимость заклинания.
+            const gsA = data.gearSpecial || {};
+            if (pendingGmAttack.isSpell && !spellNegated && gsA.magicAbsorbPct > 0 && Math.random() * 100 < gsA.magicAbsorbPct) {
+                spellNegated = true; finalDmg = 0;
+                const gotMp = Math.max(1, parseInt(pendingGmAttack.spellCost) || 0);
+                absorbedMp += gotMp;
+                defNotes.push(`🌀 Поглощение магии (${gsA.magicAbsorbPct}%): заклинание поглощено, +${gotMp} маны`);
+            }
             // «Повышение навыка» (зачарования/зелья): Блокирование — N% шанс поглотить физ. урон; Лёгкая броня — (N/2)% уклониться.
             if (finalDmg && dmgType === 'physical') {
                 const boosts = data.skillBoosts || {};
@@ -5371,6 +5306,13 @@
                     defNotes.push(`🔰 Оберег «${wEff.name}»: поглощено ${absorbed}${absorbPerk ? `, +${wardGainMp} маны («Оберег-поглотитель»)` : ''}`);
                     chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'wardHit', effId: wEff.id || null, name: wEff.name, absorbed }) }).catch(() => { }));
                 }
+            }
+            // «Перчатки Хранителя»: в защитной стойке барьер поглощает урон из запаса (350 в день). Запас уменьшается командой в лист игрока.
+            if (finalDmg > 0 && gsA.keeperBarrier > 0) {
+                const absK = Math.min(finalDmg, parseInt(gsA.keeperBarrier) || 0);
+                finalDmg -= absK;
+                defNotes.push(`🛡 Барьер Перчаток Хранителя: поглощено ${absK} (осталось ${gsA.keeperBarrier - absK})`);
+                chores.push(db.collection('characters').doc(targetUid).update({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'keeperBarrierHit', absorbed: absK }) }).catch(() => { }));
             }
             // «Контрудар» (Одноручное): попадания по игроку считаются по врагу — +1 к кубам за каждые 2 до его смерти (счёт в листе игрока).
             if ((data.perkStates || {})['skill0-perk5-step1'] && pendingGmAttack.enemyId) {
@@ -5424,6 +5366,16 @@
                         defNotes.push(`🦴 Нечестивый барьер: ${finalDmg} физ. урона → ${taken} ХП (${hpc} ХП за каждые ${per} урона)`);
                         finalDmg = taken;
                     }
+                }
+            }
+            // «Бастион» и др.: часть урона ближней физической атаки возвращается атакующему врагу.
+            if (finalDmg > 0 && dmgType === 'physical' && !pendingGmAttack.isRangedAtk && !pendingGmAttack.isSpell && gsA.reflectMeleePct > 0 && pendingGmAttack.enemyId) {
+                const refl = Math.round(finalDmg * gsA.reflectMeleePct / 100);
+                const enArr = (lastData && Array.isArray(lastData.enemies)) ? lastData.enemies : [];
+                if (refl > 0 && enArr.some(e => e.id === pendingGmAttack.enemyId)) {
+                    const enemiesR = enArr.map(e => e.id === pendingGmAttack.enemyId ? { ...e, curHp: Math.max(0, (parseInt(e.curHp) || 0) - refl), lastHitBy: targetUid, ...(((parseInt(e.curHp) || 0) - refl) <= 0 && (parseInt(e.curHp) || 0) > 0 ? { killedBy: targetUid, diedAtTurn: (lastData && lastData.sessionTurnCounter) || 0 } : {}) } : e);
+                    chores.push(gmUpdateEnemies(enemiesR).catch(() => { }));
+                    defNotes.push(`🪞 Отражение ${gsA.reflectMeleePct}%: ${pendingGmAttack.enemyName} получает ${refl} урона`);
                 }
             }
             if (dmg || absorbedMp || barrierMpSpent) {
@@ -5496,7 +5448,7 @@
                 patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
                     id: 'st-' + Date.now() + Math.random().toString(36).slice(2, 8),
                     name: pendingGmAttack.enemyName, effectName: statusDef.name, description: statusDef.desc, turnsRemaining: statusDef.turns,
-                    rollPenalty: statusDef.rollPenalty || 0, fromGm: true,
+                    rollPenalty: statusDef.rollPenalty || 0, speed: statusDef.speed || 0, fromGm: true,
                     // паралич и страх: игрок бросает спасбросок на своём листе (Телосложение / Мудрость, СЛ 13)
                     save: statusKey === 'paralyze' ? { stat: 'con', dc: 13 } : statusKey === 'fear' ? { stat: 'wis', dc: 13 } : null
                 });
@@ -5727,9 +5679,9 @@
     // высокоуровневый бандит может выпасть в чём угодно от железа до своего максимума, а не
     // гарантированно в топе.
     const BANDIT_TIER_THRESHOLDS = [
-        { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Меховые|Сыромятные|Железн)/i, bows: ['Длинный лук', 'Охотничий лук'] },
+        { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Мехов|Сыромятн|Железн)/i, bows: ['Длинный лук', 'Охотничий лук'] },
         { minLevel: 8, weaponMat: /^Стальн/i, armorMat: /^Стальн/i, bows: ['Имперский лук', 'Древний нордский лук'] },
-        { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Двемерск)/i, bows: ['Орочий лук', 'Лук Изгоев'] },
+        { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Орочий|Двемерск)/i, bows: ['Орочий лук', 'Лук Изгоев'] },
         { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bows: ['Эльфийский лук', 'Фалмерский лук'] },
         { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bows: ['Стеклянный лук', 'Лук бич магов'] },
         { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bows: ['Эбонитовый лук', 'Фалмерский гибкий лук'] }

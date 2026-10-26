@@ -71,7 +71,8 @@
         'Потеря равновесия': { rollPenalty: -2 }, 'Шатается': { advantage: true },
         'Ярость': { frenzy: true }, 'Бешенство': { frenzy: true },
         'Ошеломление': { rollPenalty: -3 }, 'Ослабление': { rollPenalty: -2 },
-        'Гравитационная клетка': { immobile: true }
+        'Гравитационная клетка': { immobile: true },
+        'Заморожен': { noAttack: true, frozen: true }
     };
     function statusRule(name) {
         const n = String(name || '');
@@ -81,7 +82,7 @@
     }
     // Сводка по всем статусам врага: флаги из самих статусов + правила по имени (старые записи без флагов тоже работают).
     function statusFlags(enemy) {
-        const out = { noAttack: null, helpless: false, helplessName: '', advantage: false, rollPenalty: 0, frenzy: null, slow: false };
+        const out = { noAttack: null, helpless: false, helplessName: '', advantage: false, rollPenalty: 0, frenzy: null, slow: false, slowFt: 0, immobile: false };
         ((enemy && enemy.statusEffects) || []).forEach(function (st) {
             if (!st) return;
             const r = Object.assign(statusRule(st.name), st);
@@ -90,10 +91,29 @@
             if (r.advantage) out.advantage = true;
             if (typeof r.rollPenalty === 'number') out.rollPenalty += r.rollPenalty;
             if (r.frenzy) out.frenzy = st;
-            if (r.slow) out.slow = true;
+            if (r.slow) { // «−15 фт скорости» из описания; без числа — 10 фт (статус мастера «Замедление»)
+                out.slow = true;
+                const m = String(st.desc || st.description || '').match(/(\d+)\s*(?:фт|фут)/);
+                out.slowFt += typeof st.slowFt === 'number' ? st.slowFt : (m ? parseInt(m[1]) : 10);
+            }
+            // Не может сдвинуться с места: паралич, оглушение, обездвиживание (клетка), заморозка.
+            if ((r.helpless && !r.breakOnDamage) || r.immobile || r.frozen || st.name === 'Оглушение') out.immobile = true;
         });
         return out;
     }
 
-    root.StCombat = { previewDamage, resistSummary, TYPE_LABEL, statusRule, statusFlags, STATUS_RULES };
+    // Итоговое сопротивление ИГРОКА входящему урону (атака врага, ловушка, руна/зона — везде одинаково).
+    // res — computeTotalResistances() листа; extra — разовые прибавки (стрелы, щит). Для огня/холода/электричества
+    // прибавляется сопротивление магии. Потолок 85%, но иммунитет (100%, вампир к ядам) остаётся полным;
+    // уязвимости (вампир к огню, знак Ученика, зелья слабости) не обрезаются нулём — урон растёт.
+    function playerIncomingResist(res, dmgType, extra) {
+        res = res || {};
+        const base = Number(res[dmgType]) || 0;
+        if (base >= 100) return 100;
+        let r = base + (Number(extra) || 0);
+        if (dmgType === 'fire' || dmgType === 'frost' || dmgType === 'shock') r += Number(res.magic) || 0;
+        return Math.max(-100, Math.min(85, r));
+    }
+
+    root.StCombat = { previewDamage, resistSummary, TYPE_LABEL, statusRule, statusFlags, STATUS_RULES, playerIncomingResist };
 })(typeof window !== 'undefined' ? window : globalThis);

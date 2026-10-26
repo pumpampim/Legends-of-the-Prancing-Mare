@@ -92,9 +92,10 @@
     // Крупные существа по имени: сторона квадрата в клетках.
     function defaultSize(name) {
         const n = String(name || '').toLowerCase();
+        if (/жрец-дракон|жрец дракон/.test(n)) return 1; // жрец-дракон — человеческого роста, не дракон
         if (/дракон|мамонт/.test(n)) return 4;
         if (/великан|центурион|гигант/.test(n)) return 3;
-        if (/тролль|медвед|саблезуб|корус|грозов\S* атронах|ледян\S* атронах|спригган.*матрон|хоркер|морозн\S* паук|ворожея-ворон/.test(n)) return 2;
+        if (/тролль|медвед|саблезуб|корус|грозов\S* атронах|ледян\S* атронах|сприг+ан.*матрон|хоркер|морозн\S* паук|ворожея-ворон/.test(n)) return 2;
         return 1;
     }
     function safe(s) { return String(s || '').replace(/[^A-Za-z0-9-]/g, '_'); }
@@ -128,7 +129,8 @@
             const pB = f > 80 ? -(c - 80 / FT) : 0;
             return { onGrid: true, ok: true, penalty: pB, feet: f, label: f + ' фт' + (pB ? ' · ' + pB + ' к попаданию' : ' · ✓') };
         }
-        const over = c - RANGED_BASE_CELLS;
+        // opts.extraFt — прибавка к дальности без штрафа (вещи «дальность колдовства +N футов»).
+        const over = c - RANGED_BASE_CELLS - Math.floor(((opts && opts.extraFt) || 0) / FT);
         const penalty = over > 0 ? -Math.ceil(over / 2) : 0; // за каждые 2 клетки дальше 60 футов −1
         return { onGrid: true, ok: true, penalty, feet: f, label: f + ' фт' + (penalty ? ' · ' + penalty + ' к попаданию' : ' · ✓') };
     }

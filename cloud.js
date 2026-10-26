@@ -17,6 +17,17 @@
     let unsubWatchedCharacter = null;
     let saveTimer = null;
     let pendingSave = null; // отложенная запись, ещё не ушедшая в облако (для flushSave)
+    // Добыча с трупа и карманов на листе игрока — из той же полной базы, что у мастера
+    // (items-data + кузница, блюда, зелья, свитки, книги, уникальное оружие), иначе вместо вещей выпадали заглушки.
+    let _lootPool = null;
+    function lootPool() {
+        if (_lootPool) return _lootPool;
+        const extra = (window.EnemyLoot && window.EnemyLoot.extraItems) ? window.EnemyLoot.extraItems() : [];
+        const seen = new Set();
+        _lootPool = (window.allItems || []).concat(extra, window.skillBooksData || [], window.uniqueWeaponsData || [], window.spellTomesData || [])
+            .filter(i => i && i.name && !seen.has(i.name) && seen.add(i.name));
+        return _lootPool;
+    }
     let cloudDataReady = false; // true только после того, как персонаж загружен из облака хотя бы раз —
                                  // защищает от перезаписи реальных данных дефолтными при входе с нового устройства.
     const SESSION_KEY = 'ttrpg_session_code';
@@ -871,7 +882,7 @@
                 let corpseLoot = enemies[idx].corpseLoot;
                 // Враг из базы: добыча ещё не брошена (как у мастера и у карманной кражи) — бросаем по тексту лута сейчас.
                 if (!corpseLoot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) {
-                    corpseLoot = JSON.parse(JSON.stringify(window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: window.allItems || [], level: enemies[idx].level || 1 }) || { gold: 0, items: [] }));
+                    corpseLoot = JSON.parse(JSON.stringify(window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: lootPool(), level: enemies[idx].level || 1 }) || { gold: 0, items: [] }));
                 }
                 if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
                 enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
@@ -895,7 +906,7 @@
                 let loot = enemies[idx].corpseLoot;
                 // У врагов из базы добыча бросается только при обыске трупа — бросаем её сейчас по тексту лута,
                 // чтобы украденное не выпало потом ещё раз.
-                if (!loot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) loot = window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: window.allItems || [], level: enemies[idx].level || 1 });
+                if (!loot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) loot = window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: lootPool(), level: enemies[idx].level || 1 });
                 if (!loot) throw new Error('Карманы оказались пусты.');
                 const nl = JSON.parse(JSON.stringify({ gold: loot.gold || 0, items: loot.items || [] })); // без undefined — Firestore их не принимает
                 if (!want) { got.gold = nl.gold; nl.gold = 0; }

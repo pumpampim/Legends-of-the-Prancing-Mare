@@ -1331,6 +1331,7 @@ const weaponsNonCraftable = [
     { name: "Древний нордский боевой топор", category: "Одноручное", subcat: "Боевые топоры", damage: 11, weight: 5.0, price: 15, slot: "melee", isAmmo: false },
     { name: "Фалмерский боевой топор", category: "Одноручное", subcat: "Боевые топоры", damage: 12, weight: 8.0, price: 82, slot: "melee", isAmmo: false },
     { name: "Топор Изгоев", category: "Одноручное", subcat: "Боевые топоры", damage: 12, weight: 7.0, price: 90, slot: "melee", isAmmo: false },
+    { name: "Кинжал Изгоев", category: "Одноручное", subcat: "Кинжалы", damage: 6, weight: 2.0, price: 45, slot: "melee", isAmmo: false }, // у Изгоя-шамана в добыче; по образцу топора (половина урона)
     { name: "Небесный стальной боевой топор", category: "Одноручное", subcat: "Боевые топоры", damage: 13, weight: 5.0, price: 80, slot: "melee", isAmmo: false },
     { name: "Железное копье", category: "Одноручное", subcat: "Копья", damage: 7, weight: 3.0, price: 30, slot: "melee", isAmmo: false },
     { name: "Стальное копье", category: "Одноручное", subcat: "Копья", damage: 10, weight: 4.0, price: 59, slot: "melee", isAmmo: false },

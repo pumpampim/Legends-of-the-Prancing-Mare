@@ -56,7 +56,7 @@ const cookingIngredients = {
     "Мед с можжевеловыми ягодами": { price: 5, weight: 0.5, category: "Напиток" },
     "Аргонианский эль": { price: 5, weight: 2.0, category: "Напиток" },
     "Вино Джесики": { price: 12, weight: 0.5, category: "Напиток" },
-    "Зольный мед(алко)": { price: 50, weight: 2.0, category: "Напиток" },
+    "Зольный мед (алко)": { price: 50, weight: 2.0, category: "Напиток" },
     "Мацт": { price: 5, weight: 2.0, category: "Напиток" },
     "Суджамма": { price: 10, weight: 2.0, category: "Напиток" },
     "Угольное вино": { price: 15, weight: 2.0, category: "Напиток" },

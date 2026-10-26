@@ -84,7 +84,14 @@
     function moveLeft(key) {
         const t = grid.tokens[key], en = entities()[key]; if (!t || !en) return 0;
         const used = (t.mv && t.mv.tick === curTick()) ? (t.mv.ft || 0) : 0;
-        return Math.max(0, (parseInt(t.speed) || en.speed) - used);
+        let spd = parseInt(t.speed) || en.speed;
+        // Статусы врага: паралич/оглушение/заморозка — стоит на месте; замедление — минус футы из описания статуса.
+        if (en.kind === 'e' && en.src && window.StCombat) {
+            const fl = window.StCombat.statusFlags(en.src);
+            if (fl.immobile) return 0;
+            if (fl.slowFt) spd = Math.max(0, spd - fl.slowFt);
+        }
+        return Math.max(0, spd - used);
     }
 
     // ---------- зоны (плащи, ауры, круги, стены, камень) ----------
@@ -110,6 +117,12 @@
         return out;
     }
     // Тик зон (вызывается из gm.js в транзакции «следующего хода»): возвращает новых врагов, сетку, журнал и удары по игрокам.
+    // Кто ранил/добил врага руной или зоной — добыча с трупа по умолчанию уходит убийце (как при обычной атаке игрока).
+    function markHitBy(e, uid, hurt, died) {
+        if (!uid) return; // руну/зону поставил мастер
+        if (hurt || died) e.lastHitBy = uid;
+        if (died) e.killedBy = uid;
+    }
     function zoneTick(d, enemiesIn) {
         const gr = norm(d.grid); const ents = entitiesOf(Object.assign({}, d, { enemies: enemiesIn }));
         const enemies = enemiesIn.map(e => Object.assign({}, e));
@@ -141,6 +154,7 @@
                     if (pv.finalDmg > 0 && Array.isArray(e.statusEffects)) e.statusEffects = e.statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
                     if (z.mpDmg) e.curMp = Math.max(0, (e.curMp || 0) - z.mpDmg);
                     if (was > 0 && e.curHp <= 0) e.diedAtTurn = d.sessionTurnCounter || 0;
+                    markHitBy(e, z.uid, pv.finalDmg > 0, was > 0 && e.curHp <= 0);
                     names.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
                 } else if (z.slow) names.push(e.name + ' замедлен');
                 if (z.resistDown) {
@@ -260,7 +274,8 @@
             html += `<div class="gg-card"><strong>${esc(en.name)}</strong>${t ? ` · клетка ${t.x + 1}:${t.y + 1}` : ''}<br>❤ ${en.hp}/${en.maxHp}${en.maxMp ? ' · 🔷 ' + en.mp + '/' + en.maxMp : ''}${en.dmg ? ' · ⚔ ' + en.dmg : ''}`;
             if (t) {
                 const spd = parseInt(t.speed) || en.speed;
-                html += `<br>🏃 Скорость ${spd} фт · в этом ходу осталось <strong>${moveLeft(selKey)}</strong> фт`;
+                const flS = (en.kind === 'e' && en.src && window.StCombat) ? window.StCombat.statusFlags(en.src) : null;
+                html += `<br>🏃 Скорость ${spd} фт${flS && flS.immobile ? ' (обездвижен статусом)' : flS && flS.slowFt ? ` (замедление −${flS.slowFt})` : ''} · в этом ходу осталось <strong>${moveLeft(selKey)}</strong> фт`;
                 html += `<br><span class="gg-note">Скорость: </span><input type="number" min="0" max="200" value="${spd}" style="width:60px; margin:2px 0;" onchange="GmGrid.setSpeed('${selKey}', this.value)">`;
                 if (en.kind === 'e') html += `<br><span class="gg-note">Размер: </span>${[1, 2, 3, 4].map(n => `<button type="button" style="width:auto; margin:1px; padding:1px 7px;${G().size(t) === n ? ' outline:2px solid #f1c40f;' : ''}" onclick="GmGrid.setSize('${selKey}', ${n})">${n}×${n}</button>`).join('')}`;
             }
@@ -407,6 +422,7 @@
                         const was = e.curHp || 0; e.curHp = Math.max(0, was - pv.finalDmg);
                         if (pv.finalDmg > 0) breakOnDamageStatuses(e);
                         if (was > 0 && e.curHp <= 0) e.diedAtTurn = dd.sessionTurnCounter || 0;
+                        markHitBy(e, r.uid, pv.finalDmg > 0, was > 0 && e.curHp <= 0);
                         hit.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
                     } else if (!R.undeadOnly) {
                         playerHits.push({ uid: en.kind === 'p' ? en.ref : en.owner, summonId: en.kind === 's' ? en.ref : '', dmg: R.knock ? 0 : (r.dmg || 0), dmgType: R.dmgType || '', knock: !!R.knock, from: r.spell });

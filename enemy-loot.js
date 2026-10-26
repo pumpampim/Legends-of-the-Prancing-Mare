@@ -417,8 +417,10 @@
             let list = aw.list;
             // у Изгоя-шамана по записи — кинжал; кинжала изгоев в базе нет, делаем «по образцу» их топора (половина урона)
             if (!isDraugr && /кинжал/i.test((enemy.weaponNote || '') + ' ' + (enemy.loot || ''))) {
+                const realK = weaponsOf(pool, /^кинжал изгоев$/i)[0];
                 const axe = weaponsOf(pool, /изгое/i).find(i => i.slot === 'melee');
-                if (axe) list = [{ name: 'Кинжал изгоев', slot: 'melee', category: 'Оружие (с трупа)', dmg: Math.max(3, Math.round(axe.dmg * 0.5)), weight: Math.max(1, Math.round((axe.weight || 4) * 0.25)), price: Math.round((axe.price || 20) * 0.5) }];
+                if (realK) list = [realK];
+                else if (axe) list = [{ name: 'Кинжал изгоев', slot: 'melee', category: 'Оружие (с трупа)', dmg: Math.max(3, Math.round(axe.dmg * 0.5)), weight: Math.max(1, Math.round((axe.weight || 4) * 0.25)), price: Math.round((axe.price || 20) * 0.5) }];
             }
             if (list.length) weapon = pick(list);
         }
@@ -519,7 +521,92 @@
         };
     }
 
-    const api = { rollFromText, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot };
+    // Вещи, которых нет в items-data.js: броня/оружие/украшения из smithing-data.js, блюда, готовые зелья, свитки.
+    // Общий список для мастера (база предметов) и для добычи на листе игрока — чтобы с трупа выпадало одно и то же.
+    const SMITH_SLOT_MAP = { 'Шлема': 'helmet', 'Доспехи': 'chest', 'Наручи и перчатки': 'gloves', 'Сапоги и ботинки': 'boots', 'Щиты': 'shield' };
+    function extraItems() {
+        const out = [];
+        (root.armorRecipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: r.armorType || 'Броня',
+                weight: r.weight, price: r.price, armor: r.resistance, dmg: null,
+                effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
+                slot: SMITH_SLOT_MAP[r.slot] || null
+            });
+        });
+        (root.jewelryRecipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: 'Ювелирное изделие',
+                weight: r.weight || 0.1, price: r.price || 0, armor: null, dmg: null, effect: '',
+                slot: r.name.includes('кольцо') ? 'ring' : 'amulet'
+            });
+        });
+        (root.weaponRecipes || []).forEach(r => {
+            const wt = !r.isAmmo && root.SMITH_SUBCAT_TO_WEAPON_TYPE ? root.SMITH_SUBCAT_TO_WEAPON_TYPE[r.subcat] : null;
+            const o = {
+                name: r.name, category: (r.category || 'Оружие') + (r.subcat ? ' — ' + r.subcat : ''),
+                weight: r.weight, price: r.price, armor: null,
+                dmg: r.damage, effect: r.perkHint ? ('Обычно требует перк: ' + r.perkHint) : '',
+                slot: r.isAmmo ? null : r.slot
+            };
+            if (wt) o.weaponType = wt; // тип оружия едет с вещью (иначе у игрока при экипировке «залипал» прошлый тип)
+            out.push(o);
+        });
+        (root.armorNonCraftable || []).forEach(a => {
+            out.push({
+                name: a.name, category: (a.armorType || 'Броня') + ' (лут)',
+                weight: a.weight, price: a.price, armor: a.resistance, dmg: null,
+                effect: 'Не куётся — только лут/покупка/квест', slot: a.slot
+            });
+        });
+        (root.weaponsNonCraftable || []).forEach(w => {
+            out.push({
+                name: w.name, category: (w.category || 'Оружие') + (w.subcat ? ' — ' + w.subcat : '') + ' (лут)',
+                weight: w.weight, price: w.price, armor: null,
+                dmg: w.damage, effect: 'Не куётся — только лут/покупка/квест',
+                slot: w.isAmmo ? null : w.slot
+            });
+        });
+        (root.recipes || []).forEach(r => {
+            out.push({
+                name: r.name, category: 'Блюдо (кулинария)',
+                weight: r.weight || 0.5, price: r.price || 0, armor: null, dmg: null,
+                effect: r.effect || '', slot: null
+            });
+        });
+        if (root.failedDish) {
+            out.push({
+                name: root.failedDish.name, category: 'Блюдо (кулинария)',
+                weight: root.failedDish.weight || 1, price: root.failedDish.price || 0,
+                armor: null, dmg: null, effect: root.failedDish.effect || '', slot: null
+            });
+        }
+        (root.alchemyPremadePotions || []).forEach(p => {
+            out.push({
+                name: p.name, category: p.category, weight: p.weight, price: p.price,
+                armor: null, dmg: null, effect: p.effect, slot: null, alchemyEffects: p.alchemyEffects
+            });
+        });
+        // Крафтящиеся свитки — все заклинания, которые игрок может выучить и записать сам.
+        const TIER_PRICE = { 1: 15, 2: 30, 3: 45, 4: 60 };
+        if (root.spellsData) {
+            Object.keys(root.spellsData).forEach(school => {
+                [1, 2, 3, 4].forEach(tier => {
+                    (root.spellsData[school][tier] || []).forEach(sp => {
+                        if (root.isSustainSpell && root.isSustainSpell(sp.desc)) return; // свитков заклинаний «на поддержании» нет
+                        out.push({
+                            name: 'Свиток: ' + sp.name, category: 'Свитки (крафтящиеся)',
+                            weight: 0.1, price: TIER_PRICE[tier], armor: null, dmg: null,
+                            effect: sp.desc || '', slot: null
+                        });
+                    });
+                });
+            });
+        }
+        return out;
+    }
+
+    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot };
     root.EnemyLoot = api;
     root.EnemyGear = { generate, familyOf };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

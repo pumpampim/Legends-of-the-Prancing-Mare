@@ -190,6 +190,8 @@
 
         hitModifier -= starve * 2;
 
+        // Снаряжение «+N% базового урона оружия» (Щит налетчика): от базы самого оружия, без кулаков.
+        if (I.gearBaseWeaponPct && wepType !== 'unarmed' && baseDmg) add('снаряжение: % базового урона оружия', Math.round(baseDmg * I.gearBaseWeaponPct / 100));
         // Баффы «урон оружия +N%» (заклинания/зелья)
         const weaponDmgPct = I.weaponDmgPct || 0;
         if (weaponDmgPct) mul('бафф урона оружия', 1 + weaponDmgPct / 100);
@@ -198,6 +200,7 @@
         const weaponBoostPct = boostSkillKey ? ((I.skillBoostPct || {})[boostSkillKey] || 0) : 0;
         if (weaponBoostPct) mul('повышение навыка', 1 + weaponBoostPct / 100);
         if (mode === 'melee' && wepType === 'unarmed') { const unB = I.unarmedBonus || 0; if (unB) add('Трансмутация мускулы', unB); }
+        if (mode === 'melee' && wepType === 'unarmed' && I.unarmedEnchant) add('Усиление рукопашного боя', I.unarmedEnchant); // зачарование перчаток/колец
         let steelFistsNote = 0;
         if (mode === 'melee' && wepType === 'unarmed' && perks.steelFists && I.steelFistsArmor) { // «Стальные кулаки»
             add('Стальные кулаки', I.steelFistsArmor); steelFistsNote = I.steelFistsArmor;
@@ -298,7 +301,7 @@
         melee: { dmg: 8, type: 'onehand', name: 'Стальной меч', offhandDmg: 0 },
         ranged: { dmg: 0, ammoDmg: 0, type: 'bow', name: '' },
         enchantDmgMelee: 0, enchantDmgRanged: 0, offhandEnchantDmg: 0, weaponDmgPct: 0, skillBoostPct: {},
-        unarmedBonus: 0, steelFistsArmor: 0, weaponDmgFlat: 0, god: {}, elementalEnchant: {}, sheogorathMult: 1
+        unarmedBonus: 0, unarmedEnchant: 0, gearBaseWeaponPct: 0, steelFistsArmor: 0, weaponDmgFlat: 0, god: {}, elementalEnchant: {}, sheogorathMult: 1
     };
     const SELF_TEST_SCENARIOS = [
         ['базовый удар', {}],
