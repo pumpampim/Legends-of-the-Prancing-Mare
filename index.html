@@ -555,10 +555,10 @@
     <script src="smithing-data.js?v=13"></script>
     <script src="enchant-data.js?v=5"></script>
     <script src="spell-data.js?v=7"></script>
-    <script src="alchemy-data.js?v=6"></script>
+    <script src="alchemy-data.js?v=7"></script>
     <script src="fish-data.js?v=3"></script>
     <script src="hunt-data.js?v=3"></script>
-    <script src="holidays-data.js?v=3"></script>
+    <script src="holidays-data.js?v=4"></script>
     <script src="skill-books-data.js?v=4"></script>
     <script src="unique-weapons-data.js?v=3"></script>
     <script src="spell-tomes-data.js?v=5"></script>
@@ -2649,6 +2649,28 @@
     }
 
     window.renderPowersPanel = renderPowersPanel;
+    // Способности расы, знака, оборотня и вампира в бою — по тем же правилам хода, что атака и заклинание:
+    // «действием» — одно основное действие за ход (не после удара/смены оружия) и не под Параличом;
+    // голосом (Боевой клич) и Магией крови вампира — ещё и не под Немотой. «Бонусным действием» и реакцией
+    // (Агрессия, Выброс адреналина) — бонусное действие хода.
+    function powerActionKind(p) {
+        if (/^Бонусным действием|реакци/i.test(p.desc || '')) return 'bonus';
+        if ((p.effect || {}).taunt || (p.source === 'vampire' && (p.perk || p.lordBase))) return 'voice';
+        return 'main';
+    }
+    function powerActionAllowed(p) {
+        if (!inCombatNow()) return true;
+        const kind = powerActionKind(p);
+        const par = blockingStatusFor('swap'); // только Паралич
+        if (par) { alert(`Сейчас на тебе «${par.effectName || par.name}» — способности в этом ходу недоступны.`); return false; }
+        if (kind === 'bonus') return bonusActionAllowed('«' + p.name + '»');
+        if (kind === 'voice') { const mute = (activeTimedEffects || []).find(e => e && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity) && (e.statusFlag === 'mute' || e.effectName === 'Немота')); if (mute) { alert(`Сейчас на тебе «${mute.effectName || mute.name}» — «${p.name}» в этом ходу недоступна.`); return false; } }
+        const k = turnKeyNow();
+        if (combatMarks.swap === k) { alert('В этом ходу ты уже сменил оружие — способность можно со следующего хода.'); return false; }
+        if (combatMarks.attack === k) { alert('В этом ходу ты уже атаковал или колдовал — способность можно в следующем ходу.'); return false; }
+        return true;
+    }
+    function markPowerAction(p) { if (powerActionKind(p) === 'bonus') markBonusAction(); else markCombatAction('attack'); }
     window.usePower = function (id) {
         const p = (window.powersData || []).find(x => x.id === id);
         if (!p) return;
@@ -2658,8 +2680,10 @@
         if (p.requiresTransformed && !(s.werewolf && s.werewolf.isTransformed)) { alert('Только в облике зверя.'); return; }
         if ((p.perk || p.lordBase) && !snLordForm()) { alert('Только в форме вампира-лорда.'); return; }
         if (p.lordLimit) { const l = lordLeft(p.id); if (l.own + l.bonus <= 0) { alert('Запас очков Магии крови и Сил ночи пуст — он восстанавливается, когда утолишь голод (кровь), или частично на следующий день.'); return; } }
+        if (!powerActionAllowed(p)) return;
         if (p.special) {
             if (runSpecialPower(p)) {
+                markPowerAction(p);
                 if (p.perDay) powersUsedToday[group] = true;
                 if (p.lordLimit) lordSpend(p.id);
                 renderPowersPanel(); if (typeof renderActiveEffects === 'function') renderActiveEffects(); updateAll(); saveLocalStorage();
@@ -2716,6 +2740,7 @@
         }
 
         if (p.perDay) powersUsedToday[group] = true;
+        markPowerAction(p);
 
         // Активный эффект на листе (если есть длительность или временные ХП)
         const hasTimed = p.turns > 0 || tempHp > 0 || eff.taunt;
@@ -3862,7 +3887,7 @@ window.toggleSkillPanel = function (idx) {
         return d > 0 ? -2 * d : 0;
     }
     function wearsItemNamed(name) {
-        return !!(equippedSlots && Object.keys(equippedSlots).some(k => { const id = equippedSlots[k]; const it = id ? playerInventory.find(i => i.itemId === id && i.count > 0) : null; return it && it.name === name; }));
+        return !!(equippedSlots && Object.keys(equippedSlots).some(k => { const id = equippedSlots[k]; const it = id ? playerInventory.find(i => i.itemId === id && i.count > 0) : null; return it && String(it.name).replace(/\s*\[[^\]]+\]$/, '') === name; })); // зачарованная вещь («Колпак повара [Эффект]») — всё та же вещь
     }
     // Дни голода, которые идут в штраф: «Одение повара» — минус к кубам только со 2-го дня без еды.
     function hungerPenaltyDays() {
@@ -5041,6 +5066,7 @@ window.toggleSkillPanel = function (idx) {
                 const mpAfter = maxMpE ? Math.max(mpBefore, Math.min(maxMpE, mpBefore + gainE)) : mpBefore + gainE;
                 hpElE.value = hpE - spendE;
                 mpElE.value = mpAfter;
+                markCombatAction('attack'); // каст — действие хода, как и кнопка «Конвертировать ХП→МП»
                 alert('Равновесие: −' + spendE + ' ХП → +' + (mpAfter - mpBefore) + ' маны' + (mpAfter - mpBefore < gainE ? ' (упёрлось в максимум маны)' : '') + '. Мана на каст не тратится.');
                 updateAll();
                 saveLocalStorage();
@@ -5206,7 +5232,7 @@ window.toggleSkillPanel = function (idx) {
         const bookDb = window.skillBookByAnyName ? window.skillBookByAnyName(item.name) : null;
         const bookKey = (bookDb && (bookDb.nameEn || bookDb.name)) || String(item.name || '').trim(); // английское и русское имя — одна книга
         if (readSkillBooks.indexOf(bookKey) !== -1) { alert(`«${item.name}» ты уже читал(а) — второй раз навык не вырастет. Книгу можно продать.`); return; }
-        if (raw >= 100 || getEffectiveSkillValue(item.skill) >= SKILL_MAX) { alert(`«${item.skill}» уже на максимуме (100) — книга не поможет, но её всё равно можно оставить или продать.`); return; }
+        if (raw >= 100) { alert(`«${item.skill}» уже на максимуме (100) — книга не поможет, но её всё равно можно оставить или продать.`); return; }
         raw = Math.min(100, raw + 1);
         input.setAttribute('data-raw-val', raw);
         levelUpProgress += 1; // +1 к навыку из книги идёт и в прогресс уровня — как у учителей и успехов
@@ -5380,7 +5406,9 @@ window.toggleSkillPanel = function (idx) {
     }
 
     function getInventoryTotalWeight() {
-        return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0);
+        // подсумок несёт игрок — вес его содержимого тоже на нём (раньше при загрузке зелья вес пропадал)
+        return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0)
+            + (typeof pouchContents !== 'undefined' && Array.isArray(pouchContents) ? pouchContents.reduce((n, e) => n + (parseFloat(e.weight) || (e.scroll ? 0.1 : 0.25)), 0) : 0);
     }
 
     // Вещи из базы предметов приходят к игроку разными путями (выдача мастером, покупка у торговца,
@@ -5705,7 +5733,7 @@ window.toggleSkillPanel = function (idx) {
         const speech = getSkillRawValue('Красноречие') + gb('speech');
         // «Повышение искусства торговли» (зачарование/зелье): цены купли и продажи выгоднее на N% — как перк «Торговец».
         const tradeBoost = getSkillBoostPercent('Торговля') / 100;
-        return (speech * 0.01) * (1 + (perks.merchantPriceBonus || 0) + getRacialPriceBonus() + tradeBoost);
+        return (speech * 0.01) * (1 + Math.min(0.3, perks.merchantPriceBonus || 0) + getRacialPriceBonus() + Math.min(0.5, tradeBoost)); // потолки те же, что при покупке: перк «Торговец» 30%, «Повышение искусства торговли» 50%
     }
 
     function getDisplayPrice(basePrice) {
@@ -5995,7 +6023,7 @@ window.toggleSkillPanel = function (idx) {
         }
         const dispositionMult = { '-1': 1.25, '0': 1, '1': 0.9, '2': 0.8 }[String(disposition)] || 1;
         const repMult = getReputationPriceMult(stock.hold);
-        const holidayDiscount = getActiveHolidayDiscount();
+        const holidayDiscount = getActiveHolidayDiscount(key);
         const dispositionNote = disposition ? `<br><span style="opacity:.8;">${disposition > 0 ? '🙂' : '😒'} Отношение торговца: ${disposition > 0 ? `скидка ${Math.round((1 - dispositionMult) * 100)}%` : `наценка ${Math.round((dispositionMult - 1) * 100)}%`} (уже учтено в ценах)</span>` : '';
         infoEl.innerHTML = `💰 У торговца: <strong>${formatNumber(stock.gold)}</strong> золота · товаров: ${stock.items.length}` +
             (holidayDiscount ? `<br><span style="color:var(--accent-color);">🎉 Скидка праздника: −${holidayDiscount}% (уже учтена в ценах ниже)</span>` : '') +
@@ -6023,12 +6051,14 @@ window.toggleSkillPanel = function (idx) {
     // Задача F: скидка праздника — либо по текущей дате на листе (естественно совпал день),
     // либо запущена мастером вручную (sessions/{code}.activeHoliday), независимо от даты.
     // Берём МАКСИМАЛЬНУЮ из двух, если вдруг совпали оба источника.
-    function getActiveHolidayDiscount() {
+    // merchantKey — ключ торговца («alchemist2@Вайтран»): скидка с пометкой discountOnly («Алхимики дают скидку…») касается только его.
+    function holidayDiscountApplies(h, merchantKey) { return !h.discountOnly || (merchantKey && String(merchantKey).indexOf(h.discountOnly) === 0); }
+    function getActiveHolidayDiscount(merchantKey) {
         let discount = 0;
         const todayHolidays = (typeof findTodayHolidays === 'function') ? findTodayHolidays() : [];
-        todayHolidays.forEach(h => { if (h.discount && h.discount > discount) discount = h.discount; });
+        todayHolidays.forEach(h => { if (h.discount && h.discount > discount && holidayDiscountApplies(h, merchantKey)) discount = h.discount; });
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
-        if (session && session.activeHoliday && session.activeHoliday.discount && session.activeHoliday.discount > discount) {
+        if (session && session.activeHoliday && session.activeHoliday.discount && session.activeHoliday.discount > discount && holidayDiscountApplies(session.activeHoliday, merchantKey)) {
             discount = session.activeHoliday.discount;
         }
         return discount;
@@ -6178,7 +6208,7 @@ window.toggleSkillPanel = function (idx) {
         // Задача H: еда зимой дороже (меньше свежих продуктов, больше расходов на хранение).
         const foodCats = ['Готовые продукты', 'Сырые продукты', 'Напитки'];
         if (category && foodCats.includes(category) && getCurrentSeason().name === 'Зима') price *= 1.2;
-        const holidayDiscount = getActiveHolidayDiscount();
+        const holidayDiscount = getActiveHolidayDiscount(merchantKey);
         if (holidayDiscount) price *= (1 - holidayDiscount / 100);
         price *= getGuildDiscountMult();
         if (merchantKey && /^blacksmith/.test(String(merchantKey)) && companionsMember()) price *= 0.9; // Соратники: −10% у кузнецов, не зависит от Красноречия
@@ -6593,6 +6623,12 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('kitchen-pot-list');
         if (!el) return;
         const cookable = invStacksByBase(n => !!(window.cookingIngredients && window.cookingIngredients.hasOwnProperty(n)));
+        // Выбор в котле не должен переживать стопку: съели/продали/сварили — лишнее убираем (раньше варилось из того, чего уже нет).
+        Object.keys(potSelections).forEach(k => {
+            const st = cookable.find(c => c.itemId === k);
+            if (!st || st.count <= 0) delete potSelections[k];
+            else if (potSelections[k] > st.count) potSelections[k] = st.count;
+        });
         if (!cookable.length) {
             el.innerHTML = '<p style="opacity:.6; font-size:14px;">В инвентаре пока нет продуктов для готовки.</p>';
             return;
@@ -6641,6 +6677,8 @@ window.toggleSkillPanel = function (idx) {
         Object.keys(potSelections).forEach(id => {
             if (potSelections[id] > 0) potMap[id] = potSelections[id];
         });
+        renderKitchenPot(); // сверяем выбор с остатками в рюкзаке
+        Object.keys(potMap).forEach(id => { if (!potSelections[id]) delete potMap[id]; else potMap[id] = potSelections[id]; });
         const potNames = Object.keys(potMap);
         const resultEl = document.getElementById('kitchen-result');
         if (potNames.length === 0) {
@@ -6985,7 +7023,7 @@ window.toggleSkillPanel = function (idx) {
             // Слот раньше был жёстко "melee" даже для луков (subcat "Луки (обычные/особые)") —
             // экип-слот для лука должен быть "ranged", иначе он попадал бы не в тот выпадающий
             // список при экипировке.
-            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price } : { slot: wepType.startsWith('ranged') ? 'ranged' : 'melee', weaponDmg: dmgVal, weaponType: wepType, price: recipe.price };
+            extra = recipe.isAmmo ? { category: 'Боеприпасы', price: recipe.price, weaponDmg: typeof dmgVal === 'number' ? dmgVal : undefined } : { slot: wepType.startsWith('ranged') ? 'ranged' : 'melee', weaponDmg: dmgVal, weaponType: wepType, price: recipe.price };
             // У оружейных рецептов поля upgradeMaterial в данных нет вообще (только у брони) — из-за
             // этого кнопки "Улучшить"/"Наточить" у выкованного оружия не появлялись. Берём материал
             // из самого рецепта: первый слиток (или Сталгрим) среди ингредиентов — как в ваниле точило
@@ -7282,6 +7320,9 @@ window.toggleSkillPanel = function (idx) {
 
         removeFromInventoryByName(gemKey, 1);
         const oldItemId = item.itemId;
+        // Слоты, где вещь была надета, — запоминаем ДО списания: списание снимает пропавшую вещь со слота,
+        // и раньше зачарованные перчатки оказывались в рюкзаке, а слот пустел.
+        const eqKeysBefore = Object.keys(equippedSlots).filter(k => equippedSlots[k] === oldItemId);
         removeFromInventoryByName(item.itemId, 1);
 
         const enchantedName = `${item.name} [${effect.name}]`;
@@ -7301,7 +7342,11 @@ window.toggleSkillPanel = function (idx) {
         addToInventory(newItemId, enchantedName, 1, item.weight, item.category, desc, extra);
         // Надетую вещь заменяем новой зачарованной автоматически (см. repointEquippedSlots)
         const newItem = playerInventory.find(i => i.itemId === newItemId);
-        const wasEquipped = Object.keys(equippedSlots).some(k => equippedSlots[k] === oldItemId);
+        const wasEquipped = eqKeysBefore.length > 0;
+        if (newItem && !playerInventory.some(i => i.itemId === oldItemId)) {
+            const KEY_TO_SLOT = { meleeWeapon: 'melee', meleeWeaponOffhand: 'melee_offhand', rangedWeapon: 'ranged', neck: 'amulet' };
+            eqKeysBefore.forEach(k => { if (equippedSlots[k] !== oldItemId) applyItemToSlot(newItem, KEY_TO_SLOT[k] || k); });
+        }
         repointEquippedSlots(oldItemId, newItem);
         if (wasEquipped) { renderAllSlotPickers(); updateAll(); }
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Зачарование');
@@ -7367,6 +7412,7 @@ window.toggleSkillPanel = function (idx) {
         const gemMult = (window.soulGemPower && window.soulGemPower[soulGem]) || 1;
         addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', desc, {
             isStaff: true, chargeDaysLeft: getChargeDays(soulGem), slot: 'ranged', price: enchantedPrice(80, effect, soulGem, calc), // база посоха 80 × 8 × сила зачарования
+            craftCost: craftCostOf([{ name: gemKey, qty: 1 }], 1), craftKind: 'ench', // сделанная вещь: потолок цены продажи, как у посоха-заклинателя
             enchantment: { name: effect.name, value: calc.boolean ? null : calc.value, unit: effect.unit, description: desc }
         });
         renderStaffList();
@@ -7485,6 +7531,17 @@ window.toggleSkillPanel = function (idx) {
         if (i.category === 'Боеприпасы') return true;
         const notAmmo = /^Свиток/i.test(i.name || '') || /Свитк|Книг|Посох|заклинан/i.test(i.category || '') || i.scrollSpellName || i.isMagicStaff;
         return !notAmmo && /стрел|болт/i.test(i.name || '');
+    }
+
+    // Урон боеприпаса. Стрелы от мастера и торговца хранят урон в weaponDmg, старые — в dmg,
+    // а у скованных урона в вещи раньше не было вовсе: тогда берём его из таблицы кузнеца по имени.
+    function ammoDamageOf(am) {
+        if (!am) return 0;
+        if (typeof am.dmg === 'number') return am.dmg;
+        if (typeof am.weaponDmg === 'number') return am.weaponDmg;
+        const base = String(am.name || '').replace(/\s*\[.*\]\s*$/, '');
+        const r = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).find(w => w.name === base);
+        return r && typeof r.damage === 'number' ? r.damage : 0;
     }
 
     function renderAmmoSelect() {
@@ -8881,9 +8938,10 @@ window.toggleSkillPanel = function (idx) {
         saveLocalStorage();
         // Задача K: выполнение квеста гильдии автоматически даёт +1 к её прогрессу.
         if (q.guild && window.CloudSync && typeof window.CloudSync.incrementGuildProgress === 'function') {
-            const before = normalizePlayerGuildEntry((playerGuildsData || {})[q.guild]).orders;
-            const after = before + 1;
-            window.CloudSync.incrementGuildProgress(q.guild).then(() => {
+            // Порог считаем по счётчику, который вернула транзакция в облаке, а не по локальному листу:
+            // два квеста, подтверждённые разом, видели один и тот же локальный счётчик и давали награду за порог дважды.
+            window.CloudSync.incrementGuildProgress(q.guild).then(res => {
+                const after = (res && typeof res.after === 'number') ? res.after : normalizePlayerGuildEntry((playerGuildsData || {})[q.guild]).orders + 1;
                 if (typeof renderGuildPanelPlayer === 'function') renderGuildPanelPlayer();
                 // Авто-выдача брони, если этот заказ как раз довёл счётчик до порога награды.
                 if (q.guild === 'Соратники') companionsNotifyRewards();
@@ -9018,13 +9076,21 @@ window.toggleSkillPanel = function (idx) {
             entry.equipSlot = isBow ? 'ranged' : 'melee';
             const prefix = isBow ? 'wep-ranged' : 'wep-melee';
             const typeField = document.getElementById(prefix + '-type');
-            entry.savedWeaponName = document.getElementById(prefix + '-name').value;
-            entry.savedWeaponDmg = document.getElementById(prefix + '-dmg').value;
-            entry.savedWeaponType = typeField ? typeField.value : null;
+            const slotKeyS = isBow ? 'rangedWeapon' : 'meleeWeapon';
+            // Повторный призыв, пока в руке уже призванное оружие: новое заменяет старое, а «настоящее» оружие для
+            // возврата берём у старого призыва. Раньше запоминался сам призванный меч — и после истечения обоих он оставался навсегда.
+            const prevS = activeSummons.find(x => x && x.equipSlot === entry.equipSlot);
+            if (prevS) {
+                ['savedWeaponName', 'savedWeaponDmg', 'savedWeaponType', 'savedSlotItemId', 'savedOffhandId', 'savedOffhandName', 'savedOffhandDmg'].forEach(f => { if (prevS[f] !== undefined) entry[f] = prevS[f]; });
+                activeSummons = activeSummons.filter(x => x !== prevS);
+            } else {
+                entry.savedWeaponName = document.getElementById(prefix + '-name').value;
+                entry.savedWeaponDmg = document.getElementById(prefix + '-dmg').value;
+                entry.savedWeaponType = typeField ? typeField.value : null;
+            }
             // Настоящее оружие уходит из руки на время призыва: иначе его зачарование прибавлялось к призванному,
             // а двуручник «держал» руки (щит с призванным мечом не надеть). После призыва — возвращается.
-            const slotKeyS = isBow ? 'rangedWeapon' : 'meleeWeapon';
-            entry.savedSlotItemId = equippedSlots[slotKeyS] || null;
+            if (!prevS) entry.savedSlotItemId = equippedSlots[slotKeyS] || null;
             equippedSlots[slotKeyS] = null;
             if (!isBow && equippedSlots.meleeWeaponOffhand) { entry.savedOffhandId = equippedSlots.meleeWeaponOffhand; entry.savedOffhandName = (document.getElementById('wep-melee-offhand-name') || {}).value || ''; entry.savedOffhandDmg = (document.getElementById('wep-melee-offhand-dmg') || {}).value || 0; equippedSlots.meleeWeaponOffhand = null; document.getElementById('wep-melee-offhand-name').value = ''; document.getElementById('wep-melee-offhand-dmg').value = 0; }
             document.getElementById(prefix + '-name').value = t.name;
@@ -9255,11 +9321,11 @@ window.toggleSkillPanel = function (idx) {
         removeFromInventoryByName(itemId, 1);
         if (isScrollInvItem(item)) { // свиток: храним всё, что нужно для чтения и возврата в инвентарь
             pouchContents.push({ itemId: item.itemId, name: item.name, category: item.category || 'Свиток', effect: item.effect || '', price: item.price, scroll: true,
-                battle: !!parseSpellDamageFromDesc(item.effect || ''), scrollSchool: item.scrollSchool || null, scrollSpellName: item.scrollSpellName || null, scrollTier: item.scrollTier || null, weight: item.weight || 0.1 });
+                battle: !!parseSpellDamageFromDesc(item.effect || ''), scrollSchool: item.scrollSchool || null, scrollSpellName: item.scrollSpellName || null, scrollTier: item.scrollTier || null, weight: item.weight || 0.1, stolen: !!item.stolen });
             renderPouchPanel(); renderInventoryList(); saveLocalStorage();
             return;
         }
-        pouchContents.push({ itemId: item.itemId, name: item.name, category: item.category || '', effect: item.effect || '', alchemyEffects: item.alchemyEffects || null, price: item.price, craftCost: item.craftCost, craftKind: item.craftKind });
+        pouchContents.push({ itemId: item.itemId, name: item.name, category: item.category || '', effect: item.effect || '', alchemyEffects: item.alchemyEffects || null, price: item.price, craftCost: item.craftCost, craftKind: item.craftKind, weight: item.weight, stolen: !!item.stolen });
         renderPouchPanel();
         renderInventoryList();
         saveLocalStorage();
@@ -9267,7 +9333,7 @@ window.toggleSkillPanel = function (idx) {
 
     // Нанести яд из подсумка на оружие (так же, как из инвентаря)
     // Цена и стоимость крафта едут с зельем в подсумок и обратно (раньше вернувшееся зелье теряло цену и продавалось за 0).
-    function pouchExtra(entry) { const o = { alchemyEffects: entry.alchemyEffects }; if (entry.price) o.price = entry.price; if (entry.craftCost) { o.craftCost = entry.craftCost; o.craftKind = entry.craftKind; } if (entry.scroll) { o.scrollSchool = entry.scrollSchool; o.scrollSpellName = entry.scrollSpellName; o.scrollTier = entry.scrollTier; } return o; }
+    function pouchExtra(entry) { const o = { alchemyEffects: entry.alchemyEffects }; if (entry.stolen) o.stolen = true; if (entry.price) o.price = entry.price; if (entry.craftCost) { o.craftCost = entry.craftCost; o.craftKind = entry.craftKind; } if (entry.scroll) { o.scrollSchool = entry.scrollSchool; o.scrollSpellName = entry.scrollSpellName; o.scrollTier = entry.scrollTier; } return o; }
 
     window.applyPoisonFromPouch = function (idx) {
         const entry = pouchContents[idx];
@@ -9292,7 +9358,7 @@ window.toggleSkillPanel = function (idx) {
         if (!entry || !entry.scroll) return;
         if (!bonusActionAllowed('достать свиток из подсумка')) return;
         const back = () => addToInventory(entry.itemId, entry.name, 1, entry.weight || 0.1, entry.category || 'Свиток', entry.effect || '',
-            { price: entry.price, scrollSchool: entry.scrollSchool, scrollSpellName: entry.scrollSpellName, scrollTier: entry.scrollTier });
+            { price: entry.price, scrollSchool: entry.scrollSchool, scrollSpellName: entry.scrollSpellName, scrollTier: entry.scrollTier, stolen: entry.stolen ? true : undefined });
         if (entry.battle) {
             pouchContents.splice(idx, 1); back(); markBonusAction();
             renderPouchPanel(); renderInventoryList(); if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect(); saveLocalStorage();
@@ -9330,10 +9396,10 @@ window.toggleSkillPanel = function (idx) {
         // Стопку могли слить с одинаковыми зельями под другим id — возвращаем в неё, а не отдельной строкой.
         let backId = entry.itemId;
         if (!playerInventory.some(i => i.itemId === backId)) {
-            const same = playerInventory.find(i => i.name === entry.name && (i.effect || '') === (entry.effect || '') && JSON.stringify(i.alchemyEffects || null) === JSON.stringify(entry.alchemyEffects || null));
+            const same = playerInventory.find(i => i.name === entry.name && !!i.stolen === !!entry.stolen && (i.effect || '') === (entry.effect || '') && JSON.stringify(i.alchemyEffects || null) === JSON.stringify(entry.alchemyEffects || null));
             if (same) backId = same.itemId;
         }
-        addToInventory(backId, entry.name, 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
+        addToInventory(backId, entry.name, 1, (typeof entry.weight === 'number' ? entry.weight : (entry.scroll ? 0.1 : 0.25)), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
         pouchContents.splice(idx, 1);
         renderPouchPanel();
         saveLocalStorage();
@@ -9644,7 +9710,7 @@ window.toggleSkillPanel = function (idx) {
         if (snWerewolfForm()) { alert('В облике зверя нельзя пить зелья и есть обычную еду — оборотень лечится только пожиранием трупов.'); return; }
         if (potionKindOf(item) === 'poison' && !confirm('Это ЯД. Его наносят на оружие (кнопка «☠ На оружие»). Выпить всё равно — он подействует на тебя?')) return;
         // В бою из рюкзака — основное действие хода; из подсумка — бонусное (drinkFromPouch).
-        if (!combatActionAllowed('cast')) return;
+        if (!combatActionAllowed('item')) return; // зелье — не заклинание: Немота не мешает
         markCombatAction('attack');
         removeFromInventoryByName(itemId, 1);
         activateTimedEffectFromItem(item);
@@ -9660,7 +9726,7 @@ window.toggleSkillPanel = function (idx) {
         if (!item || !ARTIFACT_USE[item.name]) return;
         if (item.name === 'Кубок Бесконечного Хмеля') {
             // «Глоток – снимает замедление, +4 Силы на 3 хода, −2 куба на стрельбу/магию»
-            if (!combatActionAllowed('cast')) return;
+            if (!combatActionAllowed('item')) return;
             markCombatAction('attack');
             const slowed = activeTimedEffects.filter(e => /замедл/i.test(String(e.effectName || e.name || '')) || (e.speed < 0 && !/^Болезнь:/.test(e.effectName || '')));
             activeTimedEffects = activeTimedEffects.filter(e => slowed.indexOf(e) === -1 && e.effectName !== 'Кубок Бесконечного Хмеля');
@@ -9893,6 +9959,43 @@ window.toggleSkillPanel = function (idx) {
             .then(() => alert('✴ «' + name + '»' + (enhanced ? ' (усиленная)' : '') + (dmg ? ', урон ' + dmg : '') + ': руна готова. Мастер поставит её на боевую сетку — не дальше ' + maxFt + ' фт от тебя. Сработает, когда враг подойдёт вплотную, и ударит всех в 5 фт.'))
             .catch(e => alert('Руна не передана мастеру: ' + e.message));
     }
+    // Защиты, которые мастер учитывает в атаке врага, — и для урона руны, площадного заклинания и ловушки:
+    // оберег (только против заклинаний), барьер Перчаток Хранителя, лошадь под всадником (70% урона ей).
+    function playerSoakIncoming(dmg, isSpell) {
+        const notes = [];
+        if (dmg > 0 && isSpell) {
+            const w = (activeTimedEffects || []).find(x => x && x.ward && (x.ward.left || 0) > 0 && x.turnsRemaining !== 0);
+            if (w) {
+                const ab = Math.min(dmg, parseInt(w.ward.left) || 0);
+                dmg -= ab; w.ward.left = Math.max(0, (w.ward.left || 0) - ab);
+                let gain = 0;
+                if ((document.getElementById('perk-11-7-1') || {}).checked) { // «Оберег-поглотитель»: половина поглощённого — в ману
+                    gain = Math.floor(ab / 2);
+                    const mpEl = document.getElementById('cur-mp'), mx = parseInt((document.getElementById('max-mp') || {}).value) || Infinity;
+                    if (mpEl && gain) mpEl.value = Math.min(mx, (parseInt(mpEl.value) || 0) + gain);
+                }
+                notes.push(`🔰 оберег «${w.name}» поглотил ${ab}${gain ? `, +${gain} маны` : ''}${w.ward.left > 0 ? '' : ' и рассеялся'}`);
+                if (w.ward.left <= 0) activeTimedEffects = activeTimedEffects.filter(x => x !== w);
+                renderActiveEffects();
+            }
+        }
+        if (dmg > 0 && keeperBarrierActive()) {
+            const ab = Math.min(dmg, keeperBarrierLeft);
+            dmg -= ab; keeperBarrierLeft -= ab;
+            notes.push(`🛡 барьер Перчаток Хранителя поглотил ${ab}`);
+        }
+        const horse = dmg > 0 ? ridingHorse() : null;
+        if (horse) {
+            const share = (window.PET_RIDING && window.PET_RIDING.horseShare) || 0.7;
+            const toHorse = Math.min(Math.round(dmg * share), parseInt(horse.hp) || 0);
+            dmg -= toHorse;
+            const m = applyPetHpDelta(horse.id, -toHorse);
+            notes.push(`🐎 лошадь «${horse.name}» приняла ${toHorse}${m ? ' — ' + m : ''}`);
+            if (window.renderPetsPanel) window.renderPetsPanel();
+        }
+        return { dmg, notes };
+    }
+
     // Удар руны или чужого площадного заклинания: по мне (с моими сопротивлениями) или по моему существу.
     function gridAoeHit(e) {
         const who = e.from ? '«' + e.from + '»' : 'Взрыв';
@@ -9923,10 +10026,14 @@ window.toggleSkillPanel = function (idx) {
         let dmg = Math.max(0, Math.round((e.dmg || 0) * (1 - res / 100)));
         const lordAdd = dmg > 0 ? lordFireExtra(e.dmgType) : null; // знак «Лорд»: урон огнём +2d6
         if (lordAdd) dmg += lordAdd.sum;
+        const soak = playerSoakIncoming(dmg, true); // руны и площадные заклинания — магия: оберег тоже держит
+        dmg = soak.dmg;
         const hpEl = document.getElementById('cur-hp');
         hpEl.value = Math.max(0, (parseInt(hpEl.value) || 0) - dmg);
-        alertSafe('💥 ' + who + ' задевает тебя: −' + dmg + ' ХП' + (res ? ' (' + (res > 0 ? 'сопротивление ' : 'уязвимость ') + Math.abs(res) + '%, было бы ' + e.dmg + ')' : '') + (lordAdd ? ' (знак Лорда: огонь +' + lordAdd.txt + ')' : '') + '.');
-        if (dmg > 0) armorHitProgress(e.dmgType || 'physical');
+        alertSafe('💥 ' + who + ' задевает тебя: −' + dmg + ' ХП' + (res ? ' (' + (res > 0 ? 'сопротивление ' : 'уязвимость ') + Math.abs(res) + '%, было бы ' + e.dmg + ')' : '') + (lordAdd ? ' (знак Лорда: огонь +' + lordAdd.txt + ')' : '') + (soak.notes.length ? ' (' + soak.notes.join('; ') + ')' : '') + '.');
+        if (dmg > 0) { armorHitProgress(e.dmgType || 'physical'); if (typeof window.concentrationCheck === 'function') try { window.concentrationCheck(dmg); } catch (x) { } }
+        updateAll(); saveLocalStorage(true);
+        try { if (typeof checkDeath === 'function') checkDeath(); } catch (x) { }
     }
 
     // ---- Прокачка брони как в Скайриме: навык растёт от физических попаданий по персонажу ----
@@ -10369,8 +10476,11 @@ window.toggleSkillPanel = function (idx) {
         const invById = new Map(playerInventory.map(i => [i.itemId, i]));
         ['helmet', 'chest', 'robe', 'gloves', 'boots', 'shield', 'ring', 'neck', 'circlet'].forEach(slotKey => {
             const item = equippedSlots[slotKey] ? invById.get(equippedSlots[slotKey]) : null;
-            if (!item || !item.effect) return;
-            String(item.effect).split(/\.\s*/).forEach(sent => {
+            if (!item) return;
+            // зачарованная вещь: встроенное свойство (скидка перчаток магистра) живёт в baseEffect, а effect — описание чар
+            const effTxt = (item.enchantment ? gearBaseEffect(item) + '. ' : '') + (item.effect || '');
+            if (!effTxt.trim()) return;
+            String(effTxt).split(/\.\s*/).forEach(sent => {
                 sent = sent.trim();
                 let m = sent.match(/^усилен[а-яё]*\s+заклинани[а-яё]*\s+школы\s+([а-яё]+)\s+на\s+(\d+)\s*%\s+дешевле/i);
                 if (m) {
@@ -11583,6 +11693,9 @@ window.toggleSkillPanel = function (idx) {
             resultEl.innerHTML = '<span style="color:#e74c3c;">Не знаешь ни одного «Стука».</span>';
             return;
         }
+        // те же проверки, что у каста с карточки: руки, Немота/Паралич, действие хода в бою
+        { const hb = castBlockReason(); if (hb) { alert(hb); return; } }
+        if (!castMuteCheck() || !combatActionAllowed('cast')) return;
         knownKnocks.sort((a, b) => parseInt(b.name.slice(-1)) - parseInt(a.name.slice(-1)));
         const spell = knownKnocks[0];
         const spellRank = parseInt(spell.name.slice(-1));
@@ -11596,6 +11709,7 @@ window.toggleSkillPanel = function (idx) {
         }
         consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
+        markCombatAction('attack');
         updateVitalBars();
         saveLocalStorage();
         const success = spellRank >= lockTierIdx + 1;
@@ -11898,8 +12012,11 @@ window.toggleSkillPanel = function (idx) {
                 window.CloudSync.pickpocketEnemy(enemy.id, want).then(got => {
                     if (got.gold) { goldEl.value = (parseInt(goldEl.value) || 0) + got.gold; finish(`Вытащил(а) ${got.gold} септимов.`); }
                     else if (got.item) { giveStolen(got.item, 1); finish(`Вытащил(а) «${escHtml(got.item.name)}».`); }
-                    else finish('Карманы оказались пусты.');
-                }).catch(e => say(html + `<span style="color:#e67e22;">${escHtml(e.message)}</span>`));
+                    else { // нечего брать — это не удача: ни победы в счёт, ни опыта навыка
+                        st.wins[c.vk] = Math.max(0, (st.wins[c.vk] || 1) - 1);
+                        say(html + '<span style="color:#e67e22;">Карманы оказались пусты — взять нечего.</span>'); updateTheftInfo(); saveLocalStorage(true);
+                    }
+                }).catch(e => { st.wins[c.vk] = Math.max(0, (st.wins[c.vk] || 1) - 1); say(html + `<span style="color:#e67e22;">${escHtml(e.message)}</span>`); updateTheftInfo(); });
                 return;
             }
             if (c.what === 'purse') {
@@ -12015,7 +12132,7 @@ window.toggleSkillPanel = function (idx) {
         if (skillProgress[skillIdx] >= needed) {
             skillProgress[skillIdx] = Math.round((skillProgress[skillIdx] - needed) * 100) / 100; // остаток дробного прогресса не теряется
             let raw = parseInt(skillInput.getAttribute('data-raw-val')) || 10;
-            if (raw < 100 && getEffectiveSkillValue(skillName) < SKILL_MAX) { // лимит навыка — 100 (с расовым бонусом), дальше не растёт
+            if (raw < 100) { // растёт сырой навык до 100; итог с бонусами вещей и бога обрезается потолком отдельно
                 raw = Math.min(100, raw + 1);
                 skillInput.setAttribute('data-raw-val', raw);
                 levelUpProgress += 1;
@@ -12138,7 +12255,7 @@ window.toggleSkillPanel = function (idx) {
             blockedPerk: !!(recipe && recipe.perkHint && !hasPerk), blockedMagic: magical && !(typeof isPerkChecked === 'function' && isPerkChecked('Кузнец-волшебник')) };
     }
     function isMagicalGear(item) {
-        return !!(item && (item.enchantment || item.isStaff || item.isMagicStaff || (item.effect && String(item.effect).trim() && !/^Урон \d+ \+/.test(String(item.effect)))));
+        return !!(item && (item.enchantment || item.isStaff || item.isMagicStaff || (item.effect && String(item.effect).trim() && !/^Урон \d+ \+/.test(String(item.effect)) && !(item.craftKind === 'smith' && !item.enchantment) && !/^(Урон|Сопротивление) \d+(?![\d%])(?!.*(?:заклинан|чар|магическ))/i.test(String(item.effect)))));
     }
     function refreshEquippedAfterTemper(itemId, item) {
         const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -12365,7 +12482,7 @@ window.toggleSkillPanel = function (idx) {
             return;
         }
         { const hb = castBlockReason(); if (hb) { alert(hb.replace('колдовать', 'пользоваться посохом')); return; } }
-        if (!combatActionAllowed('cast')) return;
+        if (!combatActionAllowed('item')) return; // посох работает сам — Немота не мешает
         const spN = item.spellName || String(item.name || '').replace(/^Посох-заклинатель:\s*/, '');
         const result = resolveSpellEffect(spN, item.effect || '', findSpellSchoolByName(spN) || null, 'self', true);
         item.usesLeft -= 1;
@@ -12498,12 +12615,14 @@ window.toggleSkillPanel = function (idx) {
         const targetSelect = document.getElementById('trade-target-select');
         if (!targetSelect) return;
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
-        const myName = document.getElementById('char-name').value;
+        const myUidT = tradeMyUid();
         const participants = (session && session.participants) || {};
-        const others = Object.entries(participants).filter(([uid, p]) => p.name && p.name !== myName);
+        // Получатель — другой игрок (по uid), а не «другое имя»: тёзки персонажей раньше не видели друг друга.
+        const others = Object.entries(participants).filter(([uid, p]) => p.name && uid !== myUidT);
+        const dupName = n => others.filter(([, q]) => q.name === n).length > 1 || n === document.getElementById('char-name').value;
         const prev = targetSelect.value;
         targetSelect.innerHTML = others.length
-            ? others.map(([uid, p]) => `<option value="${uid}">${escHtml(p.name)}</option>`).join('')
+            ? others.map(([uid, p]) => `<option value="${uid}">${escHtml(p.name)}${dupName(p.name) ? ' (' + escHtml(uid.slice(0, 4)) + ')' : ''}</option>`).join('')
             : '<option value="">Нет других игроков в сессии</option>';
         if (others.some(([uid]) => uid === prev)) targetSelect.value = prev;
         // Кнопки "→" у предметов в инвентаре появляются/пропадают в зависимости от того,
@@ -13633,7 +13752,7 @@ window.toggleSkillPanel = function (idx) {
                 const emod = calcAbilityMod(parseInt(e.wis) || 10), r = 1 + Math.floor(Math.random() * 20), tot = r + emod;
                 const fail = tot < dc;
                 const note = `спасбросок «${e.name}»: д20 ${r}${emod >= 0 ? '+' : ''}${emod} = ${tot} против Сл. ${dc} — ${fail ? 'ПРОВАЛ' : 'устоял(а)'}`;
-                if (fail) CS.applyStatusToEnemy(e.id, 'Паралич (Трупное проклятье)', 'Парализован — не может атаковать (4 хода)', 4, myName, { noAttack: true, unique: true }).catch(err => alert('Ошибка: ' + err.message));
+                if (fail) CS.applyStatusToEnemy(e.id, 'Паралич (Трупное проклятье)', 'Парализован — не может атаковать (4 хода)', 4, myName, { noAttack: true, helpless: true, unique: true }).catch(err => alert('Ошибка: ' + err.message));
                 snLog(`💀 ${myName} накладывает Трупное проклятье: ${note}.`);
                 alertSafe('Трупное проклятье: ' + note);
                 return true;
@@ -14304,15 +14423,20 @@ window.deployCampSite = function (useMagic) {
     if (useMagic) {
         const spell = (customSpells || []).find(s => s.name === 'Создание предмета');
         if (!spell) { alert('Не знаешь заклинание «Создание предмета».'); return; }
+        { const hb = castBlockReason(); if (hb) { alert(hb); return; } }
+        if (!castMuteCheck() || !combatActionAllowed('cast')) return;
         const enhancedCast = !enhancedBlockReason('alter', spell.desc, spell.name) && confirm('Скастовать усиленно (х2 маны)? Усиленный каст делает лагерь магически безопасным от засад (замена «Великого созидателя» — такого перка в этой системе нет). Отмена = обычный каст.');
         const costInput = document.querySelector(`#card-${spell.id} .spell-final-cost`);
-        const baseCost = costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0);
+        // Бесплатный каст («Маг») — только обычный: усиленный считается от полной цены и бесплатный каст не тратит (как у карточки).
+        const freeNow = !!(costInput && costInput.dataset && costInput.dataset.freeReason);
+        const baseCost = (enhancedCast && freeNow) ? (parseInt(costInput.dataset.paidCost) || spell.baseCost || 0) : (costInput ? (parseInt(costInput.value) || 0) : (spell.baseCost || 0));
         const finalCost = enhancedCast ? Math.round(baseCost * getEnhancedCostFactor(spell.school, spell.name)) : baseCost;
         const curMpEl = document.getElementById('cur-mp');
         const curMp = parseInt(curMpEl.value) || 0;
         if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
-        consumeMageSignFreeCast(costInput);
+        if (!enhancedCast) consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
+        markCombatAction('attack');
         updateVitalBars();
         saveLocalStorage();
         isMagicallySafe = enhancedCast;
@@ -14404,7 +14528,7 @@ window.nextDay = function () {
         if (playerSupernaturalState.vampirism) {
             const vN = playerSupernaturalState.vampire;
             vN.hungerStage = Math.min(4, (vN.hungerStage || 0) + 1);
-            if (vN.isLord && !vN.lordPoolFedToday) vN.lordPool = Math.max(lordPool(), vN.hungerStage <= 1 ? 5 : 2); // голодным: половина, дальше четверть
+            if (vN.isLord && !vN.lordPoolFedToday) vN.lordPool = Math.max(lordPool(), vN.hungerStage <= 2 ? 5 : 2); // голодным: первый голодный день (после сытого дня стадия уже выросла до 1, к утру — 2) половина, дальше четверть
             vN.lordPoolFedToday = false;
             changed = true;
         }
@@ -14457,7 +14581,8 @@ window.eatAnyFood = function (itemId) {
         alert('Это не еда.');
         return;
     }
-    if (!combatActionAllowed('cast')) return; // в бою поесть — основное действие хода
+    if (snWerewolfForm()) { alert('В облике зверя нельзя есть обычную еду — оборотень лечится только пожиранием трупов.'); return; }
+    if (!combatActionAllowed('item')) return; // в бою поесть — основное действие хода (Немота не мешает)
     markCombatAction('attack');
 
     // Если у блюда/еды есть эффект — активируем как обычный длящийся активный эффект
@@ -14475,7 +14600,7 @@ window.eatAnyFood = function (itemId) {
     }
 
     const dk = drinkStrength(item.name);
-    if (dk) godDay[dk] = (godDay[dk] || 0) + 1; // счётчик алкоголя за день (Сангвин)
+    if (dk) window.addDrink(dk, 1); // счётчик алкоголя за день (Сангвин) и «Хмель Сангвина», как у ручной кнопки
     removeFromInventoryByName(itemId, 1);
     daysWithoutFood = 0; // еда сбрасывает голод ВСЕГДА, даже алкоголь
     renderInventoryList();
@@ -16287,7 +16412,8 @@ function updateHungerPenalty() {
     if (equippedSlots.gloves) {
         const glvF = playerInventory.find(i => i.itemId === equippedSlots.gloves);
         const glvArm = glvF ? (parseInt(glvF.armorValue || glvF.armor) || 0) : 0;
-        if (glvArm && document.getElementById('eq-armor') && document.getElementById('eq-armor').value === 'heavy') steelFistsArmor = glvArm;
+        // Смотрим на сами перчатки, а не на общий тип комплекта (лёгкие перчатки в «тяжёлом» комплекте бонуса не дают).
+        if (glvArm && armorPieceClass(glvF) === 'heavy') steelFistsArmor = glvArm;
     }
     // Азура: стихийным считается оружие с зачарованием огня/холода/электричества в названии.
     const isElemental = id => { const it = id ? playerInventory.find(i => i.itemId === id) : null; return !!(weaponEnchantLive(it) && /огн|пламя|холод|мороз|электр|молни/i.test(it.enchantment.name || '')); };
@@ -16306,7 +16432,7 @@ function updateHungerPenalty() {
             isKastet: (() => { const m = equippedSlots.meleeWeapon ? playerInventory.find(i => i.itemId === equippedSlots.meleeWeapon) : null; return !!(m && typeof isKastetItem === 'function' && isKastetItem(m)); })() },
         // Урон стрелы — только от заряженного боеприпаса (раньше ручное поле считалось всегда, а при «Применить» сверху
         // прибавлялся ещё урон надетой стрелы — урон стрелы шёл дважды, и предпросмотр расходился с итогом).
-        ranged: { dmg: parseInt(val('wep-ranged-dmg')), ammoDmg: (() => { const am = equippedSlots.ammo ? playerInventory.find(i => i.itemId === equippedSlots.ammo && i.count > 0) : null; const d = am && typeof am.dmg === 'number' ? am.dmg : 0; const f = document.getElementById('ammo-dmg'); if (f) f.value = d; return d; })(), type: val('wep-ranged-type'), name: val('wep-ranged-name') || '',
+        ranged: { dmg: parseInt(val('wep-ranged-dmg')), ammoDmg: (() => { const am = equippedSlots.ammo ? playerInventory.find(i => i.itemId === equippedSlots.ammo && i.count > 0) : null; const d = ammoDamageOf(am); const f = document.getElementById('ammo-dmg'); if (f) f.value = d; return d; })(), type: val('wep-ranged-type'), name: val('wep-ranged-name') || '',
             isStaff: (() => { const r = equippedSlots.rangedWeapon ? playerInventory.find(i => i.itemId === equippedSlots.rangedWeapon) : null; return !!(r && (r.isStaff || /^Посох/.test(String(r.category || '')) || /посох/i.test(String(r.name || '')))); })() },
         enchantDmgMelee: getActiveWeaponEnchantDmg(true),
         enchantDmgRanged: getActiveWeaponEnchantDmg(false),
@@ -16493,6 +16619,8 @@ function updateHungerPenalty() {
             chkDefensiveStance: document.getElementById('chk-defensive-stance').checked,
             keeperBarrierLeft: keeperBarrierLeft,
             wepRDmg: document.getElementById('wep-ranged-dmg').value,
+            // Итоговый урон ближним и дальним оружием (Сила/Ловкость, перки, чары) — для совместной атаки у мастера.
+            coopDmg: (() => { try { const inp = collectPlayerAttackInput(); const o = {}; ['melee', 'ranged'].forEach(m => { o[m] = window.StBonuses.computePlayerWeaponAttack(Object.assign({}, inp, { mode: m, isPowerAttack: false, isSprintAttack: false })).totalDmg || 0; }); return o; } catch (e) { return null; } })(),
             wepRType: document.getElementById('wep-ranged-type').value,
             amName: document.getElementById('ammo-name').value,
             amDmg: document.getElementById('ammo-dmg').value,
@@ -16721,6 +16849,11 @@ function updateHungerPenalty() {
         // Правки мастера командами (навык ±, характеристика ±, снятие ступени перка, обучение заклинанию).
         // Через setTimeout: при загрузке листа эта функция зовётся ДО того, как поля листа выставлены из сейва, —
         // команды должны лечь поверх загруженных значений, а не быть затёрты ими.
+        // Рецепты кузни открывает мастер (лист игрока это поле не пишет) — подхватываем сразу, без перезагрузки.
+        if (Array.isArray(data.knownSmithingRecipes) && cloudFieldChanged('smithRec', JSON.stringify(data.knownSmithingRecipes)) && JSON.stringify(data.knownSmithingRecipes) !== JSON.stringify(knownSmithingRecipes)) {
+            knownSmithingRecipes = data.knownSmithingRecipes.slice();
+            if (typeof renderSmithingList === 'function') try { renderSmithingList(); } catch (e) { }
+        }
         if (Array.isArray(data.gmCmds) && data.gmCmds.length) { const cmds = data.gmCmds.slice(); setTimeout(() => applyGmCmds(cmds), 0); }
     }
     window.applyGmControlledFields = applyGmControlledFields;
@@ -16748,6 +16881,12 @@ function updateHungerPenalty() {
         if (hasMain) parts.push('оружие в правой');
         if (hasOff) parts.push('второе оружие в левой'); else if (hasShield) parts.push('щит в левой');
         return { free: 2 - used, label: parts.length ? parts.join(', ') : 'руки свободны' };
+    }
+    // Немота запрещает колдовать и вне боя (в бою её ловит ещё combatActionAllowed).
+    function castMuteCheck() {
+        const m = (activeTimedEffects || []).find(e => e && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity) && (e.statusFlag === 'mute' || e.effectName === 'Немота'));
+        if (m) { alert(`Сейчас на тебе «${m.effectName || m.name}» — колдовать нельзя.`); return false; }
+        return true;
     }
     function castBlockReason() {
         if (inJailNow()) return JAIL_BLOCK_TEXT;
@@ -16781,8 +16920,14 @@ function updateHungerPenalty() {
     }
     function combatActionAllowed(kind) {
         if (!inCombatNow()) return true;
-        { const b = blockingStatusFor(kind); if (b) { alert(`Сейчас на тебе «${b.effectName || b.name}» — ${kind === 'cast' ? 'колдовать' : kind === 'swap' ? 'менять оружие' : 'атаковать'} в этом ходу нельзя.`); return false; } }
+        { const b = blockingStatusFor(kind); if (b) { alert(`Сейчас на тебе «${b.effectName || b.name}» — ${kind === 'cast' ? 'колдовать' : kind === 'swap' ? 'менять оружие' : kind === 'item' ? 'действовать' : 'атаковать'} в этом ходу нельзя.`); return false; } }
         const k = turnKeyNow();
+        // 'item' — еда, зелье, посох, кубок: основное действие хода, но не атака и не заклинание (Страх и Немота не мешают)
+        if (kind === 'item') {
+            if (combatMarks.swap === k) { alert('В этом ходу ты уже сменил оружие — следующее действие со следующего хода.'); return false; }
+            if (combatMarks.attack === k) { alert('В этом ходу ты уже атаковал или колдовал — следующее действие в следующем ходу.'); return false; }
+            return true;
+        }
         if ((kind === 'attack' || kind === 'cast') && combatMarks.swap === k) { alert('В этом ходу ты уже сменил оружие — атаковать или колдовать можно со следующего хода.'); return false; }
         // Одно основное действие за ход: атака, удар щитом или заклинание. Раньше можно было бить сколько угодно раз до «Следующего хода».
         if ((kind === 'attack' || kind === 'cast') && combatMarks.attack === k) { alert('В этом ходу ты уже атаковал или колдовал — следующее действие в следующем ходу.'); return false; }
@@ -17274,6 +17419,9 @@ function updateHungerPenalty() {
                 } else if (c.type === 'petHp') {
                     const m = applyPetHpDelta(c.petId, parseInt(c.delta) || 0);
                     if (m) msgs.push(m);
+                } else if (c.type === 'quest' && c.quest && c.quest.id) { // мастер выдал квест — кладём в лист (раньше его стирало автосохранение)
+                    if (!playerQuests.some(q => q.id === c.quest.id)) { playerQuests.push(c.quest); msgs.push(`квест «${c.quest.title}»`); }
+                    if (typeof renderQuestList === 'function') renderQuestList();
                 }
             } catch (e) { console.error('Правка мастера не применилась:', c, e); }
             gmCmdsApplied.push(c.id);
@@ -17326,6 +17474,7 @@ function updateHungerPenalty() {
             }
         }
         const d = trapHitsDamage(hits);
+        if (d.hp > 0) { const soak = playerSoakIncoming(d.hp, false); d.hp = soak.dmg; d.parts.push(...soak.notes); }
         if (d.hp || d.mp) {
             const hpEl = document.getElementById('cur-hp'), mpEl = document.getElementById('cur-mp');
             hpEl.value = Math.max(0, (parseInt(hpEl.value) || 0) - d.hp);
@@ -18058,7 +18207,7 @@ function updateHungerPenalty() {
 <script src="firebase-config.js?v=4"></script>
 <script src="combat-calc.js?v=5"></script>
 <script src="grid-core.js?v=5"></script>
-<script src="cloud.js?v=42"></script>
+<script src="cloud.js?v=43"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

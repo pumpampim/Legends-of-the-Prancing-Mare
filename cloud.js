@@ -1113,7 +1113,7 @@
                 const next = Object.assign(typeof gd === 'number' ? { member: gd > 0 } : {}, (gd && typeof gd === 'object') ? gd : {}, { orders: before + 1 });
                 const patch = {}; patch['guildsData.' + guildName] = next;
                 if (doc.exists) tx.update(ref, patch); else tx.set(ref, { guildsData: { [guildName]: next } }, { merge: true });
-            })).then(() => announceGuildRank(guildName, before, before + 1));
+            })).then(() => { announceGuildRank(guildName, before, before + 1); return { before, after: before + 1 }; }); // счёт из облака — для наград за порог
         },
 
         // Сдача артефакта в музей коллегии бардов — +1 легендарная песня (orders), +1 к
@@ -1818,8 +1818,10 @@
         if (Array.isArray(pending) && pending.length && typeof window.applyIncomingStatusEffects === 'function') {
             window.applyIncomingStatusEffects(pending);
             if (currentSessionCode) {
+                // Убираем из очереди только применённое: если мастер успел дописать ещё что-то (урон, потом болезнь),
+                // раньше запись пустого списка стирала и это.
                 db.collection('sessions').doc(currentSessionCode).update({
-                    ['participants.' + currentUser.uid + '.pendingStatusEffects']: []
+                    ['participants.' + currentUser.uid + '.pendingStatusEffects']: firebase.firestore.FieldValue.arrayRemove(...pending)
                 }).catch(e => console.error('Ошибка очистки статус-эффектов:', e));
             }
         }
@@ -2034,7 +2036,8 @@
         if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; return; }
         target.innerHTML = enemies.map(e => {
             let extra = '';
-            if (e.isRaisable && (e.curHp || 0) <= 0) {
+            // Обыскать можно любой труп с добычей — зверя, драугра, автомата (раньше кнопка была только у поднимаемых гуманоидов)
+            if ((e.curHp || 0) <= 0 && (e.isRaisable || e.corpseLoot || (!e.looted && e.loot))) {
                 extra = (e.corpseLoot || (!e.looted && e.loot))
                     ? '<button style="width:100%; margin-top:2px; font-size:12px;" onclick="window.playerLootCorpse(\'' + e.id + '\')">💰 Обыскать труп</button>'
                     : '<div style="font-size:12px; opacity:.6; margin-top:2px;">Труп уже обыскан.</div>';

@@ -401,5 +401,6 @@ window.findSameStack = function (list, it) {
     const byId = list.find(x => x.itemId === it.itemId);
     if (byId) return byId;
     const k = window.alchemyStackKey(it);
-    return k ? list.find(x => window.alchemyStackKey(x) === k) || null : null;
+    // краденое и чистое — разные стопки (иначе возврат из подсумка «отмывал» краденое)
+    return k ? list.find(x => window.alchemyStackKey(x) === k && !!x.stolen === !!it.stolen) || null : null;
 };

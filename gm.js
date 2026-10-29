@@ -1784,7 +1784,7 @@
             if (field === 'curHp' && finalVal > 0) delete c.killedBy; // мастер поднял врага — прошлый убийца уже не в счёт
             return c;
         });
-        gmUpdateEnemies(enemies).catch(e => console.error(e));
+        gmUpdateEnemies(enemies, { absolute: true }).catch(e => console.error(e));
     };
 
     // Снятие статус-эффекта (Страх/Успокоение/Ярость/Полиморф) — тикается вручную мастером,
@@ -1794,12 +1794,59 @@
     // gmUpdateEnemies(): перед записью сохраняем снимок прежнего состояния. Хранится только последнее действие и только 30 секунд.
     // Обыск трупа в откат не входит (вещи уже выданы игроку). Откат перезаписывает врагов целиком — изменения игроков за эти секунды тоже откатятся.
     const GM_UNDO_TTL = 30000;
-    function gmUpdateEnemies(enemies) {
+    // Раньше здесь весь список врагов из снимка мастера писался поверх облака без транзакции, и удар игрока,
+    // пришедший за эти доли секунды, пропадал. Теперь пишем транзакцией и переносим на свежие данные только то,
+    // что мастер действительно поменял (сравнение со снимком): ХП и мана — как прибавка/убыль, остальное — как значение.
+    // opts.absolute — ХП/ману ставить ровно как ввёл мастер (ручная правка поля).
+    // Урон от мастера (массовый, совместная атака, ручная правка) теперь, как и удар игрока, снимает статусы
+    // «спадают от урона» (Полиморф, Бегство…) и отмечает момент смерти (окно «поднять труп»).
+    function gmMergeEnemyEdits(server, prev, desired, turnNow, opts) {
+        const byId = a => { const m = {}; (a || []).forEach(e => { if (e && e.id != null) m[e.id] = e; }); return m; };
+        const S = byId(server), P = byId(prev);
+        const desiredIds = new Set((desired || []).filter(Boolean).map(e => e.id));
+        const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        const out = [];
+        (desired || []).forEach(d => {
+            if (!d) return;
+            const p = P[d.id], s = S[d.id];
+            if (!p) { if (!s) out.push(d); else out.push(Object.assign({}, s, d)); return; } // новый враг от мастера
+            if (!s) return; // врага уже убрали из боя (за это время) — не возвращаем
+            const c = Object.assign({}, s);
+            const nums = [];
+            new Set(Object.keys(p).concat(Object.keys(d))).forEach(k => {
+                if (same(p[k], d[k])) return;
+                if ((k === 'curHp' || k === 'curMp') && !(opts && opts.absolute) && typeof p[k] === 'number' && typeof d[k] === 'number' && typeof s[k] === 'number') { nums.push(k); return; }
+                if (d[k] === undefined) delete c[k]; else c[k] = d[k];
+            });
+            nums.forEach(k => {
+                const max = k === 'curHp' ? c.maxHp : c.maxMp;
+                let v = Math.max(0, s[k] + d[k] - p[k]);
+                if (typeof max === 'number' && d[k] <= max) v = Math.min(max, v);
+                c[k] = v;
+            });
+            const sHp = parseInt(s.curHp) || 0, cHp = parseInt(c.curHp) || 0;
+            if (cHp < sHp) {
+                if (Array.isArray(c.statusEffects)) c.statusEffects = c.statusEffects.filter(st => !(st && (st.breakOnDamage || (window.StCombat && window.StCombat.statusRule && window.StCombat.statusRule(st.name).breakOnDamage))));
+                if (sHp > 0 && cHp <= 0 && (c.diedAtTurn === undefined || c.diedAtTurn === s.diedAtTurn)) c.diedAtTurn = turnNow || 0;
+            }
+            out.push(c);
+        });
+        // враги, появившиеся в облаке уже после снимка мастера, остаются
+        (server || []).forEach(s => { if (s && s.id != null && !P[s.id] && !desiredIds.has(s.id)) out.push(s); });
+        return out;
+    }
+    function gmUpdateEnemies(enemies, opts, extraPatch) {
         const prev = (lastData && Array.isArray(lastData.enemies)) ? lastData.enemies : [];
         window._gmUndo = { ts: Date.now(), sessionCode: currentCode, enemies: JSON.parse(JSON.stringify(prev)) };
         gmUndoRefresh();
-        return db.collection('sessions').doc(currentCode).update({ enemies });
+        const ref = db.collection('sessions').doc(currentCode);
+        return db.runTransaction(tx => tx.get(ref).then(doc => {
+            const d = doc.exists ? (doc.data() || {}) : {};
+            const merged = gmMergeEnemyEdits(d.enemies || [], prev, enemies, parseInt(d.sessionTurnCounter) || 0, opts);
+            tx.update(ref, Object.assign({ enemies: stripUndefinedDeep(merged) }, extraPatch || {}));
+        }));
     }
+    window.gmMergeEnemyEdits = gmMergeEnemyEdits;
     function gmUndoAvailable() { const u = window._gmUndo; return !!(u && u.sessionCode === currentCode && Date.now() - u.ts < GM_UNDO_TTL); }
     function gmUndoRefresh() {
         const b = el('gm-undo-btn'); if (!b) return;
@@ -3540,16 +3587,26 @@
             return;
         }
         const key = typeKey + '@' + hold;
-        const stocks = Object.assign({}, lastData.merchantStocks || {});
-        // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
-        // значение при обновлении ассортимента (это про товар, не про отношение), 0 только для
-        // нового торговца. Меняется отдельно, кнопками ниже (setMerchantDisposition), без
-        // необходимости перегенерировать весь ассортимент заново.
-        const existingDisposition = (stocks[key] && stocks[key].disposition) || 0;
-        stocks[key] = { gold: def.gold, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold, disposition: existingDisposition };
-        if (def.pets) stocks[key].pets = true; // игрок не продаёт таким торговцам свои вещи
-        db.collection('sessions').doc(currentCode).update({ merchantStocks: stocks }).then(() => {
-            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${formatNumber(def.gold)}.</span>`;
+        const ref = db.collection('sessions').doc(currentCode);
+        let goldNow = def.gold;
+        // Транзакцией по свежим данным: другие лавки и вклады игроков, сделанные только что, не затираются.
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            const stocks = Object.assign({}, ((doc.exists && doc.data()) || {}).merchantStocks || {});
+            const old = stocks[key] || {};
+            // disposition (-2..+2, отношение конкретного торговца к группе) — СОХРАНЯЕМ существующее
+            // значение при обновлении ассортимента (это про товар, не про отношение), 0 только для
+            // нового торговца. Меняется отдельно, кнопками ниже (setMerchantDisposition), без
+            // необходимости перегенерировать весь ассортимент заново.
+            // Вклады по перку «Вкладчик» — «навсегда»: вложившие и их +500 к запасу золота переживают обновление
+            // ассортимента (и «Скупщик» у этого торговца продолжает работать).
+            const investors = Array.isArray(old.investors) ? old.investors.slice() : [];
+            goldNow = def.gold + 500 * investors.length;
+            stocks[key] = { gold: goldNow, items: stripUndefinedDeep(finalItems), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: def.label, hold: hold, disposition: old.disposition || 0 };
+            if (investors.length) stocks[key].investors = investors;
+            if (def.pets) stocks[key].pets = true; // игрок не продаёт таким торговцам свои вещи
+            tx.update(ref, { merchantStocks: stocks });
+        })).then(() => {
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ ${def.label} в «${hold}»: ${finalItems.length} позиций, золото ${formatNumber(goldNow)}.</span>`;
             renderMerchantStaleness();
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -3684,21 +3741,13 @@
         const idx = parseInt(choice) - 1;
         if (isNaN(idx) || !rewards[idx]) return;
         const rewardText = rewards[idx];
-        db.collection('characters').doc(uid).get().then(doc => {
-            const data = doc.exists ? doc.data() : {};
-            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-            // Золотые награды просто прибавляем к золоту; предметные — кладём в инвентарь текстом,
-            // как и остальные гильдийские награды (без обязательной регистрации в общем каталоге).
-            const goldMatch = rewardText.match(/^(\d+)\s*золота/);
-            const patch = {};
-            if (goldMatch) {
-                return gmAddGold(uid, parseInt(goldMatch[1]));
-            } else {
-                inv.push({ itemId: rewardText + '_tourn_' + Date.now(), name: rewardText, count: 1, weight: 1, category: 'Награда турнира', effect: `Приз группы «${bracket}» Бойцовского клуба` });
-                patch.inventory = inv;
-            }
-            return db.collection('characters').doc(uid).update(patch);
-        }).then(() => {
+        // Золотые награды просто прибавляем к золоту; предметные — кладём в инвентарь текстом,
+        // как и остальные гильдийские награды (без обязательной регистрации в общем каталоге).
+        const goldMatch = rewardText.match(/^(\d+)\s*золота/);
+        (goldMatch
+            ? gmAddGold(uid, parseInt(goldMatch[1]))
+            : gmTxInventory(uid, inv => { inv.push({ itemId: rewardText + '_tourn_' + Date.now(), name: rewardText, count: 1, weight: 1, category: 'Награда турнира', effect: `Приз группы «${bracket}» Бойцовского клуба` }); })
+        ).then(() => {
             el('tourn-result').innerHTML = `<span style="color:#2ecc71;">Выдано: ${escapeHtml(rewardText)}.</span>`;
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -4185,6 +4234,21 @@
         `).join('');
     }
 
+    // Правка инвентаря игрока мастером — транзакцией по свежему листу из облака, а не по снимку мастера:
+    // иначе вещь, проданная или потраченная игроком в эту секунду, «воскресала». fn(inv, data) меняет inv на месте;
+    // вернуть строку — отказ с этим текстом (ничего не пишется).
+    function gmTxInventory(uid, fn) {
+        const ref = db.collection('characters').doc(uid);
+        return db.runTransaction(tx => tx.get(ref).then(doc => {
+            const data = doc.exists ? (doc.data() || {}) : {};
+            const inv = (Array.isArray(data.inventory) ? data.inventory : []).map(i => Object.assign({}, i));
+            const err = fn(inv, data);
+            if (typeof err === 'string') throw new Error(err);
+            if (doc.exists) tx.update(ref, { inventory: stripUndefinedDeep(inv) }); else tx.set(ref, { inventory: stripUndefinedDeep(inv) }, { merge: true });
+            return inv;
+        }));
+    }
+
     // Раньше удаляло весь стек разом, даже если у игрока было 10 стрел — теперь удаляет ровно
     // то количество, что указано в поле рядом с кнопкой (по умолчанию 1).
     window.deletePlayerItem = function (itemId) {
@@ -4194,11 +4258,12 @@
         const qtyInput = el('del-qty-' + itemId);
         const qty = Math.max(1, Math.min(item.count, parseInt(qtyInput ? qtyInput.value : 1) || 1));
         if (!confirm(`Удалить ${qty} шт. «${item.name}» у игрока?`)) return;
-        const newCount = item.count - qty;
-        const newInv = newCount > 0
-            ? currentPlayerInvData.inventory.map(i => i.itemId === itemId ? { ...i, count: newCount } : i)
-            : currentPlayerInvData.inventory.filter(i => i.itemId !== itemId);
-        db.collection('characters').doc(currentInvPlayerUid).update({ inventory: newInv }).then(() => {
+        gmTxInventory(currentInvPlayerUid, inv => {
+            const ix = inv.findIndex(i => i.itemId === itemId);
+            if (ix === -1) return `У игрока уже нет «${item.name}».`;
+            const left = (parseInt(inv[ix].count) || 0) - qty;
+            if (left > 0) inv[ix].count = left; else inv.splice(ix, 1);
+        }).then(newInv => {
             currentPlayerInvData.inventory = newInv;
             renderGmPlayerInventory();
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -4644,13 +4709,10 @@
         el('quest-reward-input').value = `${gold} септимов` + (difficulty === 'high' ? ' + ценный предмет по усмотрению мастера' : '');
     };
 
+    // Квест — командой в лист игрока (gmCmds), как и остальные правки мастера: прямую запись playerQuests
+    // затирало следующее автосохранение игрока (лист хранит свой список квестов).
     async function grantQuestToUid(uid, quest) {
-        const ref = db.collection('characters').doc(uid);
-        const doc = await ref.get();
-        const data = doc.exists ? doc.data() : {};
-        const quests = Array.isArray(data.playerQuests) ? data.playerQuests.slice() : [];
-        quests.push(quest);
-        await ref.set({ playerQuests: quests }, { merge: true });
+        await db.collection('characters').doc(uid).set({ gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'quest', quest }) }, { merge: true });
     }
 
     window.grantQuest = function () {
@@ -5160,7 +5222,7 @@
             const r = 1 + Math.floor(Math.random() * 100);
             if (r <= 100 - chance) return;
             const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? { ...e, statusEffects: [...(e.statusEffects || []).filter(x => x.name !== 'Страх (Вермина)'), { id: 'vrm-' + Date.now(), name: 'Страх (Вермина)', desc: 'Бежит в ужасе — не атакует', turns: 3, noAttack: true }] } : e);
-            return db.collection('sessions').doc(currentCode).update({ enemies }).then(() => gmPostLogEntryText(`😱 Вермина: «${enemyName}» напал(а) на её последователя и в ужасе бежит 3 хода (д100 = ${r}).`));
+            return gmUpdateEnemies(enemies).then(() => gmPostLogEntryText(`😱 Вермина: «${enemyName}» напал(а) на её последователя и в ужасе бежит 3 хода (д100 = ${r}).`));
         }).catch(e => console.error(e));
     }
 
@@ -5208,6 +5270,10 @@
     window.applyGmAttackDamage = function () {
         if (!pendingGmAttack) return;
         gmChargePendingMana(pendingGmAttack);
+        // «Невидимость» врага: «не виден, пока не атакует» — атака её снимает
+        { const atk = (lastData.enemies || []).find(e => e.id === pendingGmAttack.enemyId);
+          if (atk && (atk.statusEffects || []).some(x => x && x.name === 'Невидимость'))
+              gmUpdateEnemies((lastData.enemies || []).map(e => e.id === atk.id ? Object.assign({}, e, { statusEffects: (e.statusEffects || []).filter(x => !(x && x.name === 'Невидимость')) }) : e)).catch(e => console.error(e)); }
         if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') { gmApplyAttackToCompanion(); return; }
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
@@ -5799,8 +5865,8 @@
         // (включая оружие) свой отдельный шанс попасть в добычу, не 100%.
         const lootItems = [];
         if (Math.random() < 0.8) {
-            if (isRanged) lootItems.push({ name: bow.name, price: bow.price || 0, weight: bow.weight, dmg: weaponDmg, slot: 'ranged', category: 'Оружие (с трупа)' });
-            else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weaponDmg, slot: weapon.slot, category: 'Оружие (с трупа)' });
+            if (isRanged) lootItems.push({ name: bow.name, price: bow.price || 0, weight: bow.weight, dmg: bow.damage, slot: 'ranged', category: 'Оружие (с трупа)' }); // базовый урон оружия (множитель уровня — только у самого бандита)
+            else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' });
         }
         if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
         Object.values(slots).forEach(a => {
@@ -6015,11 +6081,21 @@
         const targetUid = gmCorpseLootTarget(enemy);
         if (!targetUid) { alert('Все игроки пали — добычу с трупа отдать некому.'); return; }
         // Готовая добыча (бандиты, драугры, изгои) или бросок по тексту лута из базы врагов
-        const loot = enemy.corpseLoot || rollEnemyCorpseLoot(enemy);
-        const items = loot.items || [];
-        const gold = loot.gold || 0;
+        let loot = null, items = [], gold = 0;
         const charRefL = db.collection('characters').doc(targetUid);
-        db.runTransaction(tx => tx.get(charRefL).then(doc => { // инвентарь и золото — одной транзакцией (гонка с автосохранением игрока)
+        const sessRefL = db.collection('sessions').doc(currentCode);
+        // Сначала «занимаем» труп транзакцией по свежим данным сессии: отметка «обыскан» ставится ДО выдачи.
+        // Раньше она ставилась после выдачи по снимку мастера — двойной клик или обыск игроком в ту же секунду давали добычу дважды.
+        const setEnemy = (en, id, patch) => (en || []).map(e => e && e.id === id ? Object.assign({}, e, patch) : e);
+        db.runTransaction(tx => tx.get(sessRefL).then(sd => {
+            const en = ((sd.exists && sd.data()) || {}).enemies || [];
+            const cur = en.find(e => e && e.id === enemyId);
+            if (!cur) throw new Error('Противник уже убран из боя.');
+            if (cur.looted) throw new Error('Этот труп уже обыскан.');
+            loot = cur.corpseLoot || rollEnemyCorpseLoot(cur);
+            items = loot.items || []; gold = loot.gold || 0;
+            tx.update(sessRefL, { enemies: stripUndefinedDeep(setEnemy(en, enemyId, { corpseLoot: null, looted: true })) });
+        })).then(() => db.runTransaction(tx => tx.get(charRefL).then(doc => { // инвентарь и золото — одной транзакцией (гонка с автосохранением игрока)
             const data = doc.exists ? doc.data() : {};
             const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
             items.forEach((it, idx) => {
@@ -6040,14 +6116,16 @@
             const newGold = (parseInt(data.gold) || 0) + gold;
             const patchL = { inventory: stripUndefinedDeep(inv), gold: newGold };
             if (doc.exists) tx.update(charRefL, patchL); else tx.set(charRefL, patchL, { merge: true });
+        })).catch(err => { // выдать не вышло — возвращаем труп необысканным с той же добычей
+            return db.runTransaction(tx => tx.get(sessRefL).then(sd => {
+                const en = ((sd.exists && sd.data()) || {}).enemies || [];
+                tx.update(sessRefL, { enemies: stripUndefinedDeep(setEnemy(en, enemyId, { corpseLoot: loot, looted: false })) });
+            })).catch(() => { }).then(() => { throw err; });
         })).then(() => {
             const pname = (lastData.participants[targetUid] || {}).name || targetUid;
-            const enemies = (lastData.enemies || []).map(e => e.id === enemyId ? Object.assign({}, e, { corpseLoot: null, looted: true }) : e);
             const summary = [gold ? gold + ' септ.' : '', describeLootItems(items)].filter(Boolean).join(', ') || 'ничего ценного';
-            return db.collection('sessions').doc(currentCode).update({ enemies }).then(() => {
-                alert(`Добыча с трупа «${enemy.name}» выдана игроку ${pname}: ${summary}.`);
-                gmPostLogEntryText(`💀 ${pname} обыскал(а) труп «${enemy.name}» и забрал(а): ${summary}.`);
-            });
+            alert(`Добыча с трупа «${enemy.name}» выдана игроку ${pname}: ${summary}.`);
+            gmPostLogEntryText(`💀 ${pname} обыскал(а) труп «${enemy.name}» и забрал(а): ${summary}.`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -6225,7 +6303,18 @@
     // «Новый день» = рост sessions.gameDayCounter (его двигает «Следующий день» у игрока либо кнопка мастера). Предложение, а не молчаливая замена:
     // [Применить] / [Другое] / [Оставить].
     let _wxDayLast = null;
+    // Сезон погоды хранится в сессии (sessions.weatherSeason): раньше после перезагрузки там снова было «Лето»,
+    // и автопогода нового дня бросалась по летнему пулу даже зимой.
+    window.gmSaveWeatherSeason = function () {
+        if (!currentCode) return;
+        db.collection('sessions').doc(currentCode).update({ weatherSeason: el('weather-season-select').value }).catch(e => console.error(e));
+    };
+    function gmRestoreWeatherSeason(d) {
+        const sel = el('weather-season-select');
+        if (sel && d && d.weatherSeason && sel.value !== d.weatherSeason && document.activeElement !== sel) sel.value = d.weatherSeason;
+    }
     function gmWeatherDayWatch(d) {
+        gmRestoreWeatherSeason(d);
         const day = d.gameDayCounter || 0;
         if (_wxDayLast === null) { _wxDayLast = day; return; }   // первый снимок только запоминаем
         if (day <= _wxDayLast) { _wxDayLast = day; return; }
@@ -6637,7 +6726,7 @@
         const idx = parseInt(el('holiday-manual-select').value);
         const h = window.holidaysData[idx];
         if (!h) return;
-        db.collection('sessions').doc(currentCode).update({ activeHoliday: { title: h.title, discount: h.discount || null } }).then(() => {
+        db.collection('sessions').doc(currentCode).update({ activeHoliday: { title: h.title, discount: h.discount || null, discountOnly: h.discountOnly || null } }).then(() => {
             el('holiday-gm-result').innerHTML = `<span style="color:#2ecc71;">✅ Запущено: «${escapeHtml(h.title)}»${h.discount ? ' (скидка до ' + h.discount + '%)' : ''}.</span>`;
             gmPostLogEntryText(`🎉 Мастер запускает праздник: «${h.title}»!`);
         }).catch(e => alert('Ошибка: ' + e.message));
@@ -6724,7 +6813,9 @@
                 const ranged = data.activeWep === 'ranged' && (parseInt(data.wepRDmg) || 0) > 0;
                 const es = data.effectiveStats && !Array.isArray(data.effectiveStats) ? data.effectiveStats : {};
                 const stat = parseInt(ranged ? es.dex : es.str) || 10;
-                return { uid, name: (lastData.participants[uid] || {}).name || uid, ranged, dmg: parseInt(ranged ? data.wepRDmg : data.wepMDmg) || 0, mod: calcAbilityMod(stat) };
+                // Итоговый урон с листа игрока (Сила/Ловкость, перки, чары); база оружия — только для старых листов без этого поля.
+                const full = data.coopDmg && typeof data.coopDmg === 'object' ? parseInt(ranged ? data.coopDmg.ranged : data.coopDmg.melee) : NaN;
+                return { uid, name: (lastData.participants[uid] || {}).name || uid, ranged, dmg: !isNaN(full) && full > 0 ? full : (parseInt(ranged ? data.wepRDmg : data.wepMDmg) || 0), mod: calcAbilityMod(stat) };
             };
             const a = side(d1.exists ? d1.data() : {}, p1), b = side(d2.exists ? d2.data() : {}, p2);
             // Встречный бросок, как у обычной атаки: к20 + лучший модификатор из двух против голого к20 цели; ничья — перекид.
@@ -7438,8 +7529,12 @@
     }
 
     window.removeDungeonRow = function (kind, idx) {
+        // Убираем саму строку из редактора и только потом читаем его: пустые строки при чтении выкидываются,
+        // и удаление по старому номеру строки раньше убирало не того врага.
+        const row = document.querySelector(`#${kind === 'enemies' ? 'dgn-enemies-list .dgn-enemy-row' : 'dgn-loot-list .dgn-loot-row'}[data-idx="${idx}"]`);
+        if (row) row.remove();
         const r = collectDungeonEditor(); if (!r) return;
-        r.preset[kind].splice(idx, 1);
+        if (!row) r.preset[kind].splice(idx, 1);
         renderDungeonEditor(); el('dungeon-editor').open = true;
     };
     window.addDungeonEnemy = function () {
@@ -7524,14 +7619,11 @@
         const items = dgnArr(p.loot).map(c => ({ id: c.id, label: c.label || 'Контейнер', gold: parseInt(c.gold) || 0, items: dgnArr(c.items).map(dgnResolveItem) }));
         const dungeon = { presetId: p.id || null, name: p.name, hold: p.hold || '', openedAt: Date.now(), lootTaken: [], items };
         const prev = dgnArr(lastData.enemies);
-        window._gmUndo = { ts: Date.now(), sessionCode: currentCode, enemies: JSON.parse(JSON.stringify(prev)) }; // «↶ Отменить» в журнале вернёт врагов как до развёртывания
-        if (typeof gmUndoRefresh === 'function') gmUndoRefresh();
-        // Одной записью: враги, данж и строка в журнале появляются у игроков одновременно.
-        db.collection('sessions').doc(currentCode).update(stripUndefinedDeep({
-            enemies: prev.concat(newEnemies),
-            currentDungeon: dungeon,
+        // Одной транзакцией: враги, данж и строка в журнале появляются у игроков одновременно («↶ Отменить» вернёт врагов как до развёртывания).
+        gmUpdateEnemies(prev.concat(newEnemies), null, {
+            currentDungeon: stripUndefinedDeep(dungeon),
             combatLog: firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🏰 Мастер разворачивает данж: «${p.name}». Врагов: ${newEnemies.length}. Контейнеров: ${items.length}.` })
-        })).then(() => { el('dgn-editor-msg').innerHTML = '<span style="color:#2ecc71;">🚀 Развёрнуто в сессии.</span>'; })
+        }).then(() => { el('dgn-editor-msg').innerHTML = '<span style="color:#2ecc71;">🚀 Развёрнуто в сессии.</span>'; })
             .catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -7781,6 +7873,7 @@
     // Игрок пытается обезвредить: бросок на его листе (d20 + мод. Ловкости против сложности), провал — срабатывает на нём.
     window.gmTrapDisarmBy = function (id) {
         const tr = trapsArr().find(x => x.id === id); if (!tr) return;
+        if (tr.state === 'disarmed' || tr.state === 'off') { alert('Эта ловушка уже обезврежена или разряжена — обезвреживать нечего.'); return; }
         const t = trapType(tr.type); const uid = (el('gm-trap-disarm-' + id) || {}).value; if (!uid) { alert('Выбери игрока.'); return; }
         const dc = t.disarmDc || parseInt((el('gm-trap-dc-' + id) || {}).value) || 15;
         gmSendTrapCmd(uid, { type: 'trapDisarm', trapId: id, trapName: t.name, icon: t.icon, dc, onFail: gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited }), failState: gmTrapStateAfterTrigger(t, tr) });
@@ -7789,13 +7882,10 @@
     window.gmTrapTakeStone = function (id) {
         const tr = trapsArr().find(x => x.id === id); if (!tr) return;
         const t = trapType(tr.type); const uid = (el('gm-trap-disarm-' + id) || {}).value; if (!uid) { alert('Выбери игрока, который забирает камень.'); return; }
-        db.collection('characters').doc(uid).get().then(doc => {
-            const data = doc.exists ? doc.data() : {};
-            const inv = Array.isArray(data.inventory) ? data.inventory.slice() : [];
-            const proto = gmFindItemByName(t.stone) || { name: t.stone, category: 'Камни душ', weight: 0.5, price: 100 };
+        const proto = gmFindItemByName(t.stone) || { name: t.stone, category: 'Камни душ', weight: 0.5, price: 100 };
+        gmTxInventory(uid, inv => {
             const ex = inv.find(x => x.itemId === proto.name);
             if (ex) ex.count = (ex.count || 0) + 1; else inv.push({ itemId: proto.name, name: proto.name, count: 1, weight: proto.weight || 0.5, category: proto.category || 'Камни душ', effect: proto.effect || '', price: proto.price || 0 });
-            return db.collection('characters').doc(uid).update({ inventory: inv });
         }).then(() => {
             gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, x, { state: 'off', victims: [] }) : x));
             gmPostLogEntryText(`💎 ${(((lastData || {}).participants || {})[uid] || {}).name || 'Игрок'} забирает камень с пьедестала — кристалл душ гаснет.`);
