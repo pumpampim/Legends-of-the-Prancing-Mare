@@ -49,7 +49,7 @@
             out[k] = { key: k, kind: 'p', ref: uid, name: p.name || 'Игрок', hp: p.curHp || 0, maxHp: p.maxHp || 0, mp: p.curMp || 0, maxMp: p.maxMp || 0, dmg: p.dmg || 0, dead: !!p.fallen, speed: parseInt(p.speed) || 30 };
             (p.summons || []).forEach(s => {
                 const ks = G().tokenKey('s', s.id, uid);
-                out[ks] = { key: ks, kind: 's', ref: s.id, owner: uid, name: s.name, ownerName: p.name, hp: s.curHp || 0, maxHp: s.maxHp || 0, mp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, dead: (s.curHp || 0) <= 0, speed: parseInt(s.speed) || 30 };
+                out[ks] = { key: ks, kind: 's', ref: s.id, owner: uid, name: s.name, ownerName: p.name, hp: s.curHp || 0, maxHp: s.maxHp || 0, mp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, dead: (s.curHp || 0) <= 0, speed: parseInt(s.speed) || 30, rangeFt: parseInt(s.rangeFt) || 15 };
             });
             // животные игрока — фигуры того же вида 's' (удар руны/площади по ним хозяин применяет к животному)
             (p.pets || []).forEach(pt => {
@@ -313,10 +313,10 @@
             const used = (prev.mv && prev.mv.tick === curTick()) ? (prev.mv.ft || 0) : 0;
             grid.tokens[key] = Object.assign({}, prev, { x, y, mv: { tick: curTick(), ft: used + (need || 0) } });
         } else {
-            // существо при призыве — не дальше 15 фт от хозяина
+            // существо при призыве — не дальше 15 фт от хозяина (перки «Призыватель» / «Усиление связи» — дальше, лист игрока присылает rangeFt)
             if (en.kind === 's') {
-                const owner = G().tokenOf(grid, 'p', en.owner);
-                if (owner && G().feet(owner, { x, y }) > 15 && !confirm(`Существо призывается не дальше 15 фт от хозяина, а тут ${G().feet(owner, { x, y })} фт. Всё равно поставить?`)) return false;
+                const owner = G().tokenOf(grid, 'p', en.owner), maxFt = en.pet ? 15 : (en.rangeFt || 15);
+                if (owner && G().feet(owner, { x, y }) > maxFt && !confirm(`Существо призывается не дальше ${maxFt} фт от хозяина, а тут ${G().feet(owner, { x, y })} фт. Всё равно поставить?`)) return false;
             }
             grid.tokens[key] = { kind: en.kind, ref: en.ref, owner: en.owner || '', x, y, size };
         }

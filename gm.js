@@ -2086,6 +2086,11 @@
         db.collection('sessions').doc(currentCode).update({ sessionTurnCounter: 0, sessionRoundCounter: 0 }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    function gmRollDotDice(d) {
+        const n = Math.max(1, parseInt(d[0]) || 1), sides = Math.max(1, parseInt(d[1]) || 10);
+        let sum = 0; for (let i = 0; i < n; i++) sum += 1 + Math.floor(Math.random() * sides);
+        return sum;
+    }
     // Один «тик» хода для врагов: яды/регенерация, длительность статусов, кулдауны криков.
     function gmEnemyTickOnce(enemiesIn, turnNow, tickLog) {
         const out = (enemiesIn || []).map(e => {
@@ -2096,8 +2101,10 @@
                 let poisonRes = (copy.resist && copy.resist.poison) || 0;
                 copy.statusEffects.forEach(s => { if (s.res && s.res.poison) poisonRes += s.res.poison; });
                 copy.statusEffects.forEach(s => {
-                    if (s.dotHp && s.dotType && window.StCombat) dHp -= window.StCombat.previewDamage(copy, s.dotHp, s.dotType, 0).finalDmg; // горение — огнём, с резистом и уязвимостью
-                    else if (s.dotHp) dHp -= Math.max(0, Math.round(s.dotHp * (s.dotNoResist ? 1 : (1 - poisonRes / 100))));
+                    // dotDice [N, грани] — урон бросается заново каждый ход («Змей: ядовитое касание» — Nd10 в начале каждого хода)
+                    const dot = Array.isArray(s.dotDice) ? gmRollDotDice(s.dotDice) : s.dotHp;
+                    if (dot && s.dotType && window.StCombat) dHp -= window.StCombat.previewDamage(copy, dot, s.dotType, 0).finalDmg; // горение — огнём, с резистом и уязвимостью
+                    else if (dot) dHp -= Math.max(0, Math.round(dot * (s.dotNoResist ? 1 : (1 - poisonRes / 100))));
                     if (s.dotMp) dMp -= s.dotMp;
                     if (s.regenHp) dHp += s.regenHp;
                     if (s.regenMp) dMp += s.regenMp;
@@ -4795,10 +4802,10 @@
         const uids = target === 'all' ? Object.keys(lastData.participants || {}) : [target];
         if (!uids.length) { resultEl.innerHTML = '<span style="color:#e74c3c;">В сессии нет игроков.</span>'; return; }
         const orderId = 'order_' + Date.now() + Math.random().toString(36).slice(2, 5);
-        const cmd = { id: 'co-' + orderId, cmd: 'craftOrder', orderId, npc, hold: el('craft-order-hold').value || '', itemName, qty, reward, fromGm: true };
+        const cmd = { id: 'co-' + orderId, cmd: 'craftOrder', orderId, npc, hold: el('craft-order-hold').value || '', itemName, qty, reward, fromGm: true, shared: target === 'all' }; // «всем»: сдать может только первый
         const patch = {};
         uids.forEach(u => { patch['participants.' + u + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion(cmd); });
-        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `📋 Заказ от ${npc}: ${qty}× ${itemName} → ${formatNumber(reward)} зол.` });
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `📋 Заказ от ${npc}: ${qty}× ${itemName} → ${formatNumber(reward)} зол.${target === 'all' ? ' (всем — награду получит тот, кто сдаст первым)' : ''}` });
         db.collection('sessions').doc(currentCode).update(patch)
             .then(() => { resultEl.innerHTML = `<span style="color:#2ecc71;">✅ Заказ отправлен (${uids.length}).</span>`; })
             .catch(e => { resultEl.innerHTML = '<span style="color:#e74c3c;">Ошибка: ' + escapeHtml(e.message) + '</span>'; });

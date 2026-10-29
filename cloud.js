@@ -371,7 +371,8 @@
                     patch['participants.' + currentUser.uid + '.summons'] = summons.map(s => ({
                         id: s.id, name: s.name, curHp: s.curHp || 0, maxHp: s.maxHp || 1, dmgType: s.dmgType || '',
                         curMp: s.curMp || 0, maxMp: s.maxMp || 0, dmg: s.dmg || 0, speed: s.speed || 30, // для подписей и лимита хода на боевой сетке мастера
-                        armor: sDef.armor || 0, res: sDef.res || {}
+                        armor: sDef.armor || 0, res: sDef.res || {},
+                        rangeFt: typeof window.getSummonRangeFt === 'function' ? window.getSummonRangeFt(s.category) : 15 // как далеко от хозяина можно поставить на сетке
                     }));
                     // Живые животные игрока — тоже цель для атаки врага (у мастера в «Атаке противника» и на сетке).
                     patch['participants.' + currentUser.uid + '.pets'] = (Array.isArray(data.pets) ? data.pets : []).filter(pt => pt && !pt.dead)
@@ -1136,6 +1137,20 @@
             }));
         },
 
+        // Заказ NPC «всем игрокам»: сдать может только первый. Транзакция по sessions.craftOrderClaims —
+        // второй игрок, нажавший «Сдать» в ту же секунду, получит отказ, вещи у него не спишутся.
+        claimCraftOrder: function (orderId, name) {
+            if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Сдать общий заказ можно только в активной сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            const uid = currentUser.uid;
+            return db.runTransaction(tx => tx.get(ref).then(doc => {
+                if (!doc.exists) throw new Error('Сессия не найдена.');
+                const c = ((doc.data() || {}).craftOrderClaims || {})[orderId];
+                if (c && c.uid !== uid) throw new Error('Этот заказ уже сдал(а) ' + (c.name || 'другой игрок') + '.');
+                tx.update(ref, { ['craftOrderClaims.' + orderId]: { uid: uid, name: name || 'Игрок', ts: Date.now() } });
+            }));
+        },
+
         // Квесты гильдий: игрок подаёт ЗАЯВКУ, +1 заказ и награды начисляются только после решения мастера (gm.js: resolveQuestClaim).
         requestQuestClaim: function (q) {
             if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Квест гильдии подтверждает мастер — нужна активная сессия.'));
@@ -1737,6 +1752,7 @@
         renderJournal(data.journal || {}, { hold: (data.partyPos && data.partyPos.hold) || data.currentHold || '' });
         if (typeof window.processTrades === 'function') window.processTrades(data.trades || {});
         if (typeof window.processQuestDecisions === 'function') { try { window.processQuestDecisions(data.questDecisions || []); } catch (e) { console.error(e); } }
+        if (typeof window.processCraftOrderClaims === 'function') { try { window.processCraftOrderClaims(data.craftOrderClaims || {}); } catch (e) { console.error(e); } }
         renderPlayerDungeon(data.currentDungeon || null);
         renderEnemies(data.enemies || []);
         renderInitiative(data.initiative || []);
