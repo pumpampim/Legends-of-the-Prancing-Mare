@@ -4056,8 +4056,8 @@
             el('inv-level-block').style.display = 'block';
             el('inv-level-current').textContent = currentPlayerInvData.characterLevel;
             el('inv-perkpoints-current').textContent = currentPlayerInvData.perkPointsAvailable;
-            const needed = currentPlayerInvData.characterLevel * 2 + 2;
-            el('inv-level-progress').textContent = `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков`;
+            const needed = gmSkillUpsNeededForLevel(currentPlayerInvData.characterLevel);
+            el('inv-level-progress').textContent = currentPlayerInvData.characterLevel >= GM_MAX_CHARACTER_LEVEL ? `Максимальный уровень (${GM_MAX_CHARACTER_LEVEL})` : `Прогресс: ${currentPlayerInvData.levelUpProgress} / ${needed} очков навыков` + (data.levelScheme === 2 ? '' : ' (лист ещё на старой шкале — пересчитается, когда игрок его откроет)');
             renderGmPlayerInventory();
 
             // Гильдии/Сверхъестественное пишутся сразу по клику — безопасно обновлять на лету.
@@ -4087,8 +4087,13 @@
         });
     };
 
+    // Та же шкала, что на листе игрока (index.html getSkillUpsNeededForLevel): потолок 65.
+    const GM_MAX_CHARACTER_LEVEL = 65;
+    function gmSkillUpsNeededForLevel(level) { return Math.min(level * 2 + 2, 9 + Math.ceil(level / 2)); }
+
     window.grantLevelUp = function () {
         if (!currentInvPlayerUid) return;
+        if (currentPlayerInvData && currentPlayerInvData.characterLevel >= GM_MAX_CHARACTER_LEVEL) { alert(`У персонажа уже максимальный уровень (${GM_MAX_CHARACTER_LEVEL}).`); return; }
         const statKey = el('inv-level-stat-choice').value;
         const statLabels = { str: 'Сила', dex: 'Ловкость', con: 'Телосложение', int: 'Интеллект', wis: 'Мудрость', cha: 'Харизма' };
         const statOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -4096,15 +4101,21 @@
         let newLevelForLog = null;
         db.collection('characters').doc(currentInvPlayerUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const newLevel = (parseInt(data.characterLevel) || 1) + 1;
+            const curLevel = parseInt(data.characterLevel) || 1;
+            if (curLevel >= GM_MAX_CHARACTER_LEVEL) throw new Error(`у персонажа уже максимальный уровень (${GM_MAX_CHARACTER_LEVEL})`);
+            const newLevel = curLevel + 1;
             newLevelForLog = newLevel;
+            // Прогресс обнуляется (так решено), но уже накопленные готовые уровни (например, после пересчёта на новую шкалу)
+            // не сгорают: если прогресса хватало на этот уровень, списывается только его порог.
+            const prog = parseInt(data.levelUpProgress) || 0, need = gmSkillUpsNeededForLevel(curLevel);
+            const newProgress = (data.levelScheme === 2 && prog >= need) ? prog - need : 0;
             const newPerkPoints = (parseInt(data.perkPointsAvailable) || 0) + 1;
             // +1 к характеристике — командой листу (gmCmds), а не записью stats: открытый лист stats из облака на лету
             // не подхватывал и ближайшим автосохранением затирал прибавку.
             return db.collection('characters').doc(currentInvPlayerUid).update({
                 characterLevel: newLevel,
                 perkPointsAvailable: newPerkPoints,
-                levelUpProgress: 0,
+                levelUpProgress: newProgress,
                 gmCmds: firebase.firestore.FieldValue.arrayUnion({ id: 'gmc-lv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), type: 'stat', key: statKey, delta: 1 })
             });
         }).then(() => {

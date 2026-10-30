@@ -1925,7 +1925,7 @@
 
         <div class="panel">
             <h2>🎓 Прокачка персонажа</h2>
-            <p style="font-size:13px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап = уровень×2+2.</p>
+            <p style="font-size:13px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап: до 5-го уровня — уровень×2+2 (4, 6, 8, 10, 12), дальше 9 + половина уровня (вверх): 6→7 — 12, 20→21 — 19, 40→41 — 29, 64→65 — 41. Максимальный уровень — 65.</p>
 
             <div id="level-summary" style="padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
 
@@ -12076,8 +12076,61 @@ window.toggleSkillPanel = function (idx) {
         // (Знак «Любовник» раньше давал здесь +15% к скорости прокачки — в Sistema 2.2 такого нет: у него «Поцелуй любовника».)
         return base;
     }
+    // Шкала уровней 2 (2026-10-30): потолок 65 вместо ~40. Очков навыков на уровень L→L+1 = min(2L+2, 9+⌈L/2⌉):
+    // до 5-го уровня как раньше (4, 6, 8, 10, 12), дальше +1 за каждые два уровня (64→65 — 41). Навыков 19, сырой максимум 100,
+    // всего повышений 19·90 − 45 = 1665; сумма порогов до 65-го — 1618, так что 65 достижим, выше уровень не растёт.
+    // var, а не const: миграция сейва может вызваться раньше этой строки.
+    var MAX_CHARACTER_LEVEL = 65;
+    var LEVEL_SCHEME = 2; // 1 — старая шкала 2L+2 (потолок ~40)
     function getSkillUpsNeededForLevel(level) {
-        return level * 2 + 2;
+        return Math.min(level * 2 + 2, 9 + Math.ceil(level / 2));
+    }
+    function skillUpsToReachLevel(level, scheme) {
+        let sum = 0;
+        for (let l = 1; l < level; l++) sum += scheme === 1 ? l * 2 + 2 : getSkillUpsNeededForLevel(l);
+        return sum;
+    }
+    window.getSkillUpsNeededForLevel = getSkillUpsNeededForLevel;
+    // Пересчёт листа со старой шкалы: всё накопленное (пороги пройденных уровней + текущий прогресс) раскладывается по новой.
+    // Уровень вырос — сам уровень не трогаем, а оставляем прогресс: кнопка «Применить уровень» горит столько раз, сколько уровней
+    // прибавилось, и каждый раз игрок выбирает характеристику и получает очко перка. Уровень упал (только выше 65, выданный мастером) —
+    // уровень снижается, лишние очки перков снимаются сначала из свободных, потом снимаются взятые ступени перков с самым высоким порогом.
+    // Повторно не срабатывает: в сейве остаётся levelScheme = 2.
+    function migrateLevelScheme(data) {
+        if (!data || data.levelScheme === LEVEL_SCHEME) return data;
+        data.levelScheme = LEVEL_SCHEME;
+        if (typeof data.characterLevel === 'undefined') return data;
+        const oldLevel = Math.max(1, parseInt(data.characterLevel) || 1);
+        const total = skillUpsToReachLevel(oldLevel, 1) + Math.max(0, parseInt(data.levelUpProgress) || 0);
+        let newLevel = 1;
+        while (newLevel < MAX_CHARACTER_LEVEL && skillUpsToReachLevel(newLevel + 1) <= total) newLevel++;
+        if (newLevel >= oldLevel) {
+            data.levelUpProgress = total - skillUpsToReachLevel(oldLevel);
+            if (newLevel > oldLevel) data.levelSchemeNote = { from: oldLevel, to: newLevel };
+            return data;
+        }
+        const lost = oldLevel - newLevel;
+        data.characterLevel = newLevel;
+        data.levelUpProgress = newLevel >= MAX_CHARACTER_LEVEL ? 0 : total - skillUpsToReachLevel(newLevel);
+        let pts = parseInt(data.perkPointsAvailable) || 0;
+        let toRemove = lost - Math.max(0, Math.min(pts, lost));
+        pts -= lost - toRemove;
+        const removed = [];
+        if (toRemove > 0 && data.perkStates && typeof data.perkStates === 'object') {
+            const taken = [];
+            Object.keys(data.perkStates).forEach(k => {
+                const m = data.perkStates[k] && k.match(/^skill(\d+)-perk(\d+)-step(\d+)$/);
+                if (!m) return;
+                const perk = (fullPerksManifest[skillNames[+m[1]]] || [])[+m[2]];
+                if (!perk) return;
+                taken.push({ k, name: perk.name, step: +m[3], thr: ((perk.req && perk.req.thresholds) || [])[+m[3] - 1] || 0 });
+            });
+            taken.sort((a, b) => (b.thr - a.thr) || (b.step - a.step));
+            taken.slice(0, toRemove).forEach(t => { data.perkStates[t.k] = false; removed.push(t.name + (t.step > 1 ? ' (ступень ' + t.step + ')' : '')); });
+        }
+        data.perkPointsAvailable = pts; // снимать больше нечего — в минус не уходим
+        data.levelSchemeNote = { from: oldLevel, to: newLevel, removed };
+        return data;
     }
 
     function renderLevelPanel() {
@@ -12085,10 +12138,13 @@ window.toggleSkillPanel = function (idx) {
         const readyBlock = document.getElementById('levelup-ready-block');
         if (!summaryEl) return;
         const needed = getSkillUpsNeededForLevel(characterLevel);
-        const ready = levelUpProgress >= needed;
+        const atMax = characterLevel >= MAX_CHARACTER_LEVEL;
+        const ready = !atMax && levelUpProgress >= needed;
         if (typeof renderLordPerks === 'function') renderLordPerks();
-        summaryEl.innerHTML = `Уровень: <strong>${characterLevel}</strong> · Очков перка свободно: <strong>${perkPointsAvailable}</strong><br>` +
-            `Прогресс к след. уровню: ${levelUpProgress} / ${needed} очков навыков`;
+        let readyN = 0;
+        if (ready) { let p = levelUpProgress, l = characterLevel; while (l < MAX_CHARACTER_LEVEL && p >= getSkillUpsNeededForLevel(l)) { p -= getSkillUpsNeededForLevel(l); l++; readyN++; } }
+        summaryEl.innerHTML = `Уровень: <strong>${characterLevel}</strong> из ${MAX_CHARACTER_LEVEL} · Очков перка свободно: <strong>${perkPointsAvailable}</strong><br>` +
+            (atMax ? 'Достигнут максимальный уровень.' : `Прогресс к след. уровню: ${levelUpProgress} / ${needed} очков навыков` + (readyN > 1 ? ` · готово уровней: <strong>${readyN}</strong>` : ''));
         if (readyBlock) readyBlock.style.display = ready ? 'block' : 'none';
         renderSkillProgressList();
     }
@@ -12153,7 +12209,7 @@ window.toggleSkillPanel = function (idx) {
 
     window.applyLevelUp = function () {
         const needed = getSkillUpsNeededForLevel(characterLevel);
-        if (levelUpProgress < needed) return;
+        if (levelUpProgress < needed || characterLevel >= MAX_CHARACTER_LEVEL) return;
         const statKey = document.getElementById('levelup-stat-choice').value;
         const statInput = document.getElementById('stat-' + statKey);
         if (statInput) {
@@ -16681,6 +16737,7 @@ function updateHungerPenalty() {
             characterLevel: characterLevel,
             levelUpProgress: levelUpProgress,
             perkPointsAvailable: perkPointsAvailable,
+            levelScheme: LEVEL_SCHEME,
             skillProgress: skillProgress,
             playerQuests: playerQuests,
             activeSummons: activeSummons,
@@ -16810,17 +16867,19 @@ function updateHungerPenalty() {
         }
         // Прогресс к уровню мастер обнуляет вместе с выдачей/снятием уровня — раньше лист игрока это поле не подхватывал
         // и следующим автосохранением возвращал старое значение.
-        if (typeof data.levelUpProgress !== 'undefined' && cloudFieldChanged('levelUpProgress', data.levelUpProgress) && (parseInt(data.levelUpProgress) || 0) !== levelUpProgress) {
+        // Документ в облаке ещё на старой шкале уровней (лист пересчитан, но не сохранён) — его уровень/прогресс/очки не берём, иначе пересчёт откатится.
+        const _lvOld = data.levelScheme !== LEVEL_SCHEME;
+        if (!_lvOld && typeof data.levelUpProgress !== 'undefined' && cloudFieldChanged('levelUpProgress', data.levelUpProgress) && (parseInt(data.levelUpProgress) || 0) !== levelUpProgress) {
             levelUpProgress = parseInt(data.levelUpProgress) || 0;
             if (typeof renderLevelPanel === 'function') renderLevelPanel();
             changed = true;
         }
-        if (typeof data.characterLevel !== 'undefined' && cloudFieldChanged('level', data.characterLevel) && data.characterLevel !== characterLevel) {
+        if (!_lvOld && typeof data.characterLevel !== 'undefined' && cloudFieldChanged('level', data.characterLevel) && data.characterLevel !== characterLevel) {
             characterLevel = parseInt(data.characterLevel) || 1;
             if (typeof renderLevelPanel === 'function') renderLevelPanel();
             changed = true;
         }
-        if (typeof data.perkPointsAvailable !== 'undefined' && cloudFieldChanged('perkPts', data.perkPointsAvailable)) perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
+        if (!_lvOld && typeof data.perkPointsAvailable !== 'undefined' && cloudFieldChanged('perkPts', data.perkPointsAvailable)) perkPointsAvailable = parseInt(data.perkPointsAvailable) || 0;
         if (Array.isArray(data.skills) && cloudFieldChanged('skills', data.skills)) {
             data.skills.forEach((val, i) => {
                 const input = document.getElementById('skill-' + i);
@@ -17589,6 +17648,7 @@ function updateHungerPenalty() {
         if (!data) return data;
         data = sanitizeSaveShape(data);
         data = applyItemRenames(data);
+        data = migrateLevelScheme(data);
         // Таблица алхимии сменилась (другие свойства ингредиентов) — один раз сбрасываем изученные свойства и рецепты:
         // старые знания относились к другой таблице. Предметы, зелья и яды в инвентаре остаются.
         const alchVer = window.ALCHEMY_RULES_VERSION || 1;
@@ -17803,6 +17863,13 @@ function updateHungerPenalty() {
             levelUpProgress = parseInt(data.levelUpProgress) || 0;
             perkPointsAvailable = (parseInt(data.perkPointsAvailable) || 0) + karmRefund;
             if (karmRefund) setTimeout(() => alert('Перк «Карманник» убран из игры (его нет в таблице талантов) — очко перков возвращено.'), 300);
+            if (data.levelSchemeNote) {
+                const n = data.levelSchemeNote; delete data.levelSchemeNote;
+                const msg = n.to > n.from
+                    ? `Шкала уровней изменилась: максимум теперь ${MAX_CHARACTER_LEVEL}. По накопленным очкам навыков вам положен ${n.to}-й уровень вместо ${n.from}-го — на вкладке «Проверка» нажмите «Применить уровень» ${n.to - n.from} раз(а): каждый раз +1 к характеристике на выбор и +1 очко перка.`
+                    : `Шкала уровней изменилась: максимум теперь ${MAX_CHARACTER_LEVEL}. Уровень пересчитан: ${n.from} → ${n.to}, лишние очки перков сняты` + (n.removed && n.removed.length ? `, сняты перки: ${n.removed.join(', ')}` : '') + '. Характеристики, полученные за снятые уровни, остались — их поправит мастер.';
+                setTimeout(() => { alert(msg); saveLocalStorage(); }, 400);
+            }
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
             playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
             activeSummons = Array.isArray(data.activeSummons) ? data.activeSummons : [];
@@ -17910,6 +17977,7 @@ function updateHungerPenalty() {
             // заново с уже восстановленными данными — раньше это могло остаться на дефолтных
             // значениях, если персонаж подгружался асинхронно из облака.
             updateAll();
+            renderLevelPanel(); // уровень/очки перков восстановлены выше — панель «Прокачка» иначе показывала значения до загрузки
             return true;
         } catch(e) {
             console.warn('Ошибка применения данных персонажа:', e);
