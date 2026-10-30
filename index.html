@@ -543,7 +543,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="style.css?v=27">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
@@ -2354,13 +2354,16 @@
    Раньше: 12 вкладок в ряд. Теперь: меню-«компас» из четырёх направлений + центр, внутри раздела — полоса «пилюль» с его вкладками.
    Сами вкладки (.tab-content) и их кнопки (.nav-tabs, теперь скрытые) не тронуты: openTab, значки «●», цифры 1–9, поиск Ctrl+K работают как раньше. */
 (function () {
+    // 2026-10-30: разделы совпадают с нижней панелью вкладок (js/16-game-ui.js): Герой · Бой · Сумка · Магия · Ещё.
+    // Компас (st-hub) больше не открывается: его заменили нижние вкладки и меню «Ещё».
     var GROUPS = {
-        skills: { title: 'Навыки', tabs: ['tab2', 'tab7', 'tab10'], hint: 'Ветки перков · Профессии · Проверка' },
+        hero: { title: 'Герой', tabs: ['tab1', 'tab2', 'tab10'], hint: 'Главная · Ветки перков · Проверка' },
+        fight: { title: 'Бой', tabs: ['tab3', 'tab6'], hint: 'Боевой пост · Сессия' },
+        bag: { title: 'Сумка', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
         magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
-        items: { title: 'Предметы', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
-        map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14'], hint: 'Карта · Календарь · Дневник' },
-        hero: { title: 'Герой', tabs: ['tab1', 'tab3', 'tab6'], hint: 'Главная и статы · Боевой пост · Сессия' }
+        more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14'], hint: 'Профессии · Карта · Календарь · Дневник' }
     };
+    window.stNavGroups = GROUPS;
     var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь и квесты', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
     var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
     var hub = document.getElementById('st-hub'), cur = 'hero', curTab = 'tab1';
@@ -2404,7 +2407,10 @@
         curTab = tabId; cur = groupOf(tabId); last[cur] = tabId;
         try { localStorage.setItem('skyrim_nav_last', JSON.stringify(last)); } catch (e) { }
         renderTop(); renderHubDots();
+        if (window.stGameUiSync) window.stGameUiSync(cur, tabId);
     };
+    window.stNavLast = function (g) { return last[g] && GROUPS[g] && GROUPS[g].tabs.indexOf(last[g]) >= 0 ? last[g] : (GROUPS[g] ? GROUPS[g].tabs[0] : 'tab1'); };
+    window.stNavHasDot = hasDot;
     var origOpenTab = window.openTab;
     window.openTab = function (ev, tabId) { origOpenTab.call(this, ev, tabId); window.stNavSync(tabId); };
 
@@ -2444,8 +2450,7 @@
             if (foreignModalOpen()) return;
             var t = e.target, tag = t && t.tagName;
             if (open) { e.preventDefault(); window.stHubClose(); return; }
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            e.preventDefault(); window.stHubOpen(); return;
+            return;
         }
         if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
         var dir = ARROWS[e.key]; if (!dir) return;
@@ -2458,13 +2463,14 @@
         if (target) target.focus();
     });
     // перерисовать «пилюли»/точки, когда кнопки вкладок меняют подпись (●) или дата/уровень меняются
-    var mo = new MutationObserver(function () { renderTop(); if (hub.classList.contains('open')) renderHubDots(); });
+    var mo = new MutationObserver(function () { renderTop(); if (hub.classList.contains('open')) renderHubDots(); if (window.stGameUiSync) window.stGameUiSync(cur, curTab); });
     var nav = document.querySelector('.nav-tabs'); if (nav) mo.observe(nav, { childList: true, subtree: true, characterData: true });
     var dd = document.getElementById('date-display'); if (dd) new MutationObserver(function () { if (hub.classList.contains('open')) renderBar(); }).observe(dd, { childList: true, characterData: true, subtree: true });
     setInterval(function () { try { document.getElementById('st-topbar-lvl').textContent = 'Ур. ' + characterLevel; } catch (e) { } }, 3000);
     renderTop();
 })();
 </script>
+<script src="js/16-game-ui.js?v=1"></script>
 
 </body>
 </html>
