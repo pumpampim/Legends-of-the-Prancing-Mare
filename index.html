@@ -13696,6 +13696,23 @@ window.toggleSkillPanel = function (idx) {
         } else if (sel.disabled && sel.value !== 'ideal') sel.disabled = false;
         if (changed) { saveSupernaturalStatePlayer(); saveLocalStorage(); updateAll(); }
     }
+    // «Аура смерти» высшего лича: пассивная, радиус 20 фт, все кроме лича и его нежити +5% уязвимости к магии и стихиям; на время маски гаснет.
+    function lichDeathAuraSync() {
+        const want = lichStage() >= 2 && !lichMaskKind();
+        const has = (activeTimedEffects || []).find(e => e && e.lichDeath);
+        if (want && !has) {
+            const eff = { id: 'eff-lichdeath-' + Date.now().toString(36), name: 'Аура смерти', effectName: 'Аура смерти', lichDeath: true, turnsRemaining: Infinity, hp: 0, mp: 0, value: 0,
+                description: '☠ Все существа в радиусе 20 фт, кроме тебя, твоей нежити и теней, получают +5% уязвимости к магии и стихиям. Гаснет, пока действует маска.' };
+            if (typeof gridZoneAvailable === 'function' && gridZoneAvailable()) {
+                const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+                eff.gridZoneId = eff.id;
+                window.CloudSync.addPendingZone({ id: eff.id, effId: eff.id, uid: myUidG(), ownerName: myName, spell: 'Аура смерти', kind: 'aura', place: 'follow', radiusFt: 20, dmg: 0, dmgType: '', who: 'enemies', icon: '☠', turns: null, vuln: 5 }, myName).catch(e => console.error('Аура смерти:', e));
+            }
+            activeTimedEffects.push(eff); return true;
+        }
+        if (!want && has) { activeTimedEffects = activeTimedEffects.filter(e => !(e && e.lichDeath)); return true; }
+        return false;
+    }
     function lichAfterStateChange() {
         try { snFaithSync(); } catch (e) { console.error('Вера:', e); }
         const l = snLich();
@@ -13703,7 +13720,7 @@ window.toggleSkillPanel = function (idx) {
         if (sig === _lichSig) return;
         _lichSig = sig;
         lichSync();
-        if (!lichPerk('pact')) activeTimedEffects = (activeTimedEffects || []).filter(e => !(e && (e.lichAura || e.lichBlade || e.lichMask)));
+        if (!lichPerk('pact')) activeTimedEffects = (activeTimedEffects || []).filter(e => !(e && (e.lichAura || e.lichBlade || e.lichMask || e.lichDeath)));
     }
 
     // ----- ауры (одна за раз) -----
@@ -13939,6 +13956,7 @@ window.toggleSkillPanel = function (idx) {
     }
     // ----- панель на листе -----
     function lichStatusHtml() {
+        try { if (lichDeathAuraSync()) { renderActiveEffects(); saveLocalStorage(); } } catch (e) { console.error(e); }
         const l = snLich(); if (!l || !(lichPerk('pact') || l.stage)) return '';
         const st = l.stage | 0, nPerks = window.LICH_PERKS.filter(p => l.perks[p.id]).length;
         const title = st >= 2 ? 'Высший лич' : st === 1 ? 'Низший лич' : 'Рыцарь смерти';
@@ -13953,6 +13971,7 @@ window.toggleSkillPanel = function (idx) {
         if (lichPerk('bearer')) h += btn('btn-success', 'lichPetrify()', `🧊 Окаменение (${used}/${maxUses} сегодня)`);
         if (lichPerk('herald')) h += btn('btn-success', 'lichBlade()', '🔥❄️ Клинок морозного огня (80 маны)');
         if (lichPerk('visage')) h += btn(l.shadows !== false ? 'btn-success' : '', 'lichToggleShadows()', `👤 Удар теней: ${l.shadows !== false ? 'вкл' : 'выкл'} (до ${lichShadowCap()})`);
+        if (st >= 2) h += `<div style="font-size:12px; margin-top:3px;">☠ Аура смерти (20 фт, +5% уязвимости к магии и стихиям): <strong>${lichMaskKind() ? 'погашена маской' : 'действует'}</strong></div>`;
         if (st >= 1) h += btn(l.vision ? 'btn-success' : '', 'lichToggleVision()', `👁 Зрение невидимого: ${l.vision ? 'вкл' : 'выкл'}`);
         if (lichPerk('visage') || st >= 1) {
             const mk = lichMaskKind();

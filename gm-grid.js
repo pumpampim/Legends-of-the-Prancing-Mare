@@ -161,6 +161,10 @@
                     markHitBy(e, z.uid, pv.finalDmg > 0, was > 0 && e.curHp <= 0);
                     names.push(e.name + ' −' + pv.finalDmg + (e.curHp <= 0 ? ' ☠' : ''));
                 } else if (z.slow) names.push(e.name + ' замедлен');
+                if (z.vuln) { // «Аура смерти» высшего лича: уязвимость к магии и стихиям, пока существо в радиусе (обновляется каждый тик)
+                    e.statusEffects = (e.statusEffects || []).filter(s => s.name !== 'Аура смерти').concat([{ id: 'zv' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Аура смерти', desc: 'Уязвимость к магии и стихиям +' + z.vuln + '%', turns: 1, res: { magic: -z.vuln } }]);
+                    if (!z.dmg && !z.slow) names.push(e.name + ' уязвим');
+                }
                 if (z.resistDown) {
                     const st = (e.statusEffects || []).find(s => s.name === 'Гул камня');
                     const add = { fire: -z.resistDown, frost: -z.resistDown, shock: -z.resistDown, physical: -z.resistDown, poison: -z.resistDown, magic: -z.resistDown };
