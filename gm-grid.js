@@ -150,6 +150,10 @@
                 }
                 if (z.dmg) {
                     const pv = window.StCombat ? window.StCombat.previewDamage(e, z.dmg, z.noResist ? '' : (z.dmgType || ''), 0) : { finalDmg: z.dmg };
+                    if (z.dmg2) { // вторая стихия плаща лича (огонь + холод): считается отдельно — у каждой свои сопротивления и уязвимости
+                        const pv2 = window.StCombat ? window.StCombat.previewDamage(e, z.dmg2, z.dmgType2 || '', 0) : { finalDmg: z.dmg2 };
+                        pv.finalDmg += pv2.finalDmg;
+                    }
                     const was = e.curHp || 0; e.curHp = Math.max(0, was - pv.finalDmg);
                     if (pv.finalDmg > 0 && Array.isArray(e.statusEffects)) e.statusEffects = e.statusEffects.filter(st => !(st && st.breakOnDamage)); // Полиморф и т.п. спадают от урона
                     if (z.mpDmg) e.curMp = Math.max(0, (e.curMp || 0) - z.mpDmg);
@@ -165,7 +169,13 @@
                 }
             });
             if (names.length) logs.push(`${z.icon || '✴'} «${z.spell}» (${z.ownerName || 'мастер'}): ${names.join(', ')}.`);
-            if (typeof z.turns === 'number') { z.turns -= 1; if (z.turns <= 0) { delete gr.zones[zid]; logs.push(`${z.icon || '✴'} «${z.spell}» рассеивается.`); } }
+            if (z.unit === 'round' && typeof z.rounds === 'number') {
+                // Плащи: длительность в кругах. Счёт ведём по общему счётчику кругов сессии: сколько кругов сменилось с прошлого тика — столько и списываем.
+                const curR = parseInt(d.sessionRoundCounter) || 0;
+                if (typeof z.lastRound !== 'number') z.lastRound = curR;
+                if (curR > z.lastRound) { z.rounds -= curR - z.lastRound; z.lastRound = curR; }
+                if (z.rounds <= 0) { delete gr.zones[zid]; logs.push(`${z.icon || '✴'} «${z.spell}» рассеивается.`); }
+            } else if (typeof z.turns === 'number') { z.turns -= 1; if (z.turns <= 0) { delete gr.zones[zid]; logs.push(`${z.icon || '✴'} «${z.spell}» рассеивается.`); } }
         });
         return { enemies, grid: gr, logs, hits };
     }

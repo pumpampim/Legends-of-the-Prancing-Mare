@@ -554,7 +554,8 @@
     <script src="cooking-data.js?v=10"></script>
     <script src="smithing-data.js?v=13"></script>
     <script src="enchant-data.js?v=5"></script>
-    <script src="spell-data.js?v=7"></script>
+    <script src="spell-data.js?v=8"></script>
+    <script src="lich-data.js?v=1"></script>
     <script src="alchemy-data.js?v=7"></script>
     <script src="fish-data.js?v=3"></script>
     <script src="hunt-data.js?v=3"></script>
@@ -890,6 +891,7 @@
                             <option value="molag">Молаг Бал</option>
                             <option value="hircine">Хирсин</option>
                         </optgroup>
+                        <option value="ideal" hidden disabled>Идеальные Повелители (лич)</option>
                     </select>
 
                     <label>Стадия Благословения</label>
@@ -3138,7 +3140,7 @@ window.toggleSkillPanel = function (idx) {
         const raw = parseInt(input.getAttribute('data-raw-val')) || 10;
         const race = document.getElementById('char-race').value;
         const bonus = (raceSkillBonuses[race] && raceSkillBonuses[race][skillName]) || 0;
-        return Math.min(SKILL_MAX, raw + bonus + godSkillPoints(skillName) + gearSkillPoints(skillName)); // потолок навыка — 100 вместе с расовым бонусом
+        return Math.min(SKILL_MAX, raw + bonus + godSkillPoints(skillName) + gearSkillPoints(skillName) - ((skillName === 'Красноречие' && lichPerk('visage')) ? 5 : 0)); // «Лик смерти»: −5 к красноречию; потолок навыка — 100 вместе с расовым бонусом
     }
     // Пункты навыка от снаряжения: «+5 навыка Разрушения» (вещи Брурида).
     function gearSkillPoints(skillName) {
@@ -3344,6 +3346,7 @@ window.toggleSkillPanel = function (idx) {
         bonus += getSignStatBonuses(sign)[statKey] || 0;
         // Вампиризм — как в updateAll: бонус минус штраф голода (голод бьёт по всем шести характеристикам).
         if (snVampire()) bonus += (VAMPIRE_STAT_BONUS[statKey] || 0) - vampHungerStatPenalty();
+        bonus -= lichWeakenedPenalty();
         let typedValue = parseInt(input.value) || 10;
         let raw = typedValue - bonus;
         if (raw < 1) raw = 1;
@@ -4765,9 +4768,10 @@ window.toggleSkillPanel = function (idx) {
                 const maxFieldId = heal.key === 'hp' ? 'max-hp' : 'max-mp';
                 const cur = parseInt(document.getElementById(fieldId).value) || 0;
                 const max = parseInt(document.getElementById(maxFieldId).value) || 0;
+                if (heal.key === 'hp' && school === 'restor' && lichStage() >= 1) { heal.value = 0; extraMsg = ' ☠ Лич не лечится Восстановлением — исцеление не подействовало (для этого есть «Некролечение на себя»).'; }
                 const newVal = Math.max(cur, Math.min(max, cur + heal.value));
                 document.getElementById(fieldId).value = newVal;
-                extraMsg = ` Восстановлено ${heal.value} ${heal.key === 'hp' ? 'ХП' : 'МП'} (сейчас ${newVal}/${max}).` + (heal.key === 'hp' ? grantBreather(null) : '');
+                extraMsg = (extraMsg || '') + ` Восстановлено ${heal.value} ${heal.key === 'hp' ? 'ХП' : 'МП'} (сейчас ${newVal}/${max}).` + (heal.key === 'hp' ? grantBreather(null) : '');
             } else {
                 const stSelf = { duration: parseDurationTurns(desc), plain: parsePlainEffectBonus(desc), percentEffects: parsePercentEffects(desc) };
                 const manaPerTurn = getSpellUpkeep(spellName, desc, isFree, enhanced, !!(stSelf.plain || stSelf.percentEffects.length) || /^(Аура|Некроаура|Дар силы)/.test(spellName));
@@ -8107,7 +8111,7 @@ window.toggleSkillPanel = function (idx) {
         const el = document.getElementById('supernatural-status-player');
         if (!el) return;
         const s = playerSupernaturalState;
-        if (!s || (!s.lycanthropy && !s.vampirism)) {
+        if (!s || (!s.lycanthropy && !s.vampirism && !lichStatusHtml())) {
             el.innerHTML = '<p style="opacity:.6; font-size:13px;">Нет сверхъестественного состояния.</p>';
             if (typeof renderLordPerks === 'function') renderLordPerks();
             return;
@@ -8137,6 +8141,7 @@ window.toggleSkillPanel = function (idx) {
                 <button class="${v.lordForm ? 'btn-danger' : 'btn-success'}" style="width:100%; margin-top:4px;" onclick="playerToggleLordForm()">${v.lordForm ? 'Вернуть обычный облик' : 'Принять форму вампира-лорда'}</button>` : ''}
             </div>`;
         }
+        html += lichStatusHtml();
         el.innerHTML = html;
         if (typeof renderLordPerks === 'function') renderLordPerks();
     }
@@ -9379,6 +9384,7 @@ window.toggleSkillPanel = function (idx) {
         const entry = pouchContents[idx];
         if (!entry) return;
         if (snWerewolfForm()) { alert('В облике зверя пить зелья нельзя — оборотень лечится только пожиранием трупов.'); return; }
+        if (lichBlocksUse({ name: entry.name, effect: entry.effect, alchemyEffects: entry.effects }, false)) return;
         if (!bonusActionAllowed('пить из подсумка')) return; // подсумок — бонусное действие, одно за ход в бою
         // Сначала вопрос про яд, потом трата бонусного действия: «Отмена» не должна съедать действие.
         if (pouchEntryIsPoison(entry) && !confirm('Это ЯД. Его наносят на оружие (кнопка «☠ На оружие»). Выпить всё равно — он подействует на тебя?')) return;
@@ -9708,6 +9714,7 @@ window.toggleSkillPanel = function (idx) {
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || item.count <= 0) return;
         if (snWerewolfForm()) { alert('В облике зверя нельзя пить зелья и есть обычную еду — оборотень лечится только пожиранием трупов.'); return; }
+        if (lichBlocksUse(item, isFoodItem(item) && potionKindOf(item) !== 'potion')) return;
         if (potionKindOf(item) === 'poison' && !confirm('Это ЯД. Его наносят на оружие (кнопка «☠ На оружие»). Выпить всё равно — он подействует на тебя?')) return;
         // В бою из рюкзака — основное действие хода; из подсумка — бонусное (drinkFromPouch).
         if (!combatActionAllowed('item')) return; // зелье — не заклинание: Немота не мешает
@@ -9896,11 +9903,13 @@ window.toggleSkillPanel = function (idx) {
     window.gridAnnotateTargets = gridAnnotateTargets;
     // Длительные зоны на сетке. place: follow — аура вокруг заклинателя (ходит с ним), self — круг на месте каста, gm — ставит мастер.
     const GRID_ZONE_SPELLS = {
-        'Огненный плащ': { kind: 'aura', place: 'follow', dmgType: 'fire', who: 'enemies', icon: '🔥', radius: 5 },
-        'Морозный плащ': { kind: 'aura', place: 'follow', dmgType: 'frost', who: 'enemies', icon: '❄️', radius: 5 },
-        'Плащ молний': { kind: 'aura', place: 'follow', dmgType: 'shock', who: 'enemies', icon: '⚡', radius: 5, mpHalf: true },
+        // perRound — плащи считают длительность в КРУГАХ (спадают, когда сменилось нужное число кругов), а бьют в ход каждого существа
+        'Огненный плащ': { kind: 'aura', place: 'follow', dmgType: 'fire', who: 'enemies', icon: '🔥', radius: 5, perRound: true },
+        'Морозный плащ': { kind: 'aura', place: 'follow', dmgType: 'frost', who: 'enemies', icon: '❄️', radius: 5, perRound: true },
+        'Плащ молний': { kind: 'aura', place: 'follow', dmgType: 'shock', who: 'enemies', icon: '⚡', radius: 5, mpHalf: true, perRound: true },
+        'Плащ морозного огня': { kind: 'aura', place: 'follow', dmgType: 'fire', dmgType2: 'frost', who: 'enemies', icon: '🔥❄️', radius: 5, perRound: true },
         'Аура Стендарра': { kind: 'aura', place: 'follow', dmgType: 'magic', who: 'undead', icon: '☀', radius: 5, noResist: true },
-        'Вихревой плащ': { kind: 'aura', place: 'follow', dmgType: '', who: 'enemies', icon: '🌪', radius: 5, slowOnly: true },
+        'Вихревой плащ': { kind: 'aura', place: 'follow', dmgType: '', who: 'enemies', icon: '🌪', radius: 5, slowOnly: true, perRound: true },
         'Дурман': { kind: 'aura', place: 'follow', dmgType: 'magic', who: 'enemies', icon: '🌫', radius: 10, upkeep: true },
         'Круг огня': { kind: 'area', place: 'self', dmgType: 'magic', who: 'undead', icon: '🔆', radius: 10, noResist: true },
         'Круг защиты': { kind: 'area', place: 'self', dmgType: '', who: 'undead', icon: '⭕', radius: 10, flee: true },
@@ -9919,6 +9928,12 @@ window.toggleSkillPanel = function (idx) {
         let dmg = parseInt((txt.match(/(\d+)\s*(?:единиц[аы]?\s*)?урон/i) || [])[1]) || 0;
         if (name === 'Дурман') dmg = parseInt((txt.match(/на\s+(\d+)/i) || [])[1]) || 0;
         dmg = Math.round(dmg * (mult || 1));
+        let dmg2 = 0;
+        if (Z.dmgType2) { // две стихии (плащ лича): вторая половина урона, у каждой своя стихия и свой перк стихии
+            dmg2 = Math.round((parseInt((txt.match(/и\s+(\d+)\s*(?:единиц[аы]?\s*)?урона\s+холод/i) || [])[1]) || 0) * (mult || 1));
+            const pbZ = window.perkBonuses || {};
+            dmg = Math.round(dmg * (1 + (pbZ.fireSpellBonus || 0) / 100)); dmg2 = Math.round(dmg2 * (1 + (pbZ.frostSpellBonus || 0) / 100));
+        }
         const radius = parseInt((txt.match(/радиусе?\s*(\d+)/i) || [])[1]) || Z.radius || 5;
         let turns = Z.upkeep ? null : (parseInt((txt.match(/(\d+)\s*ход/i) || [])[1]) || 8);
         const slow = name === 'Вихревой плащ' ? (parseInt((txt.match(/на\s+(\d+)\s+а\s+так/i) || [])[1]) || 15) : (name === 'Дурман' ? (parseInt((txt.match(/медлен\S*\s+на\s+(\d+)/i) || [])[1]) || 0) : 0);
@@ -9926,13 +9941,15 @@ window.toggleSkillPanel = function (idx) {
         const upkeep = Z.upkeep ? getSpellUpkeep(name, full, isFree, enhanced, true) : 0;
         const effId = 'zone-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const arrowPct = name === 'Вихревой плащ' ? (parseInt((txt.match(/(\d+)\s*%/) || [])[1]) || 20) : 0;
-        const what = Z.flee ? `нежить до ${flee.maxLevel} ур. бежит ${flee.fleeTurns} х.` : Z.slowOnly ? `враги −${slow} фт скорости` : `${dmg} урона за ход${Z.who === 'undead' ? ' нежити' : Z.who === 'all' ? ' всем внутри' : ' врагам'}${slow ? ', −' + slow + ' фт скорости' : ''}${Z.mpHalf ? ' и ' + Math.round(dmg / 2) + ' по мане' : ''}${Z.resistDown ? ', −' + Z.resistDown + '% сопротивлений каждый ход' : ''}`;
+        const what = Z.flee ? `нежить до ${flee.maxLevel} ур. бежит ${flee.fleeTurns} х.` : Z.slowOnly ? `враги −${slow} фт скорости` : `${dmg}${dmg2 ? ' огнём + ' + dmg2 + ' холодом' : ''} урона${Z.perRound ? ' в ход каждого существа' : ' за ход'}${Z.who === 'undead' ? ' нежити' : Z.who === 'all' ? ' всем внутри' : ' врагам'}${slow ? ', −' + slow + ' фт скорости' : ''}${Z.mpHalf ? ' и ' + Math.round(dmg / 2) + ' по мане' : ''}${Z.resistDown ? ', −' + Z.resistDown + '% сопротивлений каждый ход' : ''}`;
         const where = Z.place === 'follow' ? `вокруг тебя (${radius} фт, ходит с тобой)` : Z.place === 'self' ? `на месте каста (радиус ${radius} фт)` : (Z.kind === 'wall' ? 'там, где мастер проведёт стену (до 30 фт)' : `там, где мастер поставит камень (радиус ${radius} фт)`);
         pushOrRefreshTimedEffect({ id: effId, name, effectName: name, description: `${Z.icon} Зона на боевой сетке: ${what}; ${where}.${upkeep ? ' Поддержание ' + upkeep + ' маны/ход.' : ''}`,
-            turnsRemaining: turns === null ? Infinity : turns, manaPerTurn: upkeep, gridZoneId: effId, rangedResist: arrowPct || undefined });
+            turnsRemaining: turns === null ? Infinity : turns, manaPerTurn: upkeep, gridZoneId: effId, rangedResist: arrowPct || undefined, perRound: Z.perRound || undefined });
         renderActiveEffects();
         const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
-        const zone = { id: effId, effId, uid: myUidG(), ownerName: myName, spell: name, kind: Z.kind, place: Z.place, radiusFt: radius, dmg: Z.slowOnly || Z.flee ? 0 : dmg, dmgType: Z.dmgType, who: Z.who, icon: Z.icon, turns: turns === null ? null : turns + 1 };
+        const zone = { id: effId, effId, uid: myUidG(), ownerName: myName, spell: name, kind: Z.kind, place: Z.place, radiusFt: radius, dmg: Z.slowOnly || Z.flee ? 0 : dmg, dmgType: Z.dmgType, who: Z.who, icon: Z.icon, turns: (turns === null || Z.perRound) ? null : turns + 1 };
+        if (Z.perRound && turns !== null) { zone.unit = 'round'; zone.rounds = turns; }
+        if (dmg2) { zone.dmg2 = dmg2; zone.dmgType2 = Z.dmgType2; }
         if (Z.mpHalf) zone.mpDmg = Math.round(dmg / 2);
         if (slow) zone.slow = slow;
         if (Z.noResist) zone.noResist = true;
@@ -10238,6 +10255,7 @@ window.toggleSkillPanel = function (idx) {
             dHp += (e.regenHp || 0) - (e.dotHp ? (e.isPoisonEffect ? Math.round(e.dotHp * (1 - selfPoisonResist() / 100)) : e.dotHp) : 0); // яд по ходам — с сопротивлением ядам
             dMp += (e.regenMp || 0) - (e.dotMp || 0);
         });
+        if (lichStage() >= 1 && lichAlive() && !inCombatNow()) dHp += 5; // лич: регенерация 5 ХП вне боя (в бою её нет)
         if (dHp || dMp) {
             const hpEl = document.getElementById('cur-hp'), mpEl2 = document.getElementById('cur-mp');
             const maxHp = parseInt(document.getElementById('max-hp').value) || 0;
@@ -10253,7 +10271,7 @@ window.toggleSkillPanel = function (idx) {
             if (typeof updateVitalBars === 'function') updateVitalBars();
         }
 
-        activeTimedEffects.forEach(e => { if (e.turnsRemaining !== Infinity) e.turnsRemaining -= 1; });
+        activeTimedEffects.forEach(e => { if (e.turnsRemaining !== Infinity && (!e.perRound || _tickIsRound)) e.turnsRemaining -= 1; }); // perRound — длительность в кругах: списывается только на смене круга
         activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0 || e.turnsRemaining === Infinity);
         clampTempHp(); // эффект с временными ХП мог закончиться — лишнее сгорает
         renderActiveEffects();
@@ -10334,7 +10352,8 @@ window.toggleSkillPanel = function (idx) {
 
     // ---- Ход/круг. Вне сессии — личный счётчик, как раньше. В сессии — общий: кто бы ни нажал (игрок или мастер),
     // ход переключается у всех, и у каждого игрока его эффекты прокручиваются сами (syncSessionTurns ниже).
-    function localTurnTick() { rollSheogorathChaos(); tickActiveEffects(); }
+    var _tickIsRound = true; // идёт тик «круга» (а не «хода»): эффекты perRound списывают круг только тогда
+    function localTurnTick(isRound) { _tickIsRound = isRound !== false; rollSheogorathChaos(); tickActiveEffects(); _tickIsRound = true; }
     function inSyncedSession() { return !!(window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession() && window.CloudSync.advanceSessionTurn); }
     function advanceShared(kind) {
         const nm = (document.getElementById('char-name') || {}).value || 'Игрок';
@@ -10345,7 +10364,7 @@ window.toggleSkillPanel = function (idx) {
     window.nextTurn = function () {
         if (inSyncedSession()) { advanceShared('turn'); return; }
         gameTurn++;
-        localTurnTick();
+        localTurnTick(false);
         updateTurnRoundDisplay();
         saveLocalStorage();
     };
@@ -10353,7 +10372,7 @@ window.toggleSkillPanel = function (idx) {
     window.nextRound = function () {
         if (inSyncedSession()) { advanceShared('round'); return; }
         gameRound++;
-        localTurnTick();
+        localTurnTick(true);
         updateTurnRoundDisplay();
         saveLocalStorage();
     };
@@ -10369,7 +10388,8 @@ window.toggleSkillPanel = function (idx) {
         } else if (tick > sessionTurnSync.tick) {
             const n = Math.min(10, tick - sessionTurnSync.tick); // долго не было на связи — не крутим больше 10 ходов разом
             sessionTurnSync.tick = tick;
-            for (let i = 0; i < n; i++) localTurnTick();
+            const rd = Math.max(0, round - gameRound); // сколько из этих тиков — смена круга (счётчик кругов ещё не обновлён)
+            for (let i = 0; i < n; i++) localTurnTick(i >= n - rd);
             changed = true;
         }
         if (gameTurn !== turn || gameRound !== round) { gameTurn = turn; gameRound = round; changed = true; }
@@ -10466,6 +10486,7 @@ window.toggleSkillPanel = function (idx) {
         (activeTimedEffects || []).forEach(e => {
             (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
         });
+        if (lichStage() >= 2) { totals.spellPower += 10; totals.spellCostReduction += 10; } // высший лич: заклинания всех школ сильнее и дешевле на 10%
         return totals;
     }
 
@@ -10817,9 +10838,13 @@ window.toggleSkillPanel = function (idx) {
         res.disease += gb('poisonDiseaseResist');
         res.shout += gb('shoutResist');
         res.magic += gb('magicResist');
+        if (lichPerk('pact')) res.magic += 10;                                   // Тёмный пакт: сопротивление магии +10%
+        if (lichPerk('visage')) res.frost += 10;                                 // Лик смерти: холод +10%
+        if (lichStage() >= 1) { res.frost += 50; vulnAfter.shock = (vulnAfter.shock || 0) - 25; } // лич: холод +50%, электричество −25%
         if (snVampire()) { res.frost += 50 + vampHungerResistDelta(); vulnAfter.fire = (vulnAfter.fire || 0) - 50 - vampHungerResistDelta(); } // вампир: холод +50%, огонь −50% (как в Skyrim)
         Object.keys(res).forEach(k => { res[k] = Math.min(85, Math.max(0, res[k])); }); // потолок 85%, как в ваниле
         if (snVampire()) { res.poison = 100; res.disease = 100; } // вампир: полный иммунитет к ядам и болезням
+        if (lichStage() >= 1 && lichAlive()) { res.poison = 100; res.disease = 100; } // лич: иммунитет к ядам и болезням (кроме «Заёмной жизни»)
         if ((document.getElementById('char-race') || {}).value === 'argonian') res.disease = 100; // аргонианин: иммунитет к болезням
         Object.keys(vulnAfter).forEach(k => { res[k] += vulnAfter[k]; });
         // Знак «Ученик» — уязвимость к магии 10% (было только текстом в описании). В отличие от
@@ -13615,6 +13640,321 @@ window.toggleSkillPanel = function (idx) {
         renderActiveSummonsList();
         return had.length;
     }
+    // ====================== Рыцарь смерти / лич (lich-data.js; набросок игрока, правки Никиты 2026-10-30) ======================
+    // Состояние лежит в supernaturalState.lich (перки и стадию выдаёт мастер; остальное меняет сам игрок). Всё, что только считается
+    // (сопротивления, мана, вес, скорость, регенерация), берётся из него на лету — отдельных «эффектов лича» в листе нет.
+    function snLich() { const s = playerSupernaturalState; return (s && s.lich) || null; }
+    function lichPerk(id) { const l = snLich(); return !!(l && l.perks && l.perks[id]); }
+    function lichStage() { const l = snLich(); return l ? (l.stage | 0) : 0; }
+    function lichWeakenedPenalty() { const l = snLich(); return (l && l.weakened) ? 2 : 0; } // «ослабленный лич»: −2 ко всем характеристикам
+    function lichManaBonus() { const st = lichStage(); return st >= 2 ? 100 : st === 1 ? 50 : 0; }
+    function lichEffectActive(e) { return !!e && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity); }
+    function lichMaskKind() { const e = (activeTimedEffects || []).find(x => x && x.lichMask && lichEffectActive(x)); return e ? e.lichMask : ''; }
+    function lichAuraId() { const e = (activeTimedEffects || []).find(x => x && x.lichAura); return e ? e.lichAura : ''; }
+    function lichAlive() { return !(lichStage() >= 1 && lichMaskKind() === 'borrowed'); } // «Заёмная жизнь»: пока действует, нет регенерации и иммунитета
+    function lichSave() { saveSupernaturalStatePlayer(); saveLocalStorage(); renderSupernaturalStatusPlayer(); updateAll(); }
+    function lichLog(text) { if (window.CloudSync && window.CloudSync.postCombatLog) { const nm = (document.getElementById('char-name') || {}).value || 'Игрок'; window.CloudSync.postCombatLog(text, nm); } }
+    function lichSpendMana(n) {
+        const mp = document.getElementById('cur-mp'); const cur = parseInt(mp.value) || 0;
+        if (cur < n) { alert(`Не хватает маны: нужно ${n}, есть ${cur}.`); return false; }
+        mp.value = cur - n; updateVitalBars(); return true;
+    }
+    // Положенные заклинания → в книгу школ; вера → «Идеальные Повелители» (пакт отключает богов, храмы и амулеты)
+    function lichApplyFaith() {
+        const sel = document.getElementById('faith-god'); if (!sel) return;
+        const l = snLich();
+        if (lichPerk('pact')) {
+            if (sel.value !== 'ideal') { if (l) l.prevFaith = sel.value; sel.value = 'ideal'; }
+            sel.disabled = true;
+        } else if (sel.value === 'ideal') { sel.value = (l && l.prevFaith) || 'none'; sel.disabled = false; }
+        else sel.disabled = false;
+    }
+    function lichSync() {
+        const l = snLich(); if (!l) return;
+        const names = window.lichInjectSpells ? window.lichInjectSpells(l) : [];
+        names.forEach(n => { const d = window.LICH_SPELLS[n]; try { learnSpellIntoBook(d.school, n); } catch (e) { console.error(e); } });
+        lichApplyFaith();
+    }
+    var _lichSig = '';
+    function lichAfterStateChange() {
+        const l = snLich();
+        const sig = l ? JSON.stringify([l.perks, l.stage]) : '';
+        if (sig === _lichSig) return;
+        _lichSig = sig;
+        lichSync();
+        if (!lichPerk('pact')) activeTimedEffects = (activeTimedEffects || []).filter(e => !(e && (e.lichAura || e.lichBlade || e.lichMask)));
+    }
+
+    // ----- ауры (одна за раз) -----
+    const LICH_AURAS = {
+        ice: { perk: 'pact', name: 'Ледяная аура', icon: '❄️' },
+        frost: { perk: 'bearer', name: 'Инеевая кожа', icon: '🧊' },
+        rage: { perk: 'herald', name: 'Багровая ярость', icon: '🩸' }
+    };
+    window.lichToggleAura = function (id) {
+        const A = LICH_AURAS[id]; if (!A || !lichPerk(A.perk)) return;
+        const cur = lichAuraId();
+        activeTimedEffects = (activeTimedEffects || []).filter(e => !(e && e.lichAura)); // зона ледяной ауры гаснет вместе с эффектом
+        if (cur !== id) {
+            const eff = { id: 'eff-lichaura-' + Date.now().toString(36), name: A.name, effectName: A.name, lichAura: id, turnsRemaining: Infinity, hp: 0, mp: 0, value: 0 };
+            if (id === 'ice') {
+                const rad = lichPerk('visage') ? 15 : 10;
+                eff.description = `❄️ Враги в радиусе ${rad} фт: −10 фт скорости.`;
+                if (typeof gridZoneAvailable === 'function' && gridZoneAvailable()) {
+                    const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+                    eff.gridZoneId = eff.id;
+                    window.CloudSync.addPendingZone({ id: eff.id, effId: eff.id, uid: myUidG(), ownerName: myName, spell: 'Ледяная аура', kind: 'aura', place: 'follow', radiusFt: rad, dmg: 0, dmgType: '', who: 'enemies', icon: '❄️', turns: null, slow: 10 }, myName).catch(e => alert('Зона не передана мастеру: ' + e.message));
+                }
+            } else if (id === 'frost') {
+                eff.description = '🧊 Получаемый физический урон −15%.';
+                eff.percentEffects = [{ type: 'resistPhysical', value: 15 }];
+            } else {
+                eff.description = '🩸 +10% к физическому урону, +5% пробития брони.';
+                eff.percentEffects = [{ type: 'weaponDamagePercent', value: 10 }];
+            }
+            activeTimedEffects.push(eff);
+        }
+        renderActiveEffects(); updateAll(); saveLocalStorage(); renderSupernaturalStatusPlayer();
+    };
+
+    // ----- Окаменение (Носитель тьмы): круг неуязвимости; после становления личом — 2 раза в день, скорость вдвое, лечение больше -----
+    window.lichPetrify = function () {
+        if (!lichPerk('bearer')) return;
+        const maxUses = lichStage() >= 1 ? 2 : 1, used = parseInt(powersUsedToday.lich_petrify) || 0;
+        if (used >= maxUses) { alert(`«Окаменение» уже использовано сегодня (${used}/${maxUses}).`); return; }
+        if (!combatActionAllowed('item')) return;
+        markCombatAction('attack'); // тратит действие хода: в этот ход нельзя больше ничего
+        powersUsedToday.lich_petrify = used + 1;
+        const heal = lichStage() >= 1 ? 10 : 5;
+        pushOrRefreshTimedEffect({ id: 'eff-petrify-' + Date.now().toString(36), name: 'Окаменение', effectName: 'Окаменение', turnsRemaining: 1, perRound: true, hp: 0, mp: 0, value: 0,
+            regenHp: heal, regenMp: heal, powerFlag: 'petrify',
+            description: `🧊 Покрыт льдом на 1 круг: неуязвим к любому урону и магическим эффектам врагов, скорость ${lichStage() >= 1 ? 'вдвое меньше' : '0'}, атаковать нельзя. В ход каждого существа +${heal} ХП и маны.` });
+        renderActiveEffects(); updateAll(); saveLocalStorage(); renderSupernaturalStatusPlayer();
+        lichLog(`🧊 ${(document.getElementById('char-name') || {}).value || 'Игрок'} покрывается льдом («Окаменение»): неуязвим на круг.`);
+    };
+    // ----- Клинок морозного огня (Вестник смерти): 80 маны, 3 круга +10 огня и +10 холода к каждому удару -----
+    window.lichBlade = function () {
+        if (!lichPerk('herald')) return;
+        if (!combatActionAllowed('item')) return;
+        if (!lichSpendMana(80)) return;
+        markCombatAction('attack');
+        pushOrRefreshTimedEffect({ id: 'eff-lichblade-' + Date.now().toString(36), name: 'Клинок морозного огня', effectName: 'Клинок морозного огня', lichBlade: true, turnsRemaining: 3, perRound: true, hp: 0, mp: 0, value: 0,
+            description: '🔥❄️ Удары оружием наносят ещё 10 урона огнём и 10 урона холодом (перки огня и льда усиливают, как у заклинаний). 3 круга.' });
+        renderActiveEffects(); updateAll(); saveLocalStorage(); renderSupernaturalStatusPlayer();
+    };
+    function lichBladeExtras(list) {
+        const e = (activeTimedEffects || []).find(x => x && x.lichBlade && lichEffectActive(x)); if (!e) return '';
+        const pb = window.perkBonuses || {};
+        const f = Math.round(10 * (1 + (pb.fireSpellBonus || 0) / 100)), c = Math.round(10 * (1 + (pb.frostSpellBonus || 0) / 100));
+        list.push({ type: 'fire', dmg: f, label: '🔥 Клинок морозного огня (огонь)' }, { type: 'frost', dmg: c, label: '❄️ Клинок морозного огня (холод)' });
+        return ` (🔥❄️ Клинок: +${f} огнём и +${c} холодом)`;
+    }
+    // ----- переключатели -----
+    function lichGrantPerk(id) {
+        const def = (window.LICH_PERKS || []).find(p => p.id === id); if (!def) return '';
+        if (!playerSupernaturalState) playerSupernaturalState = { lycanthropy: false, vampirism: false, werewolf: { heartsEaten: 0, totem: '— нет —', hasTransformedToday: false, transformsToday: 0, isTransformed: false }, vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 } };
+        const s = playerSupernaturalState;
+        if (s.vampirism || s.lycanthropy) { alert('Перк ветки не взят: вампиризм и ликантропия несовместимы с пактом.'); return ''; }
+        const l = s.lich || (s.lich = window.lichDefault());
+        if (l.perks[id]) return '';
+        if ((characterLevel || 1) < def.level) { alert(`Перк «${def.name}» не взят: нужен ${def.level}-й уровень.`); return ''; }
+        if (def.prereq && !l.perks[def.prereq]) { alert(`Перк «${def.name}» не взят: сначала нужен предыдущий перк ветки.`); return ''; }
+        if (perkPointsAvailable <= 0) { alert(`Перк «${def.name}» не взят: нет свободного очка перков.`); return ''; }
+        perkPointsAvailable -= 1;
+        l.perks[id] = true;
+        lichAfterStateChange();
+        saveSupernaturalStatePlayer(); renderSupernaturalStatusPlayer();
+        return `перк ветки «${def.name}»`;
+    }
+    // Правки мастера: снять перк, задать стадию, поправить флаги, сбросить ветку целиком.
+    function lichAdminOp(c) {
+        if (!playerSupernaturalState) return '';
+        const s = playerSupernaturalState;
+        const l = s.lich || (s.lich = window.lichDefault());
+        const order = (window.LICH_PERKS || []).map(p => p.id);
+        let msg = '';
+        if (c.op === 'revoke') {
+            const i = order.indexOf(c.perk); if (i < 0 || !l.perks[c.perk]) return '';
+            order.slice(i).forEach(id => { if (l.perks[id]) { l.perks[id] = false; perkPointsAvailable += 1; } }); // false, а не delete: сохранение идёт merge-ом, и удалённый ключ вернулся бы из облака
+            if (!l.perks.visage) l.stage = 0;
+            msg = 'перки ветки лича сняты';
+        } else if (c.op === 'stage') {
+            const st = Math.max(0, Math.min(2, parseInt(c.stage) || 0));
+            if (st >= 1 && !l.perks.visage) return '';
+            l.stage = st; l.resReady = true; l.weakened = false; l.phylactery = 'intact'; l.daysSinceRes = 0;
+            msg = st ? `становление: ${st === 1 ? 'низший' : 'высший'} лич` : 'лич снова рыцарь смерти';
+        } else if (c.op === 'set' && c.patch && typeof c.patch === 'object') {
+            ['resReady', 'weakened', 'phylactery', 'sacrificeCd', 'daysSinceRes', 'soulsOffered'].forEach(k => { if (k in c.patch) l[k] = c.patch[k]; });
+            msg = 'состояние лича изменено мастером';
+        } else if (c.op === 'reset') {
+            const wasPerks = Object.keys(l.perks);
+            wasPerks.forEach(id => { if (l.perks[id]) perkPointsAvailable += 1; });
+            s.lich = window.lichDefault();
+            wasPerks.forEach(id => { s.lich.perks[id] = false; }); // см. выше: merge не умеет удалять ключи
+            msg = 'ветка лича сброшена';
+        } else return '';
+        _lichSig = ''; lichAfterStateChange();
+        saveSupernaturalStatePlayer(); renderSupernaturalStatusPlayer();
+        return msg;
+    }
+    window.lichToggleShadows = function () { const l = snLich(); if (!l) return; l.shadows = !l.shadows; lichSave(); };
+    window.lichToggleVision = function () { const l = snLich(); if (!l) return; l.vision = !l.vision; lichSave(); };
+    // ----- Удар теней и Жатва душ: добивающий удар -----
+    function lichShadowCap() { return Math.min(10, Math.floor(getEffectiveSkillValue('Колдовство') / 25)); } // 1 тень за каждые 25 Колдовства (договорённость 2026-10-30)
+    function lichOnKill(enemy, viaWeapon, slot) {
+        const l = snLich(); if (!l || !enemy) return '';
+        let msg = '';
+        if (lichPerk('herald')) { // за каждые 10 убийств заряд зачарования оружия +1 день
+            l.kills = (parseInt(l.kills) || 0) + 1;
+            if (l.kills % 10 === 0) {
+                const wId = equippedSlots.meleeWeapon, w = wId ? playerInventory.find(i => i.itemId === wId) : null;
+                if (w && w.enchantment && Object.prototype.hasOwnProperty.call(w, 'chargeDaysLeft') && !w.isStaff) { w.chargeDaysLeft = (w.chargeDaysLeft || 0) + 1; msg += ` ⚡ ${l.kills} убийств: зачарование «${w.name}» перезаряжено на 1 день.`; }
+                else msg += ` ⚡ ${l.kills} убийств: зачарование оружия перезаряжается на 1 день (мастер отмечает).`;
+            }
+            saveSupernaturalStatePlayer();
+        }
+        if (viaWeapon && lichPerk('visage') && l.shadows !== false) {
+            const meta = getEnemyMeta(enemy), nm = String(enemy.name || '');
+            const banned = meta.kind === 'automaton' || /атронах|дракон/i.test(nm) || enemy.boss || enemy.isBoss || /босс/i.test(String(enemy.category || ''));
+            if (!banned) {
+                const cap = lichShadowCap(), have = (activeSummons || []).filter(x => x && x.category === 'shadow').length;
+                if (cap <= 0) msg += ' 👤 Тень не поднялась: нужно Колдовство 25+.';
+                else if (have >= cap) msg += ` 👤 Теней уже ${have}/${cap}.`;
+                else {
+                    const hp = Math.max(1, Math.round((parseInt(enemy.maxHp) || parseInt(enemy.hp) || 20) / 2)), dm = Math.max(1, Math.round((parseInt(enemy.weaponDmg) || parseInt(enemy.dmg) || 10) / 2));
+                    const r = performSummon({ category: 'shadow', name: 'Тень: ' + nm.replace(/\s*\(ур\..*$/, ''), hpBase: hp, dmgBase: dm, durBase: 10, speed: parseInt(enemy.speed) || 30, permanent: false }, false, { noCap: true });
+                    msg += r.ok ? ` 👤 Восстаёт тень (${hp} ХП, урон ${dm}, 10 ходов), ${have + 1}/${cap}.` : '';
+                }
+            }
+        }
+        return msg;
+    }
+    // ----- Тёмное жертвоприношение, воскрешение -----
+    function lichBlackGemName() { return (typeof soulFilledGemName === 'function') ? soulFilledGemName('black') : 'Заполненный чёрный камень душ'; }
+    window.lichSacrifice = function () {
+        const l = snLich(); if (!l || lichStage() < 1) return;
+        if ((parseInt(l.sacrificeCd) || 0) > 0) { alert(`Камень душ ускоряет восстановление не чаще раза в 3 дня — подожди ещё ${l.sacrificeCd} дн.`); return; }
+        if (l.resReady && !l.weakened) { alert('«Воскрешение» заряжено и ты не ослаблен — жертвовать нечего.'); return; }
+        if (l.phylactery === 'destroyed') { alert('Филактерия разрушена — сначала её восстанавливают (5 заполненных чёрных камней, ритуал мастера).'); return; }
+        const gem = lichBlackGemName();
+        if (countInInventory(gem) <= 0) { alert(`Нужен «${gem}» в инвентаре.`); return; }
+        if (!confirm('Принести чёрную душу в жертву у филактерии? Камень расходуется, «Воскрешение» заряжается сразу, ослабление снимается.')) return;
+        removeFromInventoryByName(gem, 1);
+        l.resReady = true; l.weakened = false; l.sacrificeCd = 3; l.daysSinceRes = 0;
+        renderInventoryList(); lichSave();
+        lichLog(`🕯 ${(document.getElementById('char-name') || {}).value || 'Игрок'} совершает «Тёмное жертвоприношение»: «Воскрешение» заряжено.`);
+    };
+    // Вызывается из checkDeath: ХП упали до нуля. true — лич воскрес и жизнь не потрачена.
+    function lichTryResurrect() {
+        const l = snLich();
+        if (!l || lichStage() < 1 || !l.resReady || l.phylactery === 'destroyed') return false;
+        const maxHp = parseInt(document.getElementById('max-hp').value) || 1;
+        document.getElementById('cur-hp').value = Math.max(1, Math.ceil(maxHp / 2));
+        l.resReady = false; l.weakened = true; l.daysSinceRes = 0;
+        activeTimedEffects = (activeTimedEffects || []).filter(e => !(e && e.lichMask === 'illusion'));
+        lichSave(); updateVitalBars();
+        const nm = (document.getElementById('char-name') || {}).value || 'Лич';
+        lichLog(`💀 ${nm} падает, но душа возвращается из филактерии: воскрес с половиной здоровья, «ослабленный лич» (−2 ко всем характеристикам до длительного отдыха).`);
+        alert('💀 Филактерия возвращает тебя: ХП — половина максимума, статус «ослабленный лич» (−2 ко всем характеристикам до длительного отдыха). Жизнь не потрачена.');
+        return true;
+    }
+    // Длительный отдых («Следующий день»)
+    function lichDayTick() {
+        const l = snLich(); if (!l) return false;
+        let changed = false;
+        if (l.weakened) { l.weakened = false; changed = true; }
+        if (!l.resReady && l.phylactery !== 'destroyed') { l.daysSinceRes = (parseInt(l.daysSinceRes) || 0) + 1; if (l.daysSinceRes >= 7) { l.resReady = true; l.daysSinceRes = 0; } changed = true; }
+        if ((parseInt(l.sacrificeCd) || 0) > 0) { l.sacrificeCd -= 1; changed = true; }
+        const mk = (activeTimedEffects || []).find(e => e && e.lichMask === 'borrowed');
+        if (mk) { mk.hoursLeft = (parseInt(mk.hoursLeft) || 0) - 24; if (mk.hoursLeft <= 0) activeTimedEffects = activeTimedEffects.filter(e => e !== mk); changed = true; }
+        return changed;
+    }
+    // ----- Маска жизни -----
+    const LICH_GEM_HOURS = { petty: 4, lesser: 8, common: 12, greater: 24, grand: 48, black: 48 };
+    window.lichMask = function (kind) {
+        const l = snLich(); if (!l) return;
+        if (lichMaskKind()) { // повторное нажатие — снять
+            activeTimedEffects = activeTimedEffects.filter(e => !(e && e.lichMask)); renderActiveEffects(); updateAll(); saveLocalStorage(); renderSupernaturalStatusPlayer(); return;
+        }
+        if (kind === 'illusion') {
+            if (!lichPerk('visage')) return;
+            if (!combatActionAllowed('cast')) return;
+            if (!lichSpendMana(60)) return;
+            markCombatAction('cast');
+            pushOrRefreshTimedEffect({ id: 'eff-lichmask-' + Date.now().toString(36), name: 'Иллюзорная маска', effectName: 'Иллюзорная маска', lichMask: 'illusion', turnsRemaining: Infinity, hp: 0, mp: 0, value: 0,
+                description: '🎭 Одна сцена (около часа): проверки на распознание нежити — против навыка Иллюзии вместо Красноречия; репутация без штрафа. Спадает, если получишь урон или колдуешь заклинание другой школы. Холод и неприятный взгляд остаются: штрафы к убеждению и красноречию не снимаются.' });
+        } else {
+            if (lichStage() < 1) return;
+            if (!combatActionAllowed('cast')) return;
+            const names = Object.keys(LICH_GEM_HOURS), have = names.filter(k => countInInventory(soulFilledGemName(k)) > 0);
+            if (!have.length) { alert('Нужен заполненный камень душ в инвентаре.'); return; }
+            const ans = prompt('Какой заполненный камень истратить?\n' + have.map((k, i) => `${i + 1} — ${soulFilledGemName(k)} (${LICH_GEM_HOURS[k]} ч)`).join('\n'), '1');
+            const n = parseInt(ans); if (isNaN(n) || n < 1 || n > have.length) return;
+            const k = have[n - 1];
+            markCombatAction('cast');
+            removeFromInventoryByName(soulFilledGemName(k), 1); renderInventoryList();
+            pushOrRefreshTimedEffect({ id: 'eff-lichmask-' + Date.now().toString(36), name: 'Заёмная жизнь', effectName: 'Заёмная жизнь', lichMask: 'borrowed', hoursLeft: LICH_GEM_HOURS[k], turnsRemaining: Infinity, hp: 0, mp: 0, value: 0,
+                description: `🫀 На ${LICH_GEM_HOURS[k]} ч ты «живой» для заклинания «Обнаружение жизни»: пульс и тепло. Проверки на распознание — против Колдовства с бонусом +5. Пока действует, нет регенерации и иммунитета к ядам и болезням. Урон маску не снимает.` });
+        }
+        renderActiveEffects(); updateAll(); saveLocalStorage(); renderSupernaturalStatusPlayer();
+    };
+    var _lichLastHp = null;
+    function lichWatchHp(hp) { // Иллюзорная маска спадает от урона
+        if (_lichLastHp !== null && hp < _lichLastHp && lichMaskKind() === 'illusion') {
+            activeTimedEffects = activeTimedEffects.filter(e => !(e && e.lichMask === 'illusion')); renderActiveEffects(); renderSupernaturalStatusPlayer(); alertSafe('🎭 Иллюзорная маска спала: ты получил урон.');
+        }
+        _lichLastHp = hp;
+    }
+
+    // Лич не ест и не лечится зельями здоровья. true — использование заблокировано.
+    function lichBlocksUse(item, isFood) {
+        if (lichStage() < 1) return false;
+        if (isFood) { alert('Лич не нуждается в еде: баффы еды на нём не работают.'); return true; }
+        const txt = String((item && item.name) || '') + ' ' + String((item && item.effect) || '') + ' ' + JSON.stringify((item && item.alchemyEffects) || '');
+        if (/(восстановлени[ея]|лечени[ея]|исцелени[ея])[^.\n]{0,24}здоровья|зелье\s+(лечения|здоровья)/i.test(txt) && !/урон здоровью/i.test(txt.replace(/Восстановление здоровья/g, 'Восст'))) {
+            alert('Лич — нежить: зелья здоровья и лечение Восстановлением на него не действуют.'); return true;
+        }
+        return false;
+    }
+    // ----- панель на листе -----
+    function lichStatusHtml() {
+        const l = snLich(); if (!l || !(lichPerk('pact') || l.stage)) return '';
+        const st = l.stage | 0, nPerks = window.LICH_PERKS.filter(p => l.perks[p.id]).length;
+        const title = st >= 2 ? 'Высший лич' : st === 1 ? 'Низший лич' : 'Рыцарь смерти';
+        const aura = lichAuraId();
+        const used = parseInt(powersUsedToday.lich_petrify) || 0, maxUses = st >= 1 ? 2 : 1;
+        const btn = (cls, fn, txt, extra) => `<button class="${cls}" style="width:auto; padding:3px 8px; font-size:12px; margin:2px 3px 0 0;" onclick="${fn}" ${extra || ''}>${txt}</button>`;
+        let h = `<div class="party-row"><div class="row-name"><strong>💀 ${title}</strong><span>Перков ветки: ${nPerks}/4${l.weakened ? ' · ⚠ ослабленный (−2 ко всем хар-кам)' : ''}</span></div>`;
+        h += `<div style="font-size:12px; opacity:.85;">Вера — Идеальные Повелители: боги, храмы, алтари и амулеты богов недоступны. Нельзя стать вампиром или оборотнем.</div>`;
+        h += '<div style="margin-top:4px; font-size:12px;"><strong>Ауры</strong> (одна за раз):</div>';
+        Object.keys(LICH_AURAS).forEach(id => { const A = LICH_AURAS[id]; if (lichPerk(A.perk)) h += btn(aura === id ? 'btn-danger' : 'btn-success', `lichToggleAura('${id}')`, `${A.icon} ${A.name}${aura === id ? ' — вкл' : ''}`); });
+        h += '<div style="margin-top:6px; font-size:12px;"><strong>Способности</strong>:</div>';
+        if (lichPerk('bearer')) h += btn('btn-success', 'lichPetrify()', `🧊 Окаменение (${used}/${maxUses} сегодня)`);
+        if (lichPerk('herald')) h += btn('btn-success', 'lichBlade()', '🔥❄️ Клинок морозного огня (80 маны)');
+        if (lichPerk('visage')) h += btn(l.shadows !== false ? 'btn-success' : '', 'lichToggleShadows()', `👤 Удар теней: ${l.shadows !== false ? 'вкл' : 'выкл'} (до ${lichShadowCap()})`);
+        if (st >= 1) h += btn(l.vision ? 'btn-success' : '', 'lichToggleVision()', `👁 Зрение невидимого: ${l.vision ? 'вкл' : 'выкл'}`);
+        if (lichPerk('visage') || st >= 1) {
+            const mk = lichMaskKind();
+            h += '<div style="margin-top:6px; font-size:12px;"><strong>Маска жизни</strong>' + (mk ? ' — действует: ' + (mk === 'illusion' ? 'Иллюзорная маска' : 'Заёмная жизнь') : '') + ':</div>';
+            if (mk) h += btn('btn-danger', "lichMask('')", 'Снять маску');
+            else {
+                if (lichPerk('visage')) h += btn('btn-success', "lichMask('illusion')", '🎭 Иллюзорная маска (60 маны)');
+                if (st >= 1) h += btn('btn-success', "lichMask('borrowed')", '🫀 Заёмная жизнь (камень душ)');
+            }
+        }
+        if (st >= 1) {
+            h += `<div style="margin-top:6px; font-size:12px;"><strong>Филактерия</strong>: ${l.phylactery === 'destroyed' ? '<span style="color:#e74c3c;">разрушена</span>' : 'цела'} · «Воскрешение»: ${l.resReady ? '<span style="color:#2ecc71;">заряжено</span>' : `восстановится через ${Math.max(0, 7 - (parseInt(l.daysSinceRes) || 0))} дн.`}</div>`;
+            h += btn('', 'lichSacrifice()', '🕯 Тёмное жертвоприношение (чёрный камень душ)', (l.resReady && !l.weakened) ? 'disabled' : '');
+        }
+        const checks = [];
+        if (lichPerk('visage')) checks.push('+5 угрозы и запугивание, −10 убеждение, −5 красноречие (Красноречие уже уменьшено на листе)');
+        if (st >= 1) checks.push('ещё +5 угрозы и запугивание, −5 убеждение; репутация не бывает положительной');
+        if (checks.length) h += `<div style="margin-top:6px; font-size:12px; opacity:.85;">Проверки: ${checks.join('; ')}.</div>`;
+        if (lichPerk('visage') && st === 0) h += '<div style="margin-top:4px; font-size:12px; color:#e6b800;">📜 Открыт квест на становление низшим личом (его ведёт мастер): 10 заполненных чёрных камней душ невинных, филактерия превосходства.</div>';
+        if (st >= 1) h += '<div style="margin-top:4px; font-size:12px; opacity:.8;">Нежить: уязвим к электричеству +25%, серебру +50%, атакующим заклинаниям Восстановления +50%; не лечится Восстановлением и зельями здоровья, еда не действует. «Некролечение на себя» (Колдовство) — лечит. Раскрытие и «Охота на лича» ведёт мастер.</div>';
+        return h + '</div>';
+    }
+
     const LORD_PERKS = [
         { name: 'Сила Могилы', prereq: [], desc: '+50 здоровья и магии в форме вампира-лорда.' },
         { name: 'Хватка вампира', prereq: [['Сила Могилы']], desc: 'Магия крови (1 очко): придушить живое существо с < 10% здоровья.' },
@@ -14080,6 +14420,7 @@ window.toggleSkillPanel = function (idx) {
         const full = liveSpellDesc(spell);
         const p = parseControlTextParams(full, enhanced);
         const out = { kindFail: false, levelFail: false, reason: '', notes: [], maxLevel: p.maxLevel, turns: p.turns, meta: null };
+        if (out.turns && lichPerk('bearer') && /Проклят|Хрупкость/.test(name)) out.turns = Math.ceil(out.turns * 1.25); // «Носитель тьмы»: проклятия Колдовства на 25% дольше
         let affects = 'living';
         if (/нежит/i.test(name)) affects = 'undead';
         else if (/даэдр/i.test(name)) affects = 'daedra';
@@ -14141,9 +14482,9 @@ window.toggleSkillPanel = function (idx) {
         return { n: tier, sum: r.sum, rolls: r.rolls };
     }
     // Весь расчёт урона заклинания: бонус огня, баффы силы заклинаний, боги, усиление навыка, Шеогорат.
-    function computeSpellDamage(spellName, school, baseDmg) {
+    function computeSpellDamage(spellName, school, baseDmg, forceType) {
         const spellPowerPct = (typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0;
-        const dmgType = detectDmgTypeFromName(spellName);
+        const dmgType = forceType || detectDmgTypeFromName(spellName);
         const fire = fireRankDice(spellName, school, dmgType);
         const gsp = getGearSpecialBonuses();
         // Роба разрушения: «добавляет 1д6 к горению» — к огненным заклинаниям Разрушения.
@@ -14594,6 +14935,7 @@ window.nextDay = function () {
             if (playerSupernaturalState.werewolf.isTransformed) { playerSupernaturalState.werewolf.isTransformed = false; playerSupernaturalState.werewolf.hoursLeft = 0; snClearBoundSummons('werewolf'); } // длительный отдых — облик спадает
             changed = true;
         }
+        if (lichDayTick()) changed = true;
         if (changed) {
             saveSupernaturalStatePlayer();
             renderSupernaturalStatusPlayer();
@@ -14601,7 +14943,7 @@ window.nextDay = function () {
     }
 
     // Голод: если сегодня не ели — счётчик растёт. В тюрьме кормят — голод не растёт.
-    if (!inJailNow()) daysWithoutFood += 1;
+    if (!inJailNow() && lichStage() < 1) daysWithoutFood += 1; // лич не ест и не голодает
     try { if (typeof renderTrainSection === 'function') renderTrainSection(); } catch (e) { }
 
     renderStaffList();
@@ -14638,6 +14980,7 @@ window.eatAnyFood = function (itemId) {
         return;
     }
     if (snWerewolfForm()) { alert('В облике зверя нельзя есть обычную еду — оборотень лечится только пожиранием трупов.'); return; }
+    if (lichBlocksUse(item, true)) return;
     if (!combatActionAllowed('item')) return; // в бою поесть — основное действие хода (Немота не мешает)
     markCombatAction('attack');
 
@@ -14689,6 +15032,7 @@ function updateHungerPenalty() {
 
     window.rollPlayerAttack = function () {
         if (isPowerFlagActive('mist')) { alert('В туманной форме нельзя ни наносить, ни получать урон — атаковать нельзя.'); return; }
+        if (isPowerFlagActive('petrify')) { alert('Ты окаменел: этот круг нельзя ни атаковать, ни колдовать.'); return; }
         if (iAmPlayingBallad()) { alert('Ты играешь «Бардовскую балладу» и не можешь атаковать. Закончи песню во вкладке «Заклинания» → «Особые способности».'); return; }
         const targetId = document.getElementById('attack-target-select').value;
         let actionVal = document.getElementById('attack-action-select').value;
@@ -14783,6 +15127,7 @@ function updateHungerPenalty() {
                 if (ign) { penetrationPct += ign; }
             }
             trueDmgNow = calc.trueDmg || 0;
+            if (lichAuraId() === 'rage') penetrationPct += 5; // «Багровая ярость»: +5% игнорирования брони
             actionLabel = (actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием') + sneakNote;
             const spiritE = getActiveWeaponSpirit(actionVal);
             if (spiritE) {
@@ -14889,10 +15234,20 @@ function updateHungerPenalty() {
             curMpEl.value = curMp - finalCost;
             updateVitalBars();
             saveLocalStorage();
-            const cd = computeSpellDamage(spell.name, spell.school, baseDmg);
+            let lichHalf2 = null;
+            const lichDual = window.LICH_DUAL && window.LICH_DUAL[spell.name];
+            if (lichDual) { // заклинание лича: две половины урона (огонь + холод), у каждой своя стихия и свой перк стихии
+                const segL = splitSpellDescByEnhancement(liveSpellDesc(spell))[enhancedCast ? 'enhanced' : 'base'] || liveSpellDesc(spell);
+                const h1 = parseInt((segL.match(/(\d+)\s*урона\s+огн/i) || [])[1]) || baseDmg, h2 = parseInt((segL.match(/(\d+)\s*урона\s+холод/i) || [])[1]) || h1;
+                baseDmg = h1;
+                lichHalf2 = computeSpellDamage(spell.name, spell.school, h2, lichDual[1]);
+            }
+            const cd = computeSpellDamage(spell.name, spell.school, baseDmg, lichDual ? lichDual[0] : undefined);
             const spellPowerPct = cd.spellPowerPct;
             dmg = cd.dmg;
             dmgType = cd.dmgType;
+            if (lichHalf2) extraElem = { name: spell.name + ' (холод)', type: lichDual[1], dmg: lichHalf2.dmg, count: 1, icon: '❄️', logText: `❄️ «${spell.name}» (холод): урон ${lichHalf2.dmg}` };
+            if (spell.school !== 'illus' && lichMaskKind() === 'illusion') { activeTimedEffects = activeTimedEffects.filter(e => !(e && e.lichMask === 'illusion')); renderActiveEffects(); alertSafe('🎭 Иллюзорная маска спала: ты колдуешь заклинание другой школы.'); }
             spellPerkInfo = { school: spell.school, dmgType: cd.dmgType, dual: !!enhancedCast };
             // «Некромаг»: ВСЕ заклинания вдвое эффективнее против нежити (раньше — только Восстановление).
             if ((window.perkBonuses || {}).necromage && getEnemyMeta(target).kind === 'undead') { dmg *= 2; rangeNote += ' (☠ «Некромаг»: ×2 против нежити)'; }
@@ -15031,6 +15386,7 @@ function updateHungerPenalty() {
         const tgtSt = Array.isArray(target.statusEffects) ? target.statusEffects : [];
         const tgtPoisoned = tgtSt.some(x => /^яд/i.test(String(x.source || '')) || /яд|отравл/i.test(String(x.name || '')));
         const godExtra = []; // доп. удары своей стихией после основного: {type, dmg, label, pen, heal}
+        if (dmg && (actionVal === 'melee' || actionVal === 'ranged')) actionLabel += lichBladeExtras(godExtra); // «Клинок морозного огня»
         let uniqueKillMp = 0; // «убийство +N маны» (Рубиновый Тронный Кинжал)
         if (dmg && isWeaponAtk) {
             if (gb('fireWeaponDmg')) godExtra.push({ type: 'fire', dmg: gb('fireWeaponDmg'), label: '🔥 Мерунес Дагон: огонь' });
@@ -15439,10 +15795,11 @@ function updateHungerPenalty() {
                 }
                 if (res.killed && res.enemy) healMsg += soulEaterKill(res.enemy);
                 if (res.killed && res.enemy) healMsg += lordCountKill(res.enemy);
+                if (res.killed && res.enemy) healMsg += lichOnKill(res.enemy, !!attackWeaponSlot, attackWeaponSlot);
                 if (res.killed && counterHits[attackTargetId]) { delete counterHits[attackTargetId]; saveLocalStorage(); }
                 if (res.killed && lordXNow && lordXNow.healKill) { snLordKillHeal('убийство'); healMsg += ' 🩸 Лечение кровью: +50% ХП.'; }
                 // Зачарование «Захват души» / «Похититель душ»: добивающий удар оружием забирает душу бесплатно.
-                if (res.killed && attackWeaponSlot && weaponHasSoulTrap(attackWeaponSlot) && !res.enemy.soulTaken && !soulTakenLocal[res.enemy.id]) {
+                if (res.killed && attackWeaponSlot && (weaponHasSoulTrap(attackWeaponSlot) || lichPerk('bearer')) && !res.enemy.soulTaken && !soulTakenLocal[res.enemy.id]) {
                     const sz = resolveSoulSize(res.enemy);
                     const rW = (sz && sz !== 'none') ? trapSoul(res.enemy, 'weapon', { size: sz }) : { message: sz === 'none' ? `У «${res.enemy.name}» нет души.` : 'Размер души не указан — душа ускользнула.' };
                     soulMsg = '\n' + rW.message;
@@ -15775,7 +16132,8 @@ function updateHungerPenalty() {
         { const sb = getSignStatBonuses(sign); str += sb.str || 0; dex += sb.dex || 0; con += sb.con || 0; intel += sb.int || 0; wis += sb.wis || 0; cha += sb.cha || 0; } // «Маг»/«Тень» — одна характеристика на выбор
         (activeTimedEffects || []).forEach(e => { const b = e && e.statBonus; if (!b || !(e.turnsRemaining > 0 || e.turnsRemaining === Infinity)) return; str += b.str || 0; dex += b.dex || 0; con += b.con || 0; intel += b.int || 0; wis += b.wis || 0; cha += b.cha || 0; }); // временные бонусы к характеристикам (Кубок Хмеля)
         { const gS = getGearTextBonuses().stat; str += gS.str || 0; dex += gS.dex || 0; con += gS.con || 0; intel += gS.int || 0; wis += gS.wis || 0; cha += gS.cha || 0; } // «+3 Интеллекта» от снаряжения
-        if (snVampire()) { const vb = VAMPIRE_STAT_BONUS, vhp = vampHungerStatPenalty(); str += vb.str - vhp; dex += vb.dex - vhp; con += vb.con - vhp; cha += vb.cha - vhp; intel -= vhp; wis -= vhp; } // Вампиризм (Фракции.xlsx): +2 Хар, +1 Лов, +1 Сил
+        if (snVampire()) { const vb = VAMPIRE_STAT_BONUS, vhp = vampHungerStatPenalty(); str += vb.str - vhp; dex += vb.dex - vhp; con += vb.con - vhp; cha += vb.cha - vhp; intel -= vhp; wis -= vhp; }
+        { const lwp = lichWeakenedPenalty(); if (lwp) { str -= lwp; dex -= lwp; con -= lwp; intel -= lwp; wis -= lwp; cha -= lwp; } } // «ослабленный лич»: −2 ко всем характеристикам // Вампиризм (Фракции.xlsx): +2 Хар, +1 Лов, +1 Сил
 
         const godB = mergeGearIntoGod(getGodBonuses(god, rnk));
         window.activeGodBonuses = godB;
@@ -15892,6 +16250,7 @@ function updateHungerPenalty() {
             baseMp += activeEffectBonuses.mp;
             if (perks.restorationManaBonus) baseMp += Math.round(ownMpPool * perks.restorationManaBonus);
             if (snLordForm()) baseMp += 100; // форма вампира-лорда: +100 маны
+            baseMp += lichManaBonus(); // лич: +50 маны (низший) / +100 (высший)
             if (snLordForm() && snLordPerk('Сила Могилы')) baseMp += 50;
             document.getElementById('max-mp').value = Math.round(baseMp);
         }
@@ -16017,6 +16376,7 @@ function updateHungerPenalty() {
             maxWeight += (perks.extraCarryWeight || 0);
             if (snWerewolfForm()) maxWeight += 100; // форма вервольфа: +100 к переносимому весу
             if (snLordForm()) maxWeight += 50; // форма вампира-лорда: +50
+            if (lichStage() >= 1) maxWeight += 50; // лич: +50 к переносимому весу
             if (ridingHorse()) maxWeight += (window.PET_RIDING || {}).carry || 100; // верхом: поклажа на лошади
             // Экипированный рюкзак (слот backpack) — фиксированный бонус к грузоподъёмности,
             // не зависит от зачарования (это свойство самого предмета, не чары на нём).
@@ -16047,6 +16407,7 @@ function updateHungerPenalty() {
             if (document.getElementById('chk-bow-drawn').checked && (document.getElementById('wep-ranged-type') || {}).value === 'bow' && !isPerkChecked('Егерь')) speed -= 15;
             speed += weatherMods().speed;
             speed += equipBonuses.speed || 0; // скорость от экипировки (текстовые эффекты)
+            if (isPowerFlagActive('petrify')) speed = lichStage() >= 1 ? Math.floor(Math.max(0, speed) / 2) : 0; // «Окаменение»: скорость 0 (у лича — вдвое меньше)
             // Скорость в скрытности (Ноктюрнал) — условно, пока нет отдельного тумблера "крадусь
             // прямо сейчас", используем чекбокс скрытной атаки как показатель этого состояния.
             // Ноктюрнал: +10/15/20 фт, пока вас не видят (крадётесь — галочка скрытной атаки — или невидимы).
@@ -16098,7 +16459,7 @@ function updateHungerPenalty() {
             // Штраф брони на стоимость заклинаний (снимается перками «Боевой маг»/«Чувство маны»)
             let armorMult = 1.0;
             if (armorType === 'light' && !perks.lightArmorMageRobe) armorMult = 1.25;
-            if (armorType === 'heavy' && !hasBattleMagePerk()) armorMult = 1.75;
+            if (armorType === 'heavy' && !hasBattleMagePerk()) armorMult = lichPerk('bearer') ? 1.375 : 1.75; // «Тьма в доспехе»: штраф вдвое меньше
 
             // Скидка школы («Новичок/Ученик/Адепт/Эксперт школы Х» — -50% для заклинаний этого ранга)
             let schoolMult = 1.0;
@@ -16418,6 +16779,8 @@ function updateHungerPenalty() {
         if (!el || el.value === '') return;
         const hp = parseInt(el.value);
         if (isNaN(hp)) return;
+        try { lichWatchHp(hp); } catch (e) { }
+        if (hp <= 0 && !deathState.fallen && lichTryResurrect()) return; // лич с целой филактерией воскресает, жизнь не тратится
         if (hp <= 0 && !deathState.fallen) {
             deathState.fallen = true; deathState.minimized = false;
             _dLog('⚰️ ' + _dName() + ' падает без сил (0 ХП). Свободных жизней: ' + _dLives() + '.');
@@ -16833,8 +17196,10 @@ function updateHungerPenalty() {
             lycanthropy: !!data.supernaturalState.lycanthropy,
             vampirism: !!data.supernaturalState.vampirism,
             werewolf: Object.assign({ heartsEaten: 0, totem: '— нет —', hasTransformedToday: false, transformsToday: 0, isTransformed: false }, data.supernaturalState.werewolf || {}),
-            vampire: (function (v) { if (v.lordPerksLegacy === undefined) v.lordPerksLegacy = Object.keys(v.lordPerks || {}).filter(k => v.lordPerks[k]).length; return v; })(Object.assign({ hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 }, data.supernaturalState.vampire || {}))
+            vampire: (function (v) { if (v.lordPerksLegacy === undefined) v.lordPerksLegacy = Object.keys(v.lordPerks || {}).filter(k => v.lordPerks[k]).length; return v; })(Object.assign({ hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 }, data.supernaturalState.vampire || {})),
+            lich: (window.lichNormalize || (x => null))(data.supernaturalState.lich)
         } : null;
+        try { lichAfterStateChange(); } catch (e) { console.error('Лич:', e); }
         if (!_gmSame && typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
         // Оборотень-трансформация меняет боевой расчёт (когти вместо оружия) — если изменилась,
         // нужен полный пересчёт, не только собственный рендер статуса.
@@ -17478,6 +17843,10 @@ function updateHungerPenalty() {
                 } else if (c.type === 'petHp') {
                     const m = applyPetHpDelta(c.petId, parseInt(c.delta) || 0);
                     if (m) msgs.push(m);
+                } else if (c.type === 'lichPerk' && c.perk) { // мастер выдал перк ветки «Рыцарь смерти» после ритуала
+                    const lm = lichGrantPerk(c.perk); if (lm) msgs.push(lm);
+                } else if (c.type === 'lichAdmin' && c.op) { // остальные действия мастера с веткой лича
+                    const lm = lichAdminOp(c); if (lm) msgs.push(lm);
                 } else if (c.type === 'quest' && c.quest && c.quest.id) { // мастер выдал квест — кладём в лист (раньше его стирало автосохранение)
                     if (!playerQuests.some(q => q.id === c.quest.id)) { playerQuests.push(c.quest); msgs.push(`квест «${c.quest.title}»`); }
                     if (typeof renderQuestList === 'function') renderQuestList();
@@ -17649,6 +18018,7 @@ function updateHungerPenalty() {
         data = sanitizeSaveShape(data);
         data = applyItemRenames(data);
         data = migrateLevelScheme(data);
+        try { if (data.supernaturalState && data.supernaturalState.lich && window.lichInjectSpells) window.lichInjectSpells(window.lichNormalize(data.supernaturalState.lich)); } catch (e) { }
         // Таблица алхимии сменилась (другие свойства ингредиентов) — один раз сбрасываем изученные свойства и рецепты:
         // старые знания относились к другой таблице. Предметы, зелья и яды в инвентаре остаются.
         const alchVer = window.ALCHEMY_RULES_VERSION || 1;
@@ -17973,6 +18343,8 @@ function updateHungerPenalty() {
             knownSmithingRecipes = Array.isArray(data.knownSmithingRecipes) ? data.knownSmithingRecipes : [];
             renderSmithingList();
 
+            // Лич: положенные заклинания ветки — в книгу (после того, как карточки заклинаний восстановлены), вера — Идеальные Повелители.
+            try { _lichSig = ''; lichAfterStateChange(); } catch (e) { console.error('Лич:', e); }
             // Пересчитываем все производные значения (HP/MP/броня/вес/панель прокачки и т.д.)
             // заново с уже восстановленными данными — раньше это могло остаться на дефолтных
             // значениях, если персонаж подгружался асинхронно из облака.

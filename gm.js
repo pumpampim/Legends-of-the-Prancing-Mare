@@ -3173,7 +3173,8 @@
         return {
             lycanthropy: false, vampirism: false,
             werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, transformsToday: 0, isTransformed: false },
-            vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {} }
+            vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {} },
+            lich: null
         };
     }
 
@@ -3970,10 +3971,70 @@
                 <p style="font-size:12px; opacity:.75; margin-top:6px;">Пока стоит галочка «Вампиризм»: +2 Хар, +1 Лов, +1 Сил, холод +50%, яды/болезни — иммунитет, огонь −50%, ×2 урон днём; бесплатные заклинания «Вампирское высасывание» и «Подъём сильного трупа». Рангов у обычных вампиров нет.</p>
                 <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp-lord" ${s.vampire.isLord ? 'checked' : ''} onchange="toggleVampireLord(this.checked)"><label for="sn-vamp-lord"><strong>Вампир-лорд</strong> (открывает игроку ветку перков вампира-лорда и форму лорда)</label></div>
                 ${s.vampire.isLord ? `<div style="font-size:12px; margin-top:4px;">Форма лорда: <strong>${s.vampire.lordForm ? 'включена' : 'выключена'}</strong> · Взято перков: ${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length}/11${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length ? '<br>' + Object.keys(s.vampire.lordPerks).filter(k => s.vampire.lordPerks[k]).map(escapeHtml).join(', ') : ''}</div>` : ''}
-            </div>`;
+            </div>
+            ${gmLichPanelHtml(s)}`;
     }
 
+    // ---------- Ветка «Рыцарь смерти (лич)» ----------
+    function gmLichPanelHtml(s) {
+        const l = s.lich;
+        const perks = window.LICH_PERKS || [];
+        const have = l ? perks.filter(p => l.perks && l.perks[p.id]) : [];
+        let h = `<div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color);"><strong>☠ Ветка лича</strong>`;
+        h += `<p style="font-size:12px; opacity:.75; margin:4px 0;">Перки выдаются после отыгранного ритуала: игрок отдаёт невинные души (чёрные камни), вы вычёркиваете их у себя и жмёте кнопку. Очко перков и уровень проверяются у игрока. Вампиризм и ликантропия несовместимы.</p>`;
+        perks.forEach(p => {
+            const owned = !!(l && l.perks && l.perks[p.id]);
+            h += `<div style="font-size:12px; margin-top:5px; opacity:${owned ? 1 : 0.85};">${owned ? '✅' : '▫️'} <strong>${escapeHtml(p.name)}</strong> (${p.level} ур., душ: ${p.souls}) — ${escapeHtml(p.desc)}<br>` +
+                (owned ? `<button class="btn-danger" style="width:auto; padding:2px 8px; margin-top:2px;" onclick="gmLichRevokePerk('${p.id}')">Снять (и следующие)</button>`
+                       : `<button class="btn-success" style="width:auto; padding:2px 8px; margin-top:2px;" onclick="gmLichGrantPerk('${p.id}')">Выдать после ритуала</button>`) + `</div>`;
+        });
+        if (have.length === 4) {
+            const st = l.stage || 0;
+            h += `<div style="margin-top:8px;"><label>Становление</label><select onchange="gmLichSetStage(this.value)">` +
+                [0, 1, 2].map(n => `<option value="${n}" ${st === n ? 'selected' : ''}>${['Рыцарь смерти', 'Низший лич', 'Высший лич'][n]}</option>`).join('') + `</select>` +
+                (window.LICH_STAGES || []).map(x => `<p style="font-size:12px; opacity:.75; margin:3px 0;"><strong>${escapeHtml(x.name)}:</strong> ${escapeHtml(x.need)}</p>`).join('') + `</div>`;
+        }
+        if (l && (have.length || l.stage)) {
+            h += `<div style="font-size:12px; margin-top:8px;">Воскрешение: <strong>${l.resReady ? 'готово' : 'использовано'}</strong> · Ослаблен: <strong>${l.weakened ? 'да' : 'нет'}</strong> · Филактерия: <strong>${escapeHtml(String(l.phylactery))}</strong> · Убийств: ${l.kills || 0}<br>` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmLichSet({resReady:true})">Вернуть воскрешение</button> ` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmLichSet({weakened:false})">Снять ослабление</button> ` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmLichSet({phylactery:'intact'})">Починить филактерию</button> ` +
+                `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmLichReset()">Сбросить ветку</button></div>`;
+        }
+        h += `<details style="margin-top:8px; font-size:12px;"><summary>🏹 Охота на лича (для мастера)</summary><p style="opacity:.85;">Лич уязвим только пока цела его филактерия-убежище: пока она цела, убитый лич восстанавливается через 7 дней. Чтобы убить его насовсем, герои находят и разбивают филактерию (место, стража и ловушки придумывает мастер), затем добивают лича. Кнопка «Починить филактерию» возвращает её в целое состояние, если решите, что игрок её восстановил.</p></details>`;
+        return h + `</div>`;
+    }
+    window.gmLichGrantPerk = function (id) {
+        if (!currentInvPlayerUid) { alert('Выбери игрока.'); return; }
+        const def = (window.LICH_PERKS || []).find(p => p.id === id); if (!def) return;
+        const s = currentSupernaturalState;
+        if (s.vampirism || s.lycanthropy) { alert('Игрок — вампир или оборотень: ветка лича ему закрыта.'); return; }
+        const lvl = (currentPlayerInvData && currentPlayerInvData.characterLevel) || 1;
+        if (lvl < def.level) { alert(`Нужен ${def.level}-й уровень, сейчас ${lvl}.`); return; }
+        if (def.prereq && !(s.lich && s.lich.perks && s.lich.perks[def.prereq])) { alert('Сначала нужен предыдущий перк ветки.'); return; }
+        if (!confirm(`Ритуал для «${def.name}» отыгран? Игрок отдал невинных душ: ${def.souls} (чёрные камни). Выдать перк (спишется 1 очко перков)?`)) return;
+        gmSendCmd({ type: 'lichPerk', perk: id }, `{p} получает перк ветки лича «${def.name}».`).then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
+    };
+    window.gmLichRevokePerk = function (id) {
+        if (!confirm('Снять этот перк и все следующие за ним? Очки перков вернутся игроку.')) return;
+        gmSendCmd({ type: 'lichAdmin', op: 'revoke', perk: id });
+    };
+    window.gmLichSetStage = function (v) {
+        const n = parseInt(v) || 0;
+        if (n && !confirm('Ритуал становления отыгран и условия выполнены?')) { renderSupernaturalPanel(); return; }
+        gmSendCmd({ type: 'lichAdmin', op: 'stage', stage: n }, n ? '{p} становится личом.' : null);
+    };
+    window.gmLichSet = function (patch) { gmSendCmd({ type: 'lichAdmin', op: 'set', patch }); };
+    window.gmLichReset = function () {
+        if (!confirm('Сбросить ветку лича целиком? Все её перки снимутся, очки вернутся.')) return;
+        gmSendCmd({ type: 'lichAdmin', op: 'reset' });
+    };
+
     window.toggleSupernaturalFlag = function (key, checked) {
+        if (checked && (key === 'vampirism' || key === 'lycanthropy') && currentSupernaturalState.lich && currentSupernaturalState.lich.perks && currentSupernaturalState.lich.perks.pact) {
+            alert('Игрок заключил тёмный пакт лича: вампиризм и ликантропия ему недоступны. Сначала снимите перки ветки лича.');
+            renderSupernaturalPanel(); return;
+        }
         currentSupernaturalState[key] = checked;
         saveSupernaturalState().then(renderSupernaturalPanel);
     };
@@ -4067,7 +4128,8 @@
                 lycanthropy: !!data.supernaturalState.lycanthropy,
                 vampirism: !!data.supernaturalState.vampirism,
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
-                vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} })
+                vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} }),
+                lich: window.lichNormalize ? window.lichNormalize(data.supernaturalState.lich) : (data.supernaturalState.lich || null)
             } : defaultSn;
             currentCrimeState = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, data.crimeState || {});
             // Снимок листа игрока приходит на каждое его сохранение — недописанная сумма штрафа и прочие поля не теряются.
@@ -5368,8 +5430,8 @@
             // Задача L: вампир получает удвоенный урон, если сейчас "День" в сессии — раньше
             // это было только текстовым предупреждением в интерфейсе, урон не менялся.
             let mistNote = '';
-            if (finalDmg && (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).some(x => x && x.powerFlag === 'mist' && x.turnsRemaining !== 0)) {
-                finalDmg = 0; mistNote = ' (🌫 туманная форма — урон не проходит)';
+            if (finalDmg && (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : []).some(x => x && (x.powerFlag === 'mist' || x.powerFlag === 'petrify') && x.turnsRemaining !== 0)) {
+                finalDmg = 0; mistNote = ' (🌫 урон не проходит: туман или окаменение)';
             }
             let sunNote = '';
             if (finalDmg && data.supernaturalState && data.supernaturalState.vampirism && lastData.timePeriod === 'День') {
