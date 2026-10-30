@@ -5,7 +5,9 @@
 // и опечатки в именах перков в builds-data.js. Код выхода 1, если найдены ошибки (не «вопросы»).
 // ============================================================================
 const fs=require('fs'), path=require('path'); const ROOT=path.resolve(__dirname,'..');
-const s=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+// Код листа игрока лежит в index.html и js/*.js (бывший один инлайн-скрипт): читаем всё вместе.
+const JSDIR=path.join(ROOT,'js');
+const s=[fs.readFileSync(path.join(ROOT,'index.html'),'utf8')].concat(fs.existsSync(JSDIR)?fs.readdirSync(JSDIR).sort().map(f=>fs.readFileSync(path.join(JSDIR,f),'utf8')):[]).join('\n');
 function grabObj(start){ let i=s.indexOf('{',start), d=0, j=i; for(;j<s.length;j++){ if(s[j]==='{')d++; else if(s[j]==='}'){d--; if(!d)break;} } return s.slice(i,j+1); }
 function grabArr(start){ let i=s.indexOf('[',start), d=0, j=i; for(;j<s.length;j++){ if(s[j]==='[')d++; else if(s[j]===']'){d--; if(!d)break;} } return s.slice(i,j+1); }
 const M=eval('('+grabObj(s.indexOf('const fullPerksManifest ='))+')');
