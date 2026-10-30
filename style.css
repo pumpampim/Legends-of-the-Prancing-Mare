@@ -2208,3 +2208,33 @@ body.st-game-ui .st-dock-tofight { display: inline-flex; margin: 0; min-height: 
 #st-fight-effects .st-dock-right { display: flex; flex-wrap: wrap; gap: 6px; }
 #st-fight-effects .st-dock-eff { padding: 4px 10px; border-radius: 14px; border: 1px solid #3c7a3f; background: rgba(20,40,22,.6); font-size: 13px; }
 .st-fight-gear-btn { width: 100%; margin: 4px 0 0; background: transparent; border: 1px dashed var(--border-bright, #8a6f3f); color: var(--text-dim, #9c8f76); text-transform: none; letter-spacing: 0; clip-path: none; }
+
+/* ===== «Сумка» иконками на телефоне (js/16-game-ui.js, этап 3, 2026-10-30) ===== */
+.st-bag-grid, .st-bag-chips { display: none; }
+body.st-game-ui #player-inventory-list { max-height: none !important; overflow: visible !important; }
+body.st-game-ui #player-inventory-list > .stat-block { display: none !important; }
+body.st-game-ui #inv-category-filter { display: none; }
+body.st-game-ui .st-bag-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; }
+.st-bag-chip { flex: 0 0 auto; width: auto; margin: 0; min-height: 32px; padding: 3px 12px; border-radius: 16px; font: 500 14px 'Barlow Condensed', sans-serif; text-transform: none; letter-spacing: .2px;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(200,165,102,.35); color: var(--text-color, #d6c9ae); clip-path: none; box-shadow: none; }
+.st-bag-chip.on { background: var(--accent-color, #c8a566); color: #1a140b; border-color: var(--accent-color, #c8a566); font-weight: 700; }
+body.st-game-ui .st-bag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; margin: 4px 0 10px; }
+.st-bag-cell { position: relative; width: auto; margin: 0; min-height: 0; aspect-ratio: 1; padding: 6px 4px 16px; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #2a2216, #0d0a05 75%); border: 1px solid #3d3220; border-radius: 10px; color: var(--accent-color, #c8a566); clip-path: none; box-shadow: none; }
+.st-bag-cell svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 1.5; filter: drop-shadow(0 0 3px rgba(0,0,0,.7)); }
+.st-bag-cell b { position: absolute; top: 3px; right: 5px; font: 700 12px 'Barlow Condensed', sans-serif; color: #fff; text-shadow: 0 1px 2px #000; }
+.st-bag-cell span { position: absolute; left: 3px; right: 3px; bottom: 2px; font: 500 10.5px/12px 'Barlow Condensed', sans-serif; color: var(--text-dim, #9c8f76); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0; }
+.st-bag-cell.eq { border-color: var(--accent-bright, #f0c87a); box-shadow: 0 0 8px rgba(240,200,122,.4); }
+.st-bag-cell:active { transform: scale(.96); }
+.st-item-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.st-item-ic { flex: 0 0 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--accent-bright, #f0c87a);
+  background: radial-gradient(circle at 50% 40%, #2a2216, #0d0a05 75%); border: 1px solid var(--accent-color, #c8a566); }
+.st-item-ic svg { width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.st-item-name { font: 600 18px 'Cinzel', Georgia, serif; color: var(--text-bright, #f2e8cf); }
+.st-item-name small { font: 600 11px 'Barlow Condensed', sans-serif; color: #1a140b; background: var(--accent-color, #c8a566); border-radius: 8px; padding: 1px 6px; vertical-align: middle; }
+.st-item-meta { font-size: 13px; color: var(--text-dim, #9c8f76); margin-top: 2px; }
+.st-item-eff { font-size: 14px; line-height: 1.35; padding: 8px 10px; margin-bottom: 10px; border-radius: 8px; background: rgba(0,0,0,.3); border: 1px solid rgba(200,165,102,.2); }
+.st-item-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.st-item-btns .st-item-btn { width: auto; margin: 0; min-height: 46px; padding: 6px 8px; font-size: 15px; border-radius: 10px; text-transform: none; letter-spacing: .2px; clip-path: none; }
+.st-item-btns .st-item-main { grid-column: 1 / -1; min-height: 52px; font-size: 17px; }
+.st-item-btns .st-item-btn:not(.btn-success):not(.btn-danger) { background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }

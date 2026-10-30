@@ -1,4 +1,4 @@
-/* ===== Игровой интерфейс для телефона, этапы 1–2 (2026-10-30) =====
+/* ===== Игровой интерфейс для телефона, этапы 1–3 (2026-10-30) =====
    Только на ширине ≤900px: пять вкладок снизу — Герой · Бой · Сумка · Магия · Ещё. Разделы и их «пилюли»
    описаны в window.stNavGroups (index.html). Служебное (аккаунт, шрифт, звук, поиск, сброс, файлы, Drive,
    снапшоты) на телефоне переезжает в «Ещё → Настройки», на компьютере возвращается на старые места.
@@ -133,8 +133,8 @@
     }
     function openSettings() { closeSheets(); settings.classList.add('open'); }
     window.stOpenSettings = openSettings;
-    function closeSheets() { more.classList.remove('open'); settings.classList.remove('open'); }
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (more.classList.contains('open') || settings.classList.contains('open'))) { e.preventDefault(); e.stopPropagation(); closeSheets(); } }, true);
+    function closeSheets() { more.classList.remove('open'); settings.classList.remove('open'); var it = el('st-item-sheet'); if (it) { it.classList.remove('open'); it._id = null; } }
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.querySelector('.st-sheet-wrap.open')) { e.preventDefault(); e.stopPropagation(); closeSheets(); } }, true);
 
     // ---------- экран «Бой» (этап 2, только телефон) ----------
     // В сессии вверху вкладки «Бой» — ход, цели карточками, режимы атаки, крупные кнопки действий, сам блок атаки
@@ -226,6 +226,94 @@
     var origTargets = window.renderAttackTargetSelect;
     if (typeof origTargets === 'function') window.renderAttackTargetSelect = function () { var r = origTargets.apply(this, arguments); try { renderFight(); } catch (e) { } return r; };
 
+    // ---------- «Сумка» иконками (этап 3, только телефон) ----------
+    // Старый список #player-inventory-list рисуется как раньше (со всеми кнопками). На телефоне строки скрыты,
+    // а поверх них — сетка плиток. Нажатие открывает карточку снизу с копиями кнопок этой строки
+    // (у копий те же onclick-строки, поэтому действия идут через прежние функции).
+    var invList = el('player-inventory-list');
+    var catSel = el('inv-category-filter');
+    var bagGrid = document.createElement('div'); bagGrid.id = 'st-bag-grid'; bagGrid.className = 'st-bag-grid';
+    var bagChips = document.createElement('div'); bagChips.id = 'st-bag-chips'; bagChips.className = 'st-bag-chips';
+    if (invList) { invList.parentNode.insertBefore(bagGrid, invList.nextSibling); }
+    if (catSel) {
+        var CHIP = { all: 'Всё', weapon: 'Оружие', armor: 'Броня', potion: 'Зелья', ingredient: 'Травы', food: 'Еда', magic: 'Магия', jewelry: 'Украшения', other: 'Разное' };
+        bagChips.innerHTML = Array.prototype.map.call(catSel.options, function (o) { return '<button type="button" class="st-bag-chip" data-v="' + esc(o.value) + '">' + esc(CHIP[o.value] || o.text) + '</button>'; }).join('');
+        var row = catSel.parentNode; row.parentNode.insertBefore(bagChips, row.nextSibling);
+        bagChips.addEventListener('click', function (e) {
+            var b = e.target.closest('.st-bag-chip'); if (!b) return;
+            catSel.value = b.getAttribute('data-v'); catSel.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+    var bagSheet = sheet('st-item-sheet', 'Предмет', '');
+    function idFromRow(row) {
+        var b = row.querySelector('button[onclick*="dropInventoryItem("]'); if (!b) return null;
+        var m = /dropInventoryItem\('((?:[^'\\]|\\.)*)'\)/.exec(b.getAttribute('onclick') || ''); if (!m) return null;
+        return m[1].replace(/\\(.)/g, '$1');
+    }
+    function itemById(id) { try { return (playerInventory || []).find(function (i) { return i.itemId === id; }) || null; } catch (e) { return null; } }
+    function equippedIds() { var out = {}; try { Object.keys(equippedSlots || {}).forEach(function (k) { var v = equippedSlots[k]; if (typeof v === 'string' && v) out[v] = 1; }); } catch (e) { } return out; }
+    function itemIcon(it) {
+        var n = String(it.name || '').toLowerCase(), c = String(it.category || '').toLowerCase(), k = 'chest', broad = 'other';
+        try { broad = classifyItemBroad(it); } catch (e) { }
+        var has = function (re) { return re.test(n) || re.test(c); };
+        if (broad === 'weapon') k = has(/лук|арбалет/) ? 'bow' : has(/стрел|болт|боеприпас/) ? 'arrow' : has(/кинжал|нож/) ? 'dagger' : has(/топор|секир|колун/) ? 'axe' : has(/молот|булав|палиц/) ? 'hammer' : 'sword';
+        else if (broad === 'armor') k = has(/шлем|капюшон|колпак|маска|шапк/) || it.slot === 'helmet' ? 'helm' : has(/щит/) || it.slot === 'shield' ? 'shield' : has(/сапог|ботин/) || it.slot === 'boots' ? 'boot' : has(/перчат|наруч|рукавиц/) || it.slot === 'gloves' ? 'glove' : 'tunic';
+        else if (broad === 'potion') k = has(/яд/) ? 'skull' : 'potion';
+        else if (broad === 'ingredient') k = has(/гриб|шляпк|поганк/) ? 'shroom' : has(/рыб|лосос|форел/) ? 'fish' : 'herb';
+        else if (broad === 'food') k = has(/мёд|мед |эль|вино|пиво|напит|чай/) ? 'mug' : has(/мяс|окорок|стейк|колбас|ребр/) ? 'meat' : has(/рыб|лосос/) ? 'fish' : has(/суп|рагу|похлёб|каша/) ? 'bowl' : 'bread';
+        else if (broad === 'magic') k = has(/посох/) ? 'staff' : has(/камень душ|камни душ/) ? 'gem' : has(/свит/) ? 'scroll' : 'tome';
+        else if (broad === 'jewelry') k = has(/кольц/) || it.slot === 'ring' ? 'ring' : has(/обруч|диадем|корон/) || it.slot === 'circlet' ? 'crown' : 'necklace';
+        else k = has(/ключ/) ? 'key' : has(/отмыч/) ? 'key' : has(/кирк/) ? 'pick' : has(/золот|слит|руд|самоцвет|алмаз|рубин|сапфир|изумруд|аметист|гранат/) ? 'gem' : has(/книг|дневник|записк|письм/) ? 'book' : has(/шкур|кож/) ? 'tunic' : 'chest';
+        return window.stDrawnIcon ? window.stDrawnIcon(k) : '';
+    }
+    function buildBag() {
+        if (!invList || !mqMobile.matches) return;
+        var rows = Array.prototype.filter.call(invList.children, function (r) { return r.classList && r.classList.contains('stat-block'); });
+        var eq = equippedIds();
+        bagGrid.innerHTML = rows.map(function (r, i) {
+            var id = idFromRow(r), it = id ? itemById(id) : null; if (!it) return '';
+            return '<button type="button" class="st-bag-cell' + (eq[id] ? ' eq' : '') + '" data-i="' + i + '" title="' + esc(it.name) + '">' + itemIcon(it) +
+                (it.count > 1 ? '<b>' + it.count + '</b>' : '') + '<span>' + esc(it.name) + '</span></button>';
+        }).join('');
+        var cur = catSel ? catSel.value : 'all';
+        bagChips.querySelectorAll('.st-bag-chip').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === cur); });
+        if (bagSheet.classList.contains('open') && bagSheet._id) openItem(bagSheet._id, true);
+    }
+    function rowFor(id) {
+        return Array.prototype.find.call(invList.children, function (r) { return r.classList && r.classList.contains('stat-block') && idFromRow(r) === id; }) || null;
+    }
+    function openItem(id, refresh) {
+        var it = itemById(id), row = rowFor(id);
+        if (!it || !row) { if (refresh) closeSheets(); return; }
+        var price = ''; try { if (it.price) price = formatNumber(getDisplayPrice(it.price)) + ' септ.'; } catch (e) { }
+        var meta = [it.category, it.weight ? it.weight + ' фнт' : '', price, it.count > 1 ? '×' + it.count : ''].filter(Boolean).join(' · ');
+        var body = bagSheet.querySelector('.st-sheet-body');
+        body.innerHTML = '<div class="st-item-head"><div class="st-item-ic">' + itemIcon(it) + '</div><div><div class="st-item-name">' + esc(it.name) + (equippedIds()[id] ? ' <small>надето</small>' : '') + '</div><div class="st-item-meta">' + esc(meta) + '</div></div></div>' +
+            (it.effect ? '<div class="st-item-eff">' + esc(it.effect) + '</div>' : '') + '<div class="st-item-btns"></div>';
+        var box = body.querySelector('.st-item-btns'), btns = row.querySelectorAll('button');
+        Array.prototype.forEach.call(btns, function (b, i) {
+            var c = b.cloneNode(true); c.removeAttribute('style'); c.classList.add('st-item-btn');
+            if (i === 0 && btns.length > 3) c.classList.add('st-item-main');
+            var oc = c.getAttribute('onclick') || '';
+            // короткие подписи списка («→», «Исп.») в карточке пишем словами
+            var LBL = [[/dropInventoryItem\(/, 'Выбросить'], [/tradeItemToPlayer\(/, 'Передать игроку'], [/partyStashPut\(/, 'В сундук отряда']];
+            LBL.forEach(function (p) { if (p[0].test(oc)) c.textContent = p[1]; });
+            if (/useInventoryItem\(/.test(oc) && /^Исп\.?$/.test(c.textContent.trim())) c.textContent = 'Использовать';
+            c.addEventListener('click', function () { setTimeout(function () { if (!itemById(id)) closeSheets(); }, 150); });
+            box.appendChild(c);
+        });
+        bagSheet.querySelector('.st-sheet-head h3').textContent = 'Предмет';
+        if (!refresh) { closeSheets(); bagSheet.classList.add('open'); }
+        bagSheet._id = id;
+    }
+    bagGrid.addEventListener('click', function (e) {
+        var c = e.target.closest('.st-bag-cell'); if (!c) return;
+        var rows = Array.prototype.filter.call(invList.children, function (r) { return r.classList && r.classList.contains('stat-block'); });
+        var r = rows[parseInt(c.getAttribute('data-i'), 10)], id = r && idFromRow(r);
+        if (id) openItem(id);
+    });
+    if (invList) new MutationObserver(function () { buildBag(); }).observe(invList, { childList: true });
+
     // ---------- запуск ----------
     function applyLayout() {
         var mobile = mqMobile.matches;
@@ -234,6 +322,7 @@
         placeService(mobile);
         placeFight(mobile);
         renderFight();
+        buildBag();
         if (typeof window.updateCombatDock === 'function') try { window.updateCombatDock(); } catch (e) { }
         setBarH();
         var activeTab = document.querySelector('.tab-content.active'), g = 'hero';

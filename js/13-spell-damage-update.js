@@ -1895,7 +1895,7 @@ function updateHungerPenalty() {
         let extraWeight = Math.max(0, parseInt(document.getElementById('extra-weight').value) || 0); // отрицательный «доп. вес» не уменьшает нагрузку
         if ((parseInt(document.getElementById('extra-weight').value) || 0) < 0) document.getElementById('extra-weight').value = 0;
         let currentWeight = weightFromItems + extraWeight;
-        document.getElementById('weight-current').innerText = formatNumber(currentWeight);
+        document.getElementById('weight-current').innerText = formatNumber(Math.round(currentWeight * 100) / 100); // без хвостов вида 23.400000000000002
 
         let manualWeightLock = document.getElementById('manual-weight-lock').checked;
         let maxWeight;
