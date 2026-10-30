@@ -1541,7 +1541,7 @@
                         (e.ashes ? '<div style="opacity:.75;">🔥 Обращён в пепел (Трансмутация смерти) — обыскать и поднять нельзя.</div>'
                             : canLoot ? gmCorpseLootControls(e)
                             : e.looted ? '<div style="opacity:.6;">Уже обыскан.</div>' : '<div style="opacity:.6;">Здесь нечего брать.</div>') +
-                        (e.isRaisable ? '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>' : '') +
+                        (e.isRaisable ? (e.soulTaken ? '<div style="opacity:.75; margin-top:2px;">🕳 Душа захвачена — поднять заклинанием или способностью нельзя.</div>' : '<div style="opacity:.6; margin-top:2px;">🧟 Доступен для поднятия заклинанием игрока</div>') : '') +
                         '</div>';
                 })() +
                 '</div>';

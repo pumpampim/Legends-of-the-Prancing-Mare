@@ -4712,7 +4712,7 @@ window.toggleSkillPanel = function (idx) {
             const lvlM = String(template.name || '').match(/\(ур\.\s*(\d+)\)/);
             const maxRaiseLevel = lvlM ? parseInt(lvlM[1], 10) : null;
             const allCorpses = session ? (session.enemies || []).filter(e =>
-                e.isRaisable && (e.curHp || 0) <= 0 && !e.raised &&
+                e.isRaisable && !e.soulTaken && (e.curHp || 0) <= 0 && !e.raised &&
                 (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5)
             ) : [];
             const eligible = allCorpses.filter(e => { const lv = getEnemyMeta(e).level; return maxRaiseLevel === null || lv === null || lv <= maxRaiseLevel; });
@@ -5147,7 +5147,7 @@ window.toggleSkillPanel = function (idx) {
             const sessR = (window.CloudSync && window.CloudSync.isInSession && window.CloudSync.isInSession()) ? window.CloudSync.getSessionData() : null;
             if (tplR && tplR.category === 'corpse' && sessR) {
                 const turnR = sessR.sessionTurnCounter || 0;
-                const anyCorpse = (sessR.enemies || []).some(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised && (e.diedAtTurn === undefined || turnR - e.diedAtTurn <= 5));
+                const anyCorpse = (sessR.enemies || []).some(e => e.isRaisable && !e.soulTaken && (e.curHp || 0) <= 0 && !e.raised && (e.diedAtTurn === undefined || turnR - e.diedAtTurn <= 5));
                 if (!anyCorpse) { alert(`Рядом нет трупа, который можно поднять (труп должен быть не старше 5 ходов). «${nmZ}» не сработает — мана не потрачена.`); return; }
             }
         }
@@ -13518,7 +13518,7 @@ window.toggleSkillPanel = function (idx) {
         const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
         const currentTurn = (session && session.sessionTurnCounter) || 0;
         const eligible = session ? (session.enemies || []).filter(e =>
-            e.isRaisable && (e.curHp || 0) <= 0 && !e.raised &&
+            e.isRaisable && !e.soulTaken && (e.curHp || 0) <= 0 && !e.raised &&
             (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5)
         ) : [];
         const prev = select.value;
@@ -14036,11 +14036,11 @@ window.toggleSkillPanel = function (idx) {
     function snRaisableCorpses() {
         const sess = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
         const currentTurn = (sess && sess.sessionTurnCounter) || 0;
-        return ((sess && sess.enemies) || []).filter(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised && (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5));
+        return ((sess && sess.enemies) || []).filter(e => e.isRaisable && !e.soulTaken && (e.curHp || 0) <= 0 && !e.raised && (e.diedAtTurn === undefined || currentTurn - e.diedAtTurn <= 5));
     }
     function snLordCorpses() { // «Воскрешение мёртвых» лорда: любой неподнятый труп
         const sess = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
-        return ((sess && sess.enemies) || []).filter(e => e.isRaisable && (e.curHp || 0) <= 0 && !e.raised);
+        return ((sess && sess.enemies) || []).filter(e => e.isRaisable && !e.soulTaken && (e.curHp || 0) <= 0 && !e.raised);
     }
     function snTargetValue(p) { const el = document.getElementById('pow-tgt-' + p.id); return el ? el.value : ''; }
     function snLog(text) {
