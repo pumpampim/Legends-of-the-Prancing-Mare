@@ -13647,7 +13647,7 @@ window.toggleSkillPanel = function (idx) {
     function lichPerk(id) { const l = snLich(); return !!(l && l.perks && l.perks[id]); }
     function lichStage() { const l = snLich(); return l ? (l.stage | 0) : 0; }
     function lichWeakenedPenalty() { const l = snLich(); return (l && l.weakened) ? 2 : 0; } // «ослабленный лич»: −2 ко всем характеристикам
-    function lichManaBonus() { const st = lichStage(); return st >= 2 ? 100 : st === 1 ? 50 : 0; }
+    function lichManaBonus() { const st = lichStage(); return st >= 2 ? 125 : st === 1 ? 75 : 0; } // +25 сверх согласованных 50/100 (2026-10-30: лич лишён бонусов богов)
     function lichEffectActive(e) { return !!e && (e.turnsRemaining > 0 || e.turnsRemaining === Infinity); }
     function lichMaskKind() { const e = (activeTimedEffects || []).find(x => x && x.lichMask && lichEffectActive(x)); return e ? e.lichMask : ''; }
     function lichAuraId() { const e = (activeTimedEffects || []).find(x => x && x.lichAura); return e ? e.lichAura : ''; }
@@ -13676,7 +13676,28 @@ window.toggleSkillPanel = function (idx) {
         lichApplyFaith();
     }
     var _lichSig = '';
+    // Вампир-лорд верит в Молаг Бала, оборотень в Хирсина: вера меняется сама, ранг +1 (до 3); при снятии флага возвращается прежняя.
+    function snFaithSync() {
+        const sn = playerSupernaturalState, sel = document.getElementById('faith-god'), rk = document.getElementById('faith-rank');
+        if (!sn || !sel || !rk || lichPerk('pact')) return;
+        const want = (sn.vampire && sn.vampire.isLord) ? 'molag' : sn.lycanthropy ? 'hircine' : '';
+        const sh = sn.faithShift && sn.faithShift.god ? sn.faithShift : null;
+        let changed = false;
+        if (want && (!sh || sh.god !== want)) {
+            const prev = sh ? { prevGod: sh.prevGod, prevRank: sh.prevRank } : { prevGod: sel.value, prevRank: parseInt(rk.value) || 1 };
+            sn.faithShift = { god: want, prevGod: prev.prevGod, prevRank: prev.prevRank };
+            sel.value = want; rk.value = Math.min(3, prev.prevRank + 1); sel.disabled = true; changed = true;
+        } else if (want) {
+            if (sel.value !== want) { sel.value = want; changed = true; }
+            sel.disabled = true;
+        } else if (sh) {
+            sel.value = sh.prevGod || 'none'; rk.value = sh.prevRank || 1; sel.disabled = false;
+            sn.faithShift = null; changed = true;
+        } else if (sel.disabled && sel.value !== 'ideal') sel.disabled = false;
+        if (changed) { saveSupernaturalStatePlayer(); saveLocalStorage(); updateAll(); }
+    }
     function lichAfterStateChange() {
+        try { snFaithSync(); } catch (e) { console.error('Вера:', e); }
         const l = snLich();
         const sig = l ? JSON.stringify([l.perks, l.stage]) : '';
         if (sig === _lichSig) return;
@@ -17197,7 +17218,8 @@ function updateHungerPenalty() {
             vampirism: !!data.supernaturalState.vampirism,
             werewolf: Object.assign({ heartsEaten: 0, totem: '— нет —', hasTransformedToday: false, transformsToday: 0, isTransformed: false }, data.supernaturalState.werewolf || {}),
             vampire: (function (v) { if (v.lordPerksLegacy === undefined) v.lordPerksLegacy = Object.keys(v.lordPerks || {}).filter(k => v.lordPerks[k]).length; return v; })(Object.assign({ hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 }, data.supernaturalState.vampire || {})),
-            lich: (window.lichNormalize || (x => null))(data.supernaturalState.lich)
+            lich: (window.lichNormalize || (x => null))(data.supernaturalState.lich),
+            faithShift: data.supernaturalState.faithShift || null
         } : null;
         try { lichAfterStateChange(); } catch (e) { console.error('Лич:', e); }
         if (!_gmSame && typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();

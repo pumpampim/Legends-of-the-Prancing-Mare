@@ -3174,7 +3174,7 @@
             lycanthropy: false, vampirism: false,
             werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, transformsToday: 0, isTransformed: false },
             vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {} },
-            lich: null
+            lich: null, faithShift: null
         };
     }
 
@@ -4129,7 +4129,8 @@
                 vampirism: !!data.supernaturalState.vampirism,
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
                 vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} }),
-                lich: window.lichNormalize ? window.lichNormalize(data.supernaturalState.lich) : (data.supernaturalState.lich || null)
+                lich: window.lichNormalize ? window.lichNormalize(data.supernaturalState.lich) : (data.supernaturalState.lich || null),
+                faithShift: data.supernaturalState.faithShift || null
             } : defaultSn;
             currentCrimeState = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, data.crimeState || {});
             // Снимок листа игрока приходит на каждое его сохранение — недописанная сумма штрафа и прочие поля не теряются.
