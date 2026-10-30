@@ -1,7 +1,8 @@
-/* ===== Игровой интерфейс, этап 1 (2026-10-30) =====
-   Плашка героя сверху (портрет, уровень, ОЗ/мана, золото, броня, скорость, вес) и пять вкладок снизу:
-   Герой · Бой · Сумка · Магия · Ещё. Разделы и их «пилюли» описаны в window.stNavGroups (index.html).
-   Служебное (аккаунт, шрифт, звук, поиск, сброс, файлы, Drive, снапшоты) переезжает в «Ещё → Настройки».
+/* ===== Игровой интерфейс для телефона, этап 1 (2026-10-30) =====
+   Только на ширине ≤900px: пять вкладок снизу — Герой · Бой · Сумка · Магия · Ещё. Разделы и их «пилюли»
+   описаны в window.stNavGroups (index.html). Служебное (аккаунт, шрифт, звук, поиск, сброс, файлы, Drive,
+   снапшоты) на телефоне переезжает в «Ещё → Настройки», на компьютере возвращается на старые места.
+   Компьютерная версия остаётся прежней (компас, верхняя строка); менять её — только по согласию Никиты.
    Старые вкладки и все обработчики не тронуты: кнопки нижней панели просто нажимают скрытые .tab-link,
    а служебные элементы переносятся в окно настроек целиком, вместе со своими onclick. */
 (function () {
@@ -46,61 +47,8 @@
     function num(id) { var e = el(id); if (!e) return 0; var v = (e.value !== undefined && e.tagName === 'INPUT') ? e.value : e.textContent; return parseFloat(String(v).replace(',', '.')) || 0; }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
-    // ---------- плашка героя ----------
-    var hud = document.createElement('div');
-    hud.id = 'st-hud'; hud.className = 'st-hud';
-    hud.innerHTML =
-        '<button type="button" class="st-hud-av" id="st-hud-av" title="Герой"><span class="st-hud-av-img" id="st-hud-av-img"></span><b id="st-hud-lvl">1</b></button>' +
-        '<div class="st-hud-main">' +
-            '<div class="st-hud-name"><span id="st-hud-name">Герой</span><small id="st-hud-sub"></small></div>' +
-            '<div class="st-hud-bar st-hud-hp" title="Здоровье"><i id="st-hud-hp-fill"></i><span id="st-hud-hp">0/0</span></div>' +
-            '<div class="st-hud-bar st-hud-mp" title="Мана"><i id="st-hud-mp-fill"></i><span id="st-hud-mp">0/0</span></div>' +
-            '<div class="st-hud-xp" title="Очки навыков до следующего уровня"><i id="st-hud-xp-fill"></i></div>' +
-        '</div>' +
-        '<div class="st-hud-chips">' +
-            '<span class="st-hud-chip" title="Золото">' + icon('gold') + '<b id="st-hud-gold">0</b></span>' +
-            '<span class="st-hud-chip" title="Класс брони">' + icon('armor') + '<b id="st-hud-armor">0</b></span>' +
-            '<span class="st-hud-chip" title="Скорость, фт">' + icon('speed') + '<b id="st-hud-speed">0</b></span>' +
-            '<span class="st-hud-chip" title="Вес: несу / предел">' + icon('weight') + '<b id="st-hud-weight">0/0</b></span>' +
-        '</div>';
     var container = document.querySelector('.container');
-    var topbar = el('st-topbar');
-    container.insertBefore(hud, topbar || container.firstChild);
-    el('st-hud-av').onclick = function () { goTab('tab1'); };
-
-    var lastPortrait = null;
-    function renderHud() {
-        var hp = num('cur-hp'), hpMax = num('max-hp'), mp = num('cur-mp'), mpMax = num('max-mp');
-        el('st-hud-hp').textContent = hp + '/' + hpMax;
-        el('st-hud-mp').textContent = mp + '/' + mpMax;
-        el('st-hud-hp-fill').style.width = (hpMax > 0 ? Math.max(0, Math.min(100, hp / hpMax * 100)) : 0) + '%';
-        el('st-hud-mp-fill').style.width = (mpMax > 0 ? Math.max(0, Math.min(100, mp / mpMax * 100)) : 0) + '%';
-        var nm = el('char-name'); el('st-hud-name').textContent = (nm && nm.value) || 'Герой';
-        var race = el('char-race'), sub = [];
-        if (race && race.selectedIndex >= 0 && race.value) sub.push(race.options[race.selectedIndex].text.replace(/\s*\(.*\)\s*$/, ''));
-        var dd = el('date-display'); if (dd) sub.push(dd.textContent.replace(/^\s*📅\s*/, ''));
-        el('st-hud-sub').textContent = sub.join(' · ');
-        var lvl = 1; try { lvl = characterLevel || 1; } catch (e) { }
-        el('st-hud-lvl').textContent = lvl;
-        try {
-            var need = getSkillUpsNeededForLevel(lvl);
-            el('st-hud-xp-fill').style.width = (need > 0 ? Math.max(0, Math.min(100, levelUpProgress / need * 100)) : 0) + '%';
-        } catch (e) { }
-        el('st-hud-gold').textContent = Math.round(num('char-gold'));
-        el('st-hud-armor').textContent = Math.round(num('armor-total'));
-        el('st-hud-speed').textContent = Math.round(num('val-speed'));
-        var w = num('weight-current'), wm = num('weight-max-display');
-        el('st-hud-weight').textContent = (Math.round(w * 10) / 10) + '/' + Math.round(wm);
-        el('st-hud-weight').parentNode.classList.toggle('st-hud-warn', wm > 0 && w > wm);
-        var pt = ''; try { pt = window.getPortraitThumb ? window.getPortraitThumb() : ''; } catch (e) { }
-        if (pt !== lastPortrait) {
-            lastPortrait = pt;
-            var img = el('st-hud-av-img');
-            if (pt) { img.style.backgroundImage = 'url("' + pt + '")'; img.textContent = ''; }
-            else { img.style.backgroundImage = ''; img.textContent = ((nm && nm.value) || 'Г').trim().charAt(0).toUpperCase(); }
-        } else if (!pt) { el('st-hud-av-img').textContent = ((nm && nm.value) || 'Г').trim().charAt(0).toUpperCase(); }
-    }
-    window.stHudRender = renderHud;
+    var mqMobile = window.matchMedia('(max-width: 900px)');
 
     // ---------- нижние вкладки ----------
     var bar = document.createElement('nav');
@@ -109,23 +57,8 @@
         return '<button type="button" class="st-tb" data-g="' + t.g + '">' + icon(t.g, 'st-tb-ico') + '<span>' + t.label + '</span><i class="st-tb-dot" hidden></i></button>';
     }).join('');
     document.body.appendChild(bar);
-    // на компьютере та же полоса стоит под плашкой героя
-    var deskSlot = document.createElement('div'); deskSlot.id = 'st-tabbar-desk-slot';
-    container.insertBefore(deskSlot, topbar ? topbar : hud.nextSibling);
-    var mqDesk = window.matchMedia('(min-width: 901px)');
-    function placeBar() {
-        if (mqDesk.matches) { if (bar.parentNode !== deskSlot) deskSlot.appendChild(bar); }
-        else if (bar.parentNode !== document.body) document.body.appendChild(bar);
-        document.body.classList.toggle('st-tabbar-desk', mqDesk.matches);
-        setBarH();
-    }
-    function setBarH() {
-        document.body.style.setProperty('--st-tabbar-h', (mqDesk.matches ? 0 : bar.offsetHeight) + 'px');
-        document.body.style.setProperty('--st-hud-h', hud.offsetHeight + 'px');
-    }
-    if (mqDesk.addEventListener) mqDesk.addEventListener('change', placeBar); else if (mqDesk.addListener) mqDesk.addListener(placeBar);
+    function setBarH() { document.body.style.setProperty('--st-tabbar-h', (mqMobile.matches ? bar.offsetHeight : 0) + 'px'); }
     window.addEventListener('resize', setBarH);
-    document.body.classList.add('st-game-ui');
 
     bar.addEventListener('click', function (e) {
         var b = e.target.closest('.st-tb'); if (!b) return;
@@ -178,30 +111,43 @@
     }
 
     var settings = sheet('st-settings-sheet', 'Настройки', '<div class="st-set-sec" id="st-set-account"><h4>Аккаунт и вид</h4></div><div class="st-set-sec" id="st-set-save"><h4>Сохранения персонажа</h4></div><div class="st-set-sec st-set-danger" id="st-set-danger"><h4>Опасное</h4></div>');
-    // переносим служебное целиком — элементы сохраняют id и onclick, поэтому остальной код их находит
-    (function moveService() {
-        var csb = el('cloud-status-bar'); if (csb) el('st-set-account').appendChild(csb);
+    // переносим служебное целиком — элементы сохраняют id и onclick, поэтому остальной код их находит.
+    // На место каждого ставим пустой маркер, чтобы на компьютере вернуть всё как было.
+    var moved = [];
+    (function collect() {
+        var csb = el('cloud-status-bar'); if (csb) moved.push({ node: csb, to: 'st-set-account' });
         var dc = el('date-display') && el('date-display').closest('.day-controls');
         if (!dc) return;
-        var save = el('st-set-save'), danger = el('st-set-danger');
         Array.prototype.slice.call(dc.children).forEach(function (c) {
             var oc = (c.getAttribute && c.getAttribute('onclick')) || '';
-            if (/resetData\(/.test(oc)) danger.appendChild(c);
-            else if (/exportCharacterToFile|driveSaveCharacter|driveListCharacters|stToggleSnapshots/.test(oc) || c.id === 'st-snapshot-list' || c.id === 'drive-files-list' || (c.tagName === 'LABEL' && c.querySelector('input[type=file]'))) save.appendChild(c);
+            if (/resetData\(/.test(oc)) moved.push({ node: c, to: 'st-set-danger' });
+            else if (/exportCharacterToFile|driveSaveCharacter|driveListCharacters|stToggleSnapshots/.test(oc) || c.id === 'st-snapshot-list' || c.id === 'drive-files-list' || (c.tagName === 'LABEL' && c.querySelector('input[type=file]'))) moved.push({ node: c, to: 'st-set-save' });
         });
+        moved.forEach(function (m) { m.mark = document.createComment('st-settings'); m.node.parentNode.insertBefore(m.mark, m.node); });
     })();
+    function placeService(mobile) {
+        moved.forEach(function (m) {
+            if (mobile) { if (m.node.parentNode !== el(m.to)) el(m.to).appendChild(m.node); }
+            else if (m.mark.parentNode && m.node.previousSibling !== m.mark) m.mark.parentNode.insertBefore(m.node, m.mark.nextSibling);
+        });
+    }
     function openSettings() { closeSheets(); settings.classList.add('open'); }
     window.stOpenSettings = openSettings;
     function closeSheets() { more.classList.remove('open'); settings.classList.remove('open'); }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (more.classList.contains('open') || settings.classList.contains('open'))) { e.preventDefault(); e.stopPropagation(); closeSheets(); } }, true);
 
     // ---------- запуск ----------
-    placeBar();
-    var activeTab = document.querySelector('.tab-content.active');
-    window.stGameUiSync(activeTab && window.stNavGroups ? (function () { for (var g in window.stNavGroups) if (window.stNavGroups[g].tabs.indexOf(activeTab.id) >= 0) return g; return 'hero'; })() : 'hero');
-    renderHud();
-    setInterval(renderHud, 800);
-    document.addEventListener('input', function () { setTimeout(renderHud, 0); });
-    document.addEventListener('change', function () { setTimeout(renderHud, 0); });
-    window.addEventListener('load', function () { renderHud(); setBarH(); });
+    function applyLayout() {
+        var mobile = mqMobile.matches;
+        document.body.classList.toggle('st-game-ui', mobile);
+        if (!mobile) closeSheets();
+        placeService(mobile);
+        setBarH();
+        var activeTab = document.querySelector('.tab-content.active'), g = 'hero';
+        if (activeTab && window.stNavGroups) for (var k in window.stNavGroups) if (window.stNavGroups[k].tabs.indexOf(activeTab.id) >= 0) g = k;
+        window.stGameUiSync(g);
+    }
+    if (mqMobile.addEventListener) mqMobile.addEventListener('change', applyLayout); else if (mqMobile.addListener) mqMobile.addListener(applyLayout);
+    applyLayout();
+    window.addEventListener('load', setBarH);
 })();

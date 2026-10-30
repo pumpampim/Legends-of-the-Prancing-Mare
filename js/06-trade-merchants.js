@@ -614,14 +614,9 @@
         // Список «зелья для подсумка» строится из инвентаря: раньше он не перерисовывался при продаже/покупке/использовании
         // и показывал уже проданные зелья, пока не открыть подсумок заново.
         try { renderPouchPanel(); } catch (e) { /* не критично */ }
+        // 2026-10-30: формулу цены («Красноречие × (1 + перки + раса) → база × k») игроку больше не показываем — лишний текст.
         const infoEl = document.getElementById('price-multiplier-info');
-        if (infoEl) {
-            const speech = getSkillRawValue('Красноречие');
-            const perkBonus = (window.perkBonuses || {}).merchantPriceBonus || 0;
-            const raceBonus = getRacialPriceBonus();
-            const mult = getSpeechPriceMultiplier();
-            infoEl.textContent = `💬 Красноречие ${speech} × (1 + перки ${Math.round(perkBonus*100)}% + раса ${Math.round(raceBonus*100)}%) → цена = база × ${mult.toFixed(2)}`;
-        }
+        if (infoEl) { infoEl.textContent = ''; infoEl.style.display = 'none'; }
         if (!playerInventory.length) {
             el.innerHTML = '<p style="opacity:.6; font-size:14px;">Инвентарь пуст.</p>';
             return;
@@ -643,7 +638,7 @@
         }
         el.innerHTML = shownInv.map(item => {
             const priceInfo = item.price
-                ? `<span style="color:var(--accent-color); font-size:13px;"> · ${formatNumber(getDisplayPrice(item.price))} септ. <span style="opacity:.5;">(база ${formatNumber(item.price)})</span></span>`
+                ? `<span style="color:var(--accent-color); font-size:13px;"> · ${formatNumber(getDisplayPrice(item.price))} септ.</span>`
                 : '';
             return `
             <div class="stat-block" style="align-items:flex-start;">

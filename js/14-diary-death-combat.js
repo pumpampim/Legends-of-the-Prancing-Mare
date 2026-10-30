@@ -325,7 +325,6 @@
 
     let finalHtml = `
         <strong>Модификатор броска d20:</strong> 1d20 + (${hitModifier >= 0 ? '+' : ''}${hitModifier}) против кубов Мастера<br>
-        <div style="font-size:13px; opacity:.75; margin:2px 0;">Формула: ${formulaParts.join(' + ')} = ${formulaSum}${mode === 'melee' && wepType !== 'unarmed' ? ' (до силовой атаки/бонусов перков)' : ''}</div>
         <strong>Итоговый физический урон цели:</strong> <span style="color:#e74c3c; font-size:17px; font-weight:bold;">${totalDmg}</span> ед.<br>
     `;
     const weaponEnchantDesc = getEquippedWeaponEnchantDesc(mode === 'melee');

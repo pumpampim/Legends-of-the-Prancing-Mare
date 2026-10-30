@@ -543,7 +543,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=27">
+    <link rel="stylesheet" href="style.css?v=28">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
@@ -1089,7 +1089,6 @@
                 <h2>🎒 Подсумок и ⏱️ активные эффекты</h2>
 
                 <div id="pouch-block">
-                    <p style="font-size:13px; opacity:.75;">Подсумок надевается в разделе слотов экипировки выше. Сюда кладутся зелья/яды для быстрого использования в бою.</p>
                     <div id="pouch-capacity-info" style="font-size:14px; margin-bottom:4px;"></div>
                     <div style="display:flex; gap:6px;">
                         <select id="pouch-load-select" style="flex:1;"></select>
@@ -1105,20 +1104,18 @@
                         <button class="btn-success" style="flex:1;" onclick="nextRound()">🔄 Следующий круг</button>
                         <button class="btn-danger" style="flex:1;" onclick="resetTurnsRounds()">↺ Обнулить</button>
                     </div>
-                    <p style="font-size:12px; opacity:.6; margin-top:4px;">И «ход», и «круг» одинаково уменьшают длительность активных эффектов на 1 — используй тот, что удобнее по ситуации за столом.</p>
                     <div id="active-timed-effects-list" style="margin-top:8px;"></div>
                 </div>
 
                 <!-- Ножны и колчаны: 2 слота на поясе, 2 на спине. Оружие из ножен — бонусным действием. -->
                 <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
                     <h3 style="margin:0 0 4px;">🗡 Ножны и колчаны</h3>
-                    <p style="font-size:12px; opacity:.7; margin:0 0 6px;">Оружие, которое лежит в ножнах, достаётся и убирается <strong>бонусным действием</strong> (атаковать и колдовать в этом ходу можно). Без ножен смена оружия в бою — основное действие. Ножны для двуручного оружия, копий, посохов, луков, арбалетов и держатель щита — только на спину; ножны для одноручного, пик и колчаны — куда угодно. Кастеты носят на руках (вместо перчаток), ножен под них нет. Чтобы стрелять без лишнего действия «достать стрелу из рюкзака», нужен колчан под свой боеприпас.</p>
+                    
                     <div id="sheath-slots"></div>
                 </div>
 
                 <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
                     <div id="weather-display" style="font-size:15px; margin-bottom:6px;">🕐 День · Погоду и регион задаёт мастер</div>
-                    <p style="font-size:12px; opacity:.6;">Бонусы/штрафы от погоды — справочные, применяются вручную при бросках (мастер или ты сам решаете, когда они действуют).</p>
                 </div>
             </div>
         </div>
@@ -1211,9 +1208,7 @@
                 <!-- Лаборатория писца -->
                 <div class="panel" style="background:#111; border-color:var(--accent-color);">
                     <h3>📜 Лаборатория писца (Крафт Свитков)</h3>
-                    <p style="font-size:13px; color:#aaa; margin-top:-2px;">
-                        Свиток можно сделать только из заклинания, которое ты знаешь (выучено на вкладках выше), и только если оно не тратит ману «за ход» (такие эффекты нельзя записать в свиток одноразово).
-                    </p>
+                    
                     <label>Заклинание для свитка</label>
                     <select id="scroll-spell-select" onchange="updateScrollInfo()"></select>
                     <div id="scroll-spell-info" style="font-size:14px; opacity:.9; margin:8px 0; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px;"></div>
@@ -1236,7 +1231,6 @@
             <!-- Вес и ресурсы инвентаря -->
             <div class="panel">
                 <h2>🎒 Инвентарь предметов</h2>
-                <p style="font-size:13px; opacity:.75;">Сюда попадают вещи, которые передал мастер, и всё, что ты сам создал: готовые блюда, скованные броня/украшения, зачарованные предметы и посохи.</p>
 
                 <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
                     <label style="font-size:14px;">👕 Надеть/взять в руки предмет из инвентаря</label>
@@ -1302,7 +1296,6 @@
             <!-- ПЕРЕДАЧА ЗОЛОТА ДРУГОМУ ИГРОКУ (предметы — кнопкой прямо у каждой вещи в инвентаре) -->
             <div class="panel" id="trade-panel">
                 <h2>🤝 Обмен с игроком</h2>
-                <p style="font-size:13px; opacity:.75;">Работает только внутри активной сессии мастера. Выбери, кому передавать, — этот же выбор используется и для кнопки «→» у предметов в инвентаре ниже.</p>
                 <label>Кому</label>
                 <select id="trade-target-select" onchange="renderInventoryList()"></select>
 
@@ -1377,14 +1370,12 @@
         <!-- ГИЛЬДИИ (Задача K) -->
         <div class="panel">
             <h2>🏛️ Гильдии</h2>
-            <p style="font-size:13px; opacity:.75;">Показаны только гильдии, в которые тебя принял мастер. Ранг растёт автоматически с числом выполненных заказов (мастер отмечает выполнение квеста).</p>
             <div id="guild-panel-player" style="max-height:320px; overflow-y:auto;"></div>
         </div>
 
         <!-- СВЕРХЪЕСТЕСТВЕННОЕ (Задача L) -->
         <div class="panel">
             <h2>🌙 Сверхъестественное состояние</h2>
-            <p style="font-size:13px; opacity:.75;">Ликантропия/вампиризм включает мастер. Превращение и подкормка — твои кнопки, остальное (сердца/ранг/голод) правит мастер.</p>
             <div id="supernatural-status-player"></div>
         </div>
     </div>
@@ -1803,7 +1794,6 @@
         <div class="grid-2 st-check-pair">
         <div class="panel st-compact-panel">
             <h2><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросок кубов</h2>
-            <p style="font-size:14px; opacity:.8;">Выбери навык — характеристика, которая за него отвечает, подставится сама. В бросок идёт только кубик + модификатор характеристики; само значение навыка не считается (оно лишь определяет, какая характеристика используется).</p>
 
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="dice-quick-presets"></div>
 
@@ -1927,7 +1917,6 @@
 
         <div class="panel">
             <h2>🎓 Прокачка персонажа</h2>
-            <p style="font-size:13px; opacity:.75;">Наша формула (подогнана под твой пример: 4→5 уровень за 10 очков навыков): успехов на +1 к навыку = навык÷5 (округление вверх). Очков навыков на левел-ап: до 5-го уровня — уровень×2+2 (4, 6, 8, 10, 12), дальше 9 + половина уровня (вверх): 6→7 — 12, 20→21 — 19, 40→41 — 29, 64→65 — 41. Максимальный уровень — 65.</p>
 
             <div id="level-summary" style="padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
 
@@ -2083,7 +2072,6 @@
         <!-- ПРОДАЖА ПРЕДМЕТОВ -->
         <div class="panel">
             <h2><span class="skyrim-icon icon-coin" aria-hidden="true"></span> Продать вещи</h2>
-            <p style="font-size:13px; opacity:.75;">Если продаёшь торговцу не его профиль (например, ингредиенты кузнецу) — цена ниже на 20%. Барахольщик покупает всё, но всегда на 10% дешевле. Репутация в текущем владении тоже тихо влияет на цену (±5%). Каждая сделка даёт долю успеха Красноречия — она копится по сумме сделок (мелкие покупки и продажи тоже считаются), автоматически.</p>
             <div id="speech-trade-progress" style="font-size:13px; margin-bottom:8px; color:var(--accent-color);"></div>
 
             <label>Кому продаём</label>
@@ -2122,7 +2110,6 @@
                 <input type="checkbox" id="in-town-check" checked onchange="onInTownToggled(this.checked)">
                 🏙 Я в городе (вне города закупаться у торговцев нельзя; флаг может поставить и мастер)
             </label>
-            <p style="font-size:13px; opacity:.75;">Ассортимент и золото торговца задаёт мастер (обновляется примерно раз в неделю). Если товара нет — мастер ещё не завозил ассортимент в это владение для этого типа торговца.</p>
             <label>Тип торговца</label>
             <select id="buy-merchant-type" onchange="onBuyMerchantChanged()"></select>
             <label style="margin-top:6px;">Показать категорию</label>
@@ -2148,7 +2135,7 @@
 <script src="js/03-creation-spells.js?v=1"></script>
 <script src="js/04-spell-casting.js?v=1"></script>
 <script src="js/05-inventory.js?v=1"></script>
-<script src="js/06-trade-merchants.js?v=2"></script>
+<script src="js/06-trade-merchants.js?v=3"></script>
 <script src="js/07-craft-enchant-equip.js?v=1"></script>
 <script src="js/08-equipment-guilds.js?v=1"></script>
 <script src="js/09-combat-grid.js?v=1"></script>
@@ -2156,7 +2143,7 @@
 <script src="js/11-session-trade-map.js?v=2"></script>
 <script src="js/12-supernatural-lich.js?v=1"></script>
 <script src="js/13-spell-damage-update.js?v=1"></script>
-<script src="js/14-diary-death-combat.js?v=2"></script>
+<script src="js/14-diary-death-combat.js?v=3"></script>
 <script src="js/15-traps-boot.js?v=1"></script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
@@ -2354,15 +2341,24 @@
    Раньше: 12 вкладок в ряд. Теперь: меню-«компас» из четырёх направлений + центр, внутри раздела — полоса «пилюль» с его вкладками.
    Сами вкладки (.tab-content) и их кнопки (.nav-tabs, теперь скрытые) не тронуты: openTab, значки «●», цифры 1–9, поиск Ctrl+K работают как раньше. */
 (function () {
-    // 2026-10-30: разделы совпадают с нижней панелью вкладок (js/16-game-ui.js): Герой · Бой · Сумка · Магия · Ещё.
-    // Компас (st-hub) больше не открывается: его заменили нижние вкладки и меню «Ещё».
-    var GROUPS = {
+    // На компьютере — компас (st-hub) и его пять направлений. На телефоне (≤900px) — разделы нижней панели
+    // вкладок (js/16-game-ui.js): Герой · Бой · Сумка · Магия · Ещё; компас там не открывается.
+    var DESK_GROUPS = {
+        skills: { title: 'Навыки', tabs: ['tab2', 'tab7', 'tab10'], hint: 'Ветки перков · Профессии · Проверка' },
+        magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
+        items: { title: 'Предметы', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
+        map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14'], hint: 'Карта · Календарь · Дневник' },
+        hero: { title: 'Герой', tabs: ['tab1', 'tab3', 'tab6'], hint: 'Главная и статы · Боевой пост · Сессия' }
+    };
+    var MOBILE_GROUPS = {
         hero: { title: 'Герой', tabs: ['tab1', 'tab2', 'tab10'], hint: 'Главная · Ветки перков · Проверка' },
         fight: { title: 'Бой', tabs: ['tab3', 'tab6'], hint: 'Боевой пост · Сессия' },
         bag: { title: 'Сумка', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
         magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
         more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14'], hint: 'Профессии · Карта · Календарь · Дневник' }
     };
+    var mqMobile = window.matchMedia('(max-width: 900px)');
+    var GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS;
     window.stNavGroups = GROUPS;
     var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь и квесты', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
     var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
@@ -2409,6 +2405,12 @@
         renderTop(); renderHubDots();
         if (window.stGameUiSync) window.stGameUiSync(cur, tabId);
     };
+    function onLayout() {
+        GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS; window.stNavGroups = GROUPS;
+        if (mqMobile.matches && hub.classList.contains('open')) window.stHubClose();
+        window.stNavSync(curTab);
+    }
+    if (mqMobile.addEventListener) mqMobile.addEventListener('change', onLayout); else if (mqMobile.addListener) mqMobile.addListener(onLayout);
     window.stNavLast = function (g) { return last[g] && GROUPS[g] && GROUPS[g].tabs.indexOf(last[g]) >= 0 ? last[g] : (GROUPS[g] ? GROUPS[g].tabs[0] : 'tab1'); };
     window.stNavHasDot = hasDot;
     var origOpenTab = window.openTab;
@@ -2450,7 +2452,9 @@
             if (foreignModalOpen()) return;
             var t = e.target, tag = t && t.tagName;
             if (open) { e.preventDefault(); window.stHubClose(); return; }
-            return;
+            if (mqMobile.matches) return;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            e.preventDefault(); window.stHubOpen(); return;
         }
         if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
         var dir = ARROWS[e.key]; if (!dir) return;
@@ -2470,7 +2474,8 @@
     renderTop();
 })();
 </script>
-<script src="js/16-game-ui.js?v=1"></script>
+<script src="js/16-game-ui.js?v=2"></script>
+<script src="js/17-icons.js?v=1"></script>
 
 </body>
 </html>
