@@ -23,7 +23,13 @@ service cloud.firestore {
     match /sessions/{code} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.gmUid == request.auth.uid;
-      allow update: if request.auth != null;
+      // Обновлять может мастер сессии всегда, остальные — пока мастер их не выгнал (kicked.{uid}),
+      // и никто, кроме мастера, не может менять сам список выгнанных (gmKickPlayer в gm.js).
+      allow update: if request.auth != null && (
+        resource.data.gmUid == request.auth.uid ||
+        (!(request.auth.uid in resource.data.get('kicked', {})) &&
+         request.resource.data.get('kicked', {}) == resource.data.get('kicked', {}))
+      );
       // Раньше delete был запрещён вообще для всех — теперь мастер может удалить СВОЮ ЖЕ сессию
       // (нужно для автоматической чистки старых закрытых сессий, см. cleanupOldClosedSessions
       // в gm.js — иначе закрытые сессии копились бы в базе вечно).

@@ -1476,6 +1476,14 @@
                 localStorage.removeItem(SESSION_KEY);
                 return;
             }
+            if ((doc.data().kicked || {}).hasOwnProperty(currentUser.uid)) {
+                localStorage.removeItem(SESSION_KEY);
+                const errEl = el('session-join-error');
+                errEl.textContent = '🚪 Мастер исключил тебя из этой сессии. Войти снова можно, только если мастер тебя вернёт.';
+                errEl.style.color = '';
+                errEl.style.display = 'block';
+                return;
+            }
             currentSessionCode = code;
             localStorage.setItem(SESSION_KEY, code);
 
@@ -1519,6 +1527,13 @@
         }).catch(e => console.error('Ошибка входа в сессию:', e));
     }
 
+    function showKickedNotice() {
+        const n = el('session-join-error');
+        if (n) { n.textContent = '🚪 Мастер исключил тебя из этой сессии. Персонаж и вещи остались при тебе.'; n.style.color = ''; n.style.display = 'block'; }
+        if (typeof window.stNotify === 'function') window.stNotify('🚪 Тебя исключили из сессии', 'Мастер исключил тебя из сессии.');
+        alert('Мастер исключил тебя из сессии. Персонаж и вещи остались при тебе.');
+    }
+
     window.leaveSession = function () {
         if (!currentSessionCode || !currentUser) return;
         db.collection('sessions').doc(currentSessionCode).update({
@@ -1560,6 +1575,12 @@
                 const wasClosed = doc.exists;
                 window.leaveSession();
                 if (wasClosed) { const n = el('session-join-error'); if (n) { n.textContent = 'Мастер закрыл сессию.'; n.style.display = 'block'; } }
+                return;
+            }
+            if (currentUser && ((doc.data() || {}).kicked || {}).hasOwnProperty(currentUser.uid)) {
+                // Мастер выгнал игрока из сессии: выходим у себя. Лист персонажа остаётся как был.
+                window.leaveSession();
+                showKickedNotice();
                 return;
             }
             renderSession(doc.data());
@@ -1736,6 +1757,8 @@
     setTimeout(stUpdateSoundBtn, 0);
 
     function renderSession(data) {
+        // Выгнанных мастером не показываем в отряде, даже если запоздавшая запись снова создала их строку.
+        Object.keys(data.kicked || {}).forEach(uid => { if (data.participants) delete data.participants[uid]; });
         lastSessionData = data;
         stCheckLogGrowth(data.combatLog || []);
         if (typeof window.updateCombatDock === 'function') window.updateCombatDock();

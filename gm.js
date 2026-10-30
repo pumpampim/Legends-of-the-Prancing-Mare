@@ -362,6 +362,7 @@
     unsubSession = db.collection('sessions').doc(code).onSnapshot(doc => {
         if (!doc.exists) return;
         lastData = doc.data();
+        gmDropKickedParticipants(lastData);
         try { rumOnSnapshot(lastData); } catch (e) { console.error(e); }
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
@@ -1253,6 +1254,7 @@
         rumRender();
         renderJournalGm();
         renderParty(lastData.participants || {});
+        renderKickedList(lastData.kicked);
         renderGmStash(lastData);
         if (window.renderEpic3Session) window.renderEpic3Session(lastData);
         renderGmTimers();
@@ -1321,6 +1323,7 @@
                     <button style="font-size:11px; padding:1px 5px;" title="Воскресить (после квеста божества или по решению мастера)" onclick="gmDeathCmd('${uid}','revive')">✨ Воскресить</button>
                     <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',1)">+❤</button>
                     <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',-1)">−❤</button>
+                    <button class="btn-danger" style="font-size:11px; padding:1px 5px; margin-left:auto;" title="Выгнать игрока из этой сессии (персонаж не удаляется)" onclick="gmKickPlayer('${uid}')">🚪 Выгнать</button>
                 </div>
                 ${(p.summons || []).map(s => {
                     const sHpPct = Math.max(0, Math.min(100, (s.curHp || 0) / (s.maxHp || 1) * 100));
@@ -1340,6 +1343,48 @@
                 }).join('')}
             </div>`;
         }).join('');
+    }
+
+    // Кик из сессии. Игрок уходит из participants и попадает в kicked: его лист видит это и выходит из сессии,
+    // а правила Firestore больше не дают ему писать в документ сессии (и вернуться по коду), пока мастер не вернёт.
+    // Персонаж (characters/{uid}) не трогаем — кик действует только на эту сессию.
+    function gmDropKickedParticipants(d) {
+        const kicked = (d && d.kicked) || {}, parts = (d && d.participants) || {};
+        // Запоздавшая запись старой вкладки или очередь команд мастера могла заново создать запись игрока — не показываем её.
+        Object.keys(kicked).forEach(uid => { delete parts[uid]; });
+    }
+
+    window.gmKickPlayer = function (uid) {
+        const p = ((lastData && lastData.participants) || {})[uid];
+        if (!p || !currentCode) return;
+        const name = p.name || 'Без имени';
+        if (!confirm('Выгнать «' + name + '» из сессии ' + currentCode + '?\n\nИгрок сразу выйдет из сессии и не сможет зайти по коду, пока ты его не вернёшь. Персонаж и его вещи останутся у игрока.')) return;
+        const names = [name].concat(p.summonNames || []);
+        const patch = {};
+        patch['participants.' + uid] = firebase.firestore.FieldValue.delete();
+        patch['kicked.' + uid] = { name: name, ts: Date.now() };
+        // Из очереди ходов убираем самого игрока и его существ (в ней записи по именам).
+        const order = lastData.turnOrder || [];
+        const left = order.filter(i => !names.includes(i.name));
+        if (left.length !== order.length) patch.turnOrder = left;
+        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: '🚪 ' + name + ' покидает сессию по решению мастера.' });
+        db.collection('sessions').doc(currentCode).update(patch).catch(e => alert('Не удалось выгнать игрока: ' + e.message));
+    };
+
+    window.gmUnkickPlayer = function (uid) {
+        const k = ((lastData && lastData.kicked) || {})[uid];
+        if (!k || !currentCode) return;
+        if (!confirm('Разрешить «' + (k.name || 'игроку') + '» снова войти в сессию по коду?')) return;
+        db.collection('sessions').doc(currentCode).update({ ['kicked.' + uid]: firebase.firestore.FieldValue.delete() })
+            .catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    function renderKickedList(kicked) {
+        const box = el('gm-kicked-list');
+        if (!box) return;
+        const uids = Object.keys(kicked || {});
+        box.innerHTML = !uids.length ? '' : '<div style="font-size:12px; opacity:.85; margin-top:6px;">🚪 Выгнаны из сессии: ' +
+            uids.map(uid => `<span style="white-space:nowrap; margin-right:8px;">${escapeHtml(kicked[uid].name || '?')} <button style="width:auto; font-size:11px; padding:0 6px;" title="Снова пустить по коду" onclick="gmUnkickPlayer('${uid}')">вернуть</button></span>`).join('') + '</div>';
     }
 
     // Команды смерти/воскрешения игроку: уходят через очередь pendingStatusEffects, игрок применяет их у себя.
