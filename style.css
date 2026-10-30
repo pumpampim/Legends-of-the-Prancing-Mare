@@ -2165,3 +2165,46 @@ button .sk-ic, .btn .sk-ic { color: currentColor; }
 .sk-ic[data-k="snow"] { color: #9fd0ee; }
 .sk-ic[data-k="bolt"] { color: #b9a6f0; }
 .sk-ic[data-k="herb"] { color: #7fb56a; }
+
+/* ===== Экран «Бой» на телефоне (js/16-game-ui.js, этап 2, 2026-10-30) ===== */
+.st-fight { display: none; }
+body.st-game-ui.st-fight-on .st-fight { display: block; padding: 10px 12px; }
+body.st-game-ui.st-fight-on:not(.st-fight-gear) #tab3 > :not(#st-fight) { display: none !important; }
+/* нижняя боевая панель на телефоне — всегда одна строка */
+body.st-game-ui .st-combat-dock .st-dock-info, body.st-game-ui .st-combat-dock .st-dock-main { display: none !important; }
+body.st-game-ui .st-combat-dock .st-dock-mini { display: flex !important; }
+body.st-game-ui .st-combat-dock .st-dock-mini > button:not(.st-dock-tofight) { display: none; }
+.st-dock-tofight { display: none; }
+body.st-game-ui .st-dock-tofight { display: inline-flex; margin: 0; min-height: 32px; font-weight: 700; color: var(--accent-bright, #f0c87a); border-color: var(--accent-color, #c8a566); }
+.st-fight-turn { display: flex; justify-content: center; gap: 16px; padding: 6px 10px; margin-bottom: 10px; border: 1px solid var(--accent-color, #c8a566); border-radius: 20px;
+  background: rgba(122,95,46,.25); font: 500 15px 'Barlow Condensed', sans-serif; color: var(--text-bright, #f2e8cf); }
+.st-fight-turn b { color: var(--accent-bright, #f0c87a); }
+.st-fight-sec { margin-bottom: 12px; }
+.st-fight-sec h4 { margin: 0 0 6px; font: 600 12px 'Barlow Condensed', sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent-color, #c8a566); }
+.st-fight-targets { display: flex; flex-direction: column; gap: 6px; }
+.st-fight-target { width: 100%; margin: 0; min-height: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: center; text-align: left; padding: 8px 10px;
+  background: rgba(40,14,10,.7); border: 1px solid #6e2a20; border-radius: 10px; color: var(--text-bright, #f2e8cf); text-transform: none; letter-spacing: 0; clip-path: none; box-shadow: none; }
+.st-fight-target.on { border-color: var(--accent-bright, #f0c87a); box-shadow: 0 0 10px rgba(240,200,122,.4); background: rgba(70,24,16,.85); }
+.st-fight-tname { font: 600 15px 'Cinzel', Georgia, serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-fight-thp { font: 600 13px 'Barlow Condensed', sans-serif; color: #ffb3a6; }
+.st-fight-tbar { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: #0d0a05; overflow: hidden; }
+.st-fight-tbar i { display: block; height: 100%; background: linear-gradient(90deg, #7a2419, #c84534); }
+.st-fight-tres { grid-column: 1 / -1; font-size: 12px; opacity: .75; }
+.st-fight-empty { font-size: 14px; opacity: .7; }
+#st-fight-modes .st-dock-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+#st-fight-modes .st-dock-tg { width: auto; margin: 0; min-height: 34px; padding: 4px 12px; border-radius: 17px; font-size: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); color: #f0e6d2; clip-path: none; }
+#st-fight-modes .st-dock-tg.on { background: var(--accent-color, #c8a566); color: #1a140b; border-color: var(--accent-color, #c8a566); font-weight: 700; }
+#st-fight-modes .st-dock-tg-off { opacity: .45; }
+#st-fight-actions .st-dock-center { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#st-fight-actions .st-dock-center > button, #st-fight-actions #dock-fav-spells > button { width: auto; margin: 0; min-height: 58px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 12px; font: 500 14px 'Barlow Condensed', sans-serif; text-transform: none; letter-spacing: .2px; clip-path: none;
+  background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }
+#st-fight-actions .st-dock-center > button .sk-ic { width: 26px; height: 26px; margin: 0; }
+#st-fight-actions .st-dock-center > button:first-child { grid-column: span 3; min-height: 66px; font-size: 17px; border-color: var(--accent-bright, #f0c87a); background: linear-gradient(180deg, #4a3618, #241a0c); }
+#st-fight-actions .st-dock-center > button.btn-success { background: linear-gradient(180deg, #1f3a22, #122014); border-color: #3c7a3f; }
+#st-fight-attack > div { margin: 0 !important; padding: 0 !important; border: 0 !important; }
+#st-fight-attack > div > h4, #st-fight-attack > div > p, #st-fight-attack > div > label:first-of-type, #st-fight-attack #attack-target-select { display: none; }
+#st-fight-attack > div > button.btn-success { min-height: 52px; font-size: 18px; border-radius: 12px; }
+#st-fight-effects .st-dock-right { display: flex; flex-wrap: wrap; gap: 6px; }
+#st-fight-effects .st-dock-eff { padding: 4px 10px; border-radius: 14px; border: 1px solid #3c7a3f; background: rgba(20,40,22,.6); font-size: 13px; }
+.st-fight-gear-btn { width: 100%; margin: 4px 0 0; background: transparent; border: 1px dashed var(--border-bright, #8a6f3f); color: var(--text-dim, #9c8f76); text-transform: none; letter-spacing: 0; clip-path: none; }

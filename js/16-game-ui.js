@@ -1,4 +1,4 @@
-/* ===== Игровой интерфейс для телефона, этап 1 (2026-10-30) =====
+/* ===== Игровой интерфейс для телефона, этапы 1–2 (2026-10-30) =====
    Только на ширине ≤900px: пять вкладок снизу — Герой · Бой · Сумка · Магия · Ещё. Разделы и их «пилюли»
    описаны в window.stNavGroups (index.html). Служебное (аккаунт, шрифт, звук, поиск, сброс, файлы, Drive,
    снапшоты) на телефоне переезжает в «Ещё → Настройки», на компьютере возвращается на старые места.
@@ -136,12 +136,105 @@
     function closeSheets() { more.classList.remove('open'); settings.classList.remove('open'); }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (more.classList.contains('open') || settings.classList.contains('open'))) { e.preventDefault(); e.stopPropagation(); closeSheets(); } }, true);
 
+    // ---------- экран «Бой» (этап 2, только телефон) ----------
+    // В сессии вверху вкладки «Бой» — ход, цели карточками, режимы атаки, крупные кнопки действий, сам блок атаки
+    // (переносится из «Сессии» целиком, с id и обработчиками), бросок по просьбе мастера и эффекты на тебе.
+    // Нижняя боевая панель на телефоне сжимается до одной строки. Снаряжение вкладки прячется под кнопку.
+    var tab3 = el('tab3');
+    var fight = document.createElement('div');
+    fight.id = 'st-fight'; fight.className = 'panel st-fight';
+    fight.innerHTML =
+        '<div class="st-fight-turn" id="st-fight-turn"></div>' +
+        '<div class="st-fight-sec"><h4>Цели</h4><div id="st-fight-targets" class="st-fight-targets"></div></div>' +
+        '<div class="st-fight-sec" id="st-fight-modes"></div>' +
+        '<div class="st-fight-sec" id="st-fight-actions"></div>' +
+        '<div class="st-fight-sec" id="st-fight-attack"><h4>Атака</h4></div>' +
+        '<div id="st-fight-check"></div>' +
+        '<div class="st-fight-sec"><h4>На мне</h4><div id="st-fight-effects"></div></div>' +
+        '<button type="button" id="st-fight-gear-btn" class="st-fight-gear-btn">Снаряжение и расчёт атак ▾</button>';
+    if (tab3) tab3.insertBefore(fight, tab3.firstChild);
+    el('st-fight-gear-btn').onclick = function () {
+        var on = !document.body.classList.contains('st-fight-gear');
+        document.body.classList.toggle('st-fight-gear', on);
+        this.textContent = on ? 'Скрыть снаряжение ▴' : 'Снаряжение и расчёт атак ▾';
+    };
+    var fightMoved = [];
+    (function collectFight() {
+        function add(node, to) { if (node) fightMoved.push({ node: node, to: to }); }
+        add(el('dock-toggles'), 'st-fight-modes');
+        add(document.querySelector('#combat-dock .st-dock-center'), 'st-fight-actions');
+        var ts = el('attack-target-select'); add(ts && ts.parentNode, 'st-fight-attack');
+        add(el('group-check-player-panel'), 'st-fight-check');
+        add(el('dock-effects'), 'st-fight-effects');
+        fightMoved.forEach(function (m) { m.mark = document.createComment('st-fight'); m.node.parentNode.insertBefore(m.mark, m.node); });
+    })();
+    function placeFight(mobile) {
+        fightMoved.forEach(function (m) {
+            if (mobile) { if (m.node.parentNode !== el(m.to)) el(m.to).appendChild(m.node); }
+            else if (m.mark.parentNode && m.node.previousSibling !== m.mark) m.mark.parentNode.insertBefore(m.node, m.mark.nextSibling);
+        });
+    }
+    function inSession() { try { return !!(window.CloudSync && window.CloudSync.isInSession() && window.CloudSync.getSessionData()); } catch (e) { return false; } }
+    function renderFight() {
+        var on = mqMobile.matches && inSession();
+        document.body.classList.toggle('st-fight-on', on);
+        if (!on) return;
+        var t = 0, r = 0; try { t = gameTurn; r = gameRound; } catch (e) { }
+        el('st-fight-turn').innerHTML = '<span>Ход <b>' + t + '</b></span><span>Круг <b>' + r + '</b></span>';
+        var s = window.CloudSync.getSessionData() || {}, sel = el('attack-target-select');
+        var alive = (s.enemies || []).filter(function (e) { return (e.curHp || 0) > 0; });
+        var cur = sel ? sel.value : '';
+        el('st-fight-targets').innerHTML = alive.length ? alive.map(function (e) {
+            var pct = e.maxHp > 0 ? Math.max(0, Math.min(100, e.curHp / e.maxHp * 100)) : 0;
+            var res = ''; try { res = window.StCombat ? window.StCombat.resistSummary(e) : ''; } catch (x) { }
+            return '<button type="button" class="st-fight-target' + (e.id === cur ? ' on' : '') + '" data-id="' + esc(e.id) + '">' +
+                '<span class="st-fight-tname">' + (s.markedTarget === e.id ? '🎯 ' : '') + esc(e.name) + '</span>' +
+                '<span class="st-fight-thp">' + e.curHp + '/' + e.maxHp + '</span>' +
+                '<span class="st-fight-tbar"><i style="width:' + pct + '%"></i></span>' +
+                (res ? '<span class="st-fight-tres">' + esc(res) + '</span>' : '') + '</button>';
+        }).join('') : '<div class="st-fight-empty">Противников нет. Когда мастер добавит врагов, они появятся здесь.</div>';
+    }
+    el('st-fight-targets').addEventListener('click', function (e) {
+        var b = e.target.closest('.st-fight-target'); if (!b) return;
+        var sel = el('attack-target-select'); if (!sel) return;
+        sel.value = b.getAttribute('data-id'); sel.dispatchEvent(new Event('change', { bubbles: true }));
+        renderFight();
+    });
+    window.stFightRender = renderFight;
+    function goFight(focusAttack) {
+        goTab('tab3');
+        if (focusAttack) setTimeout(function () { var a = el('st-fight-attack'); if (a) try { a.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { } }, 60);
+    }
+    // на телефоне кнопки «Атака»/«Атаковать помеченного» ведут к блоку атаки на экране «Бой», а не на вкладку «Сессия»
+    var origAttack = window.dockAttack, origMarked = window.dockAttackMarked;
+    window.dockAttack = function () { if (!mqMobile.matches) return origAttack.apply(this, arguments); goFight(true); };
+    window.dockAttackMarked = function () {
+        if (!mqMobile.matches) return origMarked.apply(this, arguments);
+        var s = window.CloudSync && window.CloudSync.getSessionData && window.CloudSync.getSessionData(), sel = el('attack-target-select');
+        if (s && s.markedTarget && sel && Array.prototype.some.call(sel.options, function (o) { return o.value === s.markedTarget; })) { sel.value = s.markedTarget; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        renderFight(); goFight(true);
+    };
+    // строка свёрнутой панели: кнопка «К бою»
+    var mini = document.querySelector('#combat-dock .st-dock-mini');
+    if (mini) {
+        var go = document.createElement('button'); go.type = 'button'; go.className = 'st-dock-info-toggle st-dock-tofight'; go.textContent = '⚔️ К бою';
+        go.onclick = function () { goFight(false); };
+        mini.appendChild(go);
+    }
+    var origDock = window.updateCombatDock;
+    if (typeof origDock === 'function') window.updateCombatDock = function () { var r = origDock.apply(this, arguments); try { renderFight(); } catch (e) { } return r; };
+    var origTargets = window.renderAttackTargetSelect;
+    if (typeof origTargets === 'function') window.renderAttackTargetSelect = function () { var r = origTargets.apply(this, arguments); try { renderFight(); } catch (e) { } return r; };
+
     // ---------- запуск ----------
     function applyLayout() {
         var mobile = mqMobile.matches;
         document.body.classList.toggle('st-game-ui', mobile);
         if (!mobile) closeSheets();
         placeService(mobile);
+        placeFight(mobile);
+        renderFight();
+        if (typeof window.updateCombatDock === 'function') try { window.updateCombatDock(); } catch (e) { }
         setBarH();
         var activeTab = document.querySelector('.tab-content.active'), g = 'hero';
         if (activeTab && window.stNavGroups) for (var k in window.stNavGroups) if (window.stNavGroups[k].tabs.indexOf(activeTab.id) >= 0) g = k;
