@@ -4035,7 +4035,16 @@
             alert('Игрок заключил тёмный пакт лича: вампиризм и ликантропия ему недоступны. Сначала снимите перки ветки лича.');
             renderSupernaturalPanel(); return;
         }
-        currentSupernaturalState[key] = checked;
+        const s = currentSupernaturalState;
+        // Что-то одно: вампир, оборотень или лич. Смена пути сбрасывает прежний со всеми плюшками.
+        if (checked && key === 'lycanthropy' && s.vampirism) {
+            if (!confirm('Игрок сейчас вампир. Став оборотнем, он потеряет вампиризм и все его способности (в том числе ветку лорда). Продолжить?')) { renderSupernaturalPanel(); return; }
+            s.vampirism = false; s.vampire = defaultSupernaturalState().vampire;
+        } else if (checked && key === 'vampirism' && s.lycanthropy) {
+            if (!confirm('Игрок сейчас оборотень. Став вампиром, он потеряет ликантропию и все её способности. Продолжить?')) { renderSupernaturalPanel(); return; }
+            s.lycanthropy = false; s.werewolf = defaultSupernaturalState().werewolf;
+        }
+        s[key] = checked;
         saveSupernaturalState().then(renderSupernaturalPanel);
     };
     window.setWerewolfHearts = function (val) {
