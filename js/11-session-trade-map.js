@@ -396,7 +396,7 @@
 
     // Обёртка для автоматической фиксации успеха по имени навыка (крафт/каст) —
     // не боевые навыки качаются «за каждое успешное действие», это и есть та фиксация.
-    const COOKING_FAIL_PROGRESS = 0.25; // доля успеха за провальную готовку (похлёбку)
+    const COOKING_FAIL_PROGRESS = 0.5; // доля успеха за провальную готовку (похлёбку); было 0,25, с 2026-10-30 — половина
     const MISS_SKILL_PROGRESS = 0.25; // доля успеха навыка за промах атакой/заклинанием
     function logSkillSuccessByName(skillName, amount) {
         const idx = skillNames.indexOf(skillName);

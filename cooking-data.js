@@ -448,7 +448,9 @@ const failedDish = { name: "Похлёбка", weight: 0.5, price: 10, effect: "
 // пока навык Кулинария < minSkill, блюдо без рецепта вообще не даёт эффекта —
 // чтобы достичь потолка, нужны дорогие продукты. Все числа — в COOK_IMPROV, подкручивай тут.
 // ---------------------------------------------------------------------------
-const COOK_IMPROV = { maxUnits: 9, duration: 50, minSkill: 20, hpCap: 15, mpCap: 15, eatRawLoss: 10 };
+// 2026-10-30 (просьба Никиты): базовые свойства продуктов в КУЛИНАРИИ +20% (propBoost; алхимия не затронута — у неё своя таблица свойств),
+// потолок блюда без рецепта поднят в ту же меру (15 → 18, иначе прибавка упиралась бы в потолок); готовые блюда по рецепту сильнее на dishBoost (+20%).
+const COOK_IMPROV = { maxUnits: 9, duration: 50, minSkill: 20, hpCap: 18, mpCap: 18, eatRawLoss: 10, propBoost: 1.2, dishBoost: 0.2 };
 const COOK_VEG = ["Капуста", "Морковь", "Тыква", "Зелёное яблоко", "Лук-порей", "Картофель", "Красное яблоко", "Помидор", "Пепельный батат"];
 function improvisedDish(potMap) {
     const CK = window.cookingIngredients || {};
@@ -466,6 +468,7 @@ function improvisedDish(potMap) {
         else if (cat === 'Напиток') m = Math.max(1, Math.round(pr * 0.2));
         hp += h * q; mp += m * q;
     });
+    hp = Math.round(hp * COOK_IMPROV.propBoost); mp = Math.round(mp * COOK_IMPROV.propBoost);
     return {
         hp: Math.min(COOK_IMPROV.hpCap, hp), mp: Math.min(COOK_IMPROV.mpCap, mp),
         price: Math.max(1, Math.round(price)), units

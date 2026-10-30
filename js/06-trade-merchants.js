@@ -839,7 +839,10 @@
             } else { improvEffects = null; }
             }
         }
-        const finalEffect = (improvEffects ? dish.effect : scaleEffectText(dish.effect, powerBonus, durBonus)) + alchemyNote;
+        // Блюда по рецепту сильнее на COOK_IMPROV.dishBoost (+20%, 2026-10-30), множится с перками Кулинарии; похлёбка (провал) и импровизация не усиливаются здесь.
+        const recipeBoost = matchedRecipe ? ((window.COOK_IMPROV && window.COOK_IMPROV.dishBoost) || 0) : 0;
+        const effPower = (1 + powerBonus) * (1 + recipeBoost) - 1;
+        const finalEffect = (improvEffects ? dish.effect : scaleEffectText(dish.effect, effPower, durBonus)) + alchemyNote;
         // Цена блюда растёт вместе с его силой: перки Кулинарии усиливают эффект (×(1+сила)) и длительность (×(1+длит.)) — цена масштабируется так же.
         const strengthMult = (1 + powerBonus) * (1 + durBonus);
         const dishPrice = Math.max(dish.price || 0, Math.round((dish.price || 0) * strengthMult));
@@ -849,7 +852,7 @@
         const dishExtra = improvEffects ? { price: dishPrice, alchemyEffects: improvEffects, craftCost: craftCostOf(potNames.map(n => ({ name: n, qty: potMap[n] })), 1), craftKind: 'cook' } : { price: dishPrice, craftCost: craftCostOf(potNames.map(n => ({ name: n, qty: potMap[n] })), 1), craftKind: 'cook' };
         if (bonusAlchemy) dishExtra.bonusAlchemy = bonusAlchemy;
         addToInventory(dishId, dish.name, 1, dish.weight || 1, (matchedRecipe || improvEffects) ? 'Блюдо' : 'Провал готовки', finalEffect, dishExtra);
-        // Удачное блюдо — полный успех кулинарии; провал (похлёбка) тоже чему-то учит, но слабее: четверть успеха.
+        // Удачное блюдо — полный успех кулинарии; провал (похлёбка) тоже чему-то учит, но слабее: половина успеха (COOKING_FAIL_PROGRESS).
         if (typeof logSkillSuccessByName === 'function') logSkillSuccessByName('Кулинария', matchedRecipe ? 1 : COOKING_FAIL_PROGRESS);
         if (matchedRecipe) {
             // Запоминаем именно то сочетание, что сработало (с учётом замены ингредиента перком).
@@ -868,7 +871,7 @@
             resultEl.innerHTML = `<div style="color:#2ecc71; font-weight:bold;">✅ Получилось: ${escHtml(matchedRecipe.name)}${usedSubstitution ? ' <span style="font-weight:normal;">(с заменой ингредиента — «Сочетание вкуса»)</span>' : ''}</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>` + extraNote;
         } else {
-            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышло: ${escHtml(dish.name)}</div>${improvInfo && improvInfo.tooLow ? `<div style="font-size:13px;">Навык Кулинарии ниже ${window.COOK_IMPROV.minSkill} — блюдо без рецепта пока получается пустым (без эффекта).</div>` : ''}<div style="font-size:13px; opacity:.75;">Провал тоже чему-то учит: +¼ успеха к Кулинарии (удачное блюдо даёт целый).</div>` +
+            resultEl.innerHTML = `<div style="color:#e67e22; font-weight:bold;">Рецепт не совпал — вышло: ${escHtml(dish.name)}</div>${improvInfo && improvInfo.tooLow ? `<div style="font-size:13px;">Навык Кулинарии ниже ${window.COOK_IMPROV.minSkill} — блюдо без рецепта пока получается пустым (без эффекта).</div>` : ''}<div style="font-size:13px; opacity:.75;">Провал тоже чему-то учит: +½ успеха к Кулинарии (удачное блюдо даёт целый).</div>` +
                 `<div style="opacity:.85;">${escHtml(finalEffect)}</div>`;
         }
 
