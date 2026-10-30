@@ -388,9 +388,9 @@
         _localSaveTimer = setTimeout(() => _buildAndSaveData(false), 300);
     }
 
-    function _buildAndSaveData(immediate, recoveryOnly, localOnly) {
+    function _buildAndSaveData(immediate, recoveryOnly, localOnly, buildOnly) {
         // 6.6: пока висит вопрос «Восстановить?», обычное сохранение молчит — иначе pagehide перед перезагрузкой затёрло бы копию текущим (старым) состоянием формы
-        if (window.__stRecoveryPending && !recoveryOnly) return;
+        if (window.__stRecoveryPending && !recoveryOnly && !buildOnly) return;
         let perkStates = {};
         _allPerkCheckboxes.forEach(chk => {
             let key = `skill${chk.dataset.skillidx}-perk${chk.dataset.perkidx}-step${chk.dataset.step}`;
@@ -549,6 +549,7 @@
             // бонусы богов, которые мастер применяет при атаках врагов по игроку
             godGM: { daedraUndeadResist: gb('daedraUndeadResist'), spellAbsorb: gb('spellAbsorb'), ignoreMagicDmg: gb('ignoreMagicDmg'), fearChance: gb('fearChance'), potionPower: gb('potionPower') }
         };
+        if (buildOnly) return data;
         const json = JSON.stringify(data);
         if (recoveryOnly) { try { localStorage.setItem('skyrim_recovery', json); localStorage.setItem('skyrim_recovery_ts', String(Date.now())); } catch (e) { } return; }
         if (json === _lastLocalSaveHash) { stSetDirty(false); return; } // ничего не изменилось с прошлого сохранения
@@ -567,6 +568,8 @@
     // stForceSave — записать лист в облако заново, даже если он не менялся (облако затёрла старая вкладка — восстанавливаем);
     // stMarkSynced — лист только что взят из облака: запомнить его как сохранённый, в облако не отправлять (иначе вкладки пересохраняли бы друг друга).
     window.stForceSave = function () { clearTimeout(_localSaveTimer); _lastLocalSaveHash = ''; _buildAndSaveData(true); };
+    // stBuildSheet — текущий лист в том виде, в каком он ушёл бы в облако (для слияния с чужой версией), ничего не сохраняя.
+    window.stBuildSheet = function () { return _buildAndSaveData(false, false, true, true); };
     window.stMarkSynced = function () { clearTimeout(_localSaveTimer); _lastLocalSaveHash = ''; _buildAndSaveData(true, false, true); };
 
     // Сохранить всё, что ещё ждёт таймера (локально — 300 мс, облако — 800 мс), когда вкладка закрывается или уходит в фон.

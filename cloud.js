@@ -17,6 +17,8 @@
     let unsubWatchedCharacter = null;
     let saveTimer = null;
     let pendingSave = null; // отложенная запись, ещё не ушедшая в облако (для flushSave)
+    let saveRetryTimer = null; // повтор записи, не прошедшей из-за сети
+    let saveInFlight = false, saveQueued = false; // запись в облако в пути / за ней ждёт следующая
     // Добыча с трупа и карманов на листе игрока — из той же полной базы, что у мастера
     // (items-data + кузница, блюда, зелья, свитки, книги, уникальное оружие), иначе вместо вещей выпадали заглушки.
     let _lootPool = null;
@@ -40,6 +42,8 @@
     let lastSaveSeq = 0;
     let sheetIsStale = false;   // вкладки перекидываются листом по кругу — сохранение отсюда остановлено (showStaleSheetBanner)
     let awaitingOwnDoc = false; // вкладка вернулась из фона — не пишем, пока не сверимся с облаком
+    let syncedData = null;      // содержимое листа с меткой syncedStamp — база для слияния (mergeSheets)
+    let syncedStamp = null;     // метка листа, который точно лежит в облаке и на котором построен наш (загружен, подтянут или записан нами)
     let lastSaveHash = null;    // отпечаток содержимого этого листа (saveHash) — чужая запись того же содержимого не считается устареванием
     function sheetHash(d) { // FNV-1a по JSON без меток записи
         const c = Object.assign({}, d); delete c.saveSeq; delete c.saveBy; delete c.saveHash; delete c.saveBase;
@@ -219,19 +223,13 @@
     }
 
     // Чужая метка записи в облаке = лист записала другая вкладка/устройство. Мастер метку не трогает (пишет только свои поля).
-    // Каждая запись несёт saveBase — метку, которую писавшая вкладка видела последней. Решаем, чей лист главнее:
-    //  - у нас есть ещё не отправленные правки (игрок прямо сейчас играет здесь) — оставляем свой лист и пишем его заново;
-    //  - та вкладка видела нашу последнюю запись (saveBase совпадает) — её лист новее: берём его;
-    //  - не видела, а последняя запись была наша — та вкладка устарела и затёрла облако старым листом
-    //    (откат даты, золота, вещей): сразу пишем свой лист обратно, та вкладка увидит его и подтянет;
-    //  - иначе мы сами отстали (долго были в фоне) — берём свежий лист.
-    // Вкладка, вернувшаяся из фона, своих отложенных правок не отстаивает: они построены на старом листе.
+    // Наша вкладка писать поверх чужой записи не может (saveCharacter сверяет метку в транзакции), значит чужой лист новее — берём его.
     let staleActs = [];
     function checkStaleSheet(data, resumed) {
         const st = saveStampOf(data);
         if (!st || st === lastSaveStamp || data.saveBy === TAB_ID || sheetIsStale) return;
         // тот же самый лист (другая вкладка просто пересохранила его) — только запоминаем метку
-        if (data.saveHash && data.saveHash === lastSaveHash && !(!resumed && (pendingSave || window._dirty))) { lastSaveStamp = st; lastSaveSeq = Math.max(lastSaveSeq, parseInt(data.saveSeq) || 0); return; }
+        if (data.saveHash && data.saveHash === lastSaveHash && !(!resumed && (pendingSave || window._dirty))) { lastSaveStamp = syncedStamp = st; syncedData = data; lastSaveSeq = Math.max(lastSaveSeq, parseInt(data.saveSeq) || 0); return; }
         // Предохранитель: если вкладки почему-то перекидываются листом без конца — останавливаемся и просим закрыть лишние.
         const now = Date.now();
         staleActs = staleActs.filter(t => now - t < 60000); staleActs.push(now);
@@ -240,25 +238,76 @@
             showStaleSheetBanner();
             return;
         }
-        const hasPending = !resumed && (!!pendingSave || !!window._dirty);
-        const lastWasMine = !!lastSaveStamp && lastSaveStamp.endsWith(':' + TAB_ID);
-        const keepMine = hasPending || (data.saveBase !== lastSaveStamp && lastWasMine);
+        // Раньше здесь была ветка «облако затёрла отставшая вкладка — пишем свой лист обратно»: вкладка, чья последняя запись
+        // была своей, считала чужой лист устаревшим, если тот не помнил её метку. Но проснувшийся ноутбук видит только ПОСЛЕДНЮЮ
+        // запись телефона (её saveBase — предыдущая запись того же телефона) и по этому правилу затирал всю игру с телефона
+        // своим старым листом. Теперь вслепую поверх чужой записи не пишет никто (сверка в saveCharacter), поэтому чужая
+        // запись в облаке всегда новее нашего листа — берём её, а свои неотправленные правки дописываем к ней слиянием.
         lastSaveSeq = Math.max(lastSaveSeq, parseInt(data.saveSeq) || 0);
-        lastSaveStamp = st;
-        if (keepMine) {
-            console.warn('Облако затёрто листом с другой вкладки/устройства — записываем текущий лист обратно.');
-            lastSaveHash = null;
-            if (typeof window.stForceSave === 'function') window.stForceSave();
-            return;
+        // Есть свои ещё не отправленные правки — отправляем их сейчас: saveCharacter увидит чужую метку и сольёт листы по полям.
+        if (pendingSave || window._dirty) {
+            clearTimeout(saveTimer); pendingSave = null;
+            if (typeof window.stForceSave === 'function') { window.stForceSave(); return; }
         }
-        clearTimeout(saveTimer); pendingSave = null; // наша отложенная запись построена на старом листе — в облако она не уйдёт
+        lastSaveStamp = syncedStamp = st; syncedData = data;
+        clearTimeout(saveTimer); pendingSave = null; clearTimeout(saveRetryTimer);
+        takeCloudSheet(data, false);
+    }
+    // Взять лист из облака вместо своего (его изменили на другом устройстве) — без записи обратно в облако.
+    function takeCloudSheet(data, lostEdits, merged, base) {
         lastSaveHash = data.saveHash || null;
         console.warn('Лист персонажа изменён на другом устройстве — подтягиваем свежую версию.');
-        if (window.applyCharacterData) {
-            window.applyCharacterData(data);
-            if (window.updateAll) window.updateAll();
-            if (typeof window.stMarkSynced === 'function') window.stMarkSynced();
+        if (!window.applyCharacterData) return;
+        // После слияния (base известен) поверх ТЕКУЩЕГО листа кладём только то, что поменялось в облаке, — правки,
+        // сделанные здесь, пока шла запись, не пропадают и уходят следующей записью.
+        let apply = data, more = false;
+        if (base && typeof window.stBuildSheet === 'function') {
+            const local = window.stBuildSheet();
+            apply = Object.assign({}, local);
+            Object.keys(data).forEach(k => { if (SAVE_META.includes(k) || stableJson(data[k]) !== stableJson(base[k])) apply[k] = data[k]; });
+            more = Object.keys(apply).some(k => !SAVE_META.includes(k) && stableJson(apply[k]) !== stableJson(data[k]));
         }
+        window.applyCharacterData(apply);
+        if (window.updateAll) window.updateAll();
+        if (more && typeof window.stForceSave === 'function') window.stForceSave();
+        else if (typeof window.stMarkSynced === 'function') window.stMarkSynced();
+        if (lostEdits && lostEdits.length || !merged) showSyncNotice('Лист изменили на другом устройстве — загружена свежая версия.'
+            + (lostEdits && lostEdits.length ? ' Не сохранилось (поменяно и там, и тут): ' + lostEdits.map(sheetFieldName).filter((x, i, a) => a.indexOf(x) === i).join(', ') + '.' : ''));
+    }
+    // Трёхстороннее слияние листа по полям верхнего уровня: base — лист, на котором построены наши правки (последний
+    // загруженный/записанный), mine — наш текущий лист, cloud — то, что сейчас в облаке. Возвращает поля, которые надо дописать.
+    const SAVE_META = ['saveSeq', 'saveBy', 'saveBase', 'saveHash'];
+    const QUIET_FIELDS = ['restState', 'resistances', 'godGM', 'turnSync']; // служебное/пересчитываемое — о расхождении не сообщаем
+    function stableJson(v) {
+        if (v === undefined) return 'u';
+        if (v === null || typeof v !== 'object') return JSON.stringify(v);
+        if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+        return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}';
+    }
+    function mergeSheets(base, mine, cloud) {
+        const patch = {}, lost = []; let changed = false;
+        if (!base) return { patch, lost: ['весь лист'], changed: false }; // не знаем, на чём построен наш лист — верим облаку
+        Object.keys(mine).forEach(k => {
+            if (SAVE_META.includes(k)) return;
+            const m = stableJson(mine[k]), b = stableJson(base[k]), c = stableJson(cloud[k]);
+            if (m === b || m === c) return;            // здесь не меняли или уже то же самое
+            if (c === b) { patch[k] = mine[k]; changed = true; } // меняли только здесь
+            else if (!QUIET_FIELDS.includes(k)) lost.push(k); // меняли и там, и тут — остаётся облачное
+        });
+        return { patch, lost, changed };
+    }
+    const SHEET_FIELD_NAMES = { gold: 'золото', inventory: 'инвентарь', notes: 'заметки', vitals: 'здоровье/магия', gameDayNum: 'дата', gameMonth: 'дата', gameYear: 'дата', characterLevel: 'уровень', skillProgress: 'опыт навыков', activeTimedEffects: 'эффекты' };
+    function sheetFieldName(k) { return SHEET_FIELD_NAMES[k] || k; }
+    function showSyncNotice(text) {
+        let b = el('sync-notice');
+        if (!b) {
+            b = document.createElement('div'); b.id = 'sync-notice';
+            b.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100000;max-width:520px;width:calc(100% - 32px);padding:10px 14px;border-radius:6px;background:#1f2f3a;color:#fff;border:2px solid #3498db;box-shadow:0 4px 18px rgba(0,0,0,.5);font-size:14px;cursor:pointer;';
+            b.onclick = () => b.remove();
+            document.body.appendChild(b);
+        }
+        b.textContent = text;
+        clearTimeout(b._t); b._t = setTimeout(() => b.remove(), 8000);
     }
     function showStaleSheetBanner() {
         if (el('stale-sheet-banner')) return;
@@ -273,7 +322,7 @@
 
     function loadCharacterFromCloud(uid) {
         db.collection('characters').doc(uid).get().then(doc => {
-            if (doc.exists) { lastSaveStamp = saveStampOf(doc.data()); lastSaveSeq = parseInt(doc.data().saveSeq) || 0; lastSaveHash = doc.data().saveHash || null; }
+            if (doc.exists) { lastSaveStamp = syncedStamp = saveStampOf(doc.data()); syncedData = doc.data(); lastSaveSeq = parseInt(doc.data().saveSeq) || 0; lastSaveHash = doc.data().saveHash || null; }
             if (doc.exists && window.applyCharacterData) {
                 window.applyCharacterData(doc.data());
                 if (window.updateAll) window.updateAll();
@@ -343,9 +392,54 @@
                 // Страховка: Firestore целиком отвергает запись, если где-то внутри есть undefined
                 // («Unsupported field value: undefined»). Убираем такие поля (в массивах — null).
                 data = stripUndefinedForCloud(data);
-                db.collection('characters').doc(currentUser.uid).set(data, { merge: true })
-                    .catch(e => console.error('Ошибка сохранения в облако:', e));
-
+                // Пишем только поверх того листа, который видели (syncedStamp). Если в облаке уже чужая метка — лист с тех пор
+                // менялся на другом устройстве (ноутбук проспал всю игру с телефона, вкладка без сети, второе устройство
+                // пересохранило лист). Тогда не затираем облако целиком, а сливаем по полям листа (mergeSheets): что поменяли
+                // только здесь — дописываем, что поменяли там — берём оттуда, что поменяли и там и тут — берём из облака.
+                // Сверка и запись — в одной транзакции, иначе чужая запись могла бы проскочить между ними.
+                // Записи этой вкладки идут строго по одной: следующая ждёт ответа предыдущей (иначе вторая не увидела бы слияния первой).
+                if (saveInFlight) { saveQueued = true; return; }
+                saveInFlight = true;
+                const base = syncedStamp, baseData = syncedData, myStamp = lastSaveStamp;
+                const ref = db.collection('characters').doc(currentUser.uid);
+                clearTimeout(saveRetryTimer);
+                db.runTransaction(tx => tx.get(ref).then(doc => {
+                    const cur = doc.exists ? doc.data() : null;
+                    if (!(cur && cur.saveBy && cur.saveBy !== TAB_ID && saveStampOf(cur) !== base && cur.saveHash !== data.saveHash)) {
+                        tx.set(ref, data, { merge: true });
+                        return { wrote: data };
+                    }
+                    const m = mergeSheets(baseData, data, cur);
+                    if (!m.changed) return { took: cur, lost: m.lost };
+                    const full = Object.assign({}, cur, m.patch);
+                    m.patch.saveHash = full.saveHash = sheetHash(full);
+                    m.patch.saveBase = full.saveBase = saveStampOf(cur);
+                    m.patch.saveSeq = full.saveSeq = Math.max(parseInt(cur.saveSeq) || 0, data.saveSeq) + 1;
+                    m.patch.saveBy = full.saveBy = TAB_ID;
+                    tx.set(ref, m.patch, { merge: true });
+                    return { wrote: full, merged: true, lost: m.lost };
+                })).then(r => {
+                    saveInFlight = false;
+                    if (r.wrote && !r.merged) {
+                        if (syncedStamp === base) { syncedStamp = myStamp; syncedData = data; }
+                        syncSessionVitals(data);
+                        if (saveQueued) { saveQueued = false; if (typeof window.stForceSave === 'function') window.stForceSave(); }
+                        return;
+                    }
+                    const doc = r.wrote || r.took;
+                    lastSaveSeq = Math.max(lastSaveSeq, parseInt(doc.saveSeq) || 0);
+                    lastSaveStamp = syncedStamp = saveStampOf(doc); syncedData = doc;
+                    clearTimeout(saveTimer); pendingSave = null; saveQueued = false;
+                    takeCloudSheet(doc, r.lost, !!r.merged, baseData);
+                    if (r.merged) syncSessionVitals(doc);
+                }).catch(e => {
+                    // Нет сети — транзакция не проходит. Повторим чуть позже последней версией листа (новая правка отменит повтор).
+                    saveInFlight = false; saveQueued = false;
+                    console.error('Ошибка сохранения в облако:', e);
+                    if (!sheetIsStale) saveRetryTimer = setTimeout(() => { if (typeof window.stForceSave === 'function') window.stForceSave(); }, 5000);
+                });
+            };
+            const syncSessionVitals = (data) => {
                 if (currentSessionCode) {
                     const vitals = data.vitals || [0, 0, 0, 0];
                     const patch = {};
