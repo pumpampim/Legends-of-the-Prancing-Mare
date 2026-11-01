@@ -19,11 +19,11 @@ const LVL = +(process.env.LVL || 30), SKILL = +(process.env.SKILL || 75);
   const enemies = () => (H.store[sk].doc.enemies || []);
   let eid = null;
   async function freshTarget() {
-    await S.gmAddEnemy(gm, 'Мамонт', { 'enemy-hp-input': '999999' }); await wait(1200);
+    await S.gmAddEnemy(gm, process.env.TARGET || 'Мамонт', { 'enemy-hp-input': '999999' }); await wait(1200);
     const list = enemies(); eid = list[list.length - 1].id;
   }
   await freshTarget();
-  const spells = await pl.evaluate(([LVL, SKILL, TIERS]) => {
+  const spells = await pl.evaluate(([LVL, SKILL, TIERS, FILTER]) => {
     window.alert = m => { (window.__al = window.__al || []).push(String(m)); }; window.confirm = () => true; window.prompt = () => '1';
     try { combatActionAllowed = () => true; } catch (e) { } try { bonusActionAllowed = () => true; } catch (e) { }
     saveLocalStorage(true);
@@ -41,11 +41,12 @@ const LVL = +(process.env.LVL || 30), SKILL = +(process.env.SKILL || 75);
     applyCharacterData(d); updateAll(); saveLocalStorage(true);
     const list = [];
     Object.entries(spellsData).forEach(([school, tiers]) => TIERS.forEach(t => (tiers[t] || []).forEach(s => {
+      if (FILTER && !new RegExp(FILTER, 'i').test(s.desc + ' ' + s.name)) return;
       try { learnSpellIntoBook(school, s.name); list.push({ school, tier: t, name: s.name, baseCost: s.baseCost }); } catch (e) { }
     })));
     updateAll();
     return list;
-  }, [LVL, SKILL, TIERS]);
+  }, [LVL, SKILL, TIERS, process.env.FILTER || '']);
   await wait(500);
   const acts = await pl.evaluate(() => { window.renderAttackTargetSelect(); return Array.from(document.getElementById('attack-action-select').options).map(o => [o.value, o.text]); });
   const out = [];
@@ -96,7 +97,7 @@ const LVL = +(process.env.LVL || 30), SKILL = +(process.env.SKILL || 75);
     console.error(s.school, s.tier, s.name, JSON.stringify(row.base), '|', JSON.stringify(row.enh).slice(0, 200));
     out.push(row);
   }
-  const file = path.join(process.env.OUT || __dirname, 'out-balance-spells-l' + LVL + '.json');
+  const file = path.join(process.env.OUT || __dirname, 'out-balance-spells-l' + LVL + (process.env.TARGET ? '-' + process.env.TARGET.replace(/\s+/g, '_') : '') + '.json');
   fs.writeFileSync(file, JSON.stringify(out, null, 1));
   console.log('written', file, out.length);
   console.log('issues', JSON.stringify(H.issues).slice(0, 1500));
