@@ -72,6 +72,7 @@
     window.stGameUiSync = function (g, tabId) {
         curGroup = g || curGroup;
         var t1 = el('tab1'); document.body.classList.toggle('st-tab1', !!(t1 && t1.classList.contains('active')));
+        var t3 = el('tab3'); document.body.classList.toggle('st-tab3', !!(t3 && t3.classList.contains('active')));
         bar.querySelectorAll('.st-tb').forEach(function (b) {
             var bg = b.getAttribute('data-g');
             b.classList.toggle('active', bg === curGroup);
@@ -395,6 +396,7 @@
     function chip(icon, val, title, cls) { return '<span class="st-hero-chip' + (cls ? ' ' + cls : '') + '" title="' + esc(title) + '">' + icon + ' ' + esc(val) + '</span>'; }
     function renderHero() {
         if (!mqMobile.matches || !tab1) return;
+        renameVitals(true);
         var creating = false; try { creating = typeof creationActive === 'function' && creationActive(); } catch (e) { }
         document.body.classList.toggle('st-creating', creating);
         if (creating) { if (document.body.getAttribute('data-wiz') !== String(wizStep)) setWiz(wizStep); return; }
@@ -441,12 +443,22 @@
     });
 
     // ---------- запуск ----------
+    // Короткий заголовок панели выживания на телефоне (на ПК — прежний)
+    function renameVitals(mobile) {
+        var vh = el('cur-hp') && el('cur-hp').closest('.panel'); vh = vh && vh.querySelector('h2'); if (!vh) return;
+        var tw = document.createTreeWalker(vh, NodeFilter.SHOW_TEXT), tn;
+        while ((tn = tw.nextNode())) {
+            if (mobile && /Панель состояния, Брони и Урона/.test(tn.nodeValue)) { tn.nodeValue = tn.nodeValue.replace(/Панель состояния, Брони и Урона/, 'Выживание и вера'); return; }
+            if (!mobile && /Выживание и вера/.test(tn.nodeValue)) { tn.nodeValue = tn.nodeValue.replace(/Выживание и вера/, 'Панель состояния, Брони и Урона'); return; }
+        }
+    }
     function applyLayout() {
         var mobile = mqMobile.matches;
         document.body.classList.toggle('st-game-ui', mobile);
         if (!mobile) closeSheets();
         placeService(mobile);
         placeFight(mobile);
+        renameVitals(mobile);
         renderFight();
         buildBag();
         if (!mobile) { document.body.classList.remove('st-creating', 'st-hero-editing'); document.body.removeAttribute('data-wiz'); }

@@ -2336,3 +2336,13 @@ body.st-game-ui .spell-card > div:last-child > span::after { content: 'маны'
 body.st-game-ui .spell-card .spell-final-cost { width: 64px !important; text-align: center; font: 700 15px 'Barlow Condensed', sans-serif !important; border-radius: 14px; border: 1px solid #3f86d0 !important;
   background: rgba(31,79,138,.35) !important; color: #cfe3ff !important; padding: 4px 8px !important; }
 body.st-game-ui .spell-card > div:last-child > button { flex: 1 1 0; min-height: 44px; font-size: 15px !important; border-radius: 10px; padding: 4px 8px !important; }
+
+/* ---------- Обход 2026-11-01: мелочи мобильной версии ---------- */
+/* Обычные кнопки без класса были браузерно-белыми — на телефоне делаем их тёмными, как остальные */
+body.st-game-ui button:not([class]), body.st-game-ui button.btn-secondary, body.st-game-ui .st-sheet button:not([class]) {
+  background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); border-radius: 8px; }
+body.st-game-ui button:not([class]):active, body.st-game-ui button.btn-secondary:active { background: linear-gradient(180deg, #3a2f1c, #241c10); }
+/* Ход/круг на «Главной» дублирует экран «Бой» — прячем, когда он есть */
+body.st-game-ui.st-fight-on #tab1 .day-controls:has(#turn-round-display-main) { display: none; }
+/* На самом экране «Бой» кнопка «К бою» лишняя */
+body.st-game-ui.st-tab3 .st-dock-tofight { display: none; }

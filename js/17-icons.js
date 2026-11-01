@@ -128,7 +128,7 @@
         '🔑': 'key', '🗝': 'key', '👁': 'eye', '👀': 'eye', '🏘': 'village', '🏡': 'house', '🏠': 'house', '🎓': 'college', '📊': 'chart', '📈': 'chart', '⬆': 'up', '⬇': 'down',
         '⚔': 'swords', '🧪': 'potion', '🍷': 'potion', '⏸': 'pause', '🗣': 'shout', '📢': 'shout', '✍': 'quill', '🖋': 'quill', '🏙': 'city', '💎': 'gem', '💀': 'skull', '☠': 'skull',
         '☀': 'sun', '🌞': 'sun', '❄': 'snow', '🧊': 'snow', '❤': 'heart', '💖': 'heart', '🙏': 'pray', '🐺': 'wolf', '🧛': 'fang', '🦇': 'fang', '⛏': 'pick', '🐟': 'fish', '🐠': 'fish',
-        '🍖': 'meat', '🥩': 'meat', '🍞': 'bread', '👑': 'crown', '🌙': 'moon', '🌕': 'moon', '⭐': 'star', '🌟': 'star', '⚠': 'warn', 'ℹ': 'info', '🏔': 'mountain', '⛰': 'mountain',
+        '🍖': 'meat', '🥩': 'meat', '🍞': 'bread', '👑': 'crown', '🌙': 'moon', '💪': 'hammer', '🌑': 'hood', '🌕': 'moon', '⭐': 'star', '🌟': 'star', '⚠': 'warn', 'ℹ': 'info', '🏔': 'mountain', '⛰': 'mountain',
         '📦': 'chest', '🧰': 'chest', '🥾': 'boot', '👢': 'boot', '⛑': 'helm', '🪖': 'helm', '🧤': 'glove', '📿': 'necklace', '🪓': 'axe', '🏛': 'castle', '🧙': 'staff', '🪨': 'mountain', '🔷': 'drop', '💧': 'drop', '🩸': 'blood', '🍄': 'shroom', '🧀': 'bread', '🍺': 'mug', '🍻': 'mug', '🐴': 'horse', '🐎': 'horse', '🕷': 'spider', '🐀': 'paw', '🐕': 'paw', '🐶': 'paw'
     };
     function svg(key) {
