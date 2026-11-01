@@ -2306,3 +2306,33 @@ body.st-game-ui.st-creating #tab1 { padding-bottom: 80px; }
 body.st-game-ui.st-creating.st-dock-on .st-wiz-nav { bottom: calc(var(--st-tabbar-h, 62px) + var(--st-dock-h, 46px) + 6px); }
 .st-wiz-nav button:not(.btn-success) { background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }
 .st-wiz-nav button { flex: 1; margin: 0; min-height: 46px; font-size: 16px; text-transform: none; letter-spacing: .3px; clip-path: none; }
+
+/* ===== Подсказки правил в одну строку с ⓘ (js/18-hints.js, 2026-11-01) ===== */
+p.st-hint { position: relative; cursor: pointer; padding-left: 22px !important; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; }
+p.st-hint::before { content: 'i'; position: absolute; left: 0; top: .15em; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--accent-color, #c8a566);
+  color: var(--accent-color, #c8a566); font: italic 700 11px/14px Georgia, serif; text-align: center; }
+p.st-hint:hover::before { background: rgba(200,165,102,.2); }
+p.st-hint.st-hint-open { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }
+
+/* ===== «Магия» карточками на телефоне (этап 5, 2026-11-01) ===== */
+body.st-game-ui .spell-card { position: relative; padding: 10px 12px 10px 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid #3d3220; border-left: 4px solid var(--st-school, #c8a566);
+  background: linear-gradient(180deg, rgba(43,36,24,.85), rgba(18,15,10,.9)); }
+body.st-game-ui #spells-destr-list { --st-school: #e05a3a; }
+body.st-game-ui #spells-restor-list { --st-school: #e8c95a; }
+body.st-game-ui #spells-alter-list { --st-school: #7fb56a; }
+body.st-game-ui #spells-illus-list { --st-school: #a07ad8; }
+body.st-game-ui #spells-conj-list { --st-school: #8aa0b8; }
+body.st-game-ui .spell-card > div:first-child { display: none; } /* «Школа: …» — и так видно по разделу */
+body.st-game-ui .spell-card > div:nth-child(2) { align-items: center !important; margin-bottom: 6px !important; }
+body.st-game-ui .spell-card > div:nth-child(2) > div:last-child { display: none; } /* база MP — у выученного не меняется */
+body.st-game-ui .spell-card .spell-name-select { width: auto !important; flex: 1; -webkit-appearance: none; appearance: none; background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important;
+  font: 600 18px 'Cinzel', Georgia, serif !important; color: var(--text-bright, #f2e8cf); opacity: 1; }
+body.st-game-ui .spell-card .spell-desc { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; resize: none; font-size: 14px !important; line-height: 1.35; color: var(--text-color, #d6c9ae); height: 4.05em; margin-bottom: 8px !important; overflow: hidden; cursor: pointer; }
+body.st-game-ui .spell-card .spell-desc.st-open { overflow: visible; }
+body.st-game-ui .spell-card .spell-target-select { font-size: 14px !important; min-height: 36px; border-radius: 8px; }
+body.st-game-ui .spell-card > div:last-child { background: transparent !important; padding: 0 !important; gap: 8px; flex-wrap: wrap; }
+body.st-game-ui .spell-card > div:last-child > span { flex: 0 0 auto; font-size: 0 !important; display: inline-flex; align-items: center; gap: 4px; }
+body.st-game-ui .spell-card > div:last-child > span::after { content: 'маны'; font: 500 13px 'Barlow Condensed', sans-serif; color: #9cc3f0; }
+body.st-game-ui .spell-card .spell-final-cost { width: 64px !important; text-align: center; font: 700 15px 'Barlow Condensed', sans-serif !important; border-radius: 14px; border: 1px solid #3f86d0 !important;
+  background: rgba(31,79,138,.35) !important; color: #cfe3ff !important; padding: 4px 8px !important; }
+body.st-game-ui .spell-card > div:last-child > button { flex: 1 1 0; min-height: 44px; font-size: 15px !important; border-radius: 10px; padding: 4px 8px !important; }

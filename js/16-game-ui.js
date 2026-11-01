@@ -431,6 +431,15 @@
     setInterval(function () { if (tab1 && tab1.classList.contains('active')) renderHero(); }, 1000);
     document.addEventListener('change', function () { setTimeout(renderHero, 0); });
 
+    // ---------- «Магия» (этап 5, только телефон) ----------
+    // Описание заклинания в карточке — 3 строки; нажатие раскрывает целиком (поле только для чтения, текст не меняется).
+    document.addEventListener('click', function (e) {
+        var t = e.target; if (!mqMobile.matches || !t.classList || !t.classList.contains('spell-desc') || !t.readOnly) return;
+        var open = !t.classList.contains('st-open');
+        t.classList.toggle('st-open', open);
+        t.style.height = open ? (t.scrollHeight + 4) + 'px' : '';
+    });
+
     // ---------- запуск ----------
     function applyLayout() {
         var mobile = mqMobile.matches;
