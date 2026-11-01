@@ -2314,28 +2314,28 @@ p.st-hint::before { content: 'i'; position: absolute; left: 0; top: .15em; width
 p.st-hint:hover::before { background: rgba(200,165,102,.2); }
 p.st-hint.st-hint-open { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }
 
-/* ===== «Магия» карточками на телефоне (этап 5, 2026-11-01) ===== */
-body.st-game-ui .spell-card { position: relative; padding: 10px 12px 10px 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid #3d3220; border-left: 4px solid var(--st-school, #c8a566);
+/* ===== «Магия» карточками (телефон — этап 5; ПК — с 2026-11-01) ===== */
+:is(body.st-game-ui, body.st-pc-cards) .spell-card { position: relative; padding: 10px 12px 10px 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid #3d3220; border-left: 4px solid var(--st-school, #c8a566);
   background: linear-gradient(180deg, rgba(43,36,24,.85), rgba(18,15,10,.9)); }
-body.st-game-ui #spells-destr-list { --st-school: #e05a3a; }
-body.st-game-ui #spells-restor-list { --st-school: #e8c95a; }
-body.st-game-ui #spells-alter-list { --st-school: #7fb56a; }
-body.st-game-ui #spells-illus-list { --st-school: #a07ad8; }
-body.st-game-ui #spells-conj-list { --st-school: #8aa0b8; }
-body.st-game-ui .spell-card > div:first-child { display: none; } /* «Школа: …» — и так видно по разделу */
-body.st-game-ui .spell-card > div:nth-child(2) { align-items: center !important; margin-bottom: 6px !important; }
-body.st-game-ui .spell-card > div:nth-child(2) > div:last-child { display: none; } /* база MP — у выученного не меняется */
-body.st-game-ui .spell-card .spell-name-select { width: auto !important; flex: 1; -webkit-appearance: none; appearance: none; background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important;
+:is(body.st-game-ui, body.st-pc-cards) #spells-destr-list { --st-school: #e05a3a; }
+:is(body.st-game-ui, body.st-pc-cards) #spells-restor-list { --st-school: #e8c95a; }
+:is(body.st-game-ui, body.st-pc-cards) #spells-alter-list { --st-school: #7fb56a; }
+:is(body.st-game-ui, body.st-pc-cards) #spells-illus-list { --st-school: #a07ad8; }
+:is(body.st-game-ui, body.st-pc-cards) #spells-conj-list { --st-school: #8aa0b8; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:first-child { display: none; } /* «Школа: …» — и так видно по разделу */
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:nth-child(2) { align-items: center !important; margin-bottom: 6px !important; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:nth-child(2) > div:last-child { display: none; } /* база MP — у выученного не меняется */
+:is(body.st-game-ui, body.st-pc-cards) .spell-card .spell-name-select { width: auto !important; flex: 1; -webkit-appearance: none; appearance: none; background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important;
   font: 600 18px 'Cinzel', Georgia, serif !important; color: var(--text-bright, #f2e8cf); opacity: 1; }
-body.st-game-ui .spell-card .spell-desc { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; resize: none; font-size: 14px !important; line-height: 1.35; color: var(--text-color, #d6c9ae); height: 4.05em; margin-bottom: 8px !important; overflow: hidden; cursor: pointer; }
-body.st-game-ui .spell-card .spell-desc.st-open { overflow: visible; }
-body.st-game-ui .spell-card .spell-target-select { font-size: 14px !important; min-height: 36px; border-radius: 8px; }
-body.st-game-ui .spell-card > div:last-child { background: transparent !important; padding: 0 !important; gap: 8px; flex-wrap: wrap; }
-body.st-game-ui .spell-card > div:last-child > span { flex: 0 0 auto; font-size: 0 !important; display: inline-flex; align-items: center; gap: 4px; }
-body.st-game-ui .spell-card > div:last-child > span::after { content: 'маны'; font: 500 13px 'Barlow Condensed', sans-serif; color: #9cc3f0; }
-body.st-game-ui .spell-card .spell-final-cost { width: 64px !important; text-align: center; font: 700 15px 'Barlow Condensed', sans-serif !important; border-radius: 14px; border: 1px solid #3f86d0 !important;
+:is(body.st-game-ui, body.st-pc-cards) .spell-card .spell-desc { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; resize: none; font-size: 14px !important; line-height: 1.35; color: var(--text-color, #d6c9ae); height: 4.05em; margin-bottom: 8px !important; overflow: hidden; cursor: pointer; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card .spell-desc.st-open { overflow: visible; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card .spell-target-select { font-size: 14px !important; min-height: 36px; border-radius: 8px; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:last-child { background: transparent !important; padding: 0 !important; gap: 8px; flex-wrap: wrap; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:last-child > span { flex: 0 0 auto; font-size: 0 !important; display: inline-flex; align-items: center; gap: 4px; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:last-child > span::after { content: 'маны'; font: 500 13px 'Barlow Condensed', sans-serif; color: #9cc3f0; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card .spell-final-cost { width: 64px !important; text-align: center; font: 700 15px 'Barlow Condensed', sans-serif !important; border-radius: 14px; border: 1px solid #3f86d0 !important;
   background: rgba(31,79,138,.35) !important; color: #cfe3ff !important; padding: 4px 8px !important; }
-body.st-game-ui .spell-card > div:last-child > button { flex: 1 1 0; min-height: 44px; font-size: 15px !important; border-radius: 10px; padding: 4px 8px !important; }
+:is(body.st-game-ui, body.st-pc-cards) .spell-card > div:last-child > button { flex: 1 1 0; min-height: 44px; font-size: 15px !important; border-radius: 10px; padding: 4px 8px !important; }
 
 /* ---------- Обход 2026-11-01: мелочи мобильной версии ---------- */
 /* Обычные кнопки без класса были браузерно-белыми — на телефоне делаем их тёмными, как остальные */
@@ -2376,3 +2376,51 @@ body.st-game-ui.st-tab3 .st-dock-tofight { display: none; }
 .st-save-saved { color: #9fca8a; border-color: rgba(127,176,105,.4); }
 .st-save-saving, .st-save-pending { color: #d8c27a; border-color: rgba(216,194,122,.35); }
 .st-save-offline, .st-save-error { color: #f0a08a; border-color: rgba(224,90,79,.5); background: rgba(224,90,79,.08); }
+
+/* ===== Мастер на телефоне (js/gm-mobile.js, body.st-gm-mobile) ===== */
+.st-gm-topbar, .st-gm-toc { display: none; }
+body.st-gm-mobile { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+body.st-gm-mobile.gm-in-session .st-gm-topbar { display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 901; padding: 6px 10px;
+    background: rgba(12,10,7,.96); border-bottom: 1px solid var(--border-color); margin: 0 -8px; }
+body.st-gm-mobile .st-gm-topbar .session-code-badge { font-size: 18px; letter-spacing: 3px; padding: 2px 8px; }
+body.st-gm-mobile .st-gm-topbar .st-gm-code-l { opacity: .7; font-size: 13px; }
+body.st-gm-mobile .st-gm-topbar button { width: auto; margin: 0 0 0 auto; min-height: 36px; padding: 4px 12px; font-size: 14px; }
+body.st-gm-mobile.gm-in-session .st-gm-toc { display: flex; gap: 6px; overflow-x: auto; position: sticky; top: 49px; z-index: 900; padding: 6px 2px;
+    background: rgba(12,10,7,.92); margin: 0 -8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+body.st-gm-mobile .st-gm-toc::-webkit-scrollbar { display: none; }
+.st-gm-toc-chip { flex: 0 0 auto; width: auto; margin: 0; min-height: 34px; padding: 4px 12px; font-size: 13px; border-radius: 16px;
+    background: #1d1912; border: 1px solid var(--border-color); color: var(--text-bright, #f2e8cf); white-space: nowrap; }
+/* пульт — внизу экрана, 5 равных вкладок с иконкой над подписью */
+body.st-gm-mobile #gm-dashboard { position: fixed; top: auto; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; z-index: 950;
+    border-bottom: 0; border-top: 2px solid var(--accent-color, #c8a566); padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); gap: 2px; overflow: visible; }
+body.st-gm-mobile #gm-dashboard .dash-btn[data-gm-tab] { flex: 1 1 0; min-width: 0; min-height: 58px; padding: 4px 2px; font-size: 11px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.st-gm-mobile #gm-dashboard .dash-btn[data-gm-tab] .sk-ic { width: 24px; height: 24px; margin: 0; }
+body.st-gm-mobile #gm-dashboard .dash-btn[data-gm-tab] .sk-ic svg { width: 24px; height: 24px; }
+body.st-gm-mobile #gm-dashboard .st-dash-reset { display: none; }
+body.st-gm-mobile #gm-dashboard .st-inbox-wrap { position: fixed; right: 10px; bottom: calc(80px + env(safe-area-inset-bottom)); }
+body.st-gm-mobile #gm-dashboard .st-inbox-menu { bottom: 100%; top: auto; right: 0; left: auto; }
+/* шапка короче: заголовок и ссылка на справочник уходят, их заменяет верхняя строка */
+body.st-gm-mobile.gm-in-session .container > h1 { display: none; }
+body.st-gm-mobile.gm-in-session .container > h1 + p { font-size: 14px; margin: 4px 0; }
+body.st-gm-mobile .st-errors-panel:not(.st-has-errors) { display: none; }
+body.st-gm-mobile .panel { padding-left: 10px; padding-right: 10px; }
+body.st-gm-mobile .grid-2 { grid-template-columns: 1fr !important; }
+/* body с overflow-x: hidden ломает position: sticky у верхней строки — clip режет так же, но не мешает липкости */
+@media (max-width: 900px) { html:has(body.st-gm-mobile), body.st-gm-mobile { overflow-x: clip; } }
+
+/* ===== ПК: карточка героя и карточки заклинаний, как на телефоне (body.st-pc-cards, js/16-game-ui.js) ===== */
+body.st-pc-cards:not(.st-pc-creating) .st-hero { display: block; padding: 16px 20px; }
+body.st-pc-cards:not(.st-pc-creating):not(.st-hero-editing) #tab1 .st-p-origin,
+body.st-pc-cards:not(.st-pc-creating):not(.st-hero-editing) #tab1 .st-p-stats,
+body.st-pc-cards:not(.st-pc-creating):not(.st-hero-editing) #tab1 .st-p-vitals-main { display: none !important; }
+body.st-pc-cards .st-hero-top { gap: 18px; }
+body.st-pc-cards .st-hero-av { flex-basis: 88px; width: 88px; height: 88px; }
+body.st-pc-cards .st-hero-name { font-size: 24px; }
+body.st-pc-cards .st-hero-bar { height: 22px; }
+body.st-pc-cards .st-hero-bar span { line-height: 22px; font-size: 13px; }
+body.st-pc-cards .st-hero-stats { gap: 10px; }
+body.st-pc-cards .st-hero-stat b { font-size: 22px; }
+body.st-pc-cards .st-hero-acts { grid-template-columns: repeat(4, minmax(0, 160px)); }
+body.st-pc-cards .st-hero-acts button { min-height: 54px; }
+body.st-pc-cards .spell-card .spell-desc { cursor: pointer; }

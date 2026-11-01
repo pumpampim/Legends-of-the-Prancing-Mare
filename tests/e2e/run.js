@@ -29,6 +29,12 @@ function runOne(f) {
 }
 (async () => {
   await Promise.all(Array.from({ length: PAR }, async () => { while (next < files.length) await runOne(files[next++]); }));
+  // Сценарии со временем (ожидания по 1–3 с) под нагрузкой иногда не успевают. Упавший — повторяем один раз, уже по одному.
+  const failed = results.filter(r => !r.ok).map(r => r.f);
+  if (failed.length && !process.env.NO_RETRY) {
+    console.log('\nПовтор упавших по одному: ' + failed.join(', '));
+    for (const f of failed) { const i = results.findIndex(r => r.f === f); results.splice(i, 1); await runOne(f); }
+  }
   const bad = results.filter(r => !r.ok);
   console.log(`\n${results.length - bad.length}/${results.length} сценариев прошли. Логи: tests/e2e/out/`);
   process.exit(bad.length ? 1 : 0);

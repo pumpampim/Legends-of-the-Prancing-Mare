@@ -27,6 +27,10 @@
         handshake: '<path d="M3 11l4-4 5 3 5-3 4 4"/><path d="M7 7l-2 9 4 3 5-2 5-5"/><path d="M10 14l2 2M12 12l2 2"/>',
         hood: '<path d="M12 3c-5 0-8 5-8 10v8h16v-8c0-5-3-10-8-10z"/><path d="M8 21v-6a4 4 0 0 1 8 0v6"/><path d="M10 15h.01M14 15h.01"/>',
         bow: '<path d="M6 3c8 3 8 15 0 18"/><path d="M6 3v18"/><path d="M4 12h15"/><path d="M16 9.5l3 2.5-3 2.5"/><path d="M4 10.5L2.5 12 4 13.5"/>',
+        mask: '<path d="M4 5c3 1.5 13 1.5 16 0v6c0 5-3.5 9-8 9s-8-4-8-9z"/><path d="M7.5 10.5c1-.8 2-.8 3 0M13.5 10.5c1-.8 2-.8 3 0"/><path d="M9 15c1.8 1.5 4.2 1.5 6 0"/>',
+        gift: '<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M3 9h18M12 9v11"/><path d="M12 9c-1.5-3-5-4-5-1.5S10 9 12 9zM12 9c1.5-3 5-4 5-1.5S14 9 12 9z"/>',
+        globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c-2.5 2.5-3.5 5.5-3.5 8.5s1 6 3.5 8.5M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5"/>',
+        inbox: '<path d="M4 13l2.5-8h11L20 13v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>',
         burst: '<path d="M12 2l2 6 6-3-3 6 5 2-6 2 3 6-6-3-1 5-2-5-6 3 3-6-6-2 5-2-3-6 6 3z"/>',
         staff: '<path d="M5 21L15 11"/><circle cx="17" cy="7" r="3"/><path d="M17 2v1.5M21.5 7H20M20.2 3.8l-1 1"/><path d="M13 9.5l1.5 1.5"/>',
         bolt: '<path d="M13 2L5 13h6l-1 9 8-12h-6z"/>',
@@ -117,6 +121,7 @@
     };
     var MAP = {
         '📖': 'book', '📘': 'tome', '📕': 'tome', '📚': 'book', '🔄': 'cycle', '🔁': 'cycle', '📜': 'scroll', '📍': 'pin', '📌': 'pin', '📅': 'calendar', '🗓': 'calendar',
+        '🎭': 'mask', '🎁': 'gift', '🌍': 'globe', '🌎': 'globe', '🌏': 'globe', '📥': 'inbox',
         '🏪': 'shop', '🛒': 'basket', '🗺': 'map', '🎲': 'die', '⏭': 'next', '⏩': 'next', '💾': 'save', '📂': 'folder', '📁': 'folder', '➡': 'arrow',
         '⏳': 'hourglass', '⌛': 'hourglass', '⛺': 'tent', '🔮': 'orb', '✨': 'sparkle', '✋': 'hand', '🎯': 'target', '🤝': 'handshake', '🤫': 'hood', '🥷': 'hood',
         '🏹': 'bow', '💥': 'burst', '🪄': 'staff', '⚡': 'bolt', '🌿': 'herb', '🌱': 'herb', '🍃': 'herb', '🎣': 'rod', '😴': 'sleep', '💤': 'sleep', '🛏': 'sleep',

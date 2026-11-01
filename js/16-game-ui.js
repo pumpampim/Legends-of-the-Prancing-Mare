@@ -392,12 +392,19 @@
     function numOf(id) { var e = el(id); if (!e) return 0; var v = e.tagName === 'INPUT' ? e.value : e.textContent; return parseFloat(String(v).replace(/\s/g, '').replace(',', '.')) || 0; }
     function chip(icon, val, title, cls) { return '<span class="st-hero-chip' + (cls ? ' ' + cls : '') + '" title="' + esc(title) + '">' + icon + ' ' + esc(val) + '</span>'; }
     function renderHero() {
-        if (!mqMobile.matches || !tab1) return;
-        renameVitals(true);
+        if (!tab1) return;
+        var mobile = mqMobile.matches;
         var creating = false; try { creating = typeof creationActive === 'function' && creationActive(); } catch (e) { }
-        document.body.classList.toggle('st-creating', creating);
-        if (creating) { if (document.body.getAttribute('data-wiz') !== String(wizStep)) setWiz(wizStep); return; }
-        document.body.removeAttribute('data-wiz');
+        if (mobile) {
+            renameVitals(true);
+            document.body.classList.toggle('st-creating', creating);
+            if (creating) { if (document.body.getAttribute('data-wiz') !== String(wizStep)) setWiz(wizStep); return; }
+            document.body.removeAttribute('data-wiz');
+        } else {
+            // ПК: карточка героя вместо трёх панелей, пока идёт создание — обычные панели (без мастера шагов)
+            document.body.classList.toggle('st-pc-creating', creating);
+            if (creating) return;
+        }
         var nm = el('char-name'), name = (nm && nm.value) || 'Герой';
         el('st-hero-name').textContent = name;
         var sub = [], race = el('char-race'), sign = el('char-sign');
@@ -433,7 +440,7 @@
     // ---------- «Магия» (этап 5, только телефон) ----------
     // Описание заклинания в карточке — 3 строки; нажатие раскрывает целиком (поле только для чтения, текст не меняется).
     document.addEventListener('click', function (e) {
-        var t = e.target; if (!mqMobile.matches || !t.classList || !t.classList.contains('spell-desc') || !t.readOnly) return;
+        var t = e.target; if (!t.classList || !t.classList.contains('spell-desc') || !t.readOnly) return;
         var open = !t.classList.contains('st-open');
         t.classList.toggle('st-open', open);
         t.style.height = open ? (t.scrollHeight + 4) + 'px' : '';
@@ -452,6 +459,7 @@
     function applyLayout() {
         var mobile = mqMobile.matches;
         document.body.classList.toggle('st-game-ui', mobile);
+        document.body.classList.toggle('st-pc-cards', !mobile);
         if (!mobile) closeSheets();
         placeService(mobile);
         placeFight(mobile);
