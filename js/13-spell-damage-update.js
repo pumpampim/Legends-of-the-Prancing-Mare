@@ -200,7 +200,7 @@
     }
 
     function initSectionAccordions() {
-    const tabs = ['tab1', 'tab3', 'tab5', 'tab6'];
+    const tabs = ['tab1', 'tab3', 'tab5', 'tab6', 'tab15', 'tab16'];
     tabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (!tab) return;

@@ -386,7 +386,7 @@
         }).join('');
     }
     window.openGuildsTab = function () {
-        const b = document.getElementById('tab5-btn'); if (b) b.click();
+        const b = document.getElementById('tab15-btn'); if (b) b.click();
         setTimeout(() => { const p = document.getElementById('guild-panel-player'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
     };
     function renderGuildPanelPlayer() {

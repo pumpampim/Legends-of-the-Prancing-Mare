@@ -386,7 +386,7 @@
     hero.querySelector('.st-hero-acts').addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         var go = b.getAttribute('data-go');
-        if (go === 'tab5q') { goTab('tab5'); setTimeout(function () { var q = el('quest-list') || el('player-quests') || document.querySelector('#tab5 [id*="quest"]'); if (q) try { q.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (x) { } }, 80); return; }
+        if (go === 'tab5q') { goTab('tab15'); return; }
         if (go) { goTab(go); return; }
         if (b.getAttribute('data-act') === 'rest') {
             var rb = document.querySelector('#tab1 .rest-btn button'); if (rb) { try { rb.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { } rb.classList.add('st-flash'); setTimeout(function () { rb.classList.remove('st-flash'); }, 1500); }

@@ -682,7 +682,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab2')">Ветки Перков</button>
         <button class="tab-link" onclick="openTab(event, 'tab3')">Боевой Пост</button>
         <button class="tab-link" onclick="openTab(event, 'tab4')">Книга Заклинаний</button>
-        <button class="tab-link" id="tab5-btn" onclick="openTab(event, 'tab5')">Инвентарь и квесты</button>
+        <button class="tab-link" id="tab5-btn" onclick="openTab(event, 'tab5')">Инвентарь</button>
         <button class="tab-link" onclick="openTab(event, 'tab6')">Сессия</button>
         <button class="tab-link" onclick="openTab(event, 'tab7')"><span class="skyrim-icon icon-anvil" aria-hidden="true"></span> Профессии</button>
         <button class="tab-link" onclick="openTab(event, 'tab10')"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Проверка</button>
@@ -690,6 +690,8 @@
         <button class="tab-link" onclick="openTab(event, 'tab12')">🏪 Торговля</button>
         <button class="tab-link" id="tab13-btn" onclick="openTab(event, 'tab13')">🗺️ Карта</button>
         <button class="tab-link" id="tab14-btn" onclick="openTab(event, 'tab14')">📖 Дневник</button>
+        <button class="tab-link" id="tab15-btn" onclick="openTab(event, 'tab15')">📜 Квесты и гильдии</button>
+        <button class="tab-link" id="tab16-btn" onclick="openTab(event, 'tab16')">🌙 Сверхъестественное</button>
     </div>
 
     <!-- ТАБ 1: ГЛАВНАЯ СТРАНИЦА -->
@@ -1082,6 +1084,13 @@
                     </select>
                     <label for="eq-armor" style="display:inline;">Комплект доспехов (Штрафы магии)</label>
                 </div>
+                <!-- Ножны и колчаны: 2 слота на поясе, 2 на спине. Оружие из ножен — бонусным действием. -->
+                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                    <h3 style="margin:0 0 4px;">🗡 Ножны и колчаны</h3>
+                    
+                    <div id="sheath-slots"></div>
+                </div>
+
             </div>
 
             <!-- ПОДСУМОК, ХОДЫ И АКТИВНЫЕ ЭФФЕКТЫ -->
@@ -1105,13 +1114,6 @@
                         <button class="btn-danger" style="flex:1;" onclick="resetTurnsRounds()">↺ Обнулить</button>
                     </div>
                     <div id="active-timed-effects-list" style="margin-top:8px;"></div>
-                </div>
-
-                <!-- Ножны и колчаны: 2 слота на поясе, 2 на спине. Оружие из ножен — бонусным действием. -->
-                <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
-                    <h3 style="margin:0 0 4px;">🗡 Ножны и колчаны</h3>
-                    
-                    <div id="sheath-slots"></div>
                 </div>
 
                 <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
@@ -1358,6 +1360,10 @@
             </div><!-- /grid-col -->
         </div>
 
+    </div>
+
+    <!-- ТАБ 15: КВЕСТЫ И ГИЛЬДИИ (вынесены из «Инвентаря», 2026-11-01) -->
+    <div id="tab15" class="tab-content">
         <!-- КВЕСТЫ -->
         <div class="panel">
             <h2>📜 Активные квесты</h2>
@@ -1372,7 +1378,10 @@
             <h2>🏛️ Гильдии</h2>
             <div id="guild-panel-player" style="max-height:320px; overflow-y:auto;"></div>
         </div>
+    </div>
 
+    <!-- ТАБ 16: СВЕРХЪЕСТЕСТВЕННОЕ (раздел «Магия», 2026-11-01) -->
+    <div id="tab16" class="tab-content">
         <!-- СВЕРХЪЕСТЕСТВЕННОЕ (Задача L) -->
         <div class="panel">
             <h2>🌙 Сверхъестественное состояние</h2>
@@ -2137,12 +2146,12 @@
 <script src="js/05-inventory.js?v=1"></script>
 <script src="js/06-trade-merchants.js?v=3"></script>
 <script src="js/07-craft-enchant-equip.js?v=1"></script>
-<script src="js/08-equipment-guilds.js?v=1"></script>
+<script src="js/08-equipment-guilds.js?v=2"></script>
 <script src="js/09-combat-grid.js?v=1"></script>
 <script src="js/10-resist-gear-fish-hunt.js?v=1"></script>
-<script src="js/11-session-trade-map.js?v=2"></script>
+<script src="js/11-session-trade-map.js?v=3"></script>
 <script src="js/12-supernatural-lich.js?v=1"></script>
-<script src="js/13-spell-damage-update.js?v=2"></script>
+<script src="js/13-spell-damage-update.js?v=3"></script>
 <script src="js/14-diary-death-combat.js?v=3"></script>
 <script src="js/15-traps-boot.js?v=1"></script>
 
@@ -2270,7 +2279,7 @@
                 items.push({ label: nm, type: 'Ингредиент', rank: 3, go: function () { goTab('tab7'); setTimeout(function () { var t = findByText('tab7', nm); flash(t || document.getElementById('tab7')); }, 120); } });
             });
         } catch (e) { }
-        try { (playerQuests || []).forEach(function (q) { items.push({ label: q.title || '(квест)', type: 'Квест', rank: 4, go: function () { goTab('tab5'); setTimeout(function () { flash(findByText('tab5', q.title) || document.getElementById('tab5')); }, 80); } }); }); } catch (e) { }
+        try { (playerQuests || []).forEach(function (q) { items.push({ label: q.title || '(квест)', type: 'Квест', rank: 4, go: function () { goTab('tab15'); setTimeout(function () { flash(findByText('tab15', q.title) || document.getElementById('tab15')); }, 80); } }); }); } catch (e) { }
         tabButtons().forEach(function (b) { var t = (b.textContent || '').trim(); if (t) items.push({ label: t, type: 'Вкладка', rank: 5, go: function () { b.click(); } }); });
         // кнопки — снимаем в момент открытия, потому что часть из них рисуется динамически
         var seenBtn = {};
@@ -2345,22 +2354,22 @@
     // вкладок (js/16-game-ui.js): Герой · Бой · Сумка · Магия · Ещё; компас там не открывается.
     var DESK_GROUPS = {
         skills: { title: 'Навыки', tabs: ['tab2', 'tab7', 'tab10'], hint: 'Ветки перков · Профессии · Проверка' },
-        magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
-        items: { title: 'Предметы', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
+        magic: { title: 'Магия', tabs: ['tab4', 'tab16'], hint: 'Книга заклинаний · Сверхъестественное' },
+        items: { title: 'Предметы', tabs: ['tab5', 'tab15', 'tab12'], hint: 'Инвентарь · Квесты и гильдии · Торговля' },
         map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14'], hint: 'Карта · Календарь · Дневник' },
         hero: { title: 'Герой', tabs: ['tab1', 'tab3', 'tab6'], hint: 'Главная и статы · Боевой пост · Сессия' }
     };
     var MOBILE_GROUPS = {
         hero: { title: 'Герой', tabs: ['tab1', 'tab2', 'tab10'], hint: 'Главная · Ветки перков · Проверка' },
         fight: { title: 'Бой', tabs: ['tab3', 'tab6'], hint: 'Боевой пост · Сессия' },
-        bag: { title: 'Сумка', tabs: ['tab5', 'tab12'], hint: 'Инвентарь и квесты · Торговля' },
-        magic: { title: 'Магия', tabs: ['tab4'], hint: 'Книга заклинаний' },
+        bag: { title: 'Сумка', tabs: ['tab5', 'tab15', 'tab12'], hint: 'Инвентарь · Квесты и гильдии · Торговля' },
+        magic: { title: 'Магия', tabs: ['tab4', 'tab16'], hint: 'Книга заклинаний · Сверхъестественное' },
         more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14'], hint: 'Профессии · Карта · Календарь · Дневник' }
     };
     var mqMobile = window.matchMedia('(max-width: 900px)');
     var GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS;
     window.stNavGroups = GROUPS;
-    var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь и квесты', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
+    var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь', tab15: 'Квесты', tab16: 'Сверхъестественное', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
     var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
     var hub = document.getElementById('st-hub'), cur = 'hero', curTab = 'tab1';
     function btnFor(tabId) { return document.querySelector('.nav-tabs .tab-link[onclick*="\'' + tabId + '\'"]'); }
@@ -2474,7 +2483,7 @@
     renderTop();
 })();
 </script>
-<script src="js/16-game-ui.js?v=7"></script>
+<script src="js/16-game-ui.js?v=8"></script>
 <script src="js/17-icons.js?v=2"></script>
 <script src="js/18-hints.js?v=1"></script>
 

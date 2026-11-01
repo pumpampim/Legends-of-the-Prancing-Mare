@@ -1119,7 +1119,7 @@
             ${t.status === 'pending' ? ` <button type="button" style="width:auto; padding:1px 8px; font-size:12px;" onclick="cancelTrade('${jsq(t.id)}')">Отменить</button>` : ''}</div>`).join('')
             : '<span style="opacity:.6; font-size:13px;">Исходящих нет.</span>';
         const hasIn = incoming.length > 0;
-        if (btn) btn.textContent = hasIn && !btn.classList.contains('active') ? 'Инвентарь и квесты ●' : 'Инвентарь и квесты';
+        if (btn) btn.textContent = hasIn && !btn.classList.contains('active') ? 'Инвентарь ●' : 'Инвентарь';
         if (toast) {
             toast.style.display = hasIn ? 'block' : 'none';
             toast.textContent = hasIn ? '🤝 ' + incoming[0].fromName + ' предлагает обмен — открыть' : '';
