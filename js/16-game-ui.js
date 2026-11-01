@@ -1,4 +1,4 @@
-/* ===== Игровой интерфейс для телефона, этапы 1–3 (2026-10-30) =====
+/* ===== Игровой интерфейс для телефона, этапы 1–4 (2026-10-30 — 2026-11-01) =====
    Только на ширине ≤900px: пять вкладок снизу — Герой · Бой · Сумка · Магия · Ещё. Разделы и их «пилюли»
    описаны в window.stNavGroups (index.html). Служебное (аккаунт, шрифт, звук, поиск, сброс, файлы, Drive,
    снапшоты) на телефоне переезжает в «Ещё → Настройки», на компьютере возвращается на старые места.
@@ -71,6 +71,7 @@
     var curGroup = 'hero';
     window.stGameUiSync = function (g, tabId) {
         curGroup = g || curGroup;
+        var t1 = el('tab1'); document.body.classList.toggle('st-tab1', !!(t1 && t1.classList.contains('active')));
         bar.querySelectorAll('.st-tb').forEach(function (b) {
             var bg = b.getAttribute('data-g');
             b.classList.toggle('active', bg === curGroup);
@@ -314,6 +315,122 @@
     });
     if (invList) new MutationObserver(function () { buildBag(); }).observe(invList, { childList: true });
 
+    // ---------- «Герой» (этап 4, только телефон) ----------
+    // Карточка героя вверху «Главной»: портрет, уровень и опыт, ОЗ/мана полосками, шесть характеристик плиткой,
+    // броня/урон/скорость/вес/золото/жизни. Формы с полями ввода (происхождение, характеристики, полоски с полями)
+    // спрятаны и открываются кнопкой «✏ Править». Пока персонаж не создан — пошаговое создание вместо карточки.
+    var tab1 = el('tab1');
+    function panelOf(id) { var x = el(id); return x ? x.closest('.panel') : null; }
+    var pOrigin = panelOf('char-name'), pStats = panelOf('stat-str'), pVitals = panelOf('cur-hp');
+    if (pOrigin) pOrigin.classList.add('st-p-origin');
+    if (pStats) pStats.classList.add('st-p-stats');
+    if (pVitals) { pVitals.classList.add('st-p-vitals'); var vg = el('cur-hp').closest('.grid-2'); if (vg && vg.firstElementChild) vg.firstElementChild.classList.add('st-p-vitals-main'); }
+    var STATS = [['str', 'СИЛ'], ['dex', 'ЛОВ'], ['con', 'ТЕЛ'], ['int', 'ИНТ'], ['wis', 'МУД'], ['cha', 'ХАР']];
+    var hero = document.createElement('div');
+    hero.id = 'st-hero'; hero.className = 'panel st-hero';
+    hero.innerHTML =
+        '<div class="st-hero-top">' +
+            '<button type="button" class="st-hero-av" id="st-hero-av" title="Портрет"><span id="st-hero-av-img"></span><b id="st-hero-lvl">1</b></button>' +
+            '<div class="st-hero-id"><div class="st-hero-name" id="st-hero-name"></div><div class="st-hero-sub" id="st-hero-sub"></div>' +
+                '<div class="st-hero-xp" title="Очки навыков до следующего уровня"><i id="st-hero-xp"></i></div></div>' +
+            '<button type="button" class="st-hero-edit" id="st-hero-edit">✏️ Править</button>' +
+        '</div>' +
+        '<div class="st-hero-bar st-hero-hp"><i id="st-hero-hp-f"></i><span id="st-hero-hp"></span></div>' +
+        '<div class="st-hero-bar st-hero-mp"><i id="st-hero-mp-f"></i><span id="st-hero-mp"></span></div>' +
+        '<div class="st-hero-stats">' + STATS.map(function (x) { return '<div class="st-hero-stat"><small>' + x[1] + '</small><b id="st-hero-s-' + x[0] + '">0</b><em id="st-hero-m-' + x[0] + '">+0</em></div>'; }).join('') + '</div>' +
+        '<div class="st-hero-chips" id="st-hero-chips"></div>' +
+        '<div class="st-hero-acts">' +
+            '<button type="button" data-go="tab10">🎲<span>Проверка</span></button>' +
+            '<button type="button" data-go="tab2">⭐<span>Перки</span></button>' +
+            '<button type="button" data-act="rest">⏳<span>Отдых</span></button>' +
+            '<button type="button" data-go="tab5q">📜<span>Квесты</span></button>' +
+        '</div>';
+    var wiz = document.createElement('div');
+    wiz.id = 'st-wiz'; wiz.className = 'panel st-wiz';
+    var WIZ = [
+        { t: 'Кто ты', d: 'Имя, портрет, раса и знак рождения. Расу и знак потом сменить нельзя.' },
+        { t: 'Характеристики', d: 'Раздай 15 очков. Расовые бонусы и знак добавятся сами.' },
+        { t: 'Навыки', d: 'Раздай 30 очков и выбери навыки предыстории.' },
+        { t: 'Готово', d: 'Проверь героя и заверши создание.' }
+    ];
+    wiz.innerHTML = '<div class="st-wiz-steps" id="st-wiz-steps"></div><h3 id="st-wiz-title"></h3><div class="st-wiz-desc" id="st-wiz-desc"></div>' +
+        '<div class="st-wiz-nav"><button type="button" id="st-wiz-back">‹ Назад</button><button type="button" class="btn-success" id="st-wiz-next">Далее ›</button></div>';
+    if (tab1) { tab1.insertBefore(wiz, tab1.firstChild); tab1.insertBefore(hero, tab1.firstChild); }
+    // кнопки «Назад / Далее» — внизу экрана над вкладками, чтобы не листать к началу
+    var wizNav = wiz.querySelector('.st-wiz-nav'); wizNav.id = 'st-wiz-nav';
+    document.body.appendChild(wizNav); // в body: у вкладки есть анимация, и position:fixed внутри неё не держится у края экрана
+    var wizStep = 0; try { wizStep = parseInt(localStorage.getItem('skyrim_wiz_step')) || 0; } catch (e) { }
+    function setWiz(n) {
+        wizStep = Math.max(0, Math.min(WIZ.length - 1, n));
+        try { localStorage.setItem('skyrim_wiz_step', String(wizStep)); } catch (e) { }
+        document.body.setAttribute('data-wiz', String(wizStep));
+        el('st-wiz-steps').innerHTML = WIZ.map(function (w, i) { return '<span class="' + (i < wizStep ? 'done' : i === wizStep ? 'on' : '') + '">' + (i + 1) + '</span>'; }).join('<i></i>');
+        el('st-wiz-title').textContent = 'Шаг ' + (wizStep + 1) + '. ' + WIZ[wizStep].t;
+        el('st-wiz-desc').textContent = WIZ[wizStep].d;
+        el('st-wiz-back').style.visibility = wizStep ? 'visible' : 'hidden';
+        el('st-wiz-next').style.display = wizStep === WIZ.length - 1 ? 'none' : '';
+        try { window.scrollTo({ top: 0 }); } catch (e) { }
+    }
+    el('st-wiz-back').onclick = function () { setWiz(wizStep - 1); };
+    el('st-wiz-next').onclick = function () {
+        if (wizStep === 0) { var nm = el('char-name'); if (nm && !nm.value.trim()) { alert('Сначала дай герою имя.'); nm.focus(); return; } }
+        setWiz(wizStep + 1);
+    };
+    el('st-hero-edit').onclick = function () {
+        var on = !document.body.classList.contains('st-hero-editing');
+        document.body.classList.toggle('st-hero-editing', on);
+        this.textContent = on ? '✔ Готово' : '✏️ Править';
+    };
+    el('st-hero-av').onclick = function () { el('st-hero-edit').click(); var p = el('st-portrait-preview'); if (p) setTimeout(function () { try { p.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { } }, 50); };
+    hero.querySelector('.st-hero-acts').addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b) return;
+        var go = b.getAttribute('data-go');
+        if (go === 'tab5q') { goTab('tab5'); setTimeout(function () { var q = el('quest-list') || el('player-quests') || document.querySelector('#tab5 [id*="quest"]'); if (q) try { q.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (x) { } }, 80); return; }
+        if (go) { goTab(go); return; }
+        if (b.getAttribute('data-act') === 'rest') {
+            var rb = document.querySelector('#tab1 .rest-btn button'); if (rb) { try { rb.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { } rb.classList.add('st-flash'); setTimeout(function () { rb.classList.remove('st-flash'); }, 1500); }
+        }
+    });
+    function numOf(id) { var e = el(id); if (!e) return 0; var v = e.tagName === 'INPUT' ? e.value : e.textContent; return parseFloat(String(v).replace(/\s/g, '').replace(',', '.')) || 0; }
+    function chip(icon, val, title, cls) { return '<span class="st-hero-chip' + (cls ? ' ' + cls : '') + '" title="' + esc(title) + '">' + icon + ' ' + esc(val) + '</span>'; }
+    function renderHero() {
+        if (!mqMobile.matches || !tab1) return;
+        var creating = false; try { creating = typeof creationActive === 'function' && creationActive(); } catch (e) { }
+        document.body.classList.toggle('st-creating', creating);
+        if (creating) { if (document.body.getAttribute('data-wiz') !== String(wizStep)) setWiz(wizStep); return; }
+        document.body.removeAttribute('data-wiz');
+        var nm = el('char-name'), name = (nm && nm.value) || 'Герой';
+        el('st-hero-name').textContent = name;
+        var sub = [], race = el('char-race'), sign = el('char-sign');
+        [race, sign].forEach(function (s) { if (s && s.selectedIndex >= 0 && s.value) sub.push(s.options[s.selectedIndex].text.replace(/\s*\(.*\)\s*$/, '')); });
+        el('st-hero-sub').textContent = sub.join(' · ');
+        var lvl = 1; try { lvl = characterLevel || 1; } catch (e) { }
+        el('st-hero-lvl').textContent = lvl;
+        try { var need = getSkillUpsNeededForLevel(lvl); el('st-hero-xp').style.width = (need > 0 ? Math.max(0, Math.min(100, levelUpProgress / need * 100)) : 0) + '%'; } catch (e) { }
+        var pt = ''; try { pt = window.getPortraitThumb ? window.getPortraitThumb() : ''; } catch (e) { }
+        var av = el('st-hero-av-img');
+        if (pt) { av.style.backgroundImage = 'url("' + pt + '")'; av.textContent = ''; } else { av.style.backgroundImage = ''; av.textContent = name.trim().charAt(0).toUpperCase(); }
+        var hp = numOf('cur-hp'), hm = numOf('max-hp'), mp = numOf('cur-mp'), mm = numOf('max-mp');
+        el('st-hero-hp').textContent = '❤ ' + hp + ' / ' + hm; el('st-hero-mp').textContent = '🔷 ' + mp + ' / ' + mm;
+        el('st-hero-hp-f').style.width = (hm > 0 ? Math.max(0, Math.min(100, hp / hm * 100)) : 0) + '%';
+        el('st-hero-mp-f').style.width = (mm > 0 ? Math.max(0, Math.min(100, mp / mm * 100)) : 0) + '%';
+        STATS.forEach(function (x) {
+            el('st-hero-s-' + x[0]).textContent = Math.round(numOf('stat-' + x[0]));
+            var m = el('mod-' + x[0]); el('st-hero-m-' + x[0]).textContent = m ? m.textContent.replace(/^\s*Мод:\s*/, '') : '';
+        });
+        var w = numOf('weight-current'), wm = numOf('weight-max-display');
+        el('st-hero-chips').innerHTML =
+            chip('🛡', Math.round(numOf('armor-total')), 'Класс брони') +
+            chip('⚔', Math.round(numOf('main-panel-dmg')), 'Итоговый урон оружия') +
+            chip('🏃', Math.round(numOf('val-speed')) + ' фт', 'Скорость за ход') +
+            chip('⚖', (Math.round(w * 10) / 10) + '/' + Math.round(wm), wm > 0 && w > wm ? 'Перегруз!' : 'Вес / грузоподъёмность', wm > 0 && w > wm ? 'bad' : '') +
+            chip('💰', Math.round(numOf('char-gold')), 'Золото') +
+            chip('⚰', Math.round(numOf('char-lives')), 'Запас свободных жизней');
+    }
+    window.stHeroRender = renderHero;
+    setInterval(function () { if (tab1 && tab1.classList.contains('active')) renderHero(); }, 1000);
+    document.addEventListener('change', function () { setTimeout(renderHero, 0); });
+
     // ---------- запуск ----------
     function applyLayout() {
         var mobile = mqMobile.matches;
@@ -323,6 +440,8 @@
         placeFight(mobile);
         renderFight();
         buildBag();
+        if (!mobile) { document.body.classList.remove('st-creating', 'st-hero-editing'); document.body.removeAttribute('data-wiz'); }
+        renderHero();
         if (typeof window.updateCombatDock === 'function') try { window.updateCombatDock(); } catch (e) { }
         setBarH();
         var activeTab = document.querySelector('.tab-content.active'), g = 'hero';

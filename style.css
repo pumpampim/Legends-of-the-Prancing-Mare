@@ -2238,3 +2238,71 @@ body.st-game-ui .st-bag-grid { display: grid; grid-template-columns: repeat(auto
 .st-item-btns .st-item-btn { width: auto; margin: 0; min-height: 46px; padding: 6px 8px; font-size: 15px; border-radius: 10px; text-transform: none; letter-spacing: .2px; clip-path: none; }
 .st-item-btns .st-item-main { grid-column: 1 / -1; min-height: 52px; font-size: 17px; }
 .st-item-btns .st-item-btn:not(.btn-success):not(.btn-danger) { background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }
+
+/* ===== «Герой» на телефоне (js/16-game-ui.js, этап 4, 2026-11-01) ===== */
+.st-hero, .st-wiz { display: none; }
+body.st-game-ui:not(.st-creating) .st-hero { display: block; padding: 12px; }
+body.st-game-ui:not(.st-creating):not(.st-hero-editing) #tab1 .st-p-origin,
+body.st-game-ui:not(.st-creating):not(.st-hero-editing) #tab1 .st-p-stats,
+body.st-game-ui:not(.st-creating):not(.st-hero-editing) #tab1 .st-p-vitals-main { display: none !important; }
+.st-hero-top { display: flex; align-items: center; gap: 12px; }
+.st-hero-av { position: relative; flex: 0 0 72px; width: 72px; height: 72px; min-height: 0; margin: 0; padding: 0; border-radius: 50%; border: 2px solid var(--accent-color, #c8a566); background: #2b2418; box-shadow: 0 0 12px rgba(200,165,102,.35); clip-path: none; }
+.st-hero-av > span { position: absolute; inset: 3px; border-radius: 50%; background: center/cover no-repeat; display: flex; align-items: center; justify-content: center; font: 600 30px 'Cinzel', Georgia, serif; color: var(--accent-bright, #f0c87a); }
+.st-hero-av b { position: absolute; right: -6px; bottom: -4px; min-width: 24px; padding: 1px 6px; border-radius: 11px; background: var(--accent-deep, #7a5f2e); border: 1px solid var(--accent-bright, #f0c87a); color: #fff; font: 700 13px/18px 'Barlow Condensed', sans-serif; }
+.st-hero-id { flex: 1; min-width: 0; }
+.st-hero-name { font: 600 20px 'Cinzel', Georgia, serif; color: var(--text-bright, #f2e8cf); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-hero-sub { font-size: 13px; color: var(--text-dim, #9c8f76); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-hero-xp { height: 4px; margin-top: 6px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.st-hero-xp i { display: block; height: 100%; width: 0; background: var(--accent-color, #c8a566); }
+.st-hero-edit { flex: 0 0 auto; width: auto; margin: 0; min-height: 34px; padding: 4px 10px; font-size: 13px; border-radius: 17px; text-transform: none; letter-spacing: 0; clip-path: none;
+  background: transparent; border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-color, #d6c9ae); }
+body.st-hero-editing .st-hero-edit { background: var(--accent-color, #c8a566); color: #1a140b; }
+.st-hero-bar { position: relative; height: 18px; margin-top: 8px; border-radius: 9px; background: #0d0a05; border: 1px solid rgba(255,255,255,.12); overflow: hidden; }
+.st-hero-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; transition: width .35s ease; }
+.st-hero-hp i { background: linear-gradient(90deg, #7a2419, #c84534); }
+.st-hero-mp i { background: linear-gradient(90deg, #1f4f8a, #3f86d0); }
+.st-hero-bar span { position: absolute; left: 0; right: 0; top: 0; text-align: center; font: 700 12px/18px 'Barlow Condensed', sans-serif; color: #fff; text-shadow: 0 1px 2px #000; }
+.st-hero-bar .sk-ic { color: #fff !important; }
+.st-hero-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+.st-hero-stat { text-align: center; padding: 5px 0; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid #3d3220; }
+.st-hero-stat small { display: block; font: 600 10.5px 'Barlow Condensed', sans-serif; letter-spacing: .8px; color: var(--text-dim, #9c8f76); }
+.st-hero-stat b { display: block; font: 600 19px/1.1 'Cinzel', Georgia, serif; color: var(--text-bright, #f2e8cf); }
+.st-hero-stat em { font: 600 11px 'Barlow Condensed', sans-serif; font-style: normal; color: #7fb56a; }
+.st-hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.st-hero-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 14px; background: rgba(0,0,0,.35); border: 1px solid rgba(200,165,102,.3); font: 500 14px 'Barlow Condensed', sans-serif; }
+.st-hero-chip.bad { border-color: var(--danger-bright, #c84534); color: #ffb3a6; }
+.st-hero-acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.st-hero-acts button { width: auto; margin: 0; min-height: 62px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 12px;
+  font: 500 13px 'Barlow Condensed', sans-serif; text-transform: none; letter-spacing: .2px; clip-path: none; background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }
+.st-hero-acts .sk-ic { width: 24px; height: 24px; margin: 0; }
+
+/* пошаговое создание персонажа */
+body.st-game-ui.st-creating .st-wiz { display: block; padding: 12px; }
+body.st-game-ui.st-creating #tab1 > :not(#st-wiz):not(.grid-2):not(#st-wiz-nav) { display: none !important; }
+body.st-game-ui.st-creating #tab1 > .grid-2:not(:has(.st-p-origin)) { display: none !important; }
+body.st-game-ui.st-creating[data-wiz="0"] #tab1 .st-p-stats { display: none !important; }
+body.st-game-ui.st-creating:not([data-wiz="0"]) #tab1 .st-p-origin { display: none !important; }
+body.st-game-ui.st-creating:not([data-wiz="3"]) #tab1 .st-p-stats > :not(.section-body),
+body.st-game-ui.st-creating:not([data-wiz="3"]) #tab1 .st-p-stats .section-body > :not(#creation-panel) { display: none !important; }
+body.st-game-ui.st-creating #tab1 .st-p-stats .section-body { display: block !important; }
+body.st-game-ui.st-creating[data-wiz="1"] #creation-panel > div > :nth-child(n+4) { display: none !important; }
+body.st-game-ui.st-creating[data-wiz="2"] #creation-panel > div > :nth-child(-n+3),
+body.st-game-ui.st-creating[data-wiz="2"] #creation-panel > div > :nth-child(n+7) { display: none !important; }
+body.st-game-ui.st-creating[data-wiz="3"] #creation-panel > div > :not(:last-child) { display: none !important; }
+body.st-game-ui.st-creating #creation-panel > div { border: 0 !important; padding: 0 !important; margin: 0 !important; }
+body.st-game-ui.st-creating #creation-panel button.btn-secondary { min-width: 40px; min-height: 36px; font-size: 18px; }
+body.st-game-ui.st-creating[data-wiz="3"] #creation-panel button.btn-success { min-height: 54px; font-size: 18px; }
+.st-wiz-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 10px; }
+.st-wiz-steps span { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 700 14px 'Barlow Condensed', sans-serif;
+  border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-dim, #9c8f76); background: #120f0a; }
+.st-wiz-steps span.on { border-color: var(--accent-bright, #f0c87a); color: #1a140b; background: var(--accent-color, #c8a566); box-shadow: 0 0 10px rgba(240,200,122,.45); }
+.st-wiz-steps span.done { color: var(--accent-bright, #f0c87a); border-color: var(--accent-color, #c8a566); }
+.st-wiz-steps i { width: 28px; height: 1px; background: var(--border-bright, #8a6f3f); }
+.st-wiz h3 { margin: 0 0 4px; font-size: 18px; text-align: center; color: var(--text-bright, #f2e8cf); }
+.st-wiz-desc { text-align: center; font-size: 14px; color: var(--text-dim, #9c8f76); margin-bottom: 10px; }
+.st-wiz-nav { display: none; }
+body.st-game-ui.st-creating.st-tab1 .st-wiz-nav { display: flex; gap: 8px; position: fixed; left: 8px; right: 8px; bottom: calc(var(--st-tabbar-h, 62px) + 6px); z-index: 8550; padding: 8px; border-radius: 12px; background: rgba(14,11,7,.96); border: 1px solid var(--border-color, #5c4a2c); box-shadow: 0 -4px 14px rgba(0,0,0,.5); }
+body.st-game-ui.st-creating #tab1 { padding-bottom: 80px; }
+body.st-game-ui.st-creating.st-dock-on .st-wiz-nav { bottom: calc(var(--st-tabbar-h, 62px) + var(--st-dock-h, 46px) + 6px); }
+.st-wiz-nav button:not(.btn-success) { background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); }
+.st-wiz-nav button { flex: 1; margin: 0; min-height: 46px; font-size: 16px; text-transform: none; letter-spacing: .3px; clip-path: none; }
