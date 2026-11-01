@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script src="js/00-error-log.js?v=1"></script>
+    <script src="js/00-hooks.js?v=1"></script>
     <script>
         /* 6.1: размер шрифта — раньше только 16px из CSS, теперь 'normal'|'large'|'huge' из localStorage['skyrim_fontSize'],
            потому что на телефоне и за большим столом мелкий текст читать тяжело. Ставим ДО отрисовки, чтобы не мигало. */
@@ -543,7 +545,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=34">
+    <link rel="stylesheet" href="style.css?v=36">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
@@ -657,6 +659,7 @@
 <div class="container">
     <div id="cloud-status-bar" class="cloud-status-bar">
         <span id="cloud-user-info">⚠ Офлайн-режим (данные только в этом браузере)</span>
+        <span id="st-save-badge" class="st-save-badge" hidden aria-live="polite"></span>
         <button id="btn-logout" class="btn-danger" style="display:none;" onclick="cloudLogout()">Выйти из аккаунта</button>
         <span class="st-header-tools">
             <label for="st-font-size" title="Размер шрифта">Aa
@@ -709,8 +712,11 @@
                 <div style="display:flex; gap:8px; align-items:center; margin:6px 0;">
                     <div id="st-portrait-preview" style="width:56px; height:56px; border-radius:50%; border:1px solid var(--border-color); background:var(--input-bg) center/cover no-repeat; flex:0 0 auto;"></div>
                     <div style="flex:1;">
-                        <input type="file" id="st-portrait-file" accept="image/*" style="margin:0; font-size:12px;" onchange="loadPortrait(this)">
-                        <button type="button" style="width:auto; padding:1px 8px; font-size:12px; margin-top:2px;" onclick="clearPortrait()">Убрать портрет</button>
+                        <input type="file" id="st-portrait-file" accept="image/*" class="st-file-hidden" onchange="loadPortrait(this)">
+                        <div class="st-portrait-btns">
+                            <label for="st-portrait-file" class="st-file-btn" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">📷 Загрузить портрет</label>
+                            <button type="button" style="width:auto; padding:1px 8px; font-size:12px;" onclick="clearPortrait()">Убрать</button>
+                        </div>
                     </div>
                     <button type="button" style="width:auto; padding:4px 10px;" onclick="sendSheetToGm()" title="Одной строкой в журнал сессии: HP, MP, золото, уровень">📤 Мастеру</button>
                 </div>
@@ -2146,20 +2152,21 @@
 <script src="js/05-inventory.js?v=1"></script>
 <script src="js/06-trade-merchants.js?v=3"></script>
 <script src="js/07-craft-enchant-equip.js?v=1"></script>
-<script src="js/08-equipment-guilds.js?v=2"></script>
+<script src="js/08-equipment-guilds.js?v=3"></script>
 <script src="js/09-combat-grid.js?v=1"></script>
 <script src="js/10-resist-gear-fish-hunt.js?v=1"></script>
 <script src="js/11-session-trade-map.js?v=3"></script>
 <script src="js/12-supernatural-lich.js?v=1"></script>
-<script src="js/13-spell-damage-update.js?v=3"></script>
+<script src="js/13-spell-damage-update.js?v=4"></script>
 <script src="js/14-diary-death-combat.js?v=4"></script>
-<script src="js/15-traps-boot.js?v=1"></script>
+<script src="js/15-traps-boot.js?v=2"></script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
+<script src="crime-core.js?v=1"></script>
 <script src="firebase-config.js?v=4"></script>
 <script src="combat-calc.js?v=5"></script>
 <script src="grid-core.js?v=5"></script>
-<script src="cloud.js?v=45"></script>
+<script src="cloud.js?v=47"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
@@ -2483,7 +2490,7 @@
     renderTop();
 })();
 </script>
-<script src="js/16-game-ui.js?v=8"></script>
+<script src="js/16-game-ui.js?v=9"></script>
 <script src="js/17-icons.js?v=2"></script>
 <script src="js/18-hints.js?v=1"></script>
 

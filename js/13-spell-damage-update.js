@@ -273,10 +273,18 @@ function renderCrimeStatusPlayer() {
     if (!c) { el.innerHTML = ''; return; }
     if (c.inJail) {
         el.innerHTML = `<div style="color:#e67e22;">🔒 Ты в тюрьме (${escHtml(c.jailHold || '?')}), осталось ${c.jailDaysRemaining || 0} дн. Доступен только отдых; кормят бесплатно — голод не растёт.</div>`;
-    } else if (c.fineAmount > 0) {
-        el.innerHTML = `<div style="color:#e74c3c;">⚖️ Штраф: ${c.fineAmount} септимов (${escHtml(c.fineHold || '?')})${c.fineReason ? ' — ' + escHtml(c.fineReason) : ''}</div>`;
     } else {
         el.innerHTML = '';
+    }
+    // Розыск по владениям (crime-core.js): в каждом владении свой штраф; от 1000 — награда за голову.
+    const list = window.StCrime ? window.StCrime.list(c) : (c.fineAmount > 0 ? [{ hold: c.fineHold, amount: c.fineAmount, reason: c.fineReason }] : []);
+    if (list.length) {
+        const sess = window.CloudSync && window.CloudSync.getSessionData && window.CloudSync.getSessionData();
+        const here = sess && ((sess.partyPos && sess.partyPos.hold) || sess.currentHold);
+        el.innerHTML += `<div style="color:#e74c3c;">⚖️ Розыск: ` + list.map(b => {
+            const isHere = here && window.StCrime && window.StCrime.sameHold(b.hold, here);
+            return `<span${isHere ? ' style="font-weight:bold; text-decoration:underline;" title="Вы сейчас в этом владении"' : ''}>${escHtml(b.hold || '?')} ${b.amount}${b.head ? ' 💀' : ''}</span>`;
+        }).join(', ') + `</div>` + (list.some(b => b.head) ? `<div style="font-size:12px; opacity:.8;">💀 Награда за голову: стража этого владения нападает без разговоров.</div>` : '');
     }
 }
 

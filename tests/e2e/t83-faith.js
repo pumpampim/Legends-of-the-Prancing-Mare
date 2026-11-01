@@ -1,0 +1,21 @@
+const S = require('./setup');
+(async () => {
+  const { gm, players, H, wait } = await S.setupSession();
+  const pl = players[0]; const out = {};
+  const st = () => pl.evaluate(() => ({ god: document.getElementById('faith-god').value, rank: document.getElementById('faith-rank').value, dis: document.getElementById('faith-god').disabled }));
+  await pl.evaluate(() => { document.getElementById('faith-god').value = 'azura'; document.getElementById('faith-rank').value = 2; saveLocalStorage(true); });
+  await gm.evaluate(() => { const sel = document.getElementById('inv-player-select'); sel.value = 'p1'; window.loadPlayerInventoryForGm(); });
+  await wait(1500);
+  out.before = await st();
+  await gm.evaluate(() => { window.toggleSupernaturalFlag('vampirism', true); }); await wait(1000);
+  await gm.evaluate(() => { window.toggleVampireLord(true); }); await wait(1500);
+  out.lord = await st();
+  await gm.evaluate(() => { window.toggleVampireLord(false); }); await wait(1500);
+  out.nolord = await st();
+  await gm.evaluate(() => { window.toggleSupernaturalFlag('vampirism', false); window.toggleSupernaturalFlag('lycanthropy', true); }); await wait(1500);
+  out.wolf = await st();
+  await gm.evaluate(() => { window.toggleSupernaturalFlag('lycanthropy', false); }); await wait(1500);
+  out.none = await st();
+  console.log(JSON.stringify(out)); console.log('issues', JSON.stringify(H.issues).slice(0,1500));
+  await H.close();
+})();

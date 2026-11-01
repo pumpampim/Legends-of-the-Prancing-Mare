@@ -1,0 +1,23 @@
+const S = require('./setup');
+(async () => {
+  const { gm, players, code, H, wait } = await S.setupSession();
+  const pl = players[0];
+  await S.gmAddEnemy(gm, 'Волк');
+  await S.gmGive(gm, 'Стальная броня', 1);
+  await wait(500);
+  await S.plEquip(pl, 'Стальная броня', 'chest');
+  await pl.evaluate(() => { document.getElementById('cur-hp').value = 170; updateAll(); saveLocalStorage(true); });
+  await wait(1500);
+  const enemies = H.store['sessions/' + code].doc.enemies;
+  const s0 = await S.sheet(pl); console.log('before', s0.curHp, s0.maxHp, s0.res);
+  console.log('cloud res', JSON.stringify(H.store['characters/p1'].doc.resistances), 'vitals', JSON.stringify(H.store['characters/p1'].doc.vitals));
+  const r = await S.gmAttack(gm, enemies[0].id, 'p1', 'weapon');
+  console.log(JSON.stringify(r, null, 1));
+  await wait(1500);
+  const s1 = await S.sheet(pl); console.log('after', s1.curHp, s1.maxHp);
+  console.log('cloud vitals', JSON.stringify(H.store['characters/p1'].doc.vitals), 'participant', JSON.stringify(H.store['sessions/' + code].doc.participants.p1.curHp));
+  console.log('log', JSON.stringify(H.store['sessions/' + code].doc.combatLog.slice(-3).map(x => x.text)));
+  console.log('dialogs pl', pl.__dialogs);
+  console.log(JSON.stringify(H.issues, null, 1).slice(0, 3000));
+  await H.close();
+})();

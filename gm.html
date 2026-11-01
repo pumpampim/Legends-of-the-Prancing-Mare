@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script src="js/00-error-log.js?v=1"></script>
     <title>Экран Мастера — «Скурим» TTRPG</title>
 
     <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css (см. пояснение
@@ -17,7 +18,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=1">
 
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=36">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -105,6 +106,13 @@
     <h1><span class="skyrim-icon icon-dice" aria-hidden="true"></span> ЭКРАН МАСТЕРА — «СКУРИМ»</h1>
     <p style="margin-top:-8px;"><a href="holds.html" target="_blank" style="color:var(--accent-color); font-size:16px;">🏰 Открыть справочник Владений (города, жители, подземелья)</a></p>
 
+    <details id="gm-errors-panel" class="panel st-errors-panel">
+        <summary style="cursor:pointer; font-weight:bold;">⚠️ Ошибки у игроков <span id="gm-errors-count"></span></summary>
+        <p class="st-muted" style="font-size:14px;">Сюда сами попадают сбои сайта у игроков и у тебя: падения скриптов и неудачные сохранения. Пусто — значит всё работает.</p>
+        <div style="display:flex; gap:6px; margin:6px 0;"><button type="button" style="width:auto;" onclick="gmLoadErrors()">↻ Обновить</button><button type="button" class="btn-danger" style="width:auto;" onclick="gmClearErrors()">Очистить</button></div>
+        <div id="gm-errors-list"></div>
+    </details>
+
     <div id="no-session-block" class="panel" style="display:none;">
         <h2>Начать сессию</h2>
         <p style="font-size:15px; opacity:.85;">Создай сессию и передай код игрокам.</p>
@@ -112,6 +120,7 @@
     </div>
 
     <div id="session-block" style="display:none;">
+        <div id="gm-wanted-banner" class="panel st-wanted-banner" style="display:none;"></div>
         <div class="panel">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>Код для игроков: <span class="session-code-badge" id="gm-session-code">-</span></div>
@@ -189,6 +198,7 @@
                 </div>
                 <div id="gm-enemy-grid" class="st-enemy-grid"></div>
                 <div id="gm-enemies-list"></div>
+                <div id="gm-difficulty" class="st-difficulty"></div>
                 <div class="st-encounters" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                     <select id="gm-encounter-select" style="flex:1; min-width:140px; margin:0;"></select>
                     <button type="button" style="width:auto; margin:0;" onclick="gmLoadEncounter()" title="Добавит всех врагов заготовки к текущим (с новыми id)">📂 Загрузить заготовку</button>
@@ -201,6 +211,11 @@
                         <option value="">— выбрать готового противника —</option>
                     </select>
                     <div id="enemy-db-info" style="font-size:13px; opacity:.75; margin:4px 0;"></div>
+                    <label>Ранг врага</label>
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <select id="enemy-rank-select" style="width:auto; margin:0;" onchange="gmRankPreview()"></select>
+                        <span id="enemy-rank-hint" style="font-size:13px; opacity:.8;"></span>
+                    </div>
 
                     <label>Имя противника</label>
                     <input type="text" id="enemy-name-input" placeholder="Например: Волк">
@@ -1346,6 +1361,9 @@
 </div>
 
 <script src="firebase-config.js?v=4"></script>
+<script src="js/gm-errors.js?v=1"></script>
+<script src="enemy-ranks.js?v=1"></script>
+<script src="crime-core.js?v=1"></script>
 <script src="items-data.js?v=21"></script>
 <script src="smithing-data.js?v=13"></script>
 <script src="enchant-data.js?v=5"></script>
@@ -1370,7 +1388,8 @@
 <script src="enemy-loot.js?v=7"></script>
 <script src="grid-core.js?v=5"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=69"></script>
+<script src="gm.js?v=71"></script>
+<script src="js/17-icons.js?v=2"></script>
 <script src="gm-grid.js?v=8"></script>
 </body>
 </html>

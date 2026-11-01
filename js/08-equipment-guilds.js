@@ -237,6 +237,7 @@
     let playerSupernaturalState = null;
     let playerCrimeState = null;
     function inJailNow() { return !!(playerCrimeState && playerCrimeState.inJail); }
+    window.stGetCrimeState = () => playerCrimeState; // розыск → в сессию мастеру (cloud.js syncSessionVitals)
     const JAIL_BLOCK_TEXT = '🔒 Ты в тюрьме: доступны только короткий и длительный отдых («Следующий день»).';
 
     // Задача L: показывает активное сверхъестественное состояние на листе игрока, с кнопками

@@ -1,0 +1,3 @@
+node_modules/
+tests/e2e/out/
+package-lock.json

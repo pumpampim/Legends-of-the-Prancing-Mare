@@ -58,5 +58,15 @@ service cloud.firestore {
     match /gmPresets/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Журнал ошибок сайта (js/00-error-log.js пишет, gm.html «Ошибки у игроков» читает и чистит).
+    // Создать запись можно только от своего имени и небольшого размера; менять нельзя.
+    match /errors/{id} {
+      allow read, delete: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().size() < 20
+        && request.resource.data.msg is string && request.resource.data.msg.size() <= 400;
+    }
   }
 }

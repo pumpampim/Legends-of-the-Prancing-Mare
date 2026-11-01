@@ -12,6 +12,7 @@
     let db = null;
     let currentUser = null;
     let currentSessionCode = null;
+    window.stGetSessionCode = () => currentSessionCode; // для сборщика ошибок (js/00-error-log.js)
     let lastTurnBumpAt = 0; // троттлинг bumpSessionTurnCounter — см. ниже
     let unsubSession = null;
     let unsubWatchedCharacter = null;
@@ -375,6 +376,19 @@
     }
     window.stBreaksOnDamage = stBreaksOnDamage;
 
+    // Значок сохранения рядом с именем аккаунта: «сохранено / сохраняю / нет сети / ошибка».
+    function stSaveState(st) {
+        const b = document.getElementById('st-save-badge');
+        if (!b) return;
+        const map = { pending: ['…', 'Изменения ждут записи', 'pending'], saving: ['⟳ Сохраняю', 'Записываю лист в облако', 'saving'],
+            saved: ['✓ Сохранено', 'Лист записан в облако', 'saved'], offline: ['⚠ Нет сети', 'Нет связи с облаком: лист хранится в этом браузере и запишется, когда сеть вернётся', 'offline'],
+            error: ['⚠ Не сохранилось', 'Облако не приняло запись, повторю через 5 секунд', 'error'] };
+        const m = map[st] || map.saved;
+        b.textContent = m[0]; b.title = m[1]; b.className = 'st-save-badge st-save-' + m[2]; b.hidden = false;
+    }
+    window.addEventListener('offline', () => stSaveState('offline'));
+    window.addEventListener('online', () => { stSaveState('pending'); if (typeof window.stForceSave === 'function') window.stForceSave(); });
+
     window.CloudSync = {
         // immediate:true — обходит обычную задержку 800мс и пишет сразу. Нужно для действий,
         // после которых мастер может СРАЗУ ЖЕ что-то записать поверх (обыск трупа игроком,
@@ -399,7 +413,7 @@
                 // Сверка и запись — в одной транзакции, иначе чужая запись могла бы проскочить между ними.
                 // Записи этой вкладки идут строго по одной: следующая ждёт ответа предыдущей (иначе вторая не увидела бы слияния первой).
                 if (saveInFlight) { saveQueued = true; return; }
-                saveInFlight = true;
+                saveInFlight = true; stSaveState('saving');
                 const base = syncedStamp, baseData = syncedData, myStamp = lastSaveStamp;
                 const ref = db.collection('characters').doc(currentUser.uid);
                 clearTimeout(saveRetryTimer);
@@ -420,6 +434,7 @@
                     return { wrote: full, merged: true, lost: m.lost };
                 })).then(r => {
                     saveInFlight = false;
+                    if (!saveQueued && !pendingSave) stSaveState('saved');
                     if (r.wrote && !r.merged) {
                         if (syncedStamp === base) { syncedStamp = myStamp; syncedData = data; }
                         syncSessionVitals(data);
@@ -435,6 +450,7 @@
                 }).catch(e => {
                     // Нет сети — транзакция не проходит. Повторим чуть позже последней версией листа (новая правка отменит повтор).
                     saveInFlight = false; saveQueued = false;
+                    stSaveState(navigator.onLine === false || /offline|unavailable/i.test(String(e && (e.code || e.message))) ? 'offline' : 'error');
                     console.error('Ошибка сохранения в облако:', e);
                     if (!sheetIsStale) saveRetryTimer = setTimeout(() => { if (typeof window.stForceSave === 'function') window.stForceSave(); }, 5000);
                 });
@@ -474,6 +490,11 @@
                     // Урон игрока (итоговый урон оружия) — подпись над фигурой на боевой сетке мастера
                     { const dEl = el('main-panel-dmg'); patch['participants.' + currentUser.uid + '.dmg'] = dEl ? (parseInt(dEl.value) || 0) : 0; }
                     { const sEl = el('val-speed'); patch['participants.' + currentUser.uid + '.speed'] = sEl ? (parseInt(sEl.value) || 0) : 30; } // скорость — лимит перемещения на сетке
+                    { const lEl = el('char-level'); patch['participants.' + currentUser.uid + '.level'] = lEl ? (parseInt(lEl.value) || 1) : 1; } // уровень — мастеру для рангов врагов и сложности боя
+                    { // розыск по владениям — мастер видит, когда отряд входит туда, где кого-то ищут
+                        const cs = typeof window.stGetCrimeState === 'function' ? window.stGetCrimeState() : null;
+                        patch['participants.' + currentUser.uid + '.wanted'] = (cs && window.StCrime) ? window.StCrime.list(cs).map(b => ({ hold: b.hold, amount: b.amount })) : [];
+                    }
                     // какие длительные зоны игрока ещё держатся (мастер убирает с сетки зоны, чьих эффектов больше нет)
                     patch['participants.' + currentUser.uid + '.zoneEffs'] = (Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [])
                         .filter(e => e && e.gridZoneId && (e.turnsRemaining === null || e.turnsRemaining > 0 || e.turnsRemaining === Infinity)).map(e => e.gridZoneId);
@@ -482,6 +503,7 @@
                 }
             };
             clearTimeout(saveTimer);
+            stSaveState('pending');
             if (immediate) { pendingSave = null; doSave(); }
             else { pendingSave = doSave; saveTimer = setTimeout(() => { pendingSave = null; doSave(); }, 800); }
         },

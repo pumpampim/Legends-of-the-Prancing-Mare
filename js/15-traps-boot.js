@@ -768,11 +768,7 @@
             'useArtifactItem', 'useInventoryItem', 'useLimitedItem', 'useMagicStaff', 'usePower', 'useScrollFromPouch', 'useScrollItem', 'takeChestGold', 'lootPet',
             'applyPoisonToWeapon', 'applyPoisonFromPouch', 'donateToBardMuseum'];
         JAIL_BLOCKED.forEach(name => {
-            const fn = window[name];
-            if (typeof fn !== 'function') return;
-            window[name] = function () {
-                if (inJailNow()) { alert(JAIL_BLOCK_TEXT); return; }
-                return fn.apply(this, arguments);
-            };
+            if (typeof window[name] !== 'function') return;
+            stHook(name, 'тюрьма', { before: () => { if (inJailNow()) { alert(JAIL_BLOCK_TEXT); return stHook.STOP; } } });
         });
     })();

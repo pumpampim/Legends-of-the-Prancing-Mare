@@ -8,6 +8,7 @@
     let currentUser = null;
     let _gmHeartbeatTimer = null; // heartbeat "мастер онлайн" — см. enterSessionView
     let currentCode = null;
+    window.stGetSessionCode = () => currentCode; // для сборщика ошибок (js/00-error-log.js)
     let unsubSession = null;
     let unsubGmWatchedCharacter = null; // подписка на инвентарь выбранного игрока (своя, не через
                                           // cloud.js — gm.html его вообще не подключает)
@@ -367,6 +368,7 @@
         try { gmMaintainSession(lastData); } catch (e) { console.error(e); }
         try { gmWeatherDayWatch(lastData); } catch (e) { console.error(e); }
         try { gmJailDayWatch(lastData); } catch (e) { console.error(e); }
+        try { gmWantedWatch(lastData); } catch (e) { console.error(e); }
         try { gmNotifyWatch(lastData); } catch (e) { console.error(e); }
         try { gmEnemyTickWatch(lastData); } catch (e) { console.error(e); }
         try { if (window.GmGrid) window.GmGrid.onSnapshot(lastData); } catch (e) { console.error(e); }
@@ -1508,6 +1510,7 @@
         const target = el('gm-enemies-list');
         gmCheckMarked(enemies);
         renderEnemyGrid(enemies);
+        try { gmRenderDifficulty(); } catch (e) { console.error(e); }
         if (!enemies.length) { target.innerHTML = '<p style="opacity:.7;font-size:14px;">Противников нет.</p>'; gmBulkCount(); return; }
         target.innerHTML = enemies.map(e => {
             const resistEntries = e.resist ? Object.entries(e.resist).filter(([k, v]) => v) : [];
@@ -1773,6 +1776,62 @@
     }
     window.gmEnemyExtraFromDb = gmEnemyExtraFromDb;
 
+    // ---------- Ранги врагов и сложность боя (enemy-ranks.js) ----------
+    // Отряд для оценки: живые игроки и их призванные существа (ОЗ и урон за круг).
+    function gmPartyForDifficulty() {
+        const out = [];
+        Object.values(lastData.participants || {}).forEach(p => {
+            if (!p) return;
+            out.push({ curHp: p.curHp, maxHp: p.maxHp, dmg: p.dmg, level: p.level });
+            (p.summons || []).forEach(s => out.push({ curHp: s.curHp, maxHp: s.maxHp, dmg: s.dmg }));
+        });
+        return out;
+    }
+    function gmPartyAvgLevel() {
+        const l = Object.values(lastData.participants || {}).map(p => Number(p && p.level) || 0).filter(Boolean);
+        return l.length ? Math.round(l.reduce((a, b) => a + b, 0) / l.length) : 0;
+    }
+    function gmDifficultyLine(d, prefix) {
+        if (!d) return '';
+        const lose = d.roundsToLose === Infinity ? '—' : '~' + d.roundsToLose;
+        return `${prefix}<b style="color:${d.level.color}">${d.level.name}</b> <span style="opacity:.75">· отряд снимет врагов за ~${d.roundsToWin} кр., враги отряд — за ${lose} кр.</span>`;
+    }
+    function gmRenderDifficulty() {
+        const box = el('gm-difficulty');
+        if (!box || !window.EnemyRanks) return;
+        const d = window.EnemyRanks.difficulty(gmPartyForDifficulty(), lastData.enemies || []);
+        box.innerHTML = d ? gmDifficultyLine(d, '⚖️ Сложность боя: ') +
+            '<div style="font-size:11px; opacity:.55;">Грубая прикидка по ОЗ и урону, без попаданий, брони и заклинаний игроков.</div>' : '';
+        gmRankPreview();
+    }
+    window.gmRankPreview = function () {
+        const sel = el('enemy-rank-select'), hint = el('enemy-rank-hint');
+        if (!sel || !window.EnemyRanks) return;
+        if (!sel.options.length) {
+            sel.innerHTML = window.EnemyRanks.RANKS.map(r => `<option value="${r.id}">${r.name}${r.id === 'normal' ? '' : ` (ОЗ ×${r.hp}, урон ×${r.dmg})`}</option>`).join('');
+            const lv = gmPartyAvgLevel(); if (lv) sel.value = window.EnemyRanks.recommend(lv).id;
+        }
+        if (!hint) return;
+        const lv = gmPartyAvgLevel(), rec = lv ? window.EnemyRanks.recommend(lv) : null;
+        let txt = lv ? `Отряду ур. ~${lv} подходит «${rec.name}».` : '';
+        const name = (el('enemy-name-input') || {}).value;
+        const hp = Number((el('enemy-hp-input') || {}).value) || 0;
+        if (name && hp) {
+            const pick = (currentEnemyDbPick && currentEnemyDbPick.name === name) ? currentEnemyDbPick : null;
+            const manualDmg = Number((el('enemy-dmg-input') || {}).value) || 0;
+            const probe = window.EnemyRanks.apply({ name, maxHp: hp, curHp: hp, weaponDmg: manualDmg || (pick && pick.weaponDmg) || 0, spells: (pick && pick.spells) || [] }, sel.value);
+            const d = window.EnemyRanks.difficulty(gmPartyForDifficulty(), (lastData.enemies || []).concat([probe]));
+            if (d) txt += ' С ним: ' + `<b style="color:${d.level.color}">${d.level.name}</b>.`;
+        }
+        hint.innerHTML = txt;
+    };
+    // при выборе врага из базы и правке ХП/урона — пересчитать подсказку
+    setTimeout(() => {
+        ['enemy-hp-input', 'enemy-dmg-input', 'enemy-name-input'].forEach(id => { const i = el(id); if (i) i.addEventListener('input', () => window.gmRankPreview()); });
+        const db = el('enemy-db-select'); if (db) db.addEventListener('change', () => window.gmRankPreview());
+        window.gmRankPreview();
+    }, 0);
+
     window.addEnemy = function () {
         const name = el('enemy-name-input').value.trim();
         if (!name) return;
@@ -1799,7 +1858,11 @@
             extra.corpseLoot = gearExtra.corpseLoot; extra.lootKit = JSON.parse(JSON.stringify(gearExtra.corpseLoot || null));
             extra.loot = genLootText(gearExtra.corpseLoot);
         }
-        enemies.push(stripUndefinedDeep(Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra)));
+        let newEnemy = Object.assign({ id: genId('e'), name, maxHp, curHp: maxHp, maxMp, curMp: maxMp }, extra);
+        // Ранг (enemy-ranks.js): ветеран/элита/легенда — больше ОЗ, урона, маны и физ. резиста.
+        const rankSel = el('enemy-rank-select');
+        if (rankSel && window.EnemyRanks && rankSel.value && rankSel.value !== 'normal') newEnemy = window.EnemyRanks.apply(newEnemy, rankSel.value);
+        enemies.push(stripUndefinedDeep(newEnemy));
         gmUpdateEnemies(enemies).then(() => {
             el('enemy-name-input').value = '';
             el('enemy-hp-input').value = 10;
@@ -3067,60 +3130,114 @@
         if (!box) return;
         if (!currentInvPlayerUid) { box.innerHTML = '<p style="opacity:.6; font-size:13px;">Выбери игрока выше.</p>'; return; }
         const c = currentCrimeState;
+        const here = rumPartyHold();
         let html = '';
         if (c.inJail) {
             html += `<p style="color:#e67e22;">🔒 В тюрьме (${escapeHtml(c.jailHold)}), осталось ${c.jailDaysRemaining} дн.</p>
                 <button class="btn-success" style="width:100%;" onclick="releaseFromJail()">Освободить</button>`;
-        } else if (c.fineAmount > 0) {
-            html += `<p>💰 Штраф: <strong>${c.fineAmount}</strong> септимов (${escapeHtml(c.fineHold)}) — ${escapeHtml(c.fineReason || 'без причины')}${c.refused ? '<br><span style="color:#e74c3c;">Игрок отказался платить.</span>' : ''}</p>
-                <button class="btn-danger" style="width:100%;" onclick="clearFine()">💰 Оплатить штраф из кошелька игрока</button>
-                ${!c.refused ? `<button style="width:100%; margin-top:4px;" onclick="markFineRefused()">🙅 Отметить отказ платить</button>` : ''}
-                <label style="margin-top:6px;">Отправить в тюрьму на (дней)</label>
-                <input type="number" id="jail-days-input" value="3" min="1" style="width:70px; display:inline;">
-                <button style="width:100%; margin-top:4px;" onclick="sendToJail()">🔒 Отправить в тюрьму</button>`;
-        } else {
-            html += '<p style="opacity:.6; font-size:13px;">Штрафов нет.</p>';
         }
+        // Розыск: штрафы копятся отдельно по каждому владению (crime-core.js)
+        const bounties = window.StCrime ? window.StCrime.list(c) : [];
+        if (bounties.length) {
+            html += `<p style="margin:6px 0 2px;"><b>⚖️ Розыск по владениям</b> — всего ${c.fineAmount} септимов</p>`;
+            html += bounties.map(b => {
+                const isHere = here && window.StCrime.sameHold(b.hold, here);
+                const hs = escapeHtml(b.hold).replace(/'/g, '&#39;');
+                return `<div class="st-bounty${isHere ? ' st-bounty-here' : ''}">
+                    <div><b>${escapeHtml(b.hold)}</b>: <strong>${b.amount}</strong> септимов${b.head ? ' · <span style="color:#e05a4f;">награда за голову — стража нападает</span>' : ''}${isHere ? ' · <span style="color:#e8a25a;">отряд здесь</span>' : ''}
+                    ${b.reason ? `<div style="font-size:12px; opacity:.7;">${escapeHtml(b.reason)}</div>` : ''}
+                    ${b.refused ? '<div style="font-size:12px; color:#e74c3c;">Отказался платить.</div>' : ''}</div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+                        <button class="btn-danger" style="width:auto; margin:0;" onclick="clearFine('${hs}')">💰 Оплатить</button>
+                        ${!b.refused ? `<button style="width:auto; margin:0;" onclick="markFineRefused('${hs}')">🙅 Отказ</button>` : ''}
+                        <button style="width:auto; margin:0;" onclick="sendToJail('${hs}')" ${c.inJail ? 'disabled' : ''}>🔒 В тюрьму</button>
+                        <button style="width:auto; margin:0;" onclick="forgiveBounty('${hs}')" title="Снять розыск без оплаты (ярл помиловал, квест, подкуп)">🕊 Снять</button>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `<label style="margin-top:6px;">Срок тюрьмы (дней)</label><input type="number" id="jail-days-input" value="3" min="1" style="width:70px; display:inline;">`;
+        } else if (!c.inJail) {
+            html += '<p style="opacity:.6; font-size:13px;">Розыска нет.</p>';
+        }
+        const holdOpts = REPUTATION_HOLDS.map(h => `<option value="${escapeHtml(h)}"${here && window.StCrime && window.StCrime.sameHold(h, here) ? ' selected' : ''}>${escapeHtml(h)}</option>`).join('');
         html += `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <label>Новый штраф</label>
             <input type="number" id="fine-amount-input" placeholder="Сумма">
-            <select id="fine-hold-select">${REPUTATION_HOLDS.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('')}</select>
+            <select id="fine-hold-select">${holdOpts}</select>
             <input type="text" id="fine-reason-input" placeholder="За что (необязательно)">
             <button class="btn-success" style="width:100%; margin-top:4px;" onclick="issueFine()">Выписать штраф</button>
-            ${JAIL_FINE_THRESHOLD ? `<p style="font-size:11px; opacity:.6; margin-top:4px;">От ${JAIL_FINE_THRESHOLD} септимов штраф обычно ведёт в тюрьму, если не оплачен сразу.</p>` : ''}
+            <p style="font-size:11px; opacity:.6; margin-top:4px;">Штраф копится в выбранном владении. От ${window.StCrime ? window.StCrime.HEAD_PRICE : 1000} септимов в одном владении — награда за голову: стража нападает, а не предлагает заплатить.</p>
         </div>`;
         box.innerHTML = html;
     }
 
     function saveCrimeState() {
         if (!currentInvPlayerUid) return Promise.resolve();
-        return db.collection('characters').doc(currentInvPlayerUid).update({ crimeState: currentCrimeState });
+        const uid = currentInvPlayerUid, cs = currentCrimeState;
+        return db.collection('characters').doc(uid).update({ crimeState: cs }).then(() => {
+            // сводка розыска в сессию — для подсказки «стража узнаёт» (gmWantedWatch)
+            if (currentCode && (lastData.participants || {})[uid]) {
+                return db.collection('sessions').doc(currentCode).update({ ['participants.' + uid + '.wanted']: window.StCrime.list(cs).map(b => ({ hold: b.hold, amount: b.amount })) }).catch(() => { });
+            }
+        });
+    }
+
+    // «Стража узнаёт»: отряд в владении, где кого-то разыскивают, — плашка у мастера и одна запись в журнал.
+    const _wantedSeen = new Set();
+    function gmWantedWatch(data) {
+        const box = el('gm-wanted-banner');
+        if (!box || !window.StCrime) return;
+        const here = (data.partyPos && data.partyPos.hold) || data.currentHold || '';
+        const rows = [];
+        Object.entries(data.participants || {}).forEach(([uid, p]) => {
+            (p && Array.isArray(p.wanted) ? p.wanted : []).forEach(w => {
+                if (here && window.StCrime.sameHold(w.hold, here) && w.amount > 0) rows.push({ uid, name: p.name || 'Игрок', amount: w.amount, head: w.amount >= window.StCrime.HEAD_PRICE });
+            });
+        });
+        const firstLook = !gmWantedWatch.ready; gmWantedWatch.ready = true; // при открытии экрана старый розыск в журнал не пишем
+        if (!rows.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+        box.style.display = '';
+        box.innerHTML = `🛡 <b>Отряд в ${escapeHtml(here)}</b>, здесь разыскивают: ` + rows.map(r =>
+            `<b>${escapeHtml(r.name)}</b> (${r.amount}${r.head ? ', награда за голову — стража нападает' : ''})`).join(', ') +
+            `. <span style="opacity:.75">Стража может узнать: штраф, тюрьма или бой. Штрафы — в «Инвентарь игрока» → «Розыск».</span>`;
+        rows.forEach(r => {
+            const key = here + '|' + r.uid + '|' + r.amount;
+            if (_wantedSeen.has(key)) return;
+            _wantedSeen.add(key);
+            if (!firstLook) gmPostLogEntryText(`🛡 ${r.name} разыскивается в ${here}: ${r.amount} септимов${r.head ? ' — награда за голову' : ''}.`);
+        });
     }
 
     window.issueFine = function () {
         if (!currentInvPlayerUid) return;
         const amount = parseInt(el('fine-amount-input').value) || 0;
         if (amount <= 0) { alert('Укажи сумму штрафа.'); return; }
-        // Неоплаченный штраф не затирается новым, а растёт на новую сумму.
-        const prevFine = currentCrimeState.fineAmount || 0;
+        const hold = el('fine-hold-select').value;
         const newReason = el('fine-reason-input').value.trim();
-        currentCrimeState = Object.assign({}, currentCrimeState, {
-            fineAmount: prevFine + amount, fineHold: prevFine > 0 && currentCrimeState.fineHold ? currentCrimeState.fineHold : el('fine-hold-select').value,
-            fineReason: prevFine > 0 ? [currentCrimeState.fineReason, newReason].filter(Boolean).join('; ') : newReason, refused: false
-        });
+        const before = window.StCrime.amountIn(currentCrimeState, hold);
+        currentCrimeState = window.StCrime.addFine(currentCrimeState, hold, amount, newReason);
+        const total = window.StCrime.amountIn(currentCrimeState, hold);
         saveCrimeState().then(() => {
             renderCrimePanel();
-            gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${currentCrimeState.fineHold})${newReason ? ': ' + newReason : ''}${prevFine > 0 ? ` — всего к оплате ${currentCrimeState.fineAmount}` : ''}.`);
-            try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: currentCrimeState.fineReason, hold: currentCrimeState.fineHold || undefined, who: [((lastData.participants || {})[currentInvPlayerUid] || {}).name].filter(Boolean) }); } catch (e) { }
+            gmPostLogEntryText(`⚖️ Штраф ${amount} септимов (${hold})${newReason ? ': ' + newReason : ''}${before > 0 ? ` — розыск там ${total}` : ''}${before < window.StCrime.HEAD_PRICE && total >= window.StCrime.HEAD_PRICE ? '. Назначена награда за голову!' : ''}.`);
+            try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: newReason, hold: hold || undefined, who: [((lastData.participants || {})[currentInvPlayerUid] || {}).name].filter(Boolean) }); } catch (e) { }
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
-    window.markFineRefused = function () {
+    window.forgiveBounty = function (hold) {
         if (!currentInvPlayerUid) return;
-        currentCrimeState = Object.assign({}, currentCrimeState, { refused: true });
+        if (!confirm(`Снять розыск в «${hold}» без оплаты?`)) return;
+        currentCrimeState = window.StCrime.clearHold(currentCrimeState, hold);
+        saveCrimeState().then(() => { renderCrimePanel(); gmPostLogEntryText(`🕊 Розыск в «${hold}» снят.`); }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
+    window.markFineRefused = function (hold) {
+        if (!currentInvPlayerUid) return;
+        hold = hold || (window.StCrime.list(currentCrimeState)[0] || {}).hold;
+        currentCrimeState = window.StCrime.refuse(currentCrimeState, hold);
         saveCrimeState().then(() => {
             renderCrimePanel();
-            gmPostLogEntryText('🙅 Игрок отказался платить штраф.');
+            gmPostLogEntryText(`🙅 Игрок отказался платить штраф (${hold}).`);
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
@@ -3136,14 +3253,17 @@
         if (bribe && orders < 5) return { mult: 0.5, note: 'Гильдия воров / «Подкуп»: половина штрафа, репутацию не снижать' };
         return orders >= 5 ? { mult: 0.25, note: 'Гильдия воров: откуп в четверть штрафа' } : { mult: 0.5, note: 'Гильдия воров: откуп в половину штрафа' };
     }
-    window.clearFine = function () {
+    window.clearFine = function (hold) {
         if (!currentInvPlayerUid) return;
-        const uid = currentInvPlayerUid, fine = currentCrimeState.fineAmount || 0, hold = currentCrimeState.fineHold;
+        hold = hold || (window.StCrime.list(currentCrimeState)[0] || {}).hold;
+        const uid = currentInvPlayerUid;
         const ref = db.collection('characters').doc(uid);
-        const cleared = Object.assign({}, currentCrimeState, { fineAmount: 0, fineHold: '', fineReason: '', refused: false });
+        let fine = 0, cleared = null;
         let paid = fine, note = '';
         db.runTransaction(tx => tx.get(ref).then(doc => {
             const data = doc.data() || {};
+            fine = window.StCrime.amountIn(data.crimeState, hold);
+            cleared = window.StCrime.clearHold(data.crimeState, hold);
             const tg = thievesGuildFineMult(data);
             paid = Math.ceil(fine * tg.mult); note = tg.note;
             const have = parseInt(data.gold) || 0;
@@ -3156,13 +3276,12 @@
         }).catch(e => alert(e.message));
     };
 
-    window.sendToJail = function () {
+    // Тюрьма «отрабатывает» розыск одного владения: его штраф снимается, остальные остаются.
+    window.sendToJail = function (hold) {
         if (!currentInvPlayerUid) return;
-        const days = parseInt(el('jail-days-input').value) || 1;
-        currentCrimeState = Object.assign({}, currentCrimeState, {
-            inJail: true, jailHold: currentCrimeState.fineHold, jailDaysRemaining: days,
-            fineAmount: 0, fineReason: '', refused: false // штраф "отработан" сроком
-        });
+        hold = hold || (window.StCrime.list(currentCrimeState)[0] || {}).hold || '';
+        const days = parseInt((el('jail-days-input') || {}).value) || 1;
+        currentCrimeState = Object.assign(window.StCrime.clearHold(currentCrimeState, hold), { inJail: true, jailHold: hold, jailDaysRemaining: days });
         saveCrimeState().then(() => {
             renderCrimePanel();
             gmPostLogEntryText(`🔒 Игрок отправлен в тюрьму на ${days} дн. (${currentCrimeState.jailHold}).`);
@@ -3902,15 +4021,13 @@
             const reason = `карманная кража: ${c.victim}`;
             let next = null;
             return db.runTransaction(tx => tx.get(cref).then(doc => {
-                const cs = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, (doc.data() || {}).crimeState || {});
-                const prev = cs.fineAmount || 0;
-                next = Object.assign({}, cs, { fineAmount: prev + amount, fineHold: prev > 0 && cs.fineHold ? cs.fineHold : holdSel,
-                    fineReason: prev > 0 ? [cs.fineReason, reason].filter(Boolean).join('; ') : reason, refused: false });
+                next = window.StCrime.addFine((doc.data() || {}).crimeState, holdSel, amount, reason);
                 tx.update(cref, { crimeState: next });
             })).then(() => {
                 if (currentInvPlayerUid === c.uid) { currentCrimeState = next; renderCrimePanel(); }
-                gmPostLogEntryText(`⚖️ ${c.name}: штраф ${amount} септимов (${next.fineHold}) за карманную кражу${next.fineAmount > amount ? ` — всего к оплате ${next.fineAmount}` : ''}.`);
-                try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: reason, hold: next.fineHold || undefined, who: [c.name].filter(Boolean) }); } catch (e) { }
+                const inHold = window.StCrime.amountIn(next, holdSel);
+                gmPostLogEntryText(`⚖️ ${c.name}: штраф ${amount} септимов (${holdSel}) за карманную кражу${inHold > amount ? ` — розыск там ${inHold}` : ''}.`);
+                try { window.rumAddDeed({ kind: 'crime', amount: amount, reason: reason, hold: holdSel || undefined, who: [c.name].filter(Boolean) }); } catch (e) { }
             });
         }).catch(e => alert('Ошибка: ' + e.message));
     };
@@ -4186,7 +4303,7 @@
                 lich: window.lichNormalize ? window.lichNormalize(data.supernaturalState.lich) : (data.supernaturalState.lich || null),
                 faithShift: data.supernaturalState.faithShift || null
             } : defaultSn;
-            currentCrimeState = Object.assign({ fineAmount: 0, fineHold: '', fineReason: '', refused: false, inJail: false, jailHold: '', jailDaysRemaining: 0 }, data.crimeState || {});
+            currentCrimeState = window.StCrime.normalize(data.crimeState);
             // Снимок листа игрока приходит на каждое его сохранение — недописанная сумма штрафа и прочие поля не теряются.
             gmKeepForms(() => { renderGuildsPanel(); renderSupernaturalPanel(); renderCrimePanel(); });
             // Репутация копится ЛОКАЛЬНО до явного "Сохранить" (см. панель Задачи D) — если

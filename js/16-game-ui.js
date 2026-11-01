@@ -208,14 +208,13 @@
         if (focusAttack) setTimeout(function () { var a = el('st-fight-attack'); if (a) try { a.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { } }, 60);
     }
     // на телефоне кнопки «Атака»/«Атаковать помеченного» ведут к блоку атаки на экране «Бой», а не на вкладку «Сессия»
-    var origAttack = window.dockAttack, origMarked = window.dockAttackMarked;
-    window.dockAttack = function () { if (!mqMobile.matches) return origAttack.apply(this, arguments); goFight(true); };
-    window.dockAttackMarked = function () {
-        if (!mqMobile.matches) return origMarked.apply(this, arguments);
+    stHook('dockAttack', 'телефон: к экрану Бой', { around: function (orig, args) { if (!mqMobile.matches) return orig.apply(this, args); goFight(true); } });
+    stHook('dockAttackMarked', 'телефон: к экрану Бой', { around: function (orig, args) {
+        if (!mqMobile.matches) return orig.apply(this, args);
         var s = window.CloudSync && window.CloudSync.getSessionData && window.CloudSync.getSessionData(), sel = el('attack-target-select');
         if (s && s.markedTarget && sel && Array.prototype.some.call(sel.options, function (o) { return o.value === s.markedTarget; })) { sel.value = s.markedTarget; sel.dispatchEvent(new Event('change', { bubbles: true })); }
         renderFight(); goFight(true);
-    };
+    } });
     // строка свёрнутой панели: кнопка «К бою»
     var mini = document.querySelector('#combat-dock .st-dock-mini');
     if (mini) {
@@ -223,10 +222,8 @@
         go.onclick = function () { goFight(false); };
         mini.appendChild(go);
     }
-    var origDock = window.updateCombatDock;
-    if (typeof origDock === 'function') window.updateCombatDock = function () { var r = origDock.apply(this, arguments); try { renderFight(); } catch (e) { } return r; };
-    var origTargets = window.renderAttackTargetSelect;
-    if (typeof origTargets === 'function') window.renderAttackTargetSelect = function () { var r = origTargets.apply(this, arguments); try { renderFight(); } catch (e) { } return r; };
+    stHook('updateCombatDock', 'экран Бой', { after: function () { renderFight(); } });
+    stHook('renderAttackTargetSelect', 'экран Бой', { after: function () { renderFight(); } });
 
     // ---------- «Сумка» иконками (этап 3, только телефон) ----------
     // Старый список #player-inventory-list рисуется как раньше (со всеми кнопками). На телефоне строки скрыты,

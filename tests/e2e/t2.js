@@ -1,0 +1,28 @@
+const S = require('./setup');
+(async () => {
+  const { gm, players, code, H, wait } = await S.setupSession();
+  const pl = players[0];
+  await S.gmAddEnemy(gm, 'Бандит');
+  await S.gmAddEnemy(gm, 'Волк');
+  await S.gmGive(gm, 'Стальной меч', 1);
+  await S.gmGive(gm, 'Стальная броня', 1);
+  await wait(800);
+  const inv = await pl.evaluate(() => playerInventory.map(i => [i.name, i.count, i.weaponDmg, i.armorValue, i.slot, i.weaponType]));
+  console.log('inv', JSON.stringify(inv));
+  console.log(await S.plEquip(pl, 'Стальной меч', 'melee'));
+  console.log(await S.plEquip(pl, 'Стальная броня', 'chest'));
+  await wait(300);
+  console.log(JSON.stringify(await S.sheet(pl)));
+  const enemies = H.store['sessions/' + code].doc.enemies;
+  console.log('enemies', JSON.stringify(enemies.map(e => [e.id, e.name, e.curHp, e.weaponDmg, e.str, e.resist, e.weaponNote])));
+  await S.gmNextTurn(pl);
+  const r = await S.plAttack(pl, enemies[0].id, 'melee');
+  console.log(JSON.stringify(r, null, 1));
+  const r2 = await S.plAttack(pl, enemies[0].id, 'melee', {power:true});
+  console.log(JSON.stringify(r2, null, 1));
+  await wait(500);
+  console.log('enemy after', JSON.stringify(H.store['sessions/' + code].doc.enemies.map(e => [e.name, e.curHp, e.maxHp])));
+  console.log('dialogs pl', pl.__dialogs, 'gm', gm.__dialogs);
+  console.log(JSON.stringify(H.issues, null, 1).slice(0, 3000));
+  await H.close();
+})();

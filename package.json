@@ -1,0 +1,14 @@
+{
+  "name": "legends-of-the-prancing-mare",
+  "private": true,
+  "description": "Лист игрока и экран мастера «Легенды Гарцующей Кобылы». Сайт статический, npm нужен только для тестов.",
+  "scripts": {
+    "test": "node tests/unit.js && node tests/e2e/run.js",
+    "test:unit": "node tests/unit.js",
+    "test:e2e": "node tests/e2e/run.js",
+    "test:slow": "node tests/e2e/run.js --slow"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.2"
+  }
+}
