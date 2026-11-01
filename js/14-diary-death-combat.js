@@ -286,7 +286,8 @@
         // «Двойной вихрь/мясорубка» — только если во второй руке правда есть оружие (раньше хватало галочки)
         isDualWield: document.getElementById('chk-dual-wield').checked && (!!equippedSlots.meleeWeaponOffhand || ((parseInt(val('wep-melee-offhand-dmg')) || 0) > 0 && !!val('wep-melee-offhand-name').trim())),
         isSprintAttack: document.getElementById('chk-sprint-attack').checked,
-        melee: { dmg: parseInt(val('wep-melee-dmg')), type: meleeType, name: val('wep-melee-name'), offhandDmg: parseInt(val('wep-melee-offhand-dmg')) || 0,
+        melee: { dmg: parseInt(val('wep-melee-dmg')), type: meleeType, name: val('wep-melee-name'), offhandDmg: parseInt(val('wep-melee-offhand-dmg')) || 0, offhandName: val('wep-melee-offhand-name'),
+            offhandType: (() => { const o = equippedSlots.meleeWeaponOffhand ? playerInventory.find(i => i.itemId === equippedSlots.meleeWeaponOffhand) : null; const t = o && typeof weaponTypeToSelectValue === 'function' ? weaponTypeToSelectValue(o.weaponType) : null; return t || (/кинжал/i.test(val('wep-melee-offhand-name')) ? 'dagger' : 'onehand'); })(),
             isKastet: (() => { const m = equippedSlots.meleeWeapon ? playerInventory.find(i => i.itemId === equippedSlots.meleeWeapon) : null; return !!(m && typeof isKastetItem === 'function' && isKastetItem(m)); })() },
         // Урон стрелы — только от заряженного боеприпаса (раньше ручное поле считалось всегда, а при «Применить» сверху
         // прибавлялся ещё урон надетой стрелы — урон стрелы шёл дважды, и предпросмотр расходился с итогом).

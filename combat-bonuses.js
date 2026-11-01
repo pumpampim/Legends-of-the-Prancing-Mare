@@ -104,7 +104,6 @@
                 armorIgnore = Math.max(armorIgnore, perks.staffArmorPenetration / 100);
                 infoNotes.push(`🪄 Отшельник: посох игнорирует ${perks.staffArmorPenetration}% брони цели`);
             }
-            if (trueDmg) infoNotes.push(`🩸 Сквозь сопротивление: +${trueDmg} урона (резист цели не режет)`);
 
             enchantDmgMain = I.enchantDmgMelee || 0;
             // К урону прибавляется характеристика удара: Сила; у призванного оружия — Мудрость (как и попадание);
@@ -121,7 +120,22 @@
                 offhandDmg = melee.offhandDmg || 0;
                 offhandEnchantDmg = I.offhandEnchantDmg || 0;
                 if (offhandDmg > 0 || offhandEnchantDmg > 0) add('второе оружие', offhandDmg + offhandEnchantDmg);
+                // Второе оружие получает свои перки по своему типу и названию — как правое, но без Силы (решение Никиты 2026-11-01).
+                // Попадание — один бросок, поэтому бонусы к попаданию по-прежнему только от правого оружия.
+                const offType = melee.offhandType || 'onehand', offName = String(melee.offhandName || '').toLowerCase();
+                if (offhandDmg > 0 && offType !== 'unarmed' && TWO_HANDED.indexOf(offType) === -1) {
+                    let offPerk = offhandDmg * (perks.oneHandedDamage || 0);                    // Сильная рука
+                    if (offType === 'onehand' && /коп[ьё]/.test(offName)) { offPerk += (perks.spearBleedDamage || 0); trueDmg += (perks.spearResistDamage || 0); } // Копейщик
+                    if (offType === 'onehand' && offName.includes('топ')) offPerk += (perks.axeBleedDamage || 0);           // кровотечение топора
+                    if (perks.martialArtsTrueDmg) trueDmg += perks.martialArtsTrueDmg;            // Боевые искусства
+                    if (offType === 'onehand' && offName.includes('булав') && perks.maceArmorPenetration && perks.maceArmorPenetration > armorIgnore) {
+                        armorIgnore = perks.maceArmorPenetration;
+                        infoNotes.push(`🔨 Костолом (второе оружие): игнорирует ${Math.round(perks.maceArmorPenetration * 100)}% брони цели`);
+                    }
+                    if (offPerk) add('второе оружие: перки', offPerk);
+                }
             }
+            if (trueDmg) infoNotes.push(`🩸 Сквозь сопротивление: +${trueDmg} урона (резист цели не режет)`);
 
             // Силовая атака / Рывок-атака. Перки каждой ветки — только своим оружием: «Боевая стойка», «Безжалостный удар»,
             // «Рывок» — одноручным; «Стойка чемпиона», «Сокрушительный удар», «Великий рывок» — двуручным.
