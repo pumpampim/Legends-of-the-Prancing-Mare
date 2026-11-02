@@ -598,18 +598,30 @@ window.toggleSkillPanel = function (idx) {
     // indexOf не находил навык, проверка считала его равным 0 — и почти вся ветка брони не бралась вообще.
     const _skillNameNorm = n => String(n || '').toLowerCase().replace(/ё/g, 'е').trim();
     const SKILL_MAX = 100;
-    function getEffectiveSkillValue(skillName) {
+    // Разбивка навыка: own — своё (сырой + раса, это и есть «дошёл сам»), extra — вера и вещи, total — без потолка.
+    function getSkillParts(skillName) {
         let idx = skillNames.indexOf(skillName);
         if (idx === -1) { const k = _skillNameNorm(skillName); idx = skillNames.findIndex(n => _skillNameNorm(n) === k); }
-        if (idx === -1) return 0;
+        if (idx === -1) return null;
         skillName = skillNames[idx]; // ниже расовый бонус ищется по точному имени
         const input = document.getElementById(`skill-${idx}`);
-        if (!input) return 0;
+        if (!input) return null;
         const raw = parseInt(input.getAttribute('data-raw-val')) || 10;
         const race = document.getElementById('char-race').value;
         const bonus = (raceSkillBonuses[race] && raceSkillBonuses[race][skillName]) || 0;
-        return Math.min(SKILL_MAX, raw + bonus + godSkillPoints(skillName) + gearSkillPoints(skillName) - ((skillName === 'Красноречие' && lichPerk('visage')) ? 5 : 0)); // «Лик смерти»: −5 к красноречию; потолок навыка — 100 вместе с расовым бонусом
+        const extra = godSkillPoints(skillName) + gearSkillPoints(skillName) - ((skillName === 'Красноречие' && lichPerk('visage')) ? 5 : 0); // «Лик смерти»: −5 к красноречию
+        return { name: skillName, idx, raw, own: Math.min(SKILL_MAX, raw + bonus), extra, total: raw + bonus + extra };
     }
+    function getEffectiveSkillValue(skillName) {
+        const p = getSkillParts(skillName);
+        return p ? Math.max(0, Math.min(SKILL_MAX, p.total)) : 0; // потолок навыка — 100 вместе с расовым бонусом, верой и вещами
+    }
+    // Своё значение навыка без веры и вещей: от него считается, сколько успехов нужно на +1.
+    // Раньше бралось итоговое: у Мерунеса 3 Разрушение 65+35 = 100 требовало 20 успехов вместо 13, и вера тормозила уровни.
+    function getOwnSkillValue(skillName) { const p = getSkillParts(skillName); return p ? p.own : 0; }
+    // Пункты сверх 100 (своё + вера + вещи). Для школ магии переводятся в силу школы: +0.5% за пункт (см. getSkillBoostPercent).
+    const SKILL_OVERFLOW_PCT = 0.5;
+    function getSkillOverflowPoints(skillName) { const p = getSkillParts(skillName); return p ? Math.max(0, p.total - SKILL_MAX) : 0; }
     // Пункты навыка от снаряжения: «+5 навыка Разрушения» (вещи Брурида).
     function gearSkillPoints(skillName) {
         if (typeof getGearTextBonuses !== 'function' || typeof equippedSlots === 'undefined') return 0;

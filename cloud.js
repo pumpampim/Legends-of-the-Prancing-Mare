@@ -607,6 +607,11 @@
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 let statuses = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects.slice() : [];
+                // blockedBy: статус не ложится, пока на цели есть другой (заморозка после оттаивания); immunity: вместе со статусом вешается защита от повтора
+                const blockedBy = extra && extra.blockedBy, immunity = extra && extra.immunity;
+                if (extra) { extra = Object.assign({}, extra); delete extra.blockedBy; delete extra.immunity; }
+                if (blockedBy && statuses.some(x => x && x.name === blockedBy)) { __txRes = ({ enemyName: enemies[idx].name, blocked: true }); return; }
+                if (immunity && immunity.name) statuses = statuses.filter(x => x.name !== immunity.name).concat([{ id: 'st' + Date.now() + 'i' + Math.random().toString(36).slice(2, 6), name: immunity.name, desc: immunity.desc || '', turns: immunity.turns || null }]);
                 if (extra && (typeof extra.dmgPct === 'number' || extra.unique || extra.res)) statuses = statuses.filter(x => x.name !== statusName); // не складывается само с собой (Хрупкость: повторный каст только обновляет срок)
                 statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });

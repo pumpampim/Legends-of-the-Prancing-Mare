@@ -1265,7 +1265,7 @@ function updateHungerPenalty() {
             if (onHitNow.oblivion === 'flee' && !(r0 && r0.killed)) pp = pp.then(() => window.CloudSync.applyStatusToEnemy(attackTargetId, 'Страх', 'Бежит с поля боя («Изгнание в Обливион»)', 3, playerName || 'Игрок', { unique: true }));
             if (onHitNow.armorBreak) pp = pp.then(() => window.CloudSync.applyStatusToEnemy(attackTargetId, 'Увядание', `Броня −${onHitNow.armorBreak} (физ. сопротивление −${Math.round(onHitNow.armorBreak / 10)}%)`, 99, playerName || 'Игрок', { unique: true, res: { physical: -Math.round(onHitNow.armorBreak / 10) } }));
             if (onHitNow.slow) pp = pp.then(() => window.CloudSync.applyStatusToEnemy(attackTargetId, 'Замедление (' + onHitNow.name + ')', `−${onHitNow.slow} фт скорости`, 2, playerName || 'Игрок', { unique: true }));
-            if (onHitNow.freeze && !(r0 && r0.killed)) pp = pp.then(() => window.CloudSync.applyStatusToEnemy(attackTargetId, 'Заморожен', `Скован льдом («${onHitNow.name}»): не ходит и не атакует`, onHitNow.freeze, playerName || 'Игрок', { unique: true }));
+            if (onHitNow.freeze && !(r0 && r0.killed)) pp = pp.then(() => window.CloudSync.applyStatusToEnemy(attackTargetId, 'Заморожен', `Скован льдом («${onHitNow.name}»): не ходит и не атакует`, onHitNow.freeze, playerName || 'Игрок', { unique: true, blockedBy: 'Оттаивание', immunity: { name: 'Оттаивание', desc: 'Недавно был заморожен: заморозка не действует', turns: onHitNow.freeze + 2 } }).then(rf => { if (rf && rf.blocked) alertSafe(`❄️ «${rf.enemyName}» недавно оттаял: заморозка не сработала, урон прошёл.`); }));
             return pp.then(() => r0);
         });
         // Зачарование оружия «Паралич» / «Страх»: на попадании цель до 17 ур. (неизвестный уровень — подходит) делает спасбросок:
@@ -1732,6 +1732,9 @@ function updateHungerPenalty() {
                 let raw = parseInt(input.getAttribute('data-raw-val')) || 10;
                 let bonus = raceSkillBonus[name] || 0;
                 input.value = Math.min(SKILL_MAX, raw + bonus + godSkillPoints(name)); // как в расчётах (getEffectiveSkillValue): потолок 100
+                // Подсказка: своё значение (растёт от успехов и даёт уровни) и прибавка веры; сверх 100 у школ магии — сила школы.
+                const godP = godSkillPoints(name), own = Math.min(SKILL_MAX, raw + bonus), over = Math.max(0, raw + bonus + godP - SKILL_MAX);
+                input.title = godP ? `Своё: ${own} · вера: +${godP}` + (over ? ` · сверх 100: ${over} → +${over * SKILL_OVERFLOW_PCT}% силы школы` : '') + '. Успехи на рост считаются от своего значения.' : '';
             }
         });
 

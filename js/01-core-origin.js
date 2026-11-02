@@ -168,7 +168,7 @@
         // в тексте у всех явно "бессрочно" (держится пока не убьют/не отзовут, не по счётчику ходов).
         { category: 'skeleton', name: 'Скелет солдата', hpBase: 50, dmgBase: 15, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета солдата' },
         { category: 'skeleton', name: 'Скелет мага', hpBase: 50, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Вызов Скелета мага', note: 'Атакует обморожением (мана 120)' },
-        { category: 'skeleton', name: 'Скелет лучника', hpBase: 100, dmgBase: 35, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета лучника' },
+        { category: 'skeleton', name: 'Скелет лучника', hpBase: 100, dmgBase: 25, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета лучника' },
         { category: 'skeleton', name: 'Скелет-танк', hpBase: 190, dmgBase: 20, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Вызов скелета танка' },
         { category: 'skeleton', name: 'Сильный скелет воин', hpBase: 130, dmgBase: 30, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв сильного скелета воина' },
         { category: 'skeleton', name: 'Сильный скелет маг', hpBase: 100, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Призыв сильного скелета мага', note: 'Обморожение(15мп)/Ледяной шип(25мп, 25 урона)/Ледяная буря(70мп, 70 урона)' },
@@ -177,8 +177,8 @@
         { category: 'skeleton', name: 'Скелет-эксперт', hpBase: 140, dmgBase: 16, dmgType: 'холод', speed: 35, permanent: true, spellName: 'Призыв Скелета эксперта', note: 'Обморожение(10мп)/Ледяной шип(20мп,25)/Ледяная буря(50мп,70)/Морозная нова(150мп)' },
         { category: 'skeleton', name: 'Скелет-снайпер', hpBase: 170, dmgBase: 50, dmgType: 'физический', speed: 35, permanent: true, spellName: 'Призыв Скелета снайпера' },
         // «Плоть» — временная броня поверх кирасы (слот «Одеяние» не трогается).
-        { category: 'armor', name: 'Дубовая плоть', armorBase: 40, armorEnh: 120, durBase: 9, durEnh: 13, spellName: 'Дубовая плоть' },
-        { category: 'armor', name: 'Каменная плоть', armorBase: 60, armorEnh: 180, durBase: 9, durEnh: 12, spellName: 'Каменная плоть' },
+        { category: 'armor', name: 'Дубовая плоть', armorBase: 40, armorEnh: 80, durBase: 9, durEnh: 13, spellName: 'Дубовая плоть' },
+        { category: 'armor', name: 'Каменная плоть', armorBase: 60, armorEnh: 120, durBase: 9, durEnh: 12, spellName: 'Каменная плоть' },
         { category: 'armor', name: 'Железная плоть', armorBase: 120, armorEnh: 240, durBase: 12, durEnh: 15, spellName: 'Железная плоть' },
         { category: 'armor', name: 'Эбонитовая плоть', armorBase: 180, armorEnh: 300, durBase: 12, durEnh: 18, spellName: 'Эбонитовая плоть' }
     ];

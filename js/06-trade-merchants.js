@@ -381,7 +381,7 @@
         if (progressEl) {
             const speechVal = getEffectiveSkillValue('Красноречие');
             const speechIdx = skillNames.indexOf('Красноречие');
-            progressEl.textContent = `🗣 Красноречие: ${speechVal} · Прогресс: ${skillProgress[speechIdx] || 0}/${getSuccessesNeededForSkill(speechVal)}`;
+            progressEl.textContent = `🗣 Красноречие: ${speechVal} · Прогресс: ${skillProgress[speechIdx] || 0}/${getSuccessesNeededForSkill(getOwnSkillValue('Красноречие'))}`;
         }
         renderSellMerchantSelect();
         const target = getSellTarget();

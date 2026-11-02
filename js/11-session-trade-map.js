@@ -385,11 +385,12 @@
             // на вкладке «Ветки перков» — гарантирует, что два места всегда показывают одно число.
             const skillInput = document.getElementById('skill-' + idx);
             const effVal = skillInput ? (parseInt(skillInput.value) || getEffectiveSkillValue(name)) : getEffectiveSkillValue(name);
-            const needed = getSuccessesNeededForSkill(effVal);
+            const ownVal = getOwnSkillValue(name);
+            const needed = getSuccessesNeededForSkill(ownVal); // успехи — от своего навыка, вера и вещи не тормозят рост
             const progress = skillProgress[idx] || 0;
             // Ручной кнопки «+1» нет: успехи навыка засчитывают сами действия (атака, каст, крафт) и мастер.
             return `<div class="party-row" style="display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:3px 6px;">
-                <span style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}">${escHtml(name)} (${effVal}) — ${progress}/${needed}</span>
+                <span style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(name)}${ownVal !== effVal ? ` — своё ${ownVal}, с верой и вещами ${effVal}` : ''}">${escHtml(name)} (${ownVal !== effVal ? `${effVal}, своё ${ownVal}` : effVal}) — ${progress}/${needed}</span>
             </div>`;
         }).join('') + '</div>';
     }
@@ -409,8 +410,7 @@
         const skillInput = document.getElementById('skill-' + skillIdx);
         if (!skillInput) return;
         const skillName = skillNames[skillIdx];
-        const effVal = getEffectiveSkillValue(skillName);
-        const needed = getSuccessesNeededForSkill(effVal);
+        const needed = getSuccessesNeededForSkill(getOwnSkillValue(skillName)); // от своего навыка: вера и вещи не тормозят рост
         skillProgress[skillIdx] = Math.round(((skillProgress[skillIdx] || 0) + amount) * 100) / 100;
 
         if (skillProgress[skillIdx] >= needed) {
@@ -420,7 +420,8 @@
                 raw = Math.min(100, raw + 1);
                 skillInput.setAttribute('data-raw-val', raw);
                 levelUpProgress += 1;
-                alert(`Навык «${skillName}» вырос до ${getEffectiveSkillValue(skillName)}!`);
+                const effNow = getEffectiveSkillValue(skillName), ownNow = getOwnSkillValue(skillName);
+                alert(`Навык «${skillName}» вырос до ${effNow}!` + (ownNow !== effNow ? ` Своё значение: ${ownNow} (остальное — вера и вещи), рост идёт в уровень как обычно.` : ''));
             }
         }
 

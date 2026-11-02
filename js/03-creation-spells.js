@@ -507,7 +507,15 @@
 
     // Суммарное усиление навыка в процентах (экипировка + активные зелья).
     function getSkillBoostPercent(skillName) {
-        return getGearSkillBonusPercent(skillName) + getPotionSkillBonusPercent(skillName);
+        return getGearSkillBonusPercent(skillName) + getPotionSkillBonusPercent(skillName) + getSkillOverflowBoostPercent(skillName);
+    }
+    // Навык школы магии сверх 100 (вера Хермеуса/Мерунеса, вещи) не пропадает: +0.5% силы школы за пункт,
+    // как «Повышение навыка» той же школы. Для остальных навыков не действует.
+    function getSkillOverflowBoostPercent(skillName) {
+        if (typeof getSkillOverflowPoints !== 'function') return 0;
+        const k = String(skillName || '').toLowerCase().replace(/ё/g, 'е');
+        if (!['разрушение', 'восстановление', 'колдовство', 'иллюзия', 'изменение'].includes(k)) return 0;
+        return getSkillOverflowPoints(skillName) * SKILL_OVERFLOW_PCT;
     }
     const BOOSTABLE_SKILLS = ['одноручное оружие', 'двуручное оружие', 'скрытность', 'взлом', 'карманные кражи', 'блокирование',
         'кузнечное дело', 'торговля', 'тяжелая броня', 'легкая броня', 'стрельба', 'колдовство', 'разрушение', 'иллюзия',
