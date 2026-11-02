@@ -17,6 +17,7 @@
     const TWO_HANDED = ['twohand_sword', 'twohand_axe', 'twohand_hammer', 'twohand_pike', 'twohand_staff'];
     const abilityMod = v => Math.floor((v - 10) / 2);
 
+    const CROSSBOW_SHOT_BONUS = 0.8; // +80% к (урон арбалета + болт) за выстрел: арбалет заряжается ход
     // Какой навык усиливает атаку данным оружием (та же логика, что weaponBoostSkill в index.html).
     function weaponBoostSkill(mode, wepType, isTwoHanded) {
         if (mode !== 'melee') return 'стрельба';
@@ -186,6 +187,9 @@
             totalDmg = baseDmg + (isSummonedRanged ? wis : dex) + ammoDmg;
             steps.push({ source: 'оружие', op: 'set', value: baseDmg }, { source: statLabelForFormula, op: 'add', value: statModForFormula }, { source: 'стрела', op: 'add', value: ammoDmg });
             add('зачарование оружия', enchantDmgMain);
+            // Арбалет стреляет раз в два хода («1 ход на КД»), поэтому каждый болт бьёт сильнее: +80% от оружия и болта.
+            // Без этого выстрел был вровень с луком и арбалет проигрывал вдвое (баланс оружия 2026-11-02).
+            if (wepType === 'crossbow' && !isSummonedRanged && !ranged.isStaff) add('арбалет: тяжёлый болт', Math.round((baseDmg + ammoDmg) * CROSSBOW_SHOT_BONUS));
 
             if (perks.rangedDamagePercent && wepType === 'bow' && !ranged.isStaff) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent)); // только базовый урон лука
             if (perks.criticalShotStrFraction) {

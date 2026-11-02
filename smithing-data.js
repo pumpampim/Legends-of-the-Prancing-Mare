@@ -1347,7 +1347,7 @@ const weaponsNonCraftable = [
     { name: "Небесная стальная секира", category: "Двуручное", subcat: "Секиры", damage: 25, weight: 7.0, price: 150, slot: "melee", isAmmo: false },
     { name: "Железная пика", category: "Двуручное", subcat: "Пики", damage: 17, weight: 5.0, price: 70, slot: "melee", isAmmo: false },
     { name: "Стальная пика", category: "Двуручное", subcat: "Пики", damage: 19, weight: 5.0, price: 176, slot: "melee", isAmmo: false },
-    { name: "Орочья пика", category: "Двуручное", subcat: "Пики", damage: 9, weight: 6.0, price: 200, slot: "melee", isAmmo: false },
+    { name: "Орочья пика", category: "Двуручное", subcat: "Пики", damage: 21, weight: 6.0, price: 200, slot: "melee", isAmmo: false },
     { name: "Двемерская пика", category: "Двуручное", subcat: "Пики", damage: 23, weight: 9.0, price: 250, slot: "melee", isAmmo: false },
     { name: "Эльфийская пика", category: "Двуручное", subcat: "Пики", damage: 26, weight: 5.0, price: 450, slot: "melee", isAmmo: false },
     { name: "Нордская пика", category: "Двуручное", subcat: "Пики", damage: 26, weight: 6.0, price: 950, slot: "melee", isAmmo: false },
