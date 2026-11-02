@@ -509,13 +509,14 @@
     function getSkillBoostPercent(skillName) {
         return getGearSkillBonusPercent(skillName) + getPotionSkillBonusPercent(skillName) + getSkillOverflowBoostPercent(skillName);
     }
-    // Навык школы магии сверх 100 (вера Хермеуса/Мерунеса, вещи) не пропадает: +0.5% силы школы за пункт,
-    // как «Повышение навыка» той же школы. Для остальных навыков не действует.
+    // Навык сверх 100 (вера, вещи, раса) не пропадает: +0.5% усиления за пункт, как «Повышение навыка» этого же навыка.
+    // Действует для всех усиливаемых навыков (оружие, броня, скрытность, взлом, кражи, блок, ремёсла, школы магии);
+    // «Торговля» берёт излишек Красноречия.
     function getSkillOverflowBoostPercent(skillName) {
         if (typeof getSkillOverflowPoints !== 'function') return 0;
-        const k = String(skillName || '').toLowerCase().replace(/ё/g, 'е');
-        if (!['разрушение', 'восстановление', 'колдовство', 'иллюзия', 'изменение'].includes(k)) return 0;
-        return getSkillOverflowPoints(skillName) * SKILL_OVERFLOW_PCT;
+        const k = String(skillName || '').toLowerCase().replace(/ё/g, 'е').trim();
+        if (!BOOSTABLE_SKILLS.includes(k)) return 0;
+        return getSkillOverflowPoints(k === 'торговля' ? 'Красноречие' : skillName) * SKILL_OVERFLOW_PCT;
     }
     const BOOSTABLE_SKILLS = ['одноручное оружие', 'двуручное оружие', 'скрытность', 'взлом', 'карманные кражи', 'блокирование',
         'кузнечное дело', 'торговля', 'тяжелая броня', 'легкая броня', 'стрельба', 'колдовство', 'разрушение', 'иллюзия',
