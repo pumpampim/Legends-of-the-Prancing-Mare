@@ -25,7 +25,8 @@
         const robeBurn = (gsp.burnDice && school === 'destr' && dmgType === 'fire') ? rollNd(gsp.burnDice, 6) : null;
         if (robeBurn && fire) { fire.sum += robeBurn.sum; fire.rolls = fire.rolls.concat(robeBurn.rolls); fire.n += gsp.burnDice; }
         // «Все заклинания на N% сильнее» (Выпускник Коллегии) — к урону любого заклинания.
-        let dmg = Math.round((baseDmg + (fire ? fire.sum : robeBurn ? robeBurn.sum : 0)) * (1 + (spellPowerPct + gsp.spellPowerPct) / 100));
+        const coreDmg = baseDmg + (fire ? fire.sum : robeBurn ? robeBurn.sum : 0);
+        let dmg = Math.round(coreDmg * (1 + (spellPowerPct + gsp.spellPowerPct) / 100));
         const skillName = SCHOOL_CODE_TO_SKILL[school] || null;
         // Хермеус Мора / Мерунес Дагон дают пункты навыка (getEffectiveSkillValue), Мерунес «огнём» и Акатош — атакам, не здесь.
         let godSpellPct = gb('spellPower');
@@ -41,7 +42,7 @@
             if (elemPerkPct) dmg = Math.round(dmg * (1 + elemPerkPct / 100));
         }
         const schoolBoostPct = (skillName && (['Разрушение', 'Восстановление', 'Изменение'].includes(skillName) || (skillName === 'Колдовство' && /Проклят|Хрупкость/.test(spellName)))) ? getSkillBoostPercent(skillName) : 0;
-        if (schoolBoostPct) dmg = Math.round(dmg * (1 + schoolBoostPct / 100));
+        if (schoolBoostPct) dmg += Math.round(coreDmg * schoolBoostPct / 100); // % от базы заклинания, не от всей суммы
         if (typeof sheogorathRoll !== 'undefined' && sheogorathRoll.dmgMult !== 1) dmg = Math.round(dmg * sheogorathRoll.dmgMult);
         return { dmg, dmgType, spellPowerPct: spellPowerPct + gsp.spellPowerPct, godSpellPct, schoolBoostPct, skillName, fire: fire || (robeBurn ? { n: gsp.burnDice, sum: robeBurn.sum, rolls: robeBurn.rolls } : null), elemPerkPct, gearElemPct };
     }
@@ -595,6 +596,11 @@ function updateHungerPenalty() {
             const lastX = combatMarks.xbow;
             if (typeof lastX === 'number' && (gameTurn || 0) - lastX < 2) { alert('Арбалет перезаряжается — выстрелить можно через ход после прошлого выстрела.'); return; }
         }
+        // Силовая атака: раз в два хода (отдыхает ход после удара).
+        if ((actionVal === 'melee' || actionVal === 'ranged') && inCombatNow() && (document.getElementById('chk-power-attack') || {}).checked) {
+            const lastP = combatMarks.power;
+            if (typeof lastP === 'number' && (gameTurn || 0) - lastP < 2) { alert('Силовая атака: восстанавливаешь силы — следующая только через ход после прошлой. Сними галочку «Силовая» и бей обычным ударом.'); return; }
+        }
         if (/^(spell|control|scroll|mstaff):/.test(actionVal || '')) { // посох-заклинатель тоже держат в руке
             const hb = castBlockReason(); if (hb) { alert(/^mstaff:/.test(actionVal) ? hb.replace('колдовать', 'пользоваться посохом') : hb); return; }
             const ec = document.getElementById('chk-enhanced-cast');
@@ -1072,6 +1078,7 @@ function updateHungerPenalty() {
         if (quickShot) { dmg = Math.max(1, Math.round(dmg / 3)); actionLabel += ' (⚡ «Быстрая стрельба»: доп. действие, ⅓ урона)'; }
         if (isSummonAct) markCombatAction(actionVal); else if (quickShot) markBonusAction(); else markCombatAction('attack'); // бросок атаки/каста — действие хода
         if (actionVal === 'ranged' && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
+        if (isPowerAtkNow && inCombatNow()) combatMarks.power = gameTurn || 0;
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,
             targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, zoneDot, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea, trueDmg: trueDmgNow,
@@ -1590,10 +1597,12 @@ function updateHungerPenalty() {
         if (!god || god === 'none' || !godBonuses[god]) return {};
         if (!wearsGodAmulet(god)) return {};
         let bonuses = godBonuses[god][rank] || {};
-        // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра сильнее на 50% (+100 маны → +150).
-        if (rank >= 3 && AEDRA_AMULETS[god] && ['Шлем Хранителя', 'Броня Хранителя', 'Перчатки Хранителя', 'Сапоги Хранителя'].every(wearsItemNamed)) {
+        // Амулет бога сам несёт чары: +50% к числовым бонусам веры аэдра (решение Никиты 2026-11-02).
+        // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра ещё на 50% (+100 маны → +200 вместе с амулетом).
+        if (AEDRA_AMULETS[god]) {
+            const k = 1.5 + ((rank >= 3 && ['Шлем Хранителя', 'Броня Хранителя', 'Перчатки Хранителя', 'Сапоги Хранителя'].every(wearsItemNamed)) ? 0.5 : 0);
             const b2 = {};
-            Object.keys(bonuses).forEach(k => { const v = bonuses[k]; b2[k] = typeof v === 'number' ? (/resist/i.test(k) ? Math.min(100, Math.round(v * 1.5)) : Math.round(v * 1.5)) : v; });
+            Object.keys(bonuses).forEach(key => { const v = bonuses[key]; b2[key] = typeof v === 'number' ? (/resist/i.test(key) ? Math.min(100, Math.round(v * k)) : Math.round(v * k)) : v; });
             bonuses = b2;
         }
         if (god === 'sanguine') {
@@ -1883,7 +1892,10 @@ function updateHungerPenalty() {
             ? Math.round(shieldArmorVal * (1 + (perks.shieldArmorBonus || 0) + getGearSpecialBonuses().blockEffPct / 100))
             : shieldArmorVal;
 
-        let totalArmor = bodyArmorTotal + shieldArmorBonused +
+        // Облик зверя: надетые доспехи и щит не работают (остаётся броня формы, баффы и эффекты). Решение Никиты 2026-11-02.
+        const beastForm = snWerewolfForm();
+        if (beastForm) { bodyArmorTotal = 0; window.lightArmorDodgePct = 0; }
+        let totalArmor = (beastForm ? 0 : bodyArmorTotal) + (beastForm ? 0 : shieldArmorBonused) +
                          (parseInt(document.getElementById('armor-buff').value) || 0);
         if (godB.armor) totalArmor += godB.armor;
         totalArmor += periyteBuffs().armor; // Периайт: «Каменная подагра»

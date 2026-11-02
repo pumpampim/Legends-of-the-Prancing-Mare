@@ -680,7 +680,13 @@
             window.CloudSync.applyDamageToEnemy(e.id, 10, myName, `🦇 «Плащ ночи» (${myName}) терзает «${e.name}»: урон 10`, 'physical', 0).catch(() => { });
         });
     }
-    function lordBiteDamage() { return 10 + 5 * Math.floor((parseInt((document.getElementById('char-level') || {}).value) || 1) / 5); } // рукопашный бой лорда: 10 (+5 за каждые 5 уровней)
+    // рукопашный бой лорда: 10 (+5 за каждые 5 уровней) + 25% урона надетого оружия ближнего боя (решение Никиты 2026-11-02; оружие в формуле удара ×2)
+    function lordBiteWeaponBonus() {
+        const t = (document.getElementById('wep-melee-type') || {}).value;
+        if (!t || t === 'unarmed') return 0;
+        return Math.round((parseInt((document.getElementById('wep-melee-dmg') || {}).value) || 0) * 2 * 0.25);
+    }
+    function lordBiteDamage() { return 10 + 5 * Math.floor((parseInt((document.getElementById('char-level') || {}).value) || 1) / 5) + lordBiteWeaponBonus(); }
     // Очки перков лорда — за убийства людей в форме лорда: 5, 6, 9, 10, 12, 14, 16, 18, 20, 22, 24 (всего 156 на 11 очков).
     const LORD_KILL_STEPS = [5, 6, 9, 10, 12, 14, 16, 18, 20, 22, 24];
     function lordPointsEarned(kills) { let need = 0, n = 0; for (const st of LORD_KILL_STEPS) { need += st; if (kills >= need) n++; else break; } return n; }

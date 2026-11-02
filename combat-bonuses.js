@@ -47,7 +47,7 @@
         const add = (source, v) => { if (v) steps.push({ source, op: 'add', value: v }); totalDmg += v; };
         const mul = (source, f) => { steps.push({ source, op: 'mul', value: f }); totalDmg = Math.round(totalDmg * f); };
 
-        let baseDmg = 2, hitModifier = 0;
+        let baseDmg = 2, hitModifier = 0, ammoBase = 0;
         let wepType = 'unarmed';
         const infoNotes = [];
         let enchantDmgMain = 0, offhandDmg = 0, offhandEnchantDmg = 0, statModForFormula = 0, statLabelForFormula = 'Сила';
@@ -178,6 +178,7 @@
             // Дальний бой
             baseDmg = ranged.isStaff ? (ranged.dmg || 0) : (ranged.dmg || 0) * WEAPON_BASE_MULT; // лук/арбалет ×2, посох в слоте дальнего боя как был
             const ammoDmg = (ranged.ammoDmg || 0) * WEAPON_BASE_MULT; // боеприпас — тоже часть «оружия»
+            ammoBase = ammoDmg;
             wepType = ranged.type;
             const rangedWepName = String(ranged.name || '').toLowerCase();
             const isSummonedRanged = rangedWepName.indexOf('призван') === 0; // призванный лук бьёт от Мудрости
@@ -218,7 +219,8 @@
         // «Повышение навыка» (зачарование/зелье): Одноручное/Двуручное/Стрельба
         const boostSkillKey = weaponBoostSkill(mode, wepType, TWO_HANDED.indexOf(wepType) !== -1);
         const weaponBoostPct = boostSkillKey ? ((I.skillBoostPct || {})[boostSkillKey] || 0) : 0;
-        if (weaponBoostPct) mul('повышение навыка', 1 + weaponBoostPct / 100);
+        if (weaponBoostPct && wepType !== 'unarmed') add('повышение навыка (% базы оружия)', Math.round((baseDmg + ammoBase) * weaponBoostPct / 100)); // от базы оружия, не от всей суммы
+        else if (weaponBoostPct) mul('повышение навыка', 1 + weaponBoostPct / 100);
         if (mode === 'melee' && wepType === 'unarmed') { const unB = I.unarmedBonus || 0; if (unB) add('Трансмутация мускулы', unB); }
         if (mode === 'melee' && wepType === 'unarmed' && I.unarmedEnchant) add('Усиление рукопашного боя', I.unarmedEnchant); // зачарование перчаток/колец
         let steelFistsNote = 0;

@@ -1026,6 +1026,11 @@
         const enhFactor = enhanced ? getEnhancedCostFactor(((card.closest('[id^="spells-"]') || {}).id || '').replace('spells-', '').replace('-list', ''), (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value) : 1;
         lastSpellEnhFactor = enhFactor;
         let finalCost = enhanced ? Math.round(baseFinalCost * enhFactor) : baseFinalCost;
+        { // На своё оружие ложатся только духи стихий; любое другое заклинание с целью «моё оружие» — отказ до траты маны
+            const nmW = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
+            const tvW = (card.querySelector('.spell-target-select') || {}).value || 'self';
+            if (tvW.indexOf('weapon:') === 0 && !WEAPON_SPIRITS[nmW]) { alert('«' + nmW + '» нельзя наложить на своё оружие: на оружие ложатся только «Дух огня», «Дух мороза» и «Дух молнии». Выбери другую цель. Мана не потрачена.'); return; }
+        }
         { // «Дух огня/мороза/молнии»: цель — своё оружие; цена усиленного каста берётся из описания («30/50 маны ход»), а не ×2
             const nmS = (card.querySelector('.spell-name-custom').value) || card.querySelector('.spell-name-select').value;
             if (WEAPON_SPIRITS[nmS]) {

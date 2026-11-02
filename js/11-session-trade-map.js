@@ -1299,7 +1299,7 @@
     const DOCK_RES_ICONS = [['physical', '🛡', 'Физ.'], ['fire', '🔥', 'Огонь'], ['frost', '❄', 'Холод'], ['shock', '⚡', 'Электр.'], ['poison', '☠', 'Яд'], ['disease', '🦠', 'Болезни'], ['magic', '✨', 'Магия'], ['shout', '🗣', 'Крики']];
     // переключатели = зеркала чекбоксов боевой вкладки (меняем исходный чекбокс и шлём change — вся логика остаётся прежней)
     const DOCK_TOGGLES = [
-        { id: 'chk-power-attack', label: '💪 Силовая', title: 'Силовая атака: урон ББ ×1.5, −1 к броску d20' },
+        { id: 'chk-power-attack', label: '💪 Силовая', title: 'Силовая атака: урон ББ ×1.5, −1 к броску d20; раз в 2 хода' },
         { id: 'chk-sneak-attack', label: '🌑 Скрытная', title: 'Скрытная атака из тени: крит ×2 (кинжалы ×3)' },
         { id: 'chk-defensive-stance', label: '🛡 Стойка', title: 'Защитная стойка: щит даёт бонусы перков блокирования' },
         { id: 'chk-dual-wield', label: '⚔ Два оружия', title: 'Бой двумя одноручными (нужны перки)', when: () => (parseInt((document.getElementById('wep-melee-offhand-dmg') || {}).value) || 0) > 0 || document.getElementById('chk-dual-wield').checked },
