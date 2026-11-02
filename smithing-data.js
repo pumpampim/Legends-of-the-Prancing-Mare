@@ -102,7 +102,7 @@ const armorRecipes = [
     },
     {
         name: "Сталгримовая легкая броня", armorType: "Легкая броня", slot: "Доспехи",
-        resistance: 44, weight: 3, price: 925, upgradeMaterial: "Сталгрим",
+        resistance: 49, weight: 3, price: 925, upgradeMaterial: "Сталгрим",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Сталгрим", qty: 5 }, { name: "Ртутный слиток", qty: 1 }, { name: "Полоски кожи", qty: 3 }]
     },
