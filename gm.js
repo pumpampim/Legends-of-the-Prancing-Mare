@@ -5587,7 +5587,7 @@
                 const hasShieldB = !!(data.equippedSlots && data.equippedSlots.shield);
                 const arrowOk = !pendingGmAttack.isRangedAtk || !!((data.perkStates || {})['skill3-perk1-step1']);
                 const blockPct = (hasShieldB && arrowOk) ? (boosts['блокирование'] || 0) : 0;
-                const dodgePct = (boosts['легкая броня'] || 0) / 2;
+                const dodgePct = (boosts['легкая броня'] || 0) / 2 + (Number(data.lightArmorDodge) || 0); // чары на лёгкую броню + уклонение самой лёгкой брони
                 if (blockPct > 0 && Math.random() * 100 < blockPct) { defNotes.push(`🛡️ Блок (${blockPct}%) — урон поглощён`); finalDmg = 0; }
                 else if (dodgePct > 0 && Math.random() * 100 < dodgePct) { defNotes.push(`💨 Уклонение (${dodgePct}%) — атака мимо`); finalDmg = 0; }
             }

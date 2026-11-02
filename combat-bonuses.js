@@ -17,7 +17,8 @@
     const TWO_HANDED = ['twohand_sword', 'twohand_axe', 'twohand_hammer', 'twohand_pike', 'twohand_staff'];
     const abilityMod = v => Math.floor((v - 10) / 2);
 
-    const CROSSBOW_SHOT_BONUS = 0.8; // +80% к (урон арбалета + болт) за выстрел: арбалет заряжается ход
+    const WEAPON_BASE_MULT = 2; // множитель базового урона оружия и боеприпасов в формуле удара
+    const CROSSBOW_SHOT_BONUS = 0.7; // +70% к (урон арбалета + болт) за выстрел: арбалет заряжается ход
     // Какой навык усиливает атаку данным оружием (та же логика, что weaponBoostSkill в index.html).
     function weaponBoostSkill(mode, wepType, isTwoHanded) {
         if (mode !== 'melee') return 'стрельба';
@@ -62,6 +63,7 @@
         if (mode === 'melee') {
             baseDmg = melee.dmg || 2;
             wepType = melee.type;
+            if (wepType !== 'unarmed') baseDmg *= WEAPON_BASE_MULT; // вклад оружия в удар ×2 (решение Никиты 2026-11-02): материал оружия теперь заметен рядом с Силой
             const wepName = String(melee.name || '').toLowerCase();
             // Призванное оружие (имя начинается с «Призван…») бьёт от Мудрости, а не от Силы.
             const isSummonedWeapon = wepName.indexOf('призван') === 0;
@@ -118,7 +120,7 @@
             // Двойное оружие (одноручное/кинжал, не для двуручного)
             if (isDualWield && !isTwoHanded && wepType !== 'unarmed') {
                 if (perks.dualWieldHitBonus) hitModifier += perks.dualWieldHitBonus;
-                offhandDmg = melee.offhandDmg || 0;
+                offhandDmg = (melee.offhandDmg || 0) * WEAPON_BASE_MULT;
                 offhandEnchantDmg = I.offhandEnchantDmg || 0;
                 if (offhandDmg > 0 || offhandEnchantDmg > 0) add('второе оружие', offhandDmg + offhandEnchantDmg);
                 // Второе оружие получает свои перки по своему типу и названию — как правое, но без Силы (решение Никиты 2026-11-01).
@@ -174,8 +176,8 @@
             if (isTwoHanded && perks.sweepingSideAttack && isPowerAttack) infoNotes.push('🌀 Веерная атака: силовая атака при шаге вбок задевает всех противников впереди');
         } else {
             // Дальний бой
-            baseDmg = ranged.dmg || 0;
-            const ammoDmg = ranged.ammoDmg || 0;
+            baseDmg = ranged.isStaff ? (ranged.dmg || 0) : (ranged.dmg || 0) * WEAPON_BASE_MULT; // лук/арбалет ×2, посох в слоте дальнего боя как был
+            const ammoDmg = (ranged.ammoDmg || 0) * WEAPON_BASE_MULT; // боеприпас — тоже часть «оружия»
             wepType = ranged.type;
             const rangedWepName = String(ranged.name || '').toLowerCase();
             const isSummonedRanged = rangedWepName.indexOf('призван') === 0; // призванный лук бьёт от Мудрости
@@ -191,7 +193,7 @@
             // Без этого выстрел был вровень с луком и арбалет проигрывал вдвое (баланс оружия 2026-11-02).
             if (wepType === 'crossbow' && !isSummonedRanged && !ranged.isStaff) add('арбалет: тяжёлый болт', Math.round((baseDmg + ammoDmg) * CROSSBOW_SHOT_BONUS));
 
-            if (perks.rangedDamagePercent && wepType === 'bow' && !ranged.isStaff) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent)); // только базовый урон лука
+            if (perks.rangedDamagePercent && (wepType === 'bow' || wepType === 'crossbow') && !ranged.isStaff) add('Избыточное натяжение', Math.round(baseDmg * perks.rangedDamagePercent)); // только базовый урон лука
             if (perks.criticalShotStrFraction) {
                 const strBonus = Math.round(str * perks.criticalShotStrFraction); // доля значения Силы (¼/½/полная), не модификатора
                 if (strBonus) {

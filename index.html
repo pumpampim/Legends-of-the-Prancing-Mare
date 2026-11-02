@@ -132,7 +132,7 @@
                 { name: "Крушитель черепов", steps: 3, desc: "Атаки молотами игнорируют 25/50/75% брони.", req: { skill: "Двуручное оружие", thresholds: [30, 60, 90], prereq: [["Варвар"]] } }
             ],
             "Стрельба": [
-                { name: "Избыточное натяжение", steps: 5, desc: "С каждым уровнем навыка повышает базовый урон лука на 20% (до 100%)", req: { skill: "Стрельба", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
+                { name: "Избыточное натяжение", steps: 5, desc: "С каждым уровнем навыка повышает базовый урон лука и арбалета на 20% (до 100%)", req: { skill: "Стрельба", thresholds: [0, 20, 40, 60, 80], prereq: [] } },
                 { name: "Орлиный взор", steps: 1, desc: "Появляется возможность увидеть и попасть в цель на расстоянии до 90 футов.", req: { skill: "Стрельба", thresholds: [30], prereq: [["Избыточное натяжение"]] } },
                 { name: "Критический выстрел", steps: 3, desc: "Появляется возможность добавить дополнительный бонус к урону от силы в четверть/половину/ полном объеме.", req: { skill: "Стрельба", thresholds: [30, 60, 90], prereq: [["Избыточное натяжение"]] } },
                 { name: "Твёрдая рука", steps: 2, desc: "Добавляет +1/2 к кубам", req: { skill: "Стрельба", thresholds: [40, 60], prereq: [["Орлиный взор"]] } },
@@ -554,7 +554,7 @@
     <script src="perks.js?v=11"></script>
     <script src="items-data.js?v=21"></script>
     <script src="cooking-data.js?v=11"></script>
-    <script src="smithing-data.js?v=14"></script>
+    <script src="smithing-data.js?v=15"></script>
     <script src="enchant-data.js?v=5"></script>
     <script src="spell-data.js?v=10"></script>
     <script src="lich-data.js?v=1"></script>
@@ -570,7 +570,7 @@
     <script src="enemy-loot.js?v=7"></script>
     <script src="pets-data.js?v=2"></script>
     <script src="holds-map.js?v=4"></script>
-    <script src="combat-bonuses.js?v=9"></script>
+    <script src="combat-bonuses.js?v=10"></script>
     <script src="builds-data.js?v=3"></script>
 </head>
 <body>
@@ -2157,8 +2157,8 @@
 <script src="js/10-resist-gear-fish-hunt.js?v=2"></script>
 <script src="js/11-session-trade-map.js?v=4"></script>
 <script src="js/12-supernatural-lich.js?v=2"></script>
-<script src="js/13-spell-damage-update.js?v=6"></script>
-<script src="js/14-diary-death-combat.js?v=4"></script>
+<script src="js/13-spell-damage-update.js?v=8"></script>
+<script src="js/14-diary-death-combat.js?v=5"></script>
 <script src="js/15-traps-boot.js?v=2"></script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->

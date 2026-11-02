@@ -1,5 +1,7 @@
 
     // ===== Кубики в уроне заклинаний, огненный бонус ранга, Болид =====
+    const HEAVY_ARMOR_DENSITY = 0.5; // тяжёлая броня: +50% к классу брони тяжёлых частей
+    const LIGHT_DODGE_CAP = 15;       // лёгкая броня: уклонение не больше 15%
     function getSpellDice(desc, enhanced) {
         const text = splitEnhancedDesc(desc, enhanced);
         const m = text.match(/нанос[а-яёА-ЯЁ]*\s+(\d+)\s*[дd]\s*(\d+)/i);
@@ -1832,7 +1834,9 @@ function updateHungerPenalty() {
             const it = id ? playerInventory.find(i => i.itemId === id && i.count > 0) : null;
             return { item: it, armor: v, cls: it ? armorPieceClass(it) : null };
         });
-        let heavyPct = perks.heavyArmorBonus || 0;
+        // Тяжёлая броня плотнее: +50% к классу брони тяжёлых частей само по себе (решение Никиты 2026-11-02: у лёгкой есть уклонение,
+        // у тяжёлой должна быть больше защита). Перки Джаггернаут, «Хорошая экипировка», «Полный комплект» складываются с этим.
+        let heavyPct = (perks.heavyArmorBonus || 0) + HEAVY_ARMOR_DENSITY;
         let lightPct = perks.lightArmorBonus || 0;
 
         // Полный комплект — НАДЕТЫЕ вещи (из инвентаря) во всех четырёх слотах, одного класса с комплектом доспехов.
@@ -1865,6 +1869,10 @@ function updateHungerPenalty() {
             bodyArmorTotal += p.armor * (1 + pct);
         });
         bodyArmorTotal = Math.round(bodyArmorTotal);
+        // Лёгкая броня даёт уклонение: 1% за каждые 20 очков брони лёгких частей (с перками), не больше LIGHT_DODGE_CAP%.
+        // Мастер бросает его при физической атаке по игроку (gm.js, data.lightArmorDodge).
+        { let lightBodyArmor = 0; bodySlotPieces.forEach(p => { if (p.cls === 'light') lightBodyArmor += p.armor * (1 + lightPct); });
+          window.lightArmorDodgePct = Math.min(LIGHT_DODGE_CAP, Math.round(lightBodyArmor / 20 * 10) / 10); }
         // «Повышение навыка: Тяжёлая/Лёгкая броня» (зачарование): +N единиц брони, пока надет комплект этого класса.
         if (armorType === 'heavy') bodyArmorTotal += Math.round(getSkillBoostPercent('Тяжелая броня'));
         if (armorType === 'light') bodyArmorTotal += Math.round(getSkillBoostPercent('Легкая броня'));
@@ -1892,6 +1900,7 @@ function updateHungerPenalty() {
             const res = computeTotalResistances();
             const parts = [];
             if (res.physical) parts.push(`🛡️ Физ. ${res.physical}%`);
+            if (window.lightArmorDodgePct > 0) parts.push(`💨 Уклонение ${window.lightArmorDodgePct}%`);
             if (res.fire) parts.push(`🔥 Огонь ${res.fire}%`);
             if (res.frost) parts.push(`❄️ Холод ${res.frost}%`);
             if (res.shock) parts.push(`⚡ Электр. ${res.shock}%`);

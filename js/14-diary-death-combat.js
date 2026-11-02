@@ -513,6 +513,7 @@
             weaponPoison: weaponPoison,
             alchemyRulesVersion: window.ALCHEMY_RULES_VERSION || 1,
             skillBoosts: getAllSkillBoosts(),
+            lightArmorDodge: window.lightArmorDodgePct || 0,
             gearSpecial: (function () { try { const g = getGearSpecialBonuses(); return { reflectMeleePct: g.reflectMeleePct, magicAbsorbPct: g.magicAbsorbPct, keeperBarrier: keeperBarrierActive() ? keeperBarrierLeft : 0 }; } catch (e) { return {}; } })(), // мастеру: отражение (Бастион), поглощение магии, барьер Хранителя
             effectiveStats: {
                 str: parseInt((document.getElementById('stat-str') || {}).value) || 10, dex: parseInt((document.getElementById('stat-dex') || {}).value) || 10,

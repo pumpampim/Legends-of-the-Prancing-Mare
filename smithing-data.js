@@ -439,7 +439,7 @@ const armorRecipes = [
     },
     {
         name: "Эбонитовая броня", armorType: "Тяжелая броня", slot: "Доспехи",
-        resistance: 53, weight: 19, price: 1500, upgradeMaterial: "Эбонитовый слиток",
+        resistance: 58, weight: 19, price: 1500, upgradeMaterial: "Эбонитовый слиток",
         perkHint: "Эбонитовые доспехи",
         ingredients: [{ name: "Эбонитовый слиток", qty: 5 }, { name: "Полоски кожи", qty: 3 }]
     },
