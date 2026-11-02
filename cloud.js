@@ -607,7 +607,7 @@
                 const idx = enemies.findIndex(e => e.id === enemyId);
                 if (idx === -1) throw new Error('Противник не найден (возможно, уже убран).');
                 let statuses = Array.isArray(enemies[idx].statusEffects) ? enemies[idx].statusEffects.slice() : [];
-                if (extra && (typeof extra.dmgPct === 'number' || extra.unique)) statuses = statuses.filter(x => x.name !== statusName); // не складывается само с собой
+                if (extra && (typeof extra.dmgPct === 'number' || extra.unique || extra.res)) statuses = statuses.filter(x => x.name !== statusName); // не складывается само с собой (Хрупкость: повторный каст только обновляет срок)
                 statuses.push(Object.assign({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 8), name: statusName, desc: statusDesc, turns: turns || null }, (window.StCombat && window.StCombat.statusRule) ? window.StCombat.statusRule(statusName) : {}, extra || {}));
                 enemies[idx] = Object.assign({}, enemies[idx], { statusEffects: statuses });
                 const logText = `✨ ${authorName || 'Игрок'} накладывает на «${enemies[idx].name}»: ${statusName}${turns ? ` (${turns} х.)` : ''} — ${statusDesc}`;

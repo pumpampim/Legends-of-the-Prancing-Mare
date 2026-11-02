@@ -1543,11 +1543,11 @@
                 '<input type="number" min="0" value="' + (e.level || '') + '" placeholder="?" style="width:50px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'level\',this.value)"> ' +
                 '<select style="width:auto; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'kind\',this.value)">' +
                 KIND_OPTS.map(o => '<option value="' + o[0] + '"' + ((e.kind || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>';
-            // Заклинания «Приказ даэдра»/«Изгнание даэдра» действуют полностью только на ПРИЗВАННЫХ даэдра. По умолчанию даэдра считается
-            // призванным; снять галочку — значит «дикий» (изгнание вместо этого наносит урон, приказ не работает).
+            // Заклинания «Приказ даэдра»/«Изгнание даэдра» действуют полностью только на ПРИЗВАННЫХ даэдра. По умолчанию даэдра «дикий» (изгнание наносит урон,
+            // приказ не работает); галочку ставит мастер, если даэдра призвал вражеский маг.
             const summonedLine = e.kind === 'daedra'
                 ? '<div style="font-size:12px; opacity:.9; margin-top:2px;"><label style="display:flex; align-items:center; gap:4px; cursor:pointer;">' +
-                  '<input type="checkbox" style="width:auto; margin:0;"' + (e.summoned === false ? '' : ' checked') + ' onchange="setEnemySummoned(\'' + e.id + '\', this.checked)"> 🔮 Призван (иначе «Приказ» и «Изгнание даэдра» не подействуют полностью)</label></div>'
+                  '<input type="checkbox" style="width:auto; margin:0;"' + (e.summoned === true ? ' checked' : '') + ' onchange="setEnemySummoned(\'' + e.id + '\', this.checked)"> 🔮 Призван (иначе «Приказ» и «Изгнание даэдра» не подействуют полностью)</label></div>'
                 : '';
             const lootLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">🎒 ' +
                 '<input type="text" value="' + escapeHtml(e.loot || '') + '" placeholder="лут текстом" style="flex:1; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'loot\',this.value)"></div>';

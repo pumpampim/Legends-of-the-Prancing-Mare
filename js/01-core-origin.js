@@ -157,9 +157,9 @@
         { category: 'wolf', name: 'Огненный волк', hpBase: 80, dmgBase: 20, dmgType: 'физический', durBase: 6, durEnh: 6, note: 'При истечении времени взрывается: 30/50 урона огнём в большом радиусе', spellName: 'Огненный питомец' },
         { category: 'pet', name: 'Призрачный питомец', hpBase: 50, dmgBase: 30, dmgType: 'физический', durBase: 10, durEnh: 15, enhCount: 2, note: 'ХП и урон — как у Волка из базы врагов', spellName: 'Вызов питомца' },
         { category: 'daedra', name: 'Лорд дремора', hpBase: 390, dmgBase: 71, dmgType: 'физический', durBase: 20, durEnh: 28, enhCount: 2, note: 'ХП и урон — как у Лорда дремора из базы врагов', spellName: 'Вызов лорда дремора' },
-        { category: 'atronach', name: 'Огненный атронах', hpBase: 180, dmgBase: 20, dmgType: 'огонь', durBase: 15, durEnh: 18, enhCount: 2, estimated: true, spellName: 'Вызов огненного атронаха' },
-        { category: 'atronach', name: 'Ледяной атронах', hpBase: 240, dmgBase: 15, dmgType: 'холод', durBase: 16, durEnh: 20, enhCount: 2, estimated: true, note: 'Замедляет цель', spellName: 'Вызов ледяного атронаха' },
-        { category: 'atronach', name: 'Грозовой атронах', hpBase: 250, dmgBase: 25, dmgType: 'электричество', durBase: 20, durEnh: 24, enhCount: 2, estimated: true, spellName: 'Вызов грозового атронаха' },
+        { category: 'atronach', name: 'Огненный атронах', hpBase: 180, dmgBase: 35, dmgType: 'огонь', durBase: 15, durEnh: 18, enhCount: 2, estimated: true, spellName: 'Вызов огненного атронаха' },
+        { category: 'atronach', name: 'Ледяной атронах', hpBase: 240, dmgBase: 30, dmgType: 'холод', durBase: 16, durEnh: 20, enhCount: 2, estimated: true, note: 'Замедляет цель', spellName: 'Вызов ледяного атронаха' },
+        { category: 'atronach', name: 'Грозовой атронах', hpBase: 250, dmgBase: 45, dmgType: 'электричество', durBase: 20, durEnh: 24, enhCount: 2, estimated: true, spellName: 'Вызов грозового атронаха' },
         { category: 'skeleton', name: 'Скелет-компаньон', hpBase: 50, dmgBase: 12, dmgType: 'физический', speed: 30, permanent: true, requiresItem: 'Кучка костей' },
         // Настоящие 10 вариантов "Вызов скелета" из книги заклинаний (spell-data.js, школа
         // Колдовство) — раньше НИ ОДИН из них не был в этом списке, только не связанный с ними
@@ -179,8 +179,8 @@
         // «Плоть» — временная броня поверх кирасы (слот «Одеяние» не трогается).
         { category: 'armor', name: 'Дубовая плоть', armorBase: 40, armorEnh: 120, durBase: 9, durEnh: 13, spellName: 'Дубовая плоть' },
         { category: 'armor', name: 'Каменная плоть', armorBase: 60, armorEnh: 180, durBase: 9, durEnh: 12, spellName: 'Каменная плоть' },
-        { category: 'armor', name: 'Железная плоть', armorBase: 80, armorEnh: 240, durBase: 12, durEnh: 15, spellName: 'Железная плоть' },
-        { category: 'armor', name: 'Эбонитовая плоть', armorBase: 120, armorEnh: 300, durBase: 12, durEnh: 18, spellName: 'Эбонитовая плоть' }
+        { category: 'armor', name: 'Железная плоть', armorBase: 120, armorEnh: 240, durBase: 12, durEnh: 15, spellName: 'Железная плоть' },
+        { category: 'armor', name: 'Эбонитовая плоть', armorBase: 180, armorEnh: 300, durBase: 12, durEnh: 18, spellName: 'Эбонитовая плоть' }
     ];
     // Любой постоянный скелет требует «Кучку костей» (расходуется при призыве, возвращается, когда существо развеяно).
     summonTemplates.forEach(t => { if (t.category === 'skeleton' && !t.requiresItem) t.requiresItem = 'Кучка костей'; }); // любой скелет — из кучки костей

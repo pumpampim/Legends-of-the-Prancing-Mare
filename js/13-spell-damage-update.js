@@ -620,6 +620,7 @@ function updateHungerPenalty() {
         let onHit = null;     // эффекты луча при попадании (замедление / вытягивание маны)
         let spellPerkInfo = null, bashInfo = null, powerShotNow = false; // данные для перков после попадания
         let sneakNote = '';
+        let zoneDot = null; // плащ/аура без боевой сетки: первый удар сейчас, остальное — урон за ход статусом на цели
         let healFlat = 0, devourSummonId = null; // «Жизнеотвод» / «Пожирающая сила» (атака существом)
         const shadowEff = (activeTimedEffects || []).find(x => x.shadowStrike && (x.turnsRemaining > 0 || x.turnsRemaining === Infinity)); // «Шаг сквозь тень» / «Ночной клинок»
 
@@ -797,6 +798,13 @@ function updateHungerPenalty() {
               if (/скелет[а-яё]*\s+получа[а-яё]*\s+двойн/i.test(dsc) && /скелет/i.test(target.name || '')) { dmg *= 2; rangeNote += ' (💀 скелет: ×2)'; }
               if (/механизм[а-яё]*\s+получа[а-яё]*\s+половин/i.test(dsc) && getEnemyMeta(target).kind === 'automaton') { dmg = Math.round(dmg / 2); rangeNote += ' (⚙ механизм: ½ урона)'; } }
             if (maraLivingPct) { dmg = Math.round(dmg * maraLivingPct / 100); rangeNote += ` (Мара: по живым ${maraLivingPct}% урона)`; }
+            { // Плащи и ауры (Огненный/Морозный плащ, Плащ молний, Круг огня, Гудящий камень…) без сетки: раньше били один раз за всю цену.
+              const zd = (typeof GRID_ZONE_SPELLS !== 'undefined') ? GRID_ZONE_SPELLS[spell.name] : null;
+              if (zd && zd.dmgType !== '' && !zd.flee && !zd.slowOnly && !zd.upkeep && dmg > 0 && !(typeof gridZoneAvailable === 'function' && gridZoneAvailable())) {
+                  const partZ = splitEnhancedDesc(liveSpellDesc(spell), enhancedCast) || '';
+                  const tz = parseInt((partZ.match(/(\d+)\s*ход/) || [])[1]) || 0;
+                  if (tz > 1) { zoneDot = { name: spell.name, dot: dmg, turns: tz - 1, type: dmgType }; rangeNote += ` (⏳ дальше ${dmg} урона за ход ещё ${tz - 1} х.)`; }
+              } }
             const skillName = cd.skillName;
             const statKey = skillName ? SKILL_TO_STAT[skillName] : null;
             const statInput = statKey ? document.getElementById('stat-' + statKey) : null;
@@ -911,7 +919,7 @@ function updateHungerPenalty() {
             if (ctrl.banish) {
                 // Изгнание срабатывает на ПРИЗВАННОГО даэдра не выше предела; иначе — урон и потеря равновесия.
                 if (!chk.levelFail && chk.meta.summoned) controlStatus = { status: 'Изгнан', turns: null, desc: 'Изгнан в Обливион', banish: true };
-                else controlStatus = { status: 'Потеря равновесия', turns: 1, damage: 20, damageType: 'magic', desc: 'Не изгнан (' + (chk.levelFail ? 'уровень выше предела' : 'цель не призвана') + '): получает 20 урона и теряет равновесие (−2 к кубам на следующее действие)' };
+                else controlStatus = { status: 'Потеря равновесия', turns: 1, damage: enhCtl ? 110 : 60, damageType: 'magic', desc: 'Не изгнан (' + (chk.levelFail ? 'уровень выше предела' : 'цель не призвана') + '): получает ' + (enhCtl ? 110 : 60) + ' урона и теряет равновесие (−2 к кубам на следующее действие)' };
             }
             actionLabel = `заклинанием «${spell.name}»${enhCtl ? ' (усиленно)' : ''} (−${finalCost} маны, ${controlStatus.desc})${chk.notes.length ? ' ⚠ ' + chk.notes.join('; ') : ''}`;
             skillNameForProgress = SCHOOL_CODE_TO_SKILL[spell.school] || null;
@@ -1064,7 +1072,7 @@ function updateHungerPenalty() {
         if (actionVal === 'ranged' && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,
-            targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea, trueDmg: trueDmgNow,
+            targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, zoneDot, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea, trueDmg: trueDmgNow,
             spellPerk: spellPerkInfo, bash: bashInfo, powerShot: powerShotNow, killMp: uniqueKillMp,
             godProcs: (actionVal === 'melee' || actionVal === 'ranged') ? {
                 kill: gb('instantKillChance'), // Мерунес Дагон: любая атака оружием
@@ -1150,6 +1158,11 @@ function updateHungerPenalty() {
     window.applyPlayerAttackDamage = function () {
         if (!pendingPlayerAttack || !window.CloudSync) return;
         const playerName = document.getElementById('char-name') ? document.getElementById('char-name').value : 'Игрок';
+        if (pendingPlayerAttack.zoneDot && window.CloudSync.applyStatusToEnemy) {
+            const zd = pendingPlayerAttack.zoneDot;
+            window.CloudSync.applyStatusToEnemy(pendingPlayerAttack.targetId, zd.name, `${zd.dot} урона за ход`, zd.turns, playerName, { dotHp: zd.dot, unique: true })
+                .catch(e => console.error('Ошибка статуса зоны:', e));
+        }
         if (pendingPlayerAttack.controlStatus) {
             const cs = pendingPlayerAttack.controlStatus;
             if (cs.absorbMp) {

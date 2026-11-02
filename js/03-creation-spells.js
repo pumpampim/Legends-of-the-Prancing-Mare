@@ -305,11 +305,17 @@
         const seq = (loadedData && Number.isFinite(+loadedData.seq)) ? +loadedData.seq : ++_spellSeq;
         if (seq > _spellSeq) _spellSeq = seq;
         const name = loadedData ? loadedData.name : '';
-        const baseCost = loadedData ? loadedData.baseCost : 30;
-        const desc = loadedData ? loadedData.desc : 'Описание эффекта заклинания...';
+        let baseCost = loadedData ? loadedData.baseCost : 30;
+        let desc = loadedData ? loadedData.desc : 'Описание эффекта заклинания...';
         // Название, которого нет в списке школы (переименовано/удалено в данных), — это «своё название»: раньше выпадающий список
         // тогда сваливался на первый пункт и при следующем сохранении заклинание подменялось.
         const isCustomName = loadedData ? (loadedData.isCustom === true || !isKnownSpellName(school, name)) : false;
+        // Заклинание из книги школ: цену берём из актуальных данных (после правок баланса старые листы
+        // хранили прежнюю цену; описание и так читается из данных через liveSpellDesc).
+        if (loadedData && !isCustomName) {
+            const tiersD = (window.spellsData && window.spellsData[school]) || {};
+            Object.keys(tiersD).forEach(t => (tiersD[t] || []).forEach(s => { if (s.name === name) { if (typeof s.baseCost === 'number') baseCost = s.baseCost; if (s.desc) desc = s.desc; } }));
+        }
 
         const html = `
             <div class="spell-card" id="card-${id}" data-seq="${seq}" data-fav="${loadedData && loadedData.favorite ? 1 : 0}">

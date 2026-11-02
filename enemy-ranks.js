@@ -10,10 +10,10 @@
 // ============================================================================
 (function () {
     const RANKS = [
-        { id: 'normal', name: 'Обычный', tag: '', hp: 1, dmg: 1, mp: 1, phys: 0, minLvl: 1 },
-        { id: 'veteran', name: 'Ветеран', tag: 'ветеран', hp: 1.5, dmg: 1.25, mp: 1.25, phys: 5, minLvl: 15 },
-        { id: 'elite', name: 'Элита', tag: 'элита', hp: 2.5, dmg: 1.5, mp: 1.5, phys: 10, minLvl: 30 },
-        { id: 'legend', name: 'Легенда', tag: 'легенда', hp: 4, dmg: 2, mp: 2, phys: 20, minLvl: 45 }
+        { id: 'normal', name: 'Обычный', tag: '', hp: 1, dmg: 1, mp: 1, phys: 0, lvl: 0, minLvl: 1 },
+        { id: 'veteran', name: 'Ветеран', tag: 'ветеран', hp: 1.5, dmg: 1.25, mp: 1.25, phys: 5, lvl: 5, minLvl: 15 },
+        { id: 'elite', name: 'Элита', tag: 'элита', hp: 2.5, dmg: 1.5, mp: 1.5, phys: 10, lvl: 10, minLvl: 30 },
+        { id: 'legend', name: 'Легенда', tag: 'легенда', hp: 4, dmg: 2, mp: 2, phys: 20, lvl: 15, minLvl: 45 }
     ];
     const PHYS_CAP = 85; // как у поля «Физ. резист» в форме мастера
 
@@ -41,6 +41,7 @@
             res.physical = Math.min(PHYS_CAP, (Number(res.physical) || 0) + r.phys);
             e.resist = res;
         }
+        if (r.lvl) e.levelBonus = r.lvl; // +уровень для заклинаний контроля («до N уровня»), см. getEnemyMeta
         e.rank = r.id;
         if (r.tag && !new RegExp('\\(' + r.tag + '\\)$').test(e.name || '')) e.name = (e.name || 'Враг') + ' (' + r.tag + ')';
         return e;

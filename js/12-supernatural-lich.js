@@ -840,7 +840,8 @@
             else if (/двемер/.test(l)) kind = 'automaton';
             else if (/бандит|разбойник|громил|грабител|головорез|мародер|изгой/.test(l)) kind = 'people';
         }
-        return { level, kind, summoned: !(target && target.summoned === false) };
+        if (level !== null && target && Number(target.levelBonus) > 0) level += Number(target.levelBonus); // ранг врага (ветеран/элита/легенда) поднимает уровень для контроля
+        return { level, kind, summoned: !!(target && target.summoned === true) }; // призван — только если мастер отметил (2026-11-02: раньше по умолчанию любой даэдра считался призванным, и «Высылка» убирала любого)
     }
     const KIND_LABEL = { animal: 'зверь', monster: 'монстр', people: 'человек/мер', undead: 'нежить', daedra: 'даэдра', automaton: 'механизм' };
     // Проверка цели для заклинания «до N уровня». kindFail — не тот тип цели; levelFail — уровень выше предела.
@@ -854,7 +855,9 @@
         if (/нежит/i.test(name)) affects = 'undead';
         else if (/даэдр/i.test(name)) affects = 'daedra';
         else if (['Проклятие слабости', 'Хрупкость', 'Поглощение магии', 'Паралич', 'Гравитационный куб'].indexOf(name) !== -1) affects = 'any';
-        else if (name === 'Руна бешенства' && enhanced) affects = 'any'; // усиленная действует на всех
+        // Усиленная Иллюзия, в описании которой названы нежить/даэдра/механизмы («Существа, нежить, механизмы и даэдра…»),
+        // действует на всех (раньше так было только у «Руны бешенства», а «Умиротворение», «Бешенство», «Бегство» отказывали).
+        else if (enhanced && spell.school === 'illus' && /нежит|даэдр|механизм/i.test(splitEnhancedDesc(full, true))) affects = 'any';
         if (spell.school === 'illus' && affects === 'living' && (window.perkBonuses || {}).illusionMindMaster) affects = 'any'; // «Мастер разума»
         const meta = getEnemyMeta(target);
         out.meta = meta;
@@ -878,7 +881,7 @@
                 const sb = getSchoolBoost(spell.school);
                 if (sb.pct) { const b = Math.round(eff * sb.mult); if (b !== eff) eff = b; }
                 const pbI = window.perkBonuses || {};
-                if (enhanced && pbI.dualIllus) { eff *= 2; bonuses.push('«Двойная иллюзия» ×2 уровень'); }
+                if (enhanced && pbI.dualIllus) { eff += 5; bonuses.push('«Двойная иллюзия» +5 к уровню'); } // было ×2: предел до 40 брал любого врага игры (самые сильные — 30 ур.)
                 if (meta.kind === 'people' && pbI.peopleLevelBonus) { eff += pbI.peopleLevelBonus; bonuses.push('«Обман людских глаз» +' + pbI.peopleLevelBonus); }
                 if (/^(Страх|Бегство)$/.test(name) && pbI.fearLevelBonus) { eff += pbI.fearLevelBonus; bonuses.push('«Наука страха» +' + pbI.fearLevelBonus); }
                 if (/^(Ярость|Бешенство|Руна бешенства)$/.test(name) && pbI.furyLevelBonus) { eff += pbI.furyLevelBonus; bonuses.push('«Неистовство» +' + pbI.furyLevelBonus); }
