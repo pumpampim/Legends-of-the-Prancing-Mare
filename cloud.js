@@ -1322,6 +1322,7 @@
         // Одинаковые сваренные зелья лежат одной стопкой, даже если у них разные itemId (см. alchemyStackKey в alchemy-data.js).
         // Разрозненные стопки, положенные до исправления, сливаются при следующем изменении сундука.
         _mergeStash: function (stash) {
+            if (window.GearLegacy) window.GearLegacy.fixList(stash);
             const keyOf = typeof window.alchemyStackKey === 'function' ? window.alchemyStackKey : () => null;
             const seen = {}, out = [];
             stash.forEach(s => {

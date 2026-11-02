@@ -384,6 +384,8 @@
             playerInventory = Array.isArray(data.inventory) ? data.inventory : [];
             playerInventory.forEach(enrichItemFromDb);
             healInventoryIds(playerInventory);
+            // Надетое оружие и броня: поля листа берём из пересчитанных вещей (старые сохранения держали прежние числа)
+            try { Object.keys(equippedSlots).forEach(k => { const id = equippedSlots[k]; const it = id ? playerInventory.find(i => i.itemId === id) : null; if (it && typeof refreshEquippedAfterTemper === 'function' && (typeof it.weaponDmg === 'number' || typeof it.armorValue === 'number')) refreshEquippedAfterTemper(id, it); }); } catch (e) { }
 
             // Миграция старого инвентаря ресурсов (фиксированные счётчики) в новый общий —
             // чтобы у тех, кто сохранялся раньше, ресурсы не потерялись.

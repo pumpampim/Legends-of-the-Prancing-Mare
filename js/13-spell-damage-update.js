@@ -1,6 +1,6 @@
 
     // ===== Кубики в уроне заклинаний, огненный бонус ранга, Болид =====
-    const HEAVY_ARMOR_DENSITY = (window.StBonuses && window.StBonuses.HEAVY_ARMOR_DENSITY) || 0.5; // тяжёлая броня: +50% к классу брони тяжёлых частей (источник — combat-bonuses.js)
+    const HEAVY_ARMOR_DENSITY = 0; // плотность тяжёлой брони (+50%) теперь внутри значений брони в данных вещей
     const LIGHT_DODGE_CAP = 15;       // лёгкая броня: уклонение не больше 15%
     function getSpellDice(desc, enhanced) {
         const text = splitEnhancedDesc(desc, enhanced);
@@ -1921,7 +1921,6 @@ function updateHungerPenalty() {
         totalArmor += snWerewolfArmor(lvl); // форма вервольфа: 0 на 1 ур., +50 каждые 5 уровней
         totalArmor += sheathArmorBonus(); // утяжелённые ножны: +5 каждые (не лёгкая и не тяжёлая броня)
         document.getElementById('armor-total').innerText = totalArmor;
-        if (typeof refreshEffectiveNumbers === 'function') refreshEffectiveNumbers();
 
         { // разбор класса брони: что даёт сам доспех, что добавляют плотность тяжёлой/перки и всё остальное
             const totEl = document.getElementById('armor-total');
@@ -1936,7 +1935,7 @@ function updateHungerPenalty() {
                     const lightRaw = bodySlotPieces.filter(p => p.cls === 'light').reduce((n, p) => n + (p.armor || 0), 0);
                     if (rawBody) {
                         let t = `Доспех: ${rawBody} по вещам`;
-                        if (heavyRaw) t += ` · тяжёлые ${heavyRaw} × ${(1 + heavyPct).toFixed(2)} (плотность +${Math.round(HEAVY_ARMOR_DENSITY * 100)}%${perks.heavyArmorBonus ? ` и перки +${Math.round(perks.heavyArmorBonus * 100)}%` : ''})`;
+                        if (heavyRaw) t += ` · тяжёлые ${heavyRaw}${heavyPct ? ` × ${(1 + heavyPct).toFixed(2)} (перки +${Math.round(heavyPct * 100)}%)` : ''}`;
                         if (lightRaw) t += ` · лёгкие ${lightRaw}${lightPct ? ` × ${(1 + lightPct).toFixed(2)} (перки)` : ''}, уклонение 1% за 20`;
                         t += ` = ${bodyArmorTotal}`;
                         bits.push(t);

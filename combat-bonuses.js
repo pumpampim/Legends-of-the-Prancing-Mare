@@ -17,8 +17,10 @@
     const TWO_HANDED = ['twohand_sword', 'twohand_axe', 'twohand_hammer', 'twohand_pike', 'twohand_staff'];
     const abilityMod = v => Math.floor((v - 10) / 2);
 
-    const WEAPON_BASE_MULT = 1.35; // базовый урон оружия и боеприпасов +35% в формуле удара (решение Никиты 2026-11-02: ×2 было много)
-    const weaponBase = n => Math.round((Number(n) || 0) * WEAPON_BASE_MULT);
+    // Урон оружия и стрел в данных уже пересчитан (+35%, решение Никиты 2026-11-02) — в формуле удара берётся как есть.
+    // WEAPON_DATA_SCALE нужен только там, где из данных строят врагов: их урон остаётся прежним (см. gm.js).
+    const WEAPON_DATA_SCALE = 1.35, HEAVY_DATA_SCALE = 1.5;
+    const weaponBase = n => Number(n) || 0;
     const CROSSBOW_SHOT_BONUS = 0.85; // +85% к (урон арбалета + болт) за выстрел: арбалет заряжается ход
     // Какой навык усиливает атаку данным оружием (та же логика, что weaponBoostSkill в index.html).
     function weaponBoostSkill(mode, wepType, isTwoHanded) {
@@ -344,14 +346,10 @@
         return rows;
     }
 
-    // ===== Показ «действительных» цифр оружия и брони (в данных лежит база; в бою оружие ×2, тяжёлая броня +50%) =====
-    const HEAVY_ARMOR_DENSITY = 0.5; // тяжёлая броня плотнее: +50% к классу брони тяжёлых частей (js/13 берёт отсюда же)
-    const LIGHT_DODGE_PER = 20, LIGHT_DODGE_CAP_PCT = 15;
-    function shownWeaponDmg(n, item) { // базовый урон оружия/боеприпаса из данных → вклад в удар
-        n = Number(n); if (!isFinite(n)) return n;
-        if (item && /посох/i.test(String(item.name || ''))) return n; // посох в слоте дальнего боя не удваивается
-        return weaponBase(n);
-    }
+    // ===== Цифры оружия и брони: данные уже содержат действительные значения (оружие +35%, тяжёлая броня +50%) =====
+    const HEAVY_ARMOR_DENSITY = 0; // плотность тяжёлой брони теперь внутри данных вещей
+    const LIGHT_DODGE_PER = 20;
+    function shownWeaponDmg(n) { return Number(n); }
     function isHeavyArmorItem(item) {
         if (!item) return false;
         if (/щит/i.test(String(item.slot || '')) || item.slot === 'shield') return false;
@@ -361,27 +359,16 @@
         if (!item || /щит/i.test(String(item.slot || '')) || item.slot === 'shield') return false;
         return /light|л[её]гк/i.test(String(item.armorType || '') + ' ' + String(item.category || ''));
     }
-    function shownArmor(n, item) { // класс брони в расчёте: у тяжёлых частей +50%
-        n = Number(n); if (!isFinite(n)) return n;
-        return isHeavyArmorItem(item) ? Math.round(n * (1 + HEAVY_ARMOR_DENSITY)) : n;
-    }
-    function armorNote(n, item) { // подпись для карточек: тяжёлая — «в расчёте», лёгкая — уклонение
+    function shownArmor(n) { return Number(n); }
+    function armorNote(n, item) { // подпись для карточек лёгкой брони: уклонение
         n = Number(n); if (!isFinite(n)) return '';
-        if (isHeavyArmorItem(item)) return ` (тяжёлая: в расчёте ${shownArmor(n, item)})`;
-        if (isLightArmorItem(item)) return ` (уклонение +${Math.round(n / LIGHT_DODGE_PER * 10) / 10}%)`;
-        return '';
+        return isLightArmorItem(item) ? ` (уклонение +${Math.round(n / LIGHT_DODGE_PER * 10) / 10}%)` : '';
     }
-    // Описание вещи для показа: «Урон 7» → «Урон 14», «Сопротивление 49» → «Броня 73» (старые подписи в сохранённых вещах правятся на лету).
-    function shownEffect(item) {
-        let t = String((item && item.effect) || '');
-        if (!item) return t;
-        const isWep = item.slot === 'melee' || item.slot === 'ranged' || item.isAmmo || /боеприпас/i.test(String(item.category || '')) || typeof item.weaponDmg === 'number';
-        if (isWep) t = t.replace(/^Урон (\d+)(?: \+ (\d+) ([а-яё]+) \(в сумме (\d+)\))?/i, (m, a, b, w, c) =>
-            'Урон ' + shownWeaponDmg(a, item) + (b ? ' + ' + shownWeaponDmg(b, item) + ' ' + w + ' (в сумме ' + shownWeaponDmg(c, item) + ')' : ''));
-        if (isHeavyArmorItem(item) || isLightArmorItem(item) || typeof item.armorValue === 'number') t = t.replace(/^Сопротивление (\d+)/, (m, a) => 'Броня ' + shownArmor(a, item));
-        return t;
-    }
-    const api = { shownEffect, shownWeaponDmg, shownArmor, armorNote, isHeavyArmorItem, HEAVY_ARMOR_DENSITY, computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
+    function shownEffect(item) { return String((item && item.effect) || ''); }
+    // Враги, собранные из таблиц оружия и брони, бьют и держат броню как раньше: пересчёт данных на них не распространяется.
+    function enemyWeaponDmg(n) { return Number(n) / WEAPON_DATA_SCALE; }
+    function enemyArmorValue(n, item) { return isHeavyArmorItem(item) ? Number(n) / HEAVY_DATA_SCALE : Number(n); }
+    const api = { enemyWeaponDmg, enemyArmorValue, shownEffect, shownWeaponDmg, shownArmor, armorNote, isHeavyArmorItem, HEAVY_ARMOR_DENSITY, computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
     if (typeof window !== 'undefined') {
         window.StBonuses = api;
         window.__stSelfTestAttack = selfTest;

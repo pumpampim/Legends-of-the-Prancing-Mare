@@ -77,6 +77,7 @@
             if (u && typeof u.damage === 'number') it.weaponDmg = u.damage;
         }
         try { normalizeWeaponFields(it); } catch (e) { }
+        try { if (window.GearLegacy) window.GearLegacy.fixItem(it); } catch (e) { } // вещи со старым уроном/бронёй до пересчёта баланса
         if (!it.sheathKind && window.allItems) { const ps = window.allItems.find(p => p.name === it.name && p.sheathKind); if (ps) { it.sheathKind = ps.sheathKind; it.slot = 'sheath'; if (ps.sheathArmor) it.sheathArmor = ps.sheathArmor; } }
         fixFailedDish(it);
         if (it.alchemyEffects && typeof it.effect === 'string' && window.alchemyFixRoundsText) it.effect = window.alchemyFixRoundsText(it.effect);
@@ -168,6 +169,7 @@
             existing.count += qty;
             if (effect) existing.effect = effect;
             if (extra) Object.assign(existing, extra);
+            if (window.GearLegacy) window.GearLegacy.fixItem(existing);
             fixFailedDish(existing);
             normalizeWeaponFields(existing);
         } else {

@@ -552,9 +552,10 @@
     <script src="vendor/firebase/firebase-auth-compat.js?v=10.13.2"></script>
     <script src="vendor/firebase/firebase-firestore-compat.js?v=10.13.2"></script>
     <script src="perks.js?v=11"></script>
-    <script src="items-data.js?v=23"></script>
+    <script src="items-data.js?v=24"></script>
     <script src="cooking-data.js?v=11"></script>
-    <script src="smithing-data.js?v=16"></script>
+    <script src="smithing-data.js?v=17"></script>
+    <script src="gear-legacy.js?v=1"></script>
     <script src="enchant-data.js?v=5"></script>
     <script src="spell-data.js?v=10"></script>
     <script src="lich-data.js?v=1"></script>
@@ -563,14 +564,14 @@
     <script src="hunt-data.js?v=3"></script>
     <script src="holidays-data.js?v=4"></script>
     <script src="skill-books-data.js?v=4"></script>
-    <script src="unique-weapons-data.js?v=3"></script>
+    <script src="unique-weapons-data.js?v=4"></script>
     <script src="spell-tomes-data.js?v=5"></script>
 <script src="powers-data.js?v=8"></script>
     <script src="enemies-data.js?v=11"></script>
     <script src="enemy-loot.js?v=7"></script>
     <script src="pets-data.js?v=2"></script>
     <script src="holds-map.js?v=4"></script>
-    <script src="combat-bonuses.js?v=13"></script>
+    <script src="combat-bonuses.js?v=14"></script>
     <script src="builds-data.js?v=3"></script>
 </head>
 <body>
@@ -972,7 +973,7 @@
                 <label>Оружие ближнего боя / Кулаки (правая рука)</label>
                 <div class="slot-row">
                     <input type="text" id="wep-melee-name" value="Бой голыми руками" placeholder="Название оружия" onchange="saveLocalStorage()">
-                    <input type="number" id="wep-melee-dmg" value="2" placeholder="Баз. урон" readonly tabindex="-1" title="Базовый урон из данных вещи. В удар идёт на 35% больше (7 → 9) плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
+                    <input type="number" id="wep-melee-dmg" value="2" placeholder="Баз. урон" readonly tabindex="-1" title="Урон надетой вещи (из данных). В удар идёт он плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
                     <select id="wep-melee-type" onchange="onMeleeTypeChanged(this)">
                         <option value="unarmed">Кулаки / кастеты (без Силы)</option>
                         <option value="dagger">Кинжал (Крит х3, +1 к атаке)</option>
@@ -990,7 +991,7 @@
                 <label>Второе одноручное оружие (левая рука, для боя двумя оружиями)</label>
                 <div class="slot-row">
                     <input type="text" id="wep-melee-offhand-name" placeholder="Название (необязательно)" onchange="saveLocalStorage()">
-                    <input type="number" id="wep-melee-offhand-dmg" value="0" placeholder="Баз. урон" readonly tabindex="-1" title="Базовый урон из данных вещи. В удар идёт на 35% больше (7 → 9) плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
+                    <input type="number" id="wep-melee-offhand-dmg" value="0" placeholder="Баз. урон" readonly tabindex="-1" title="Урон надетой вещи (из данных). В удар идёт он плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
                     <select id="slot-melee-offhand-picker" class="slot-picker" onchange="equipToSlotDirect('melee_offhand', this.value, 'slot-melee-offhand-picker')"></select><button type="button" class="slot-unequip-btn" id="unequip-meleeWeaponOffhand" onclick="unequipSlot('meleeWeaponOffhand')" title="Снять и убрать в инвентарь" style="display:none;">✖ Снять</button>
                 </div>
                 <div id="slot-melee-offhand-enchant-info" class="slot-enchant-info"></div>
@@ -998,7 +999,7 @@
                 <label>Оружие дальнего боя (Лук или Арбалет)</label>
                 <div class="slot-row">
                     <input type="text" id="wep-ranged-name" placeholder="Название лука (пусто, если не надет)" onchange="saveLocalStorage()">
-                    <input type="number" id="wep-ranged-dmg" value="0" placeholder="Баз. урон" readonly tabindex="-1" title="Базовый урон из данных вещи. В удар идёт на 35% больше (7 → 9) плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
+                    <input type="number" id="wep-ranged-dmg" value="0" placeholder="Баз. урон" readonly tabindex="-1" title="Урон надетой вещи (из данных). В удар идёт он плюс Сила/Ловкость. Берётся из надетой вещи автоматически">
                     <select id="wep-ranged-type" onchange="updateAll(); saveLocalStorage();">
                         <option value="bow">Лук (Обычный)</option>
                         <option value="crossbow">Арбалет (1 ход на КД)</option>
@@ -1016,7 +1017,7 @@
                 <label>Экипированные боеприпасы</label>
                 <div class="slot-row">
                     <input type="text" id="ammo-name" value="Железная стрела" placeholder="Название стрел" onchange="saveLocalStorage()">
-                    <input type="number" id="ammo-dmg" value="0" placeholder="Урон стрелы" readonly tabindex="-1" title="Базовый урон заряженных стрел/болтов из данных — в удар идёт на 35% больше. Берётся из надетого боеприпаса">
+                    <input type="number" id="ammo-dmg" value="0" placeholder="Урон стрелы" readonly tabindex="-1" title="Урон заряженных стрел/болтов (из данных). Берётся из надетого боеприпаса">
                     <span style="width:33%; text-align:center; font-size:13px; color:#aaa;">Снаряды</span>
                 </div>
 
@@ -2149,24 +2150,24 @@
 <script src="js/02-powers-time.js?v=2"></script>
 <script src="js/03-creation-spells.js?v=4"></script>
 <script src="js/04-spell-casting.js?v=2"></script>
-<script src="js/05-inventory.js?v=1"></script>
-<script src="js/06-trade-merchants.js?v=6"></script>
-<script src="js/07-craft-enchant-equip.js?v=3"></script>
-<script src="js/08-equipment-guilds.js?v=5"></script>
+<script src="js/05-inventory.js?v=2"></script>
+<script src="js/06-trade-merchants.js?v=7"></script>
+<script src="js/07-craft-enchant-equip.js?v=4"></script>
+<script src="js/08-equipment-guilds.js?v=6"></script>
 <script src="js/09-combat-grid.js?v=1"></script>
 <script src="js/10-resist-gear-fish-hunt.js?v=2"></script>
-<script src="js/11-session-trade-map.js?v=6"></script>
-<script src="js/12-supernatural-lich.js?v=4"></script>
-<script src="js/13-spell-damage-update.js?v=13"></script>
+<script src="js/11-session-trade-map.js?v=7"></script>
+<script src="js/12-supernatural-lich.js?v=5"></script>
+<script src="js/13-spell-damage-update.js?v=14"></script>
 <script src="js/14-diary-death-combat.js?v=5"></script>
-<script src="js/15-traps-boot.js?v=2"></script>
+<script src="js/15-traps-boot.js?v=3"></script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
 <script src="crime-core.js?v=1"></script>
 <script src="firebase-config.js?v=4"></script>
 <script src="combat-calc.js?v=5"></script>
 <script src="grid-core.js?v=5"></script>
-<script src="cloud.js?v=49"></script>
+<script src="cloud.js?v=50"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {

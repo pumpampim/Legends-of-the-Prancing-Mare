@@ -1651,8 +1651,8 @@
     // ---------- Снаряжение и добыча врага по выбору мастера ----------
     let enemyGearDraft = []; // [{ name, qty, chance }]
 
-    function gmItemDmg(i) { return typeof i.dmg === 'number' ? i.dmg : (typeof i.damage === 'number' ? i.damage : null); }
-    function gmItemArmor(i) { return typeof i.armor === 'number' ? i.armor : (typeof i.resistance === 'number' ? i.resistance : null); }
+    function gmItemDmg(i) { if (window.GearLegacy) window.GearLegacy.fixItem(i); return typeof i.dmg === 'number' ? i.dmg : (typeof i.damage === 'number' ? i.damage : null); }
+    function gmItemArmor(i) { if (window.GearLegacy) window.GearLegacy.fixItem(i); return typeof i.armor === 'number' ? i.armor : (typeof i.resistance === 'number' ? i.resistance : null); }
     function enemyGearRole(i) {
         if (!i) return 'loot';
         const isAmmo = /стрел|болт/i.test(i.name || '');
@@ -6070,7 +6070,7 @@
             if (options && options.length) {
                 const picked = options[Math.floor(Math.random() * options.length)];
                 slots[key] = picked;
-                totalArmor += picked.resistance || 0;
+                totalArmor += Math.round(StBonuses.enemyArmorValue(picked.resistance || 0, Object.assign({ slot: key }, picked)));
             }
         });
 
@@ -6091,8 +6091,8 @@
         // при самой атаке — enemyWeaponDamage(); раньше сюда запекался лишь модификатор (+1…+7),
         // и он же не учитывался бы повторно.
         const weaponDmg = isRanged
-            ? Math.round(bow.damage * levelDmgMult)
-            : Math.round(weapon.damage * levelDmgMult);
+            ? Math.round(StBonuses.enemyWeaponDmg(bow.damage) * levelDmgMult) // таблицы оружия пересчитаны для игроков — враги бьют как раньше
+            : Math.round(StBonuses.enemyWeaponDmg(weapon.damage) * levelDmgMult);
         const hp = con * 10 + Math.round(randInt(0, 20) * levelHpMult);
         // Мана — теперь у ЛЮБОГО бандита (не только мага), для зелий/свитков за столом мастера.
         const mp = Math.round(randInt(20, 40) * (1 + (level - 1) * 0.05));

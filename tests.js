@@ -192,6 +192,15 @@
     const total = [1, 2, 3, 4].map(k => (SR[k] || []).reduce((s, g) => s + g.qty, 0));
     ok(total.every((v, i) => i === 0 || v > total[i - 1]), 'Посохи: рецепт Новичка легче Ученика, Ученика легче Адепта и т.д. (суммарно ингредиентов)', total.join(' < '));
 
+    // ---------- ПЕРЕСЧЁТ ОРУЖИЯ И БРОНИ (2026-11-02): старые вещи чинятся по названию ----------
+    { const G = W.GearLegacy; const sw = (W.weaponRecipes || []).find(r => r.name === 'Железный меч'), eb = (W.armorRecipes || []).find(r => r.name === 'Эбонитовая броня');
+      eq([sw.damage, eb.resistance], [9, 87], 'Данные: железный меч 7 → 9, эбонитовая броня 58 → 87');
+      const old = { name: 'Железный меч', weaponDmg: 7, effect: 'Урон 7' }; G.fixItem(old);
+      eq([old.weaponDmg, old.effect], [9, 'Урон 9'], 'Старый железный меч в сохранении получает новый урон');
+      const hv = { name: 'Эбонитовая броня', armorValue: 58, baseArmorValue: 58, temperTier: 0 }; G.fixItem(hv);
+      eq(hv.armorValue, 87, 'Старая эбонитовая броня получает новую броню');
+      const again = { name: 'Железный меч', weaponDmg: 9 }; eq(G.fixItem(again), false, 'Уже новая вещь не трогается'); }
+
     // ---------- УНИКАЛЬНОЕ НЕ ДОЛЖНО ПАДАТЬ ИЗ СЛУЧАЙНЫХ СУНДУКОВ ----------
     // Правило из gm.js (isUniqueLootItem): флаг unique ИЛИ категория на "Уникальн".
     const uniq = (W.uniqueWeaponsData || []);
@@ -483,26 +492,26 @@
     if (W.StBonuses) {
         const st = W.StBonuses.selfTest();
         const by = n => (st.find(r => r.сценарий.indexOf(n) === 0) || {});
-        eq(by('базовый').урон, 27.2, 'Удар: базовый (меч 8 +35% = 11, СИЛ 14, «Сильная рука» 20%) = 11 + 2.2 + 14');
-        eq(by('силовая').урон, 41, 'Удар: силовая атака ×1.5 с округлением');
-        eq([by('скрытная').урон, by('скрытная').скрытность], [20, '×3'], 'Удар: кинжал, скрытность ×3');
-        eq([by('дух огня').урон, by('дух огня').дух], [32.2, 12], 'Удар: зачарование +5 и дух огня 10 × 1.2');
-        eq(by('бог').урон, 38, 'Удар: бог — оружие +10%, потом ближний бой +25% (по очереди, с округлением)');
+        eq(by('базовый').урон, 23.6, 'Удар: базовый (меч 8, СИЛ 14, «Сильная рука» 20%) = 8 + 1.6 + 14');
+        eq(by('силовая').урон, 35, 'Удар: силовая атака ×1.5 с округлением');
+        eq([by('скрытная').урон, by('скрытная').скрытность], [18.8, '×3'], 'Удар: кинжал, скрытность ×3');
+        eq([by('дух огня').урон, by('дух огня').дух], [28.6, 12], 'Удар: зачарование +5 и дух огня 10 × 1.2');
+        eq(by('бог').урон, 33, 'Удар: бог — оружие +10%, потом ближний бой +25% (по очереди, с округлением)');
         ok(st.every(r => r.повтор === r.урон), 'Удар: журнал шагов воспроизводит итог (applyBonuses)');
         eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, str: 3 }).total, 10, 'Удар врага: оружие + СИЛ');
         // Перки не протекают между ветками (раньше «Безжалостный»/«Сокрушительный», «Рывок», «Боевая стойка» общие)
         const B = W.StBonuses, base = { mode: 'melee', str: 10, dex: 10, wis: 10, isPowerAttack: true, god: {}, sheogorathMult: 1, skillBoostPct: {},
             melee: { dmg: 10, type: 'twohand_hammer', name: 'Боевой молот' }, ranged: {} };
         const hammer = B.computePlayerWeaponAttack(Object.assign({}, base, { perks: { oneHandStandingPower: 0.25, powerAttackHitBonus: 1 } }));
-        eq([hammer.totalDmg, hammer.hitModifier], [36, -5], 'Перки: «Безжалостный удар» и «Боевая стойка» (одноручные) не усиливают молот (молот −4, силовая −1)');
+        eq([hammer.totalDmg, hammer.hitModifier], [30, -5], 'Перки: «Безжалостный удар» и «Боевая стойка» (одноручные) не усиливают молот (молот −4, силовая −1)');
         const hammer2 = B.computePlayerWeaponAttack(Object.assign({}, base, { perks: { twoHandStandingPower: 0.25 } }));
-        eq(hammer2.totalDmg, 42, 'Перки: «Сокрушительный удар» усиливает двуручное (×1.75)');
+        eq(hammer2.totalDmg, 35, 'Перки: «Сокрушительный удар» усиливает двуручное (×1.75)');
         const sprint = B.computePlayerWeaponAttack(Object.assign({}, base, { isSprintAttack: true, perks: { oneHandSprintDouble: true } }));
-        eq(sprint.totalDmg, 36, 'Перки: «Рывок» (одноручное) не открывает рывок-атаку двуручным');
+        eq(sprint.totalDmg, 30, 'Перки: «Рывок» (одноручное) не открывает рывок-атаку двуручным');
         const spear = B.computePlayerWeaponAttack(Object.assign({}, base, { isPowerAttack: false, melee: { dmg: 10, type: 'onehand', name: 'Железное копьё' }, perks: { spearBleedDamage: 5, spearResistDamage: 5, pikeBleedDamage: 8, pikeResistDamage: 8 } }));
-        eq([spear.totalDmg, spear.trueDmg], [29, 5], 'Перки: копьё — только «Копейщик», урон через сопротивление отдельно');
+        eq([spear.totalDmg, spear.trueDmg], [25, 5], 'Перки: копьё — только «Копейщик», урон через сопротивление отдельно');
         const pike = B.computePlayerWeaponAttack(Object.assign({}, base, { isPowerAttack: false, melee: { dmg: 10, type: 'twohand_pike', name: 'Железная пика' }, perks: { spearBleedDamage: 5, spearResistDamage: 5, pikeBleedDamage: 8, pikeResistDamage: 8 } }));
-        eq([pike.totalDmg, pike.trueDmg, pike.hitModifier], [32, 8, 0], 'Перки: пика — только «Пикосажатель», пика без штрафа к кубам');
+        eq([pike.totalDmg, pike.trueDmg, pike.hitModifier], [28, 8, 0], 'Перки: пика — только «Пикосажатель», пика без штрафа к кубам');
         const mace = B.computePlayerWeaponAttack(Object.assign({}, base, { isPowerAttack: false, melee: { dmg: 10, type: 'onehand', name: 'Железная булава' }, perks: { maceArmorPenetration: 0.45, martialArtsTrueDmg: 15, martialArtsHitBonus: 2 } }));
         eq([mace.armorIgnore, mace.trueDmg, mace.hitModifier], [0.45, 15, 2], 'Перки: «Костолом» игнорирует 45% брони, «Боевые искусства» — урон сквозь резист');
         const martial2h = B.computePlayerWeaponAttack(Object.assign({}, base, { isPowerAttack: false, perks: { martialArtsTrueDmg: 15, martialArtsHitBonus: 2 } }));
@@ -527,7 +536,7 @@
         const fist = W.StBonuses.computePlayerWeaponAttack(Object.assign({}, b0, { melee: { dmg: 2, type: 'unarmed', name: 'Бой голыми руками' } }));
         eq(fist.totalDmg, 2, 'Кулаки: урон без Силы');
         const bound = W.StBonuses.computePlayerWeaponAttack(Object.assign({}, b0, { melee: { dmg: 13, type: 'onehand', name: 'Призванный меч' } }));
-        eq([bound.totalDmg, bound.hitModifier], [36, 4], 'Призванный меч: урон и попадание от Мудрости (13 + 18, мод. +4)');
+        eq([bound.totalDmg, bound.hitModifier], [31, 4], 'Призванный меч: урон и попадание от Мудрости (13 + 18, мод. +4)');
     }
     // «Огненные чары» усиливают и сопротивление огню (описание: «на оружие и доспехи»)
     if (W.calcEnchantPower) {
