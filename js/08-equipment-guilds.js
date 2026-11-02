@@ -473,7 +473,7 @@
             return;
         }
         const r1 = 1 + Math.floor(Math.random() * 10), r2 = 1 + Math.floor(Math.random() * 10);
-        const speech = getSkillRawValue('Красноречие') + gb('speech');
+        const speech = (getSkillRawValue('Красноречие') + gb('speech')) * (1 + (typeof getSkillOverflowPoints === 'function' ? getSkillOverflowPoints('Красноречие') * SKILL_OVERFLOW_PCT / 100 : 0)); // сверх 100: +0.5% за пункт
         const gold = bardPerformGold(r1 + r2, speech, bardRepNow());
         st.acts.perform = (st.acts.perform || 0) + 1;
         const goldInput = document.getElementById('char-gold');

@@ -14,6 +14,8 @@
                 gearBonus += item.enchantment.value;
             }
         });
+        // Алхимия сверх 100: +0.5% за пункт, как «Повышение навыка: Алхимия».
+        if (typeof getSkillOverflowPoints === 'function') gearBonus += getSkillOverflowPoints('Алхимия') * SKILL_OVERFLOW_PCT;
         return {
             alchemistRank: perks.alchemistRank || 0,
             hasHealer: !!perks.alchemyHealer,
@@ -668,7 +670,9 @@
         const isCombatSkill = skillLabel && COMBAT_SKILLS_TIE_REROLL.includes(skillLabel);
         const hasDc = dc !== null && !isNaN(dc);
         // «Повышение навыка» Скрытность / Взлом / Карманные кражи: каждые 10% — +1 к кубам (40% → +4 при любом выпавшем значении).
-        const diceBoostPct = (skillLabel && ['скрытность', 'взлом', 'карманные кражи'].includes(canonSkillKey(skillLabel))) ? getSkillBoostPercent(skillLabel) : 0;
+        let diceBoostPct = (skillLabel && ['скрытность', 'взлом', 'карманные кражи'].includes(canonSkillKey(skillLabel))) ? getSkillBoostPercent(skillLabel) : 0;
+        // Красноречие сверх 100 (вера, вещи, раса): +0.5% за пункт, как у остальных навыков, — те же «каждые 10% = +1 к кубам».
+        if (skillLabel && canonSkillKey(skillLabel) === 'красноречие' && typeof getSkillOverflowPoints === 'function') diceBoostPct += getSkillOverflowPoints('Красноречие') * SKILL_OVERFLOW_PCT;
 
         // Ничья у боевых навыков — кубы перекидываются (не провал). Ограничение в 20 попыток
         // просто страхует от бесконечного цикла, на практике повторных ничьих почти не бывает.
