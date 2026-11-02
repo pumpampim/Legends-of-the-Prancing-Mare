@@ -587,7 +587,7 @@
         const tier = item.temperTier || 0;
         const skill = getTemperSkill();
         const lines = [];
-        lines.push(`Ранг: <strong>${tier ? escHtml(TEMPER_TIERS[tier - 1].name) : 'обычное'}</strong> (${tier}/${TEMPER_TIERS.length}) · ${isWeapon ? 'урон' : 'броня'}: ${isWeapon ? item.weaponDmg : item.armorValue}${item.price ? ' · цена: ' + item.price + ' септ.' : ''}`);
+        lines.push(`Ранг: <strong>${tier ? escHtml(TEMPER_TIERS[tier - 1].name) : 'обычное'}</strong> (${tier}/${TEMPER_TIERS.length}) · ${isWeapon ? 'урон' : 'броня'}: ${isWeapon ? StBonuses.shownWeaponDmg(item.weaponDmg, item) : StBonuses.shownArmor(item.armorValue, item)}${item.price ? ' · цена: ' + item.price + ' септ.' : ''}`);
         if (tier >= TEMPER_TIERS.length) {
             lines.push('<span style="color:#2ecc71;">Достигнут максимальный ранг — точить дальше некуда.</span>');
         } else {
@@ -597,7 +597,7 @@
             const baseV = isWeapon ? item.baseWeaponDmg : item.baseArmorValue;
             const newV = temperValue(baseV, next);
             const newP = (typeof item.basePrice === 'number' && item.basePrice > 0) ? temperValue(item.basePrice, next) : null;
-            lines.push(`Следующий ранг: <strong>${escHtml(TEMPER_TIERS[next - 1].name)}</strong> — ${isWeapon ? 'урон' : 'броня'} ${isWeapon ? item.weaponDmg : item.armorValue} → <strong>${newV}</strong>${newP !== null ? `, цена ${item.price} → <strong>${newP}</strong>` : ''}`);
+            lines.push(`Следующий ранг: <strong>${escHtml(TEMPER_TIERS[next - 1].name)}</strong> — ${isWeapon ? 'урон' : 'броня'} ${isWeapon ? StBonuses.shownWeaponDmg(item.weaponDmg, item) : StBonuses.shownArmor(item.armorValue, item)} → <strong>${isWeapon ? StBonuses.shownWeaponDmg(newV, item) : StBonuses.shownArmor(newV, item)}</strong>${newP !== null ? `, цена ${item.price} → <strong>${newP}</strong>` : ''}`);
             if (req.blockedPerk) lines.push(`<span style="color:#e74c3c;">Нужен перк «${escHtml(req.perkName)}» — без него эту вещь не улучшить.</span>`);
             if (req.blockedMagic) lines.push('<span style="color:#e74c3c;">Магическую вещь улучшать можно только с перком «Кузнец-волшебник».</span>');
             lines.push(`Навык Кузнечного дела: ${skill} (нужно ${req.need}${req.perkName ? `; перк «${escHtml(req.perkName)}»: ${req.hasPerk ? 'есть' : 'нет'}` : ''}) ${skill >= req.need ? '✅' : '❌'}`);

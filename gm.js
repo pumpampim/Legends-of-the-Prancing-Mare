@@ -1688,11 +1688,11 @@
         box.innerHTML = enemyGearDraft.length ? enemyGearDraft.map((d, idx) => {
             const it = gmFindItemByName(d.name) || {};
             const role = enemyGearRole(it);
-            const stat = role === 'weapon' ? ' · урон ' + gmItemDmg(it) : role === 'armor' ? ' · броня ' + gmItemArmor(it) : '';
+            const stat = role === 'weapon' ? ' · урон ' + StBonuses.shownWeaponDmg(gmItemDmg(it), it) : role === 'armor' ? ' · броня ' + StBonuses.shownArmor(gmItemArmor(it), it) : '';
             const uniq = (typeof isUniqueLootItem === 'function' && isUniqueLootItem(it)) ? ' <span style="color:#e6b800;">★ уникальное</span>' : '';
             return '<div class="party-row" style="display:flex; align-items:center; gap:6px; padding:3px 6px; font-size:13px;">' +
                 '<span style="flex:1;"><strong>' + escapeHtml(d.name) + '</strong>' + (d.qty > 1 ? ' ×' + d.qty : '') + uniq +
-                '<br><span style="opacity:.7;">' + ROLE[role] + stat + ' · шанс ' + d.chance + '%' + (it.effect ? ' · ' + escapeHtml(String(it.effect).slice(0, 70)) : '') + '</span></span>' +
+                '<br><span style="opacity:.7;">' + ROLE[role] + stat + ' · шанс ' + d.chance + '%' + (it.effect ? ' · ' + escapeHtml(StBonuses.shownEffect(it).slice(0, 70)) : '') + '</span></span>' +
                 '<button type="button" style="width:auto; margin:0; padding:2px 8px;" class="btn-danger" onclick="removeEnemyGearItem(' + idx + ')">×</button></div>';
         }).join('') : '<p style="opacity:.6; font-size:13px; margin:2px 0;">Список пуст.</p>';
     }
@@ -4474,7 +4474,7 @@
                         <button class="btn-danger" style="width:auto; padding:2px 8px; font-size:12px;" onclick="deletePlayerItem('${jsq(item.itemId)}')">Удалить</button>
                     </span>
                 </div>
-                ${item.effect ? `<div style="font-size:12px; opacity:.75; margin-top:2px;">${escapeHtml(item.effect)}</div>` : ''}
+                ${item.effect ? `<div style="font-size:12px; opacity:.75; margin-top:2px;">${escapeHtml(StBonuses.shownEffect(item))}</div>` : ''}
             </div>
         `).join('');
     }
@@ -5854,7 +5854,7 @@
         if (loot.trap) { const tt = trapType(loot.trap.id) || {}; html += `<span style="color:#e67e22;">🪤 С ловушкой: ${tt.icon || ''} ${escapeHtml(tt.name || loot.trap.id)} — обезвредить: ${escapeHtml(loot.trap.tier)} (сл. ${loot.trap.dc}). Игроку при выдаче придёт бросок на обезвреживание.</span><br>`; }
         if (loot.gold) html += `💰 ${loot.gold} септимов<br>`;
         loot.items.forEach(it => {
-            const stats = (it.armor ? ` · броня ${it.armor}` : '') + (it.dmg ? ` · урон ${it.dmg}` : '');
+            const stats = (it.armor ? ` · броня ${StBonuses.shownArmor(it.armor, it)}` : '') + (it.dmg ? ` · урон ${StBonuses.shownWeaponDmg(it.dmg, it)}` : '');
             html += `• ${escapeHtml(it.name)}${it.qty > 1 ? ` ×${it.qty}` : ''} <span style="opacity:.65;">(${escapeHtml(it.category || '')}${stats}, ${it.price} септимов)</span><br>`;
         });
         return html;

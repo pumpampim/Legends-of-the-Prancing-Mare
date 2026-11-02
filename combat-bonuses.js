@@ -343,7 +343,44 @@
         return rows;
     }
 
-    const api = { computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
+    // ===== Показ «действительных» цифр оружия и брони (в данных лежит база; в бою оружие ×2, тяжёлая броня +50%) =====
+    const HEAVY_ARMOR_DENSITY = 0.5; // тяжёлая броня плотнее: +50% к классу брони тяжёлых частей (js/13 берёт отсюда же)
+    const LIGHT_DODGE_PER = 20, LIGHT_DODGE_CAP_PCT = 15;
+    function shownWeaponDmg(n, item) { // базовый урон оружия/боеприпаса из данных → вклад в удар
+        n = Number(n); if (!isFinite(n)) return n;
+        if (item && /посох/i.test(String(item.name || ''))) return n; // посох в слоте дальнего боя не удваивается
+        return n * WEAPON_BASE_MULT;
+    }
+    function isHeavyArmorItem(item) {
+        if (!item) return false;
+        if (/щит/i.test(String(item.slot || '')) || item.slot === 'shield') return false;
+        return /heavy|тяж[её]л/i.test(String(item.armorType || '') + ' ' + String(item.category || ''));
+    }
+    function isLightArmorItem(item) {
+        if (!item || /щит/i.test(String(item.slot || '')) || item.slot === 'shield') return false;
+        return /light|л[её]гк/i.test(String(item.armorType || '') + ' ' + String(item.category || ''));
+    }
+    function shownArmor(n, item) { // класс брони в расчёте: у тяжёлых частей +50%
+        n = Number(n); if (!isFinite(n)) return n;
+        return isHeavyArmorItem(item) ? Math.round(n * (1 + HEAVY_ARMOR_DENSITY)) : n;
+    }
+    function armorNote(n, item) { // подпись для карточек: тяжёлая — «в расчёте», лёгкая — уклонение
+        n = Number(n); if (!isFinite(n)) return '';
+        if (isHeavyArmorItem(item)) return ` (тяжёлая: в расчёте ${shownArmor(n, item)})`;
+        if (isLightArmorItem(item)) return ` (уклонение +${Math.round(n / LIGHT_DODGE_PER * 10) / 10}%)`;
+        return '';
+    }
+    // Описание вещи для показа: «Урон 7» → «Урон 14», «Сопротивление 49» → «Броня 73» (старые подписи в сохранённых вещах правятся на лету).
+    function shownEffect(item) {
+        let t = String((item && item.effect) || '');
+        if (!item) return t;
+        const isWep = item.slot === 'melee' || item.slot === 'ranged' || item.isAmmo || /боеприпас/i.test(String(item.category || '')) || typeof item.weaponDmg === 'number';
+        if (isWep) t = t.replace(/^Урон (\d+)(?: \+ (\d+) ([а-яё]+) \(в сумме (\d+)\))?/i, (m, a, b, w, c) =>
+            'Урон ' + shownWeaponDmg(a, item) + (b ? ' + ' + shownWeaponDmg(b, item) + ' ' + w + ' (в сумме ' + shownWeaponDmg(c, item) + ')' : ''));
+        if (isHeavyArmorItem(item) || isLightArmorItem(item) || typeof item.armorValue === 'number') t = t.replace(/^Сопротивление (\d+)/, (m, a) => 'Броня ' + shownArmor(a, item));
+        return t;
+    }
+    const api = { shownEffect, shownWeaponDmg, shownArmor, armorNote, isHeavyArmorItem, HEAVY_ARMOR_DENSITY, computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
     if (typeof window !== 'undefined') {
         window.StBonuses = api;
         window.__stSelfTestAttack = selfTest;

@@ -110,7 +110,7 @@
             const qty = it.qty || 1;
             // Цена и кнопка "Купить" рядом с названием (как в списке продажи), а не на дальнем краю строки.
             return `<div class="stat-block" style="align-items:flex-start; justify-content:flex-start; gap:12px;">
-                <span style="flex:0 1 300px; min-width:0;"><strong>${escHtml(it.name)}</strong>${qty > 1 ? ` <span style="opacity:.6; font-size:12px;">(есть: ${qty})</span>` : ''}${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(it.effect)}</span>` : ''}</span>
+                <span style="flex:0 1 300px; min-width:0;"><strong>${escHtml(it.name)}</strong>${qty > 1 ? ` <span style="opacity:.6; font-size:12px;">(есть: ${qty})</span>` : ''}${it.effect ? `<br><span style="font-size:12px; color:#8a8171;">${escHtml(StBonuses.shownEffect(it))}</span>` : ''}</span>
                 <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                     <span style="color:var(--accent-color);">${formatNumber(price)} септ.</span>
                     <button class="btn-success" style="width:auto; padding:2px 8px;" ${canAfford ? '' : 'disabled'} onclick="buyFromMerchant('${jsq(key)}', ${idx})">Купить</button>
@@ -646,7 +646,7 @@
                     <strong>${escHtml(item.name)}</strong> × ${item.count}
                     ${item.weight ? `<span style="opacity:.6; font-size:13px;"> (вес ${item.weight} / шт.)</span>` : ''}
                     ${priceInfo}
-                    ${item.effect ? `<br><span style="font-size:13px; color:#8a8171;">${escHtml(item.effect)}</span>` : ''}
+                    ${item.effect ? `<br><span style="font-size:13px; color:#8a8171;">${escHtml(StBonuses.shownEffect(item))}</span>` : ''}
                 </span>
                                <span style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
                     ${(potionKindOf(item) || ['Блюдо', 'Провал готовки'].includes(item.category)) ? `<button class="btn-success" style="width:auto; padding:2px 6px; font-size:13px;" onclick="useInventoryItem('${jsq(item.itemId)}')">${potionKindOf(item) === 'poison' ? 'Выпить' : 'Исп.'}</button>` : ''}
@@ -995,11 +995,11 @@
             }).join(', ');
             let statLine;
             if (r.hasOwnProperty('damage')) {
-                statLine = `Урон: ${r.damage} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
+                statLine = `Урон: ${StBonuses.shownWeaponDmg(r.damage, r)} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
             } else if (r.slot === 'jewelry') {
                 statLine = r.yieldCount ? `Выход: ${r.yieldCount} шт.` : 'Ювелирное изделие';
             } else {
-                statLine = `Сопротивление: ${r.resistance} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}`;
+                statLine = `Броня: ${StBonuses.shownArmor(r.resistance, r)}${StBonuses.armorNote(r.resistance, r)} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}`;
             }
             const perkNote = !hasMatPerk ? `<div style="font-size:13px; color:#e67e22;">🔒 Нужен перк «${escHtml(r.perkHint)}»</div>` : (!r.ingredients.length ? '<div style="font-size:13px; color:#e67e22;">⚠ Материалы этого рецепта не указаны в данных — ковка недоступна</div>' : '');
             return `<div class="party-row">
@@ -1089,7 +1089,7 @@
         const SUBCAT_TO_WEAPON_TYPE = window.SMITH_SUBCAT_TO_WEAPON_TYPE || {};
         if (recipe.hasOwnProperty('damage')) {
             // Оружие или боеприпасы
-            desc = recipe.isAmmo ? `Урон ${dmgVal} (боеприпас)` : `Урон ${dmgVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
+            desc = recipe.isAmmo ? `Урон ${StBonuses.shownWeaponDmg(dmgVal, recipe)} (боеприпас)` : `Урон ${StBonuses.shownWeaponDmg(dmgVal, recipe)}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
             const wepType = SUBCAT_TO_WEAPON_TYPE[recipe.subcat] || 'onehand';
             // Слот раньше был жёстко "melee" даже для луков (subcat "Луки (обычные/особые)") —
             // экип-слот для лука должен быть "ranged", иначе он попадал бы не в тот выпадающий
@@ -1122,7 +1122,7 @@
             // переключатель "во что одет" (#eq-armor) себе выставить — сама система не может
             // сделать это автоматически (тот переключатель общий на весь комплект, не по вещи).
             const upgradeNote = recipe.upgradeMaterial ? ` · Улучшается «${recipe.upgradeMaterial}»` : '';
-            desc = `Сопротивление ${resVal}${smithBonus ? ` (+${smithBonus}% от бога)` : ''} · ${recipe.armorType || '?'}${upgradeNote}`;
+            desc = `Сопротивление ${StBonuses.shownArmor(resVal, recipe)}${smithBonus ? ` (+${smithBonus}% от бога)` : ''} · ${recipe.armorType || '?'}${upgradeNote}`;
             extra = { slot: SMITHING_SLOT_MAP[recipe.slot] || null, armorValue: resVal, price: recipe.price, armorType: recipe.armorType, upgradeMaterial: recipe.upgradeMaterial };
             if (recipe.upgradeQty) extra.upgradeQty = recipe.upgradeQty;
         }

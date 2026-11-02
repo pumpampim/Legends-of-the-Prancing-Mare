@@ -766,13 +766,13 @@
             if (!list.length) { alert('Нет данных об оружии небесной кузницы.'); return; }
             const ov = compModal(`<div style="font-weight:bold;font-size:16px;margin-bottom:6px;">🗡 Подарок при вступлении</div>
                 <div style="font-size:13px;opacity:.85;margin-bottom:8px;">Соратники дают новичку одно оружие небесной кузницы на выбор.</div>
-                <label>Оружие</label><select id="comp-j-type">${list.map((w, i) => `<option value="${i}">${escHtml(w.name)} — урон ${w.damage}</option>`).join('')}</select>
+                <label>Оружие</label><select id="comp-j-type">${list.map((w, i) => `<option value="${i}">${escHtml(w.name)} — урон ${StBonuses.shownWeaponDmg(w.damage, w)}</option>`).join('')}</select>
                 <div style="display:flex;gap:8px;margin-top:10px;"><button id="comp-ok" class="btn-success" style="flex:1;margin:0;">Получить</button><button id="comp-cancel" style="flex:1;margin:0;">Позже</button></div>`);
             ov.querySelector('#comp-cancel').onclick = () => ov.remove();
             ov.querySelector('#comp-ok').onclick = () => {
                 const w = list[parseInt(ov.querySelector('#comp-j-type').value) || 0];
                 if (w && !companionRewards.joinWeapon) {
-                    addToInventory(w.name, w.name, 1, w.weight || 3, w.category, `Урон ${w.damage}`, { slot: 'melee', weaponDmg: w.damage, weaponType: COMP_WEAPON_TYPE[w.subcat] || 'onehand', price: w.price || 0 });
+                    addToInventory(w.name, w.name, 1, w.weight || 3, w.category, `Урон ${StBonuses.shownWeaponDmg(w.damage, w)}`, { slot: 'melee', weaponDmg: w.damage, weaponType: COMP_WEAPON_TYPE[w.subcat] || 'onehand', price: w.price || 0 });
                     companionRewards.joinWeapon = true;
                     renderInventoryList(); renderGuildPanelPlayer(); saveLocalStorage(true);
                     alert(`🏅 Соратники выдают «${w.name}».`);
@@ -799,7 +799,7 @@
             if (!list.length) { alert('Нет данных об оружии небесной кузницы.'); return; }
             const ov = compModal(`<div style="font-weight:bold;font-size:16px;margin-bottom:6px;">🗡 Небесная кузница</div>
                 <div style="font-size:13px;opacity:.85;margin-bottom:8px;">Оружие небесной кузницы с чарами — в 2 раза сильнее обычного. Выбери вид оружия и зачарование.</div>
-                <label>Оружие</label><select id="comp-w-type">${list.map((w, i) => `<option value="${i}">${escHtml(w.name)} — урон ${w.damage * 2} (обычное ${w.damage})</option>`).join('')}</select>
+                <label>Оружие</label><select id="comp-w-type">${list.map((w, i) => `<option value="${i}">${escHtml(w.name)} — урон ${StBonuses.shownWeaponDmg(w.damage * 2, w)} (обычное ${StBonuses.shownWeaponDmg(w.damage, w)})</option>`).join('')}</select>
                 <label>Зачарование</label><select id="comp-w-ench">${COMP_WEAPON_ENCHANTS.map((e, i) => `<option value="${i}">${escHtml(e.label)}</option>`).join('')}</select>
                 <div style="display:flex;gap:8px;margin-top:10px;"><button id="comp-ok" class="btn-success" style="flex:1;margin:0;">Получить</button><button id="comp-cancel" style="flex:1;margin:0;">Позже</button></div>`);
             ov.querySelector('#comp-cancel').onclick = () => ov.remove();
@@ -834,7 +834,7 @@
         });
         companionRewards.weapon = true;
         renderInventoryList(); renderGuildPanelPlayer(); saveLocalStorage(true);
-        alert(`🏅 Соратники выдают «${nm}» (урон ${dmg}).`);
+        alert(`🏅 Соратники выдают «${nm}» (урон ${StBonuses.shownWeaponDmg(dmg, base)}).`);
     }
     function claimCompanionsArmor(helmEff, gloveEff) {
         if (companionRewards.armor) return;

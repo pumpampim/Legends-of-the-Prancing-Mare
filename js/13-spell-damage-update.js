@@ -1,6 +1,6 @@
 
     // ===== Кубики в уроне заклинаний, огненный бонус ранга, Болид =====
-    const HEAVY_ARMOR_DENSITY = 0.5; // тяжёлая броня: +50% к классу брони тяжёлых частей
+    const HEAVY_ARMOR_DENSITY = (window.StBonuses && window.StBonuses.HEAVY_ARMOR_DENSITY) || 0.5; // тяжёлая броня: +50% к классу брони тяжёлых частей (источник — combat-bonuses.js)
     const LIGHT_DODGE_CAP = 15;       // лёгкая броня: уклонение не больше 15%
     function getSpellDice(desc, enhanced) {
         const text = splitEnhancedDesc(desc, enhanced);
@@ -1577,6 +1577,7 @@ function updateHungerPenalty() {
 
     // Аэдра дают силу, только пока надет амулет именно этого бога (таблица богов). Даэдра амулет не нужен.
     const AEDRA_AMULETS = { zenithar: 'Амулет Зенитара', stendarr: 'Амулет Стендарра', julianos: 'Амулет Джулианоса', mara: 'Амулет Мары', dibella: 'Амулет Дибеллы', kynareth: 'Амулет Кинарет', arkay: 'Амулет Аркея', talos: 'Амулет Талоса', akatosh: 'Амулет Акатоша' };
+    const AMULET_ENCHANT_SHARE = 0.5; // чары амулета бога = половина бонуса аэдра на ступени владельца
     function wearsGodAmulet(god) {
         const need = AEDRA_AMULETS[god]; if (!need) return true;
         const it = equippedSlots.neck ? playerInventory.find(i => i.itemId === equippedSlots.neck) : null;
@@ -1597,13 +1598,21 @@ function updateHungerPenalty() {
         if (!god || god === 'none' || !godBonuses[god]) return {};
         if (!wearsGodAmulet(god)) return {};
         let bonuses = godBonuses[god][rank] || {};
-        // Амулет бога сам несёт чары: +50% к числовым бонусам веры аэдра (решение Никиты 2026-11-02).
-        // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра ещё на 50% (+100 маны → +200 вместе с амулетом).
-        if (AEDRA_AMULETS[god]) {
-            const k = 1.5 + ((rank >= 3 && ['Шлем Хранителя', 'Броня Хранителя', 'Перчатки Хранителя', 'Сапоги Хранителя'].every(wearsItemNamed)) ? 0.5 : 0);
+        // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра сильнее на 50% (+100 маны → +150).
+        const rawBonuses = bonuses;
+        if (rank >= 3 && AEDRA_AMULETS[god] && ['Шлем Хранителя', 'Броня Хранителя', 'Перчатки Хранителя', 'Сапоги Хранителя'].every(wearsItemNamed)) {
             const b2 = {};
-            Object.keys(bonuses).forEach(key => { const v = bonuses[key]; b2[key] = typeof v === 'number' ? (/resist/i.test(key) ? Math.min(100, Math.round(v * k)) : Math.round(v * k)) : v; });
+            Object.keys(bonuses).forEach(k => { const v = bonuses[k]; b2[k] = typeof v === 'number' ? (/resist/i.test(k) ? Math.min(100, Math.round(v * 1.5)) : Math.round(v * 1.5)) : v; });
             bonuses = b2;
+        }
+        // Амулет бога — зачарованная вещь: свои чары в AMULET_ENCHANT_SHARE от бонуса этого аэдра на ступени владельца
+        // (решение Никиты 2026-11-02). Это отдельный источник: бонусы веры он не усиливает и от Хранителя не растёт.
+        if (AEDRA_AMULETS[god]) {
+            const b3 = Object.assign({}, bonuses);
+            Object.keys(rawBonuses).forEach(k => { const v = rawBonuses[k]; if (typeof v !== 'number' || !v) return;
+                const add = Math.round(v * AMULET_ENCHANT_SHARE);
+                b3[k] = /resist/i.test(k) ? Math.min(100, (Number(b3[k]) || 0) + add) : (Number(b3[k]) || 0) + add; });
+            bonuses = b3;
         }
         if (god === 'sanguine') {
             // Вампиризм и сопротивление ядам — всегда; прибавка к урону — 20 ходов после выпивки в «пьяный» день.
