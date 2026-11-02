@@ -18,7 +18,7 @@ const S = require('./setup');
   const [n, e] = en;
   console.log(JSON.stringify(en.map(x => [x.name, x.maxHp, x.weaponDmg, x.resist, x.rank])));
   check(n.maxHp === base.hp && !n.rank, 'обычный бандит как в базе: ' + n.maxHp);
-  check(e.maxHp === Math.round(base.hp * 3.4) && e.curHp === e.maxHp, 'элита: ОЗ ×3.4 = ' + e.maxHp);
+  check(e.maxHp === Math.round(base.hp * 2.5) && e.curHp === e.maxHp, 'элита: ОЗ ×2.5 = ' + e.maxHp);
   check(e.weaponDmg === Math.round(n.weaponDmg * 1.5), 'элита: урон ×1.5 (' + n.weaponDmg + ' → ' + e.weaponDmg + ')');
   check(((e.resist || {}).physical || 0) === Math.min(85, ((n.resist || {}).physical || 0) + 10), 'элита: физ. резист +10');
   check(/\(элита\)$/.test(e.name) && e.rank === 'elite', 'имя и метка ранга');

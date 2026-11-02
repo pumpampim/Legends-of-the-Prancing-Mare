@@ -1718,6 +1718,14 @@ function updateHungerPenalty() {
                   '<div style="opacity:.6; margin-top:4px;">✅ — уже учтено в расчёте автоматически · 📝 — применяй сам/через мастера</div>'
                 : '';
             if (AEDRA_AMULETS[god] && !wearsGodAmulet(god)) godDescEl.innerHTML = `<div style="color:#e67e22; margin-bottom:4px;">⚠ Благословение не действует: надень «${AEDRA_AMULETS[god]}» (слот ожерелья).</div>` + godDescEl.innerHTML;
+            if (AEDRA_AMULETS[god] && wearsGodAmulet(god) && godBonuses[god] && godBonuses[god][rnk]) { // сила чар амулета — отдельной строкой
+                const bb = godBonuses[god][rnk];
+                const lines = Object.keys(bb).filter(k => typeof bb[k] === 'number' && bb[k]).map(k => {
+                    const info = (typeof GOD_BONUS_LABELS !== 'undefined' && GOD_BONUS_LABELS[k]) || { label: k, suffix: '' };
+                    return `${info.label}: +${Math.round(bb[k] * AMULET_ENCHANT_SHARE)}${info.suffix}`;
+                });
+                if (lines.length) godDescEl.innerHTML += `<div style="margin-top:6px; padding:6px; border:1px solid var(--border-color); border-radius:4px;">📿 <strong>Чары «${escHtml(AEDRA_AMULETS[god])}»</strong> (${Math.round(AMULET_ENCHANT_SHARE * 100)}% от бонуса ступени ${rnk}, уже входят в расчёт):<br>${lines.map(escHtml).join('<br>')}</div>`;
+            }
             if (god === 'sanguine') {
                 const t = SANGUINE_THRESHOLDS[rnk] || SANGUINE_THRESHOLDS[1];
                 godDescEl.innerHTML += `<div style="margin-top:6px; padding:6px; border:1px solid var(--border-color); border-radius:4px;">
@@ -1914,6 +1922,31 @@ function updateHungerPenalty() {
         totalArmor += sheathArmorBonus(); // утяжелённые ножны: +5 каждые (не лёгкая и не тяжёлая броня)
         document.getElementById('armor-total').innerText = totalArmor;
 
+        { // разбор класса брони: что даёт сам доспех, что добавляют плотность тяжёлой/перки и всё остальное
+            const totEl = document.getElementById('armor-total');
+            let bd = document.getElementById('armor-breakdown');
+            if (totEl && !bd) { bd = document.createElement('div'); bd.id = 'armor-breakdown'; bd.style.cssText = 'font-size:12px; margin-top:3px; opacity:.85;'; const host = document.getElementById('resistances-display'); if (host && host.parentNode) host.parentNode.insertBefore(bd, host); }
+            if (bd) {
+                const bits = [];
+                if (beastForm) bits.push('🐺 в облике зверя доспехи и щит не работают');
+                else {
+                    const rawBody = bodySlotPieces.reduce((n, p) => n + (p.armor || 0), 0);
+                    const heavyRaw = bodySlotPieces.filter(p => p.cls === 'heavy').reduce((n, p) => n + (p.armor || 0), 0);
+                    const lightRaw = bodySlotPieces.filter(p => p.cls === 'light').reduce((n, p) => n + (p.armor || 0), 0);
+                    if (rawBody) {
+                        let t = `Доспех: ${rawBody} по вещам`;
+                        if (heavyRaw) t += ` · тяжёлые ${heavyRaw} × ${(1 + heavyPct).toFixed(2)} (плотность +${Math.round(HEAVY_ARMOR_DENSITY * 100)}%${perks.heavyArmorBonus ? ` и перки +${Math.round(perks.heavyArmorBonus * 100)}%` : ''})`;
+                        if (lightRaw) t += ` · лёгкие ${lightRaw}${lightPct ? ` × ${(1 + lightPct).toFixed(2)} (перки)` : ''}, уклонение 1% за 20`;
+                        t += ` = ${bodyArmorTotal}`;
+                        bits.push(t);
+                    }
+                    if (shieldArmorBonused) bits.push(`щит ${shieldArmorBonused}`);
+                }
+                const rest = totalArmor - (beastForm ? 0 : bodyArmorTotal + shieldArmorBonused);
+                if (rest) bits.push(`баффы, чары, форма: ${rest > 0 ? '+' : ''}${rest}`);
+                bd.textContent = bits.join(' · ');
+            }
+        }
         // Сопротивления рядом с бронёй — то же самое, что реально вычитается из входящего урона
         // (computeTotalResistances уже читает armor-total, поэтому вызываем сразу после него).
         const resEl = document.getElementById('resistances-display');
