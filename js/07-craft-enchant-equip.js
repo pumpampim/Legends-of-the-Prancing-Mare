@@ -727,8 +727,8 @@
     const SLOT_TO_EQUIP_KEY = { helmet: 'helmet', chest: 'chest', robe: 'robe', gloves: 'gloves', boots: 'boots', shield: 'shield', melee: 'meleeWeapon', melee_offhand: 'meleeWeaponOffhand', ranged: 'rangedWeapon' };
     function itemMainValue(it) {
         if (!it) return null;
-        if (typeof it.weaponDmg === 'number') return { v: it.weaponDmg, label: 'урон' };
-        if (typeof it.armorValue === 'number') return { v: it.armorValue, label: 'БР' };
+        if (typeof it.weaponDmg === 'number') return { v: StBonuses.shownWeaponDmg(it.weaponDmg, it), label: 'урон' };
+        if (typeof it.armorValue === 'number') return { v: StBonuses.shownArmor(it.armorValue, it), label: 'БР' };
         return null;
     }
     function compareLabel(item, slot) {
@@ -796,3 +796,28 @@
         });
         el.innerHTML = lines.length ? lines.join('') : '<p style="opacity:.6; font-size:14px;">Зачарованных/особых предметов не надето.</p>';
     }
+
+
+// Рядом с «базовыми» полями оружия и брони на листе — число, которое реально идёт в расчёт (оружие +35%, тяжёлая броня +50%).
+window.refreshEffectiveNumbers = function () {
+    try {
+        const put = (inputId, text) => {
+            const inp = document.getElementById(inputId); if (!inp) return;
+            let sp = document.getElementById(inputId + '-eff');
+            if (!sp) { sp = document.createElement('span'); sp.id = inputId + '-eff'; sp.style.cssText = 'font-size:12px; color:var(--success-color); white-space:nowrap; padding:0 4px;'; inp.insertAdjacentElement('afterend', sp); }
+            sp.textContent = text;
+        };
+        const wv = id => parseInt((document.getElementById(id) || {}).value) || 0;
+        const mt = (document.getElementById('wep-melee-type') || {}).value;
+        put('wep-melee-dmg', mt && mt !== 'unarmed' ? '→ ' + StBonuses.shownWeaponDmg(wv('wep-melee-dmg')) : '');
+        put('wep-melee-offhand-dmg', wv('wep-melee-offhand-dmg') ? '→ ' + StBonuses.shownWeaponDmg(wv('wep-melee-offhand-dmg')) : '');
+        const rn = (document.getElementById('wep-ranged-name') || {}).value || '';
+        put('wep-ranged-dmg', wv('wep-ranged-dmg') ? '→ ' + StBonuses.shownWeaponDmg(wv('wep-ranged-dmg'), { name: rn }) : '');
+        put('ammo-dmg', wv('ammo-dmg') ? '→ ' + StBonuses.shownWeaponDmg(wv('ammo-dmg')) : '');
+        [['helmet', 'slot-helm-armor'], ['chest', 'slot-chest-armor'], ['gloves', 'slot-gloves-armor'], ['boots', 'slot-boots-armor'], ['shield', 'slot-shield-armor']].forEach(([k, id]) => {
+            const itemId = equippedSlots[k]; const it = itemId ? playerInventory.find(i => i.itemId === itemId) : null;
+            const base = wv(id);
+            put(id, it && base && StBonuses.isHeavyArmorItem(Object.assign({}, it, { slot: k })) ? '→ ' + StBonuses.shownArmor(base, Object.assign({}, it, { slot: k })) : '');
+        });
+    } catch (e) { }
+};

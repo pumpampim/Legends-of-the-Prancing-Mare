@@ -1921,6 +1921,7 @@ function updateHungerPenalty() {
         totalArmor += snWerewolfArmor(lvl); // форма вервольфа: 0 на 1 ур., +50 каждые 5 уровней
         totalArmor += sheathArmorBonus(); // утяжелённые ножны: +5 каждые (не лёгкая и не тяжёлая броня)
         document.getElementById('armor-total').innerText = totalArmor;
+        if (typeof refreshEffectiveNumbers === 'function') refreshEffectiveNumbers();
 
         { // разбор класса брони: что даёт сам доспех, что добавляют плотность тяжёлой/перки и всё остальное
             const totEl = document.getElementById('armor-total');
