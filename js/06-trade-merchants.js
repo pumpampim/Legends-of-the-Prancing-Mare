@@ -795,7 +795,8 @@
         if (hatFree) powersUsedToday.cook_hat_free = (powersUsedToday.cook_hat_free || 0) + 1;
         else potNames.forEach(name => removeFromInventoryByName(name, potMap[name]));
 
-        const powerBonus = perks.cookingDishPowerPercent || 0;
+        // Кулинария сверх 100 (вера, вещи, раса): +0.5% к силе блюда за пункт (SKILL_OVERFLOW_PCT), множится вместе с перками.
+        const powerBonus = (perks.cookingDishPowerPercent || 0) + ((typeof getSkillOverflowPoints === 'function' ? getSkillOverflowPoints('Кулинария') : 0) * SKILL_OVERFLOW_PCT) / 100;
         const durBonus = perks.cookingDurationBonus || 0;
         let alchemyNote = '', bonusAlchemy = null;
         if (perks.cookingAddAlchemyIngredient) {

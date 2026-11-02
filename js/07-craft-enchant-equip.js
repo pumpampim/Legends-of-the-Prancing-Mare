@@ -179,6 +179,9 @@
     // Азура: сила зачарования +N% — применяется после расчёта calcEnchantPower, единообразно
     // и для обычных вещей, и для посохов.
     function applyGodEnchantBonus(calc, effect) {
+        // Зачарование сверх 100 (вера, вещи, раса): +0.5% к величине чар за пункт, выше таблицы тоже можно.
+        const overE = (typeof getSkillOverflowPoints === 'function') ? getSkillOverflowPoints('Зачарование') : 0;
+        if (!calc.boolean && overE > 0) calc.value = Math.round(calc.value * (1 + overE * SKILL_OVERFLOW_PCT / 100) * 100) / 100;
         if (!calc.boolean && gb('enchantingPower')) {
             // Бонус бога никогда не уменьшает уже посчитанное значение: потолок — максимум эффекта, но не ниже базового результата
             // (перки зачарования могут вывести его выше maxValue — раньше Азура в этом случае обрезала чары вниз).
