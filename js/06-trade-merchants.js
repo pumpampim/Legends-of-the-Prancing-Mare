@@ -337,7 +337,7 @@
                 addToInventory(pid, it.name, qty, it.weight || 0, it.category || '', it.effect || '', pi);
             } else {
                 const isStaffB = it.type === 'staff' || it.category === 'Посохи';
-                addToInventory(it.name, it.name, qty, it.weight || 0, it.category || '', it.effect || '', Object.assign({ slot: isStaffB ? 'ranged' : it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price, capacity: it.capacity }, isStaffB ? { isStaff: true } : {}));
+                addToInventory(it.name, it.name, qty, it.weight || 0, it.category || '', it.effect || '', Object.assign({ slot: isStaffB ? 'ranged' : it.slot, armorValue: it.armor, weaponDmg: it.dmg, price: it.price, capacity: it.capacity, thrown: it.thrown, throwKind: it.throwKind }, isStaffB ? { isStaff: true } : {}));
             }
             { // цена покупки едет с самой вещью: при передаче другому игроку или заточке потолок перепродажи сохраняется
                 const bought = playerInventory.find(x => x.itemId === (it.playerItem ? (it.playerItem.itemId || it.name) : it.name));
@@ -885,7 +885,7 @@
     // ========================================================================
 
     function getAllSmithingRecipes() {
-        return [...(window.armorRecipes || []), ...(window.jewelryRecipes || []), ...(window.weaponRecipes || []), ...(window.sheathRecipes || [])];
+        return [...(window.armorRecipes || []), ...(window.jewelryRecipes || []), ...(window.weaponRecipes || []), ...(window.thrownRecipes || []), ...(window.sheathRecipes || [])];
     }
     // Ножны и колчаны (alwaysKnown) открывать мастеру не нужно — простая работа по коже.
     function isSmithingRecipeKnown(r) { return !!r.alwaysKnown || knownSmithingRecipes.includes(r.name); }
@@ -910,6 +910,7 @@
     // Тип рецепта для фильтра: ближний/дальний бой, боеприпасы, лёгкая/тяжёлая броня, щиты, украшения.
     function smithingTypeOf(r) {
         if (r.slot === 'jewelry') return 'jewelry';
+        if (r.thrown) return 'thrown';
         if (r.hasOwnProperty('damage')) {
             if (r.isAmmo) return 'ammo';
             return r.slot === 'ranged' ? 'ranged' : 'melee';
@@ -995,7 +996,7 @@
             }).join(', ');
             let statLine;
             if (r.hasOwnProperty('damage')) {
-                statLine = `Урон: ${StBonuses.shownWeaponDmg(r.damage, r)} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
+                statLine = (r.thrown ? 'Бросок (бонусное действие). ' : '') + `Урон: ${StBonuses.shownWeaponDmg(r.damage, r)} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
             } else if (r.slot === 'jewelry') {
                 statLine = r.yieldCount ? `Выход: ${r.yieldCount} шт.` : 'Ювелирное изделие';
             } else {
@@ -1087,7 +1088,11 @@
         // Таблица «подкатегория рецепта → тип оружия» живёт в smithing-data.js (SMITH_SUBCAT_TO_WEAPON_TYPE),
         // чтобы test.html мог проверять её на тех же данных: перепутанные секиры/боевые топоры ловятся тестом.
         const SUBCAT_TO_WEAPON_TYPE = window.SMITH_SUBCAT_TO_WEAPON_TYPE || {};
-        if (recipe.hasOwnProperty('damage')) {
+        if (recipe.thrown) {
+            // Метательное: расходник, носится связками в подсумке; бросок — бонусное действие
+            desc = `Метательное (${recipe.subcat.toLowerCase()}): урон ${dmgVal}, бросок — бонусным действием`;
+            extra = { category: 'Метательное', weaponDmg: dmgVal, thrown: true, throwKind: recipe.throwKind, price: recipe.price };
+        } else if (recipe.hasOwnProperty('damage')) {
             // Оружие или боеприпасы
             desc = recipe.isAmmo ? `Урон ${StBonuses.shownWeaponDmg(dmgVal, recipe)} (боеприпас)` : `Урон ${StBonuses.shownWeaponDmg(dmgVal, recipe)}${smithBonus ? ` (+${smithBonus}% от бога)` : ''}`;
             const wepType = SUBCAT_TO_WEAPON_TYPE[recipe.subcat] || 'onehand';

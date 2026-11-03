@@ -366,8 +366,33 @@
     function splitOr(s) { return s.split(/\s+или\s+/i).map(x => x.trim()).filter(Boolean); }
 
     // Лут конкретного врага (по текстовому полю loot), с учётом его уровня.
+    // Метательное оружие с трупа: бандиты, Клинки Забвения, Предавшие клятву — 15–25% шанс на 2–6 ножей/топориков/дротиков
+    // материала по уровню; копья только у элиты (опция spear), 1–2 шт. Нежить не носит.
+    const THROWN_TIERS = ['Желез', 'Стальн', 'Двемер', 'Стеклян', 'Эбонит'];
+    function thrownTierIndex(lvl) { return lvl >= 40 ? 4 : lvl >= 30 ? 3 : lvl >= 20 ? 2 : lvl >= 10 ? 1 : 0; }
+    function rollThrownLoot(level, opts) {
+        opts = opts || {};
+        const recs = (typeof window !== 'undefined' && window.thrownRecipes) || [];
+        if (!recs.length) return null;
+        const chance = 0.15 + Math.min(0.10, (level || 1) * 0.0025);
+        if (Math.random() >= chance) return null;
+        const mat = THROWN_TIERS[thrownTierIndex(level || 1)];
+        const kinds = ['knife', 'axe', 'dart'];
+        const wantSpear = opts.spear && Math.random() < 0.3;
+        const kind = wantSpear ? 'spear' : kinds[Math.floor(Math.random() * kinds.length)];
+        const rec = recs.find(r => r.throwKind === kind && r.name.indexOf(mat) === 0) || recs.find(r => r.throwKind === kind && r.name.indexOf(mat.slice(0, 4)) === 0);
+        if (!rec) return null;
+        const qty = kind === 'spear' ? rnd(1, 2) : rnd(2, 6);
+        return { name: rec.name, price: rec.price || 0, weight: rec.weight, dmg: rec.damage, weaponDmg: rec.damage, category: 'Метательное', thrown: true, throwKind: kind, qty };
+    }
+
     function rollForEnemy(enemy, pool) {
-        return rollFromText(enemy && enemy.loot, { pool: pool || [], level: (enemy && enemy.level) || 1 });
+        const r = rollFromText(enemy && enemy.loot, { pool: pool || [], level: (enemy && enemy.level) || 1 });
+        if (enemy && /бандит|клинк|предавш/i.test(enemy.name || '') && !/драугр|нежит/i.test(enemy.name || '')) {
+            const t = rollThrownLoot(enemy.level || 1, { spear: /элит|легенд|главар|предводител/i.test(enemy.name || '') });
+            if (t && r && r.items) r.items.push(t);
+        }
+        return r;
     }
 
     // ===========================================================================
@@ -606,7 +631,7 @@
         return out;
     }
 
-    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot };
+    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot, rollThrownLoot };
     root.EnemyLoot = api;
     root.EnemyGear = { generate, familyOf };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

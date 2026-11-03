@@ -1275,6 +1275,132 @@ const weaponRecipes = [
 ];
 window.weaponRecipes = weaponRecipes;
 
+// ---------- Метательное оружие (расходник): ножи, топорики, дротики, копья. Бросок — бонусное действие (концепт Никиты 2026-11-03).
+// damage — урон вещи; урон броска = (damage + Ловкость) ÷ 2. yieldCount — штук за одну ковку и в «связке» подсумка.
+const thrownRecipes = [
+    {
+        name: "Железный метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        damage: 9, weight: 0.3, price: 3, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
+        yieldCount: 6, perkHint: null,
+        ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Стальный метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        damage: 11, weight: 0.3, price: 6, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
+        yieldCount: 6, perkHint: "Стальные доспехи",
+        ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Двемерскый метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        damage: 15, weight: 0.4, price: 12, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
+        yieldCount: 6, perkHint: "Двемерские доспехи",
+        ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Стеклянный метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        damage: 19, weight: 0.2, price: 18, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
+        yieldCount: 6, perkHint: "Стеклянные доспехи",
+        ingredients: [{ name: "Малахитовый слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Эбонитовый метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        damage: 22, weight: 0.35, price: 21, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
+        yieldCount: 6, perkHint: "Эбонитовые доспехи",
+        ingredients: [{ name: "Эбонитовый слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Железный метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        damage: 13, weight: 1.0, price: 6, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
+        yieldCount: 3, perkHint: null,
+        ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Стальный метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        damage: 17, weight: 1.0, price: 12, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
+        yieldCount: 3, perkHint: "Стальные доспехи",
+        ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Двемерскый метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        damage: 23, weight: 1.3, price: 24, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
+        yieldCount: 3, perkHint: "Двемерские доспехи",
+        ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Стеклянный метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        damage: 29, weight: 0.6, price: 36, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
+        yieldCount: 3, perkHint: "Стеклянные доспехи",
+        ingredients: [{ name: "Малахитовый слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Эбонитовый метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        damage: 32, weight: 1.2, price: 42, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
+        yieldCount: 3, perkHint: "Эбонитовые доспехи",
+        ingredients: [{ name: "Эбонитовый слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
+    },
+    {
+        name: "Железный дротик", category: "Метательное", subcat: "Дротики",
+        damage: 7, weight: 0.1, price: 2, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
+        yieldCount: 12, perkHint: null,
+        ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полено", qty: 1 }]
+    },
+    {
+        name: "Стальный дротик", category: "Метательное", subcat: "Дротики",
+        damage: 8, weight: 0.1, price: 4, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
+        yieldCount: 12, perkHint: "Стальные доспехи",
+        ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полено", qty: 1 }]
+    },
+    {
+        name: "Двемерскый дротик", category: "Метательное", subcat: "Дротики",
+        damage: 11, weight: 0.15, price: 8, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
+        yieldCount: 12, perkHint: "Двемерские доспехи",
+        ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полено", qty: 1 }]
+    },
+    {
+        name: "Стеклянный дротик", category: "Метательное", subcat: "Дротики",
+        damage: 14, weight: 0.05, price: 12, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
+        yieldCount: 12, perkHint: "Стеклянные доспехи",
+        ingredients: [{ name: "Малахитовый слиток", qty: 1 }, { name: "Полено", qty: 1 }]
+    },
+    {
+        name: "Эбонитовый дротик", category: "Метательное", subcat: "Дротики",
+        damage: 16, weight: 0.1, price: 14, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
+        yieldCount: 12, perkHint: "Эбонитовые доспехи",
+        ingredients: [{ name: "Эбонитовый слиток", qty: 1 }, { name: "Полено", qty: 1 }]
+    },
+    {
+        name: "Железное метательное копьё", category: "Метательное", subcat: "Метательные копья",
+        damage: 17, weight: 2.0, price: 10, slot: null, isAmmo: false, thrown: true, throwKind: "spear",
+        yieldCount: 2, perkHint: null,
+        ingredients: [{ name: "Железный слиток", qty: 2 }, { name: "Полено", qty: 2 }, { name: "Кожа", qty: 1 }]
+    },
+    {
+        name: "Стальное метательное копьё", category: "Метательное", subcat: "Метательные копья",
+        damage: 21, weight: 2.0, price: 20, slot: null, isAmmo: false, thrown: true, throwKind: "spear",
+        yieldCount: 2, perkHint: "Стальные доспехи",
+        ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Полено", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Корундовый слиток", qty: 1 }]
+    },
+    {
+        name: "Двемерское метательное копьё", category: "Метательное", subcat: "Метательные копья",
+        damage: 29, weight: 2.6, price: 40, slot: null, isAmmo: false, thrown: true, throwKind: "spear",
+        yieldCount: 2, perkHint: "Двемерские доспехи",
+        ingredients: [{ name: "Двемерский слиток", qty: 2 }, { name: "Полено", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Корундовый слиток", qty: 1 }]
+    },
+    {
+        name: "Стеклянное метательное копьё", category: "Метательное", subcat: "Метательные копья",
+        damage: 36, weight: 1.2, price: 60, slot: null, isAmmo: false, thrown: true, throwKind: "spear",
+        yieldCount: 2, perkHint: "Стеклянные доспехи",
+        ingredients: [{ name: "Малахитовый слиток", qty: 2 }, { name: "Полено", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Корундовый слиток", qty: 1 }]
+    },
+    {
+        name: "Эбонитовое метательное копьё", category: "Метательное", subcat: "Метательные копья",
+        damage: 41, weight: 2.4, price: 70, slot: null, isAmmo: false, thrown: true, throwKind: "spear",
+        yieldCount: 2, perkHint: "Эбонитовые доспехи",
+        ingredients: [{ name: "Эбонитовый слиток", qty: 2 }, { name: "Полено", qty: 2 }, { name: "Кожа", qty: 1 }, { name: "Корундовый слиток", qty: 1 }]
+    },
+];
+window.thrownRecipes = thrownRecipes;
+
 // Не куются (лут/покупка/квест-only), но всё равно существуют — чтобы мастер мог
 // выдать их напрямую через "База предметов". Игроку эти рецепты не показываются.
 const armorNonCraftable = [

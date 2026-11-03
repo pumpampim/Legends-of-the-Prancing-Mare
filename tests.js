@@ -545,6 +545,23 @@
         ok(fr.value > fr0.value, 'Зачарование: «Огненные чары» усиливают сопротивление огню');
     }
 
+    // ---------- МЕТАТЕЛЬНОЕ ОРУЖИЕ ----------
+    if (W.thrownRecipes) {
+        const T = W.thrownRecipes;
+        eq(T.length, 20, 'Метательное: 4 вида × 5 материалов');
+        const ingNames = new Set([].concat(W.ingredientsData || [], (W.allItems || [])).map(i => i && i.name));
+        const bad = T.filter(r => !r.thrown || !r.throwKind || !(r.yieldCount > 0) || !(r.price > 0) || !(r.weight > 0) || r.slot !== null);
+        eq(bad.map(r => r.name), [], 'Метательное: у каждого рецепта вид, пачка, цена, вес, без слота');
+        const dmg = n => (T.find(r => r.name === n) || {}).damage;
+        eq([dmg('Железный метательный нож'), dmg('Эбонитовое метательное копьё')], [9, 41], 'Метательное: урон ножа/копья по концепту');
+        const sp = T.filter(r => r.throwKind === 'spear').length, kn = T.filter(r => r.throwKind === 'knife').length;
+        eq([sp, kn], [5, 5], 'Метательное: по 5 материалов на вид');
+        if (window.EnemyLoot && EnemyLoot.rollThrownLoot) {
+            let got = null; for (let k = 0; k < 400 && !got; k++) got = EnemyLoot.rollThrownLoot(45, {});
+            ok(!!got && got.thrown && got.qty >= 2 && got.qty <= 6 && /Эбонит/.test(got.name), 'Метательное: лут с трупа — ур.45 даёт эбонит, 2–6 шт.');
+        }
+    }
+
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;
     if (typeof document !== 'undefined') {

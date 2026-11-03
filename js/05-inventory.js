@@ -13,7 +13,7 @@
     function getInventoryTotalWeight() {
         // подсумок несёт игрок — вес его содержимого тоже на нём (раньше при загрузке зелья вес пропадал)
         return playerInventory.reduce((sum, i) => sum + (i.weight || 0) * (i.count || 0), 0)
-            + (typeof pouchContents !== 'undefined' && Array.isArray(pouchContents) ? pouchContents.reduce((n, e) => n + (parseFloat(e.weight) || (e.scroll ? 0.1 : 0.25)), 0) : 0);
+            + (typeof pouchContents !== 'undefined' && Array.isArray(pouchContents) ? pouchContents.reduce((n, e) => n + (parseFloat(e.weight) || (e.scroll ? 0.1 : 0.25)) * (e.qty || 1), 0) : 0);
     }
 
     // Вещи из базы предметов приходят к игроку разными путями (выдача мастером, покупка у торговца,
@@ -234,7 +234,7 @@
                 else if (k === 'pouch') {
                     setV('slot-pouch-name', '');
                     const back = pouchContents; pouchContents = [];
-                    back.forEach(entry => addToInventory(entry.itemId, entry.name, 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry)));
+                    back.forEach(entry => addToInventory(entry.itemId, entry.name, entry.qty || 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry)));
                     if (typeof renderPouchPanel === 'function') renderPouchPanel();
                 }
                 else if (k === 'meleeWeapon') { setV('wep-melee-name', 'Бой голыми руками'); setV('wep-melee-dmg', 2); }

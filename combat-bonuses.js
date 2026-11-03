@@ -275,6 +275,7 @@
         if (wepType === 'dagger') sneakMult = perks.assassinBladeUnlocked ? 6 : 3;
         else if (mode === 'melee' && wepType === 'onehand' && perks.backstabUnlocked) sneakMult = 3;
         else if (mode !== 'melee' && perks.sneakBowTriple) sneakMult = 4; // «Верный прицел»: скрытный выстрел ×4 (луки и арбалеты; без перка ×2)
+        if (mode !== 'melee' && wepType === 'thrown' && ranged.throwKind === 'knife') sneakMult = Math.max(sneakMult, 3); // метательный нож — как кинжал
         sneakMult += gb('sneakMult'); // Боэтия/Ноктюрнал
 
         return {

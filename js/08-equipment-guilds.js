@@ -1410,6 +1410,10 @@
     }
 
     function renderPouchPanel() {
+        renderPouchPanelCore();
+        if (typeof renderAttackActionSelect === 'function') { try { renderAttackActionSelect(); } catch (e) { } } // бросок метательного — в списке действий
+    }
+    function renderPouchPanelCore() {
         const capEl = document.getElementById('pouch-capacity-info');
         const loadSelect = document.getElementById('pouch-load-select');
         const listEl = document.getElementById('pouch-contents-list');
@@ -1425,21 +1429,21 @@
         loadSelect.disabled = false;
         capEl.textContent = `Занято: ${pouchContents.length} / ${capacity}`;
         // В подсумок кладутся зелья, яды и свитки — всё это достаётся бонусным действием.
-        const potions = playerInventory.filter(i => i.count > 0 && (potionKindOf(i) || isScrollInvItem(i)));
+        const potions = playerInventory.filter(i => i.count > 0 && (potionKindOf(i) || isScrollInvItem(i) || isThrownInvItem(i)));
         const prevPick = loadSelect.value;
         loadSelect.innerHTML = potions.length
-            ? potions.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count})</option>`).join('')
-            : '<option value="">Нет зелий, ядов и свитков в инвентаре</option>';
+            ? potions.map(i => `<option value="${escHtml(i.itemId)}">${escHtml(i.name)} (есть: ${i.count}${isThrownInvItem(i) ? ', в связку ' + thrownBundleSize(i) : ''})</option>`).join('')
+            : '<option value="">Нет зелий, ядов, свитков и метательного в инвентаре</option>';
         if (potions.some(i => i.itemId === prevPick)) loadSelect.value = prevPick;
         listEl.innerHTML = pouchContents.length
             ? pouchContents.map((entry, idx) => `
                 <div class="party-row">
-                    <div class="row-name"><span>${escHtml(entry.name)}</span></div>
+                    <div class="row-name"><span>${escHtml(entry.name)}${entry.thrown ? ' × ' + (entry.qty || 1) : ''}</span></div>
                     <div style="font-size:13px; opacity:.8; margin:2px 0;">${escHtml(entry.effect || '')}</div>
                     <div style="display:flex; gap:6px;">
                         ${entry.scroll ? `<button class="btn-success" style="flex:1; background:#3b2f5c;" onclick="useScrollFromPouch(${idx})">📜 ${entry.battle ? 'Достать для атаки' : 'Прочитать'}</button>` : ''}
                         ${pouchEntryIsPoison(entry) ? `<button class="btn-danger" style="flex:1; background:#5b2c6f;" onclick="applyPoisonFromPouch(${idx})">☠ На оружие</button>` : ''}
-                        ${entry.scroll ? '' : `<button class="${pouchEntryIsPoison(entry) ? '' : 'btn-success'}" style="flex:1;" onclick="drinkFromPouch(${idx})">Выпить</button>`}
+                        ${(entry.scroll || entry.thrown) ? '' : `<button class="${pouchEntryIsPoison(entry) ? '' : 'btn-success'}" style="flex:1;" onclick="drinkFromPouch(${idx})">Выпить</button>`}
                         <button style="flex:1;" onclick="returnFromPouch(${idx})">Убрать обратно</button>
                     </div>
                 </div>`).join('')
@@ -1458,6 +1462,13 @@
         if (pouchContents.length >= capacity) { alert('Подсумок полон.'); return; }
         const item = playerInventory.find(i => i.itemId === itemId);
         if (!item || item.count <= 0) return;
+        if (isThrownInvItem(item)) { // связка метательного: одно место подсумка, до thrownBundleSize штук
+            const n = Math.min(item.count, thrownBundleSize(item));
+            removeFromInventoryByName(itemId, n);
+            pouchContents.push({ itemId: item.itemId, name: item.name, category: 'Метательное', effect: item.effect || '', price: item.price, weight: item.weight, thrown: true, throwKind: item.throwKind || ((window.thrownRecipes || []).find(x => x.name === thrownBaseName(item)) || {}).throwKind, weaponDmg: item.weaponDmg, qty: n, stolen: !!item.stolen });
+            renderPouchPanel(); renderInventoryList(); saveLocalStorage();
+            return;
+        }
         removeFromInventoryByName(itemId, 1);
         if (isScrollInvItem(item)) { // свиток: храним всё, что нужно для чтения и возврата в инвентарь
             pouchContents.push({ itemId: item.itemId, name: item.name, category: item.category || 'Свиток', effect: item.effect || '', price: item.price, scroll: true,
@@ -1473,7 +1484,7 @@
 
     // Нанести яд из подсумка на оружие (так же, как из инвентаря)
     // Цена и стоимость крафта едут с зельем в подсумок и обратно (раньше вернувшееся зелье теряло цену и продавалось за 0).
-    function pouchExtra(entry) { const o = { alchemyEffects: entry.alchemyEffects }; if (entry.stolen) o.stolen = true; if (entry.price) o.price = entry.price; if (entry.craftCost) { o.craftCost = entry.craftCost; o.craftKind = entry.craftKind; } if (entry.scroll) { o.scrollSchool = entry.scrollSchool; o.scrollSpellName = entry.scrollSpellName; o.scrollTier = entry.scrollTier; } return o; }
+    function pouchExtra(entry) { const o = { alchemyEffects: entry.alchemyEffects }; if (entry.stolen) o.stolen = true; if (entry.price) o.price = entry.price; if (entry.craftCost) { o.craftCost = entry.craftCost; o.craftKind = entry.craftKind; } if (entry.thrown) { o.thrown = true; o.throwKind = entry.throwKind; o.weaponDmg = entry.weaponDmg; } if (entry.scroll) { o.scrollSchool = entry.scrollSchool; o.scrollSpellName = entry.scrollSpellName; o.scrollTier = entry.scrollTier; } return o; }
 
     window.applyPoisonFromPouch = function (idx) {
         const entry = pouchContents[idx];
@@ -1490,6 +1501,11 @@
         alchToast(`☠ Яд «${escHtml(entry.name)}» нанесён на оружие — сработает на одном ударе.`);
     };
 
+    // Метательное (ножи, топорики, дротики, копья): в подсумок кладётся «связка» — столько штук, сколько даёт одна ковка.
+    function isThrownInvItem(i) { return !!i && (i.thrown === true || i.category === 'Метательное'); }
+    function thrownBaseName(i) { return String(i.name || '').replace(/#zen\d+$/, ''); }
+    function thrownBundleSize(i) { const r = (window.thrownRecipes || []).find(x => x.name === thrownBaseName(i)); return (r && r.yieldCount) || 3; }
+    window.isThrownInvItem = isThrownInvItem;
     function isScrollInvItem(i) { return !!i && (/^свит/i.test(String(i.category || '')) || /^Свиток:/.test(String(i.name || ''))); }
     // Свиток из подсумка — бонусным действием. Обычный читается сразу; боевой (с уроном) кладётся в руку —
     // в список «Действие» атаки, а сам удар уже основным действием.
@@ -1540,7 +1556,7 @@
             const same = playerInventory.find(i => i.name === entry.name && !!i.stolen === !!entry.stolen && (i.effect || '') === (entry.effect || '') && JSON.stringify(i.alchemyEffects || null) === JSON.stringify(entry.alchemyEffects || null));
             if (same) backId = same.itemId;
         }
-        addToInventory(backId, entry.name, 1, (typeof entry.weight === 'number' ? entry.weight : (entry.scroll ? 0.1 : 0.25)), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
+        addToInventory(backId, entry.name, entry.qty || 1, (typeof entry.weight === 'number' ? entry.weight : (entry.scroll ? 0.1 : 0.25)), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
         pouchContents.splice(idx, 1);
         renderPouchPanel();
         saveLocalStorage();

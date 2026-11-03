@@ -118,6 +118,12 @@
             if (f > r) return { onGrid: true, ok: false, penalty: 0, feet: f, reason: 'слишком далеко для ближнего боя (' + f + ' фт, оружие достаёт на ' + r + ' фт)', label: f + ' фт · не достать' };
             return { onGrid: true, ok: true, penalty: 0, feet: f, label: f + ' фт · ✓' };
         }
+        if (mode === 'ranged' && opts && opts.thrown) { // метательное: без помехи до freeFt, дальше −1 за клетку, не дальше maxFt
+            const fr = opts.thrown.freeFt || 30, mx = opts.thrown.maxFt || 50;
+            if (f > mx) return { onGrid: true, ok: false, penalty: 0, feet: f, reason: 'бросок не долетит дальше ' + mx + ' фт (' + f + ' фт)', label: f + ' фт · не долетит' };
+            const pT = f > fr ? -(c - fr / FT) : 0;
+            return { onGrid: true, ok: true, penalty: pT, feet: f, label: f + ' фт' + (pT ? ' · ' + pT + ' к попаданию' : ' · ✓') };
+        }
         const ammo = opts && opts.ammo;
         if (mode === 'ranged' && ammo === 'arrow') {
             const maxFt = (opts && opts.maxFt) || 80;

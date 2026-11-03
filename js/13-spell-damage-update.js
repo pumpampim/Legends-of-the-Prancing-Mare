@@ -148,6 +148,7 @@
         if (playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed) {
             opts += `<option value="claw">🐺 Когти зверя (${getWerewolfClawDamage()} урона)</option>`;
         }
+        if (equippedSlots.pouch) (pouchContents || []).forEach((en, ix) => { if (en && en.thrown && en.qty > 0) opts += `<option value="throw:${ix}">🎯 Бросок: ${escHtml(en.name)} ×${en.qty} (бонусное действие)</option>`; });
         if (snLordForm()) opts += `<option value="bite">🦇 Укус вампира-лорда (${lordBiteDamage()} урона)</option>`;
         if ((document.getElementById('char-race') || {}).value === 'argonian') opts += `<option value="argbite">🦎 Укус аргонианина (1к6 + мод. Силы, колющий)</option>`;
         { const pbBO = window.perkBonuses || {}; const shO = parseInt((document.getElementById('slot-shield-armor') || {}).value) || 0;
@@ -586,18 +587,27 @@ function updateHungerPenalty() {
             if (!bonusActionAllowed('быстрый выстрел')) return;
             quickShot = true; actionVal = 'ranged';
         }
+        // Бросок метательного из подсумка: бонусное действие, урон вдвое меньше обычного выстрела (концепт Никиты 2026-11-03).
+        let throwShot = null; const origActionVal = actionVal;
+        if ((actionVal || '').indexOf('throw:') === 0) {
+            const tEntry = pouchContents[parseInt(actionVal.slice(6))];
+            if (!tEntry || !tEntry.thrown || !(tEntry.qty > 0)) { alert('Эта связка метательного закончилась — обнови список действий.'); renderAttackActionSelect(); return; }
+            if (!bonusActionAllowed('бросок метательного')) return;
+            throwShot = { entry: tEntry, idx: parseInt(actionVal.slice(6)) };
+            actionVal = 'ranged';
+        }
         // Призванное существо бьёт само (раз в ход) и не тратит действие хозяина.
         const isSummonAct = (actionVal || '').indexOf('summon:') === 0;
         if (isSummonAct && inCombatNow() && combatMarks[actionVal] === turnKeyNow()) { alert('Это существо уже атаковало в этом ходу.'); return; }
-        if (!isSummonAct && !quickShot && !combatActionAllowed('attack')) return;
-        if (actionVal === 'ranged' && !rangedAmmoReady()) return;
+        if (!isSummonAct && !quickShot && !throwShot && !combatActionAllowed('attack')) return;
+        if (actionVal === 'ranged' && !throwShot && !rangedAmmoReady()) return;
         // Арбалет: «1 ход на КД» — после выстрела следующий только через ход (перезарядка).
-        if (actionVal === 'ranged' && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') {
+        if (actionVal === 'ranged' && !throwShot && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') {
             const lastX = combatMarks.xbow;
             if (typeof lastX === 'number' && (gameTurn || 0) - lastX < 2) { alert('Арбалет перезаряжается — выстрелить можно через ход после прошлого выстрела.'); return; }
         }
         // Силовая атака: раз в два хода (отдыхает ход после удара).
-        if ((actionVal === 'melee' || actionVal === 'ranged') && inCombatNow() && (document.getElementById('chk-power-attack') || {}).checked) {
+        if ((actionVal === 'melee' || (actionVal === 'ranged' && !throwShot)) && inCombatNow() && (document.getElementById('chk-power-attack') || {}).checked) {
             const lastP = combatMarks.power;
             if (typeof lastP === 'number' && (gameTurn || 0) - lastP < 2) { alert('Силовая атака: восстанавливаешь силы — следующая только через ход после прошлой. Сними галочку «Силовая» и бей обычным ударом.'); return; }
         }
@@ -613,7 +623,7 @@ function updateHungerPenalty() {
         const target = session && (session.enemies || []).find(e => e.id === targetId);
         if (!target) { alert('Цель не найдена — обнови список.'); return; }
         // Боевая сетка: досягаемость и видимость проверяем ДО траты маны/стрел; штраф за дальность — к броску ниже.
-        const gridChk = gridCheckFor(actionVal, targetId);
+        const gridChk = gridCheckFor(origActionVal, targetId);
         if (gridChk && gridChk.onGrid && !gridChk.ok) { alert('Не достать «' + target.name + '»: ' + gridChk.reason + '.'); return; }
 
         let dmg = 0, mod = 0, actionLabel = '', skillNameForProgress = null, dmgType = 'physical';
@@ -636,7 +646,12 @@ function updateHungerPenalty() {
         if (actionVal === 'melee' || actionVal === 'ranged') {
             // Стрелы теперь реально расходуются — раньше выстрелы были бесконечными, слота
             // боеприпасов не существовало вообще.
-            if (actionVal === 'ranged') {
+            if (actionVal === 'ranged' && throwShot) {
+                // метательное расходуется из связки в подсумке
+                throwShot.entry.qty -= 1;
+                if (throwShot.entry.qty <= 0) pouchContents.splice(throwShot.idx, 1);
+                renderPouchPanel(); renderInventoryList();
+            } else if (actionVal === 'ranged') {
                 const ammoItem = playerInventory.find(i => i.itemId === equippedSlots.ammo);
                 if (!ammoItem || ammoItem.count <= 0) {
                     alert('Нет заряженных боеприпасов — выбери стрелы/болты в разделе экипировки (вкладка Инвентарь).');
@@ -650,7 +665,8 @@ function updateHungerPenalty() {
                 if ((window.perkBonuses || {}).powerShotEvery3 && window.__rangedShots % 3 === 0 && !(/дракон|великан|мамонт|центурион/i.test(String(target.name || '')) && !/жрец-дракон/i.test(String(target.name || '')))) powerShotNow = true; // кроме самых крупных
             }
             document.getElementById('active-combat-weapon').value = actionVal;
-            updateCombat();
+            window.__throwOverride = throwShot ? { dmg: throwShot.entry.weaponDmg || 0, name: throwShot.entry.name, kind: throwShot.entry.throwKind } : null; // collectPlayerAttackInput подставит метательное вместо лука
+            try { updateCombat(); } finally { window.__throwOverride = null; }
             const calc = window.lastWeaponCombatCalc || { totalDmg: 0, hitModifier: 0 };
             mod = calc.hitModifier;
             dmg = calc.totalDmg;
@@ -677,7 +693,7 @@ function updateHungerPenalty() {
             }
             trueDmgNow = calc.trueDmg || 0;
             if (lichAuraId() === 'rage') penetrationPct += 5; // «Багровая ярость»: +5% игнорирования брони
-            actionLabel = (actionVal === 'melee' ? 'ближним оружием' : 'дальним оружием') + sneakNote;
+            actionLabel = (actionVal === 'melee' ? 'ближним оружием' : throwShot ? `метательным «${throwShot.entry.name}» (бросок, бонусное действие)` : 'дальним оружием') + sneakNote;
             const spiritE = getActiveWeaponSpirit(actionVal);
             if (spiritE) {
                 const w = spiritE.weaponSpirit;
@@ -1074,10 +1090,11 @@ function updateHungerPenalty() {
         const healPct = lifestealPct;
 
         // Яд на оружии сработает на ближайшем попадании обычной атакой оружием (расходуется на один удар).
-        const attackPoison = (hit && weaponPoison && (actionVal === 'melee' || actionVal === 'ranged')) ? weaponPoison : null;
+        const attackPoison = (hit && weaponPoison && !throwShot && (actionVal === 'melee' || actionVal === 'ranged')) ? weaponPoison : null;
+        if (throwShot) { dmg = Math.max(1, Math.round(dmg / 2)); actionLabel += ' (🎯 урон броска: половина выстрела)'; }
         if (quickShot) { dmg = Math.max(1, Math.round(dmg / 3)); actionLabel += ' (⚡ «Быстрая стрельба»: доп. действие, ⅓ урона)'; }
-        if (isSummonAct) markCombatAction(actionVal); else if (quickShot) markBonusAction(); else markCombatAction('attack'); // бросок атаки/каста — действие хода
-        if (actionVal === 'ranged' && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
+        if (isSummonAct) markCombatAction(actionVal); else if (quickShot || throwShot) markBonusAction(); else markCombatAction('attack'); // бросок атаки/каста — действие хода
+        if (actionVal === 'ranged' && !throwShot && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
         if (isPowerAtkNow && inCombatNow()) combatMarks.power = gameTurn || 0;
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,

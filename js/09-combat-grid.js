@@ -418,6 +418,11 @@
             if (sm && sm.category === 'weapon') return { from: G.tokenOf(grid, 'p', me), mode: sm.equipSlot === 'ranged' ? 'ranged' : 'melee', reach: 5 };
             return { from: G.tokenOf(grid, 's', actionVal.slice(7), me), mode: summonIsRanged(sm) ? 'ranged' : 'melee', reach: 5, who: sm ? sm.name : 'существо' };
         }
+        if (actionVal && actionVal.indexOf('throw:') === 0) { // бросок метательного: копьё долетает хуже остальных
+            const te = (typeof pouchContents !== 'undefined' ? pouchContents : [])[parseInt(actionVal.slice(6))];
+            const spear = te && te.throwKind === 'spear';
+            return { from: G.tokenOf(grid, 'p', me), mode: 'ranged', reach: 0, opts: { thrown: spear ? { freeFt: 20, maxFt: 40 } : { freeFt: 30, maxFt: 50 } } };
+        }
         const mode = (actionVal === 'ranged') ? 'ranged' : (actionVal && /^(spell|scroll|control|mstaff):/.test(actionVal)) ? 'spell' : 'melee';
         const reach = mode !== 'melee' ? 0 : (['bite', 'claw', 'bash', 'bash_basic'].indexOf(actionVal) !== -1 ? 5 : playerMeleeReachFt());
         let opts = null;

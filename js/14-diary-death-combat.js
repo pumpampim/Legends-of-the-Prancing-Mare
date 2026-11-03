@@ -262,6 +262,13 @@
   // данных листа. Чтения DOM и геттеры эффектов вынесены сюда, чтобы модуль можно было проверять без страницы
   // (window.__stSelfTestAttack) и звать с экрана мастера на тех же данных.
   function collectPlayerAttackInput(finalStr, finalDex) {
+    const inp = collectPlayerAttackInputBase(finalStr, finalDex);
+    // Бросок метательного: вместо лука и стрелы считаем вещь из связки (ставит rollPlayerAttack на время расчёта)
+    if (window.__throwOverride) inp.ranged = { dmg: window.__throwOverride.dmg, ammoDmg: 0, type: 'thrown', name: window.__throwOverride.name, isStaff: false, throwKind: window.__throwOverride.kind };
+    if (window.__throwOverride) { inp.enchantDmgRanged = 0; inp.elementalEnchant = Object.assign({}, inp.elementalEnchant, { ranged: false }); } // чары лука на бросок не действуют
+    return inp;
+  }
+  function collectPlayerAttackInputBase(finalStr, finalDex) {
     const val = id => document.getElementById(id).value;
     const mode = val('active-combat-weapon');
     const meleeType = val('wep-melee-type');

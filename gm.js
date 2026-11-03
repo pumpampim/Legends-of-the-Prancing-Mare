@@ -2803,7 +2803,7 @@
     function getAllSmithingRecipeNames() {
         const armor = window.armorRecipes || [];
         const jewelry = window.jewelryRecipes || [];
-        const weapons = window.weaponRecipes || [];
+        const weapons = (window.weaponRecipes || []).concat(window.thrownRecipes || []);
         return [...armor, ...jewelry, ...weapons];
     }
 
@@ -3413,6 +3413,7 @@
             pool = pool.concat((window.weaponRecipes || []).filter(w => !/лук/i.test(w.name) && !w.isAmmo).map(w => ({ name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorRecipes || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: GM_SMITHING_SLOT_MAP[a.slot] || null })));
             pool = pool.concat(merchantArrowPool());
+            pool = pool.concat((window.thrownRecipes || []).map(w => ({ name: w.name, category: 'Метательное', price: w.price, weight: w.weight, dmg: w.damage, thrown: true, throwKind: w.throwKind })));
             pool = pool.concat((window.weaponsNonCraftable || []).filter(w => !/лук/i.test(w.name)).map(w => ({ name: w.name, category: /стрел|болт/i.test(w.name) ? 'Боеприпасы' : 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot })));
             pool = pool.concat((window.armorNonCraftable || []).map(a => ({ name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot) })));
         }
@@ -3557,7 +3558,7 @@
     const MERCH_REGIONAL_ARMOR = { 'Фолкрит': 'Фолкрит', 'Хьялмарк': 'Хьялмарк', 'Белый Берег': 'Белый берег и Винтерхолд', 'Винтерхолд': 'Белый берег и Винтерхолд' };
     function merchantCatalogue() {
         const WR = window.weaponRecipes || [], WN = window.weaponsNonCraftable || [], AR = window.armorRecipes || [], AN = window.armorNonCraftable || [];
-        const C = { w1: [], w2: [], gaunt: [], bow: [], xbow: [], arrow: [], bolt: [], fxAmmo: [], light: [], heavy: [], shield: [], specialMelee: [], specialRanged: [], specialArmor: [] };
+        const C = { w1: [], w2: [], gaunt: [], bow: [], xbow: [], arrow: [], bolt: [], fxAmmo: [], light: [], heavy: [], shield: [], specialMelee: [], specialRanged: [], specialArmor: [], thrownLight: [], thrownSpear: [] };
         const seen = new Set();
         const ammoCat = n => /болт/i.test(n) ? 'bolt' : 'arrow';
         const put = (kind, e, dom) => {
@@ -3582,6 +3583,11 @@
             if (cat === 'Одноручное') return put('w1', { name: w.name, category: 'Оружие', price: w.price, weight: w.weight, dmg: w.damage, slot: w.slot }, 'Melee');
         };
         WR.forEach(weapon); WN.forEach(weapon);
+        (window.thrownRecipes || []).forEach(w => { // метательное: ножи, топорики, дротики — обычные товары, копья — реже
+            const e = { name: w.name, category: 'Метательное', price: w.price, weight: w.weight, dmg: w.damage, thrown: true, throwKind: w.throwKind };
+            if (!(w.price > 0) || seen.has(w.name)) return;
+            seen.add(w.name); (w.throwKind === 'spear' ? C.thrownSpear : C.thrownLight).push(e);
+        });
         const armor = (a, slot) => {
             const kind = slot === 'shield' ? 'shield' : (/Тяжел/i.test(a.armorType) ? 'heavy' : 'light');
             put(kind, { name: a.name, category: 'Броня', price: a.price, weight: a.weight, armor: a.resistance, slot }, 'Armor');
@@ -3607,7 +3613,7 @@
         if (LIVING_MERCHANT_TYPES[typeKey] && LIVING_MERCHANT_TYPES[typeKey].pets) return buildPetMerchantItems(typeKey, hold);
         const C = merchantCatalogue(), out = [], used = new Set();
         const ALL = ((window.allItems && window.allItems.length ? window.allItems : gmAllItems) || []).filter(i => !gmIsSustainScroll(i));
-        const STACK = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Драгоценные камни', 'Камни душ'];
+        const STACK = ['Готовые продукты', 'Сырые продукты', 'Напитки', 'Ингредиенты для алхимии', 'Боеприпасы', 'Метательное', 'Драгоценные камни', 'Камни душ'];
         const affList = (typeKey === 'blacksmith2' || typeKey === 'fletcher') ? (MERCH_AFFINITY[hold] || []) : [];
         const floraRules = typeKey === 'alchemist2' ? MERCH_ING_AFFINITY : (['foodVendor', 'grocer', 'innkeeper'].indexOf(typeKey) !== -1 ? MERCH_FOOD_AFFINITY : []);
         const affMult = name => {
@@ -3625,6 +3631,7 @@
             if (typeof i.armor === 'number') o.armor = i.armor;
             if (i.slot) o.slot = i.slot;
             if (i.weaponType) o.weaponType = i.weaponType;
+            if (i.thrown) { o.thrown = true; o.throwKind = i.throwKind; }
             if (typeof i.capacity === 'number') o.capacity = i.capacity;
             out.push(o); used.add(i.name);
         };
@@ -3654,6 +3661,7 @@
                 ['Ножны для кинжала', 'Ножны для меча', 'Ножны для боевого топора', 'Ножны для булавы', 'Ножны для двуручного меча', 'Ножны для секиры', 'Ножны для боевого молота', 'Ножны для копья', 'Ножны для пики', 'Ножны для посоха', 'Держатель для щита'].forEach(n => always(n, 1, 3));
                 take(itemsOf(['Ножны и колчаны'], i => i.sheathArmor && !/лука|арбалета/.test(i.name)), 2, 4);
                 take(C.arrow, 1, 2); take(C.gaunt, 0, 1);
+                take(C.thrownLight, 1, 3, { qty: [3, 8] }); take(C.thrownSpear, 0, 1, { qty: [1, 2] });
                 take(C.specialMelee.concat(C.specialArmor), 0, 2);
                 if (MERCH_REGIONAL_ARMOR[hold]) take(itemsOf(['Уникальная броня'], i => i.location === MERCH_REGIONAL_ARMOR[hold]), 1, 3);
                 take(itemsOf(['Одноручное (лут)', 'Двуручное (лут)', 'Тяжелая броня (лут)', 'Легкая броня (лут)']), 0, 2);
@@ -3664,6 +3672,7 @@
                 take(itemsOf(['Ножны и колчаны'], i => i.sheathArmor && /лука|арбалета/.test(i.name)), 0, 2);
                 take(C.bow, 5, 7); take(C.xbow, 0, 2);
                 take(C.arrow, 5, 7); take(C.bolt, 2, 4);
+                take(C.thrownLight, 0, 2, { qty: [3, 8] });
                 take(C.fxAmmo, 0, 2, { qty: [2, 6] });
                 take(C.specialRanged, 0, 1);
                 take(itemsOf(['Луки (лут)']), 0, 1);
@@ -6114,6 +6123,7 @@
             else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' });
         }
         if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
+        { const th = window.EnemyLoot && EnemyLoot.rollThrownLoot && EnemyLoot.rollThrownLoot(level, {}); if (th) lootItems.push(th); }
         Object.values(slots).forEach(a => {
             if (a && Math.random() < 0.6) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot), category: 'Броня (с трупа)' });
         });

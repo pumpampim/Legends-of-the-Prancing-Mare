@@ -540,7 +540,7 @@
         if (slot === 'pouch') {
             // Возвращаем содержимое старого подсумка обратно в инвентарь перед сменой
             pouchContents.forEach(entry => {
-                addToInventory(entry.itemId, entry.name, 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
+                addToInventory(entry.itemId, entry.name, entry.qty || 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry));
             });
             pouchContents = [];
             document.getElementById('slot-pouch-name').value = item.name;
@@ -686,7 +686,7 @@
         const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
         const it = playerInventory.find(i => i.itemId === equippedSlots[key]);
         if (key === 'pouch') {
-            pouchContents.forEach(entry => addToInventory(entry.itemId, entry.name, 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry)));
+            pouchContents.forEach(entry => addToInventory(entry.itemId, entry.name, entry.qty || 1, entry.weight || (entry.scroll ? 0.1 : 0.25), pouchEntryCategory(entry), entry.effect, pouchExtra(entry)));
             pouchContents = [];
             setV('slot-pouch-name', '');
             equippedSlots.pouch = null;
