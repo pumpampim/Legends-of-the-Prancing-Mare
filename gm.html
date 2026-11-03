@@ -894,6 +894,17 @@
                 </div>
             </div>
 
+            <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
+                <div>📅 Дата игрока — выставить вручную <span style="font-size:12px; opacity:.8;">(день не проживается: без голода, отдыха и крафта)</span></div>
+                <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; align-items:center;">
+                    <input type="number" id="inv-date-day" placeholder="День" min="1" max="30" style="width:70px;">
+                    <select id="inv-date-month" style="flex:1; min-width:120px;"><option value="0">Утренней звезды</option><option value="1">Восхода солнца</option><option value="2">Первого зерна</option><option value="3">Руки дождя</option><option value="4">Второго зерна</option><option value="5">Середины года</option><option value="6">Высокого солнца</option><option value="7">Последнего зерна</option><option value="8">Огня очага</option><option value="9">Начала морозов</option><option value="10">Заката солнца</option><option value="11">Вечерней звезды</option></select>
+                    <input type="number" id="inv-date-year" placeholder="Год 4Э" min="1" value="201" style="width:80px;">
+                    <label style="font-size:13px;"><input type="checkbox" id="inv-date-food"> сбросить голод</label>
+                    <button style="width:auto;" onclick="gmSetPlayerDate()">Выставить</button>
+                </div>
+            </div>
+
             <div id="inv-level-block" style="display:none; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-bottom:10px;">
                 <div>🎓 Уровень: <strong id="inv-level-current">1</strong> · Очков перка: <strong id="inv-perkpoints-current">0</strong></div>
                 <div id="inv-level-progress" style="font-size:14px; opacity:.8; margin:4px 0;"></div>
@@ -1389,7 +1400,7 @@
 <script src="enemy-loot.js?v=8"></script>
 <script src="grid-core.js?v=6"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=76"></script>
+<script src="gm.js?v=77"></script>
 <script src="js/17-icons.js?v=3"></script>
 <script src="js/gm-mobile.js?v=1"></script>
 <script src="gm-grid.js?v=8"></script>

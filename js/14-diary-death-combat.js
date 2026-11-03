@@ -1286,6 +1286,11 @@
                         clampTempHp(); renderActiveEffects();
                         msgs.push('мастер снял эффект «' + (gone[0].effectName || gone[0].name) + '»');
                     }
+                } else if (c.type === 'setDate') { // мастер вручную выставил дату: день не «проживается» — ни голода, ни отдыха, ни крафта
+                    const d = Math.max(1, Math.min(30, parseInt(c.day) || gameDayNum)), m = Math.max(0, Math.min(11, isNaN(parseInt(c.month)) ? gameMonth : parseInt(c.month))), y = Math.max(1, parseInt(c.year) || gameYear);
+                    gameDayNum = d; gameMonth = m; gameYear = y;
+                    if (c.resetFood) daysWithoutFood = 0;
+                    msgs.push(`дата выставлена мастером: ${d} ${MONTH_NAMES[m]} 4Э ${y}${c.resetFood ? ', голод сброшен' : ''}`);
                 } else if (c.type === 'penance') { // мастер: покаяние пройдено — можно вернуться к аэдра
                     penanceAllowed = true;
                     msgs.push('покаяние пройдено — можно снова выбрать бога-аэдра');

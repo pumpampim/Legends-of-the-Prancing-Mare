@@ -4293,6 +4293,7 @@
             if (typeof window.gmRenderTeachSpells === 'function') window.gmRenderTeachSpells();
             { const ss = el('inv-skill-decrease-select'); if (ss) { const cur = ss.value; ss.innerHTML = SKILL_NAMES_BY_IDX.map((n, i) => `<option value="${i}">${escapeHtml(n)} — ${getEffectiveSkillFromData(currentPlayerInvData, i)}</option>`).join(''); /* как у игрока: с расовым бонусом */ if (cur !== '') ss.value = cur; } }
             el('inv-gold-block').style.display = 'block';
+            { const dd = el('inv-date-day'), dm = el('inv-date-month'), dy = el('inv-date-year'); if (dd && document.activeElement !== dd && document.activeElement !== dm && document.activeElement !== dy) { dd.value = parseInt(data.gameDayNum) || 10; dm.value = isNaN(parseInt(data.gameMonth)) ? 6 : parseInt(data.gameMonth); dy.value = parseInt(data.gameYear) || 201; } }
             el('inv-gold-current').textContent = formatNumber(currentPlayerInvData.gold);
             el('inv-level-block').style.display = 'block';
             el('inv-level-current').textContent = currentPlayerInvData.characterLevel;
@@ -4416,6 +4417,14 @@
                 return true;
             }).catch(e => { alert('Ошибка: ' + e.message); return false; });
     }
+    // Дата игрока вручную: только меняет число/месяц/год, без последствий смены дня (голод, отдых, крафт). Опционально сбрасывает голод.
+    window.gmSetPlayerDate = function () {
+        const d = parseInt(el('inv-date-day').value), m = parseInt(el('inv-date-month').value), y = parseInt(el('inv-date-year').value);
+        if (!(d >= 1 && d <= 30) || !(y >= 1)) { alert('День 1–30, год — положительное число.'); return; }
+        const food = !!el('inv-date-food').checked;
+        const mn = el('inv-date-month').options[m].text;
+        gmSendCmd({ type: 'setDate', day: d, month: m, year: y, resetFood: food }, `игроку {p} выставлена дата: ${d} ${mn} 4Э ${y}${food ? ', голод сброшен' : ' (без смены дня и голода)'}.`);
+    };
     // «Покаяние»: игрок-даэдропоклонник получает право один раз снова выбрать бога-аэдра.
     window.gmPenance = function () { gmSendCmd({ type: 'penance' }, 'игрок {p} прошёл покаяние — может вернуться к аэдра.'); };
     // Прошёл игровой час — у всех игроков сессии тает облик зверя (4 ч, с «Вечным голодом» 8).
