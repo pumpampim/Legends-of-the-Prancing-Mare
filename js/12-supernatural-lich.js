@@ -344,6 +344,17 @@
         return false;
     }
     // ----- панель на листе -----
+    // Путь лича в «Ветках судьбы», пока герой им не идёт: что это и чем закрыт (перки выдаёт мастер после ритуала)
+    function lichPathTeaserHtml() {
+        const s = playerSupernaturalState || {};
+        if (s.vampirism || s.lycanthropy) return '';
+        const blocked = playerPaladin && plHas('p1') && !playerPaladin.fallen && !playerPaladin.abandoned;
+        let h = '<div style="border:1px solid #6c8ebf; border-radius:6px; padding:8px; margin-top:8px; background:rgba(108,142,191,.08);">';
+        h += `<div class="row-name"><strong>☠ Путь лича (Рыцарь смерти)</strong><span>${blocked ? 'закрыт паладином' : 'не начат'}</span></div>`;
+        h += '<div style="font-size:12px; opacity:.85; margin:4px 0;">Тёмный путь: перки выдаёт только мастер после отыгранного ритуала (души невинных 1/2/3/4, филактерия). Вера в богов теряется, нельзя быть вампиром, оборотнем или паладином одновременно.</div>';
+        (window.LICH_PERKS || []).forEach(p => { h += `<div style="padding:3px 0; border-top:1px dashed var(--border-color); font-size:12px;"><strong>${escHtml(p.name)}</strong> <span style="opacity:.75;">(ур. ${p.level}, душ ${p.souls})</span><div>${escHtml(p.desc)}</div></div>`; });
+        return h + '</div>';
+    }
     function lichStatusHtml() {
         try { if (lichDeathAuraSync()) { renderActiveEffects(); saveLocalStorage(); } } catch (e) { console.error(e); }
         const l = snLich(); if (!l || !(lichPerk('pact') || l.stage)) return '';

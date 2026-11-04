@@ -245,12 +245,7 @@
     function renderSupernaturalStatusPlayer() {
         const el = document.getElementById('supernatural-status-player');
         if (!el) return;
-        const s = playerSupernaturalState;
-        if (!s || (!s.lycanthropy && !s.vampirism && !lichStatusHtml() && !plStatusHtml())) {
-            el.innerHTML = '<p style="opacity:.6; font-size:13px;">Нет сверхъестественного состояния.</p>';
-            if (typeof renderLordPerks === 'function') renderLordPerks();
-            return;
-        }
+        const s = playerSupernaturalState || {};
         let html = '';
         if (s.lycanthropy) {
             const w = s.werewolf;
@@ -276,8 +271,9 @@
                 <button class="${v.lordForm ? 'btn-danger' : 'btn-success'}" style="width:100%; margin-top:4px;" onclick="playerToggleLordForm()">${v.lordForm ? 'Вернуть обычный облик' : 'Принять форму вампира-лорда'}</button>` : ''}
             </div>`;
         }
-        html += lichStatusHtml();
         html += plStatusHtml();
+        html += lichStatusHtml() || lichPathTeaserHtml();
+        if (!html) html = '<p style="opacity:.6; font-size:13px;">Пока ни один путь не открыт.</p>';
         el.innerHTML = html;
         if (typeof renderLordPerks === 'function') renderLordPerks();
     }
