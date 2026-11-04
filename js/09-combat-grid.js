@@ -814,7 +814,7 @@
 
     function getActiveEffectBonuses() {
         let hp = 0, mp = 0, armor = 0, speed = 0, weight = 0;
-        activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; speed += e.speed || 0; weight += e.weight || 0; });
+        activeTimedEffects.forEach(e => { if (e.plCircle && !plInCircle(e)) return; hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; speed += e.speed || 0; weight += e.weight || 0; });
         { const pb = plBonus(); hp += pb.hp; mp += pb.mp; } // ветка паладина: «защитник» +100 ХП, «провизор» +50 маны
         return { hp, mp, armor, speed, weight };
     }
@@ -1079,6 +1079,7 @@
     function getActivePercentBonuses() {
         const totals = { spellPower: 0, spellCostReduction: 0, resistPhysical: 0, resistElemental: 0, resistPoisonDiseaseShout: 0, speed: 0, weaponDamagePercent: 0, armorPenetrationFlat: 0 };
         (activeTimedEffects || []).forEach(e => {
+            if (e.plCircle && !plInCircle(e)) return; // круг паладина действует, пока он стоит в круге
             (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
         });
         { const pb = plBonus(); totals.weaponDamagePercent += pb.weaponPct; totals.spellPower += pb.spellPower; totals.spellCostReduction += pb.costCut; } // ветка паладина

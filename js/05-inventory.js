@@ -161,6 +161,7 @@
         // Firestore отвергает ЛЮБОЕ поле undefined — а вызовы вида { armorValue: it.armor, weaponDmg: it.dmg, capacity: it.capacity }
         // кладут в предмет undefined-свойства у вещей без брони/урона. Выбрасываем их здесь.
         if (extra) Object.keys(extra).forEach(k => { if (extra[k] === undefined) delete extra[k]; });
+        if (extra && extra.stolen && typeof plCountTheft === 'function') { try { plCountTheft(qty || 1); } catch (e) { console.error(e); } } // клятва правосудия: не красть более 10 предметов
         // Сваренное зелье из сундука/от другого игрока имеет свой itemId — кладём его на такую же стопку (alchemyStackKey).
         const existing = playerInventory.find(i => i.itemId === itemId) ||
             (extra && extra.alchemyEffects && typeof window.findSameStack === 'function'

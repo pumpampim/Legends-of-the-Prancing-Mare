@@ -912,12 +912,17 @@
     function plState() { return playerPaladin; }
     function plHas(id) { return !!(playerPaladin && playerPaladin.perks && playerPaladin.perks[id]); }
     function plIsAedraGod() { const g = (document.getElementById('faith-god') || {}).value; return !!(g && AEDRA_AMULETS[g]); }
-    function plBrokenByDaedric() {
-        return ['meleeWeapon', 'meleeWeaponOffhand', 'rangedWeapon'].some(k => {
-            const id = equippedSlots[k]; const it = id ? playerInventory.find(i => i.itemId === id) : null;
-            return !!(it && /даэдр/i.test(String(it.name || '') + ' ' + String(it.category || '')));
+    // Только НАДЕТОЕ: любое оружие, доспех, украшение или артефакт даэдра в слотах (запрет паладина)
+    function plDaedricWorn() {
+        const out = [];
+        Object.keys(equippedSlots || {}).forEach(k => {
+            const id = equippedSlots[k]; if (!id || typeof id !== 'string') return;
+            const it = playerInventory.find(i => i.itemId === id);
+            if (it && /даэдр/i.test(String(it.name || '') + ' ' + String(it.category || ''))) out.push(it.name);
         });
+        return out;
     }
+    function plBrokenByDaedric() { return plDaedricWorn().length > 0; }
     function plSuspended() { // временно: болезнь, лич, даэдрическое оружие
         const s = playerSupernaturalState || {};
         return !!(s.vampirism || s.lycanthropy || lichPerk('pact') || plBrokenByDaedric());
@@ -956,6 +961,40 @@
         plSave();
         setTimeout(() => alert(`⚜ Паладин пал: ${p.fallReason}.\nЭффекты ветки и бонусы веры в аэдра не действуют. Покаяние — на вкладке «Магия» (один раз, ${PALADIN_PENANCE_GOLD} септимов храму); потом остаётся только отказаться от ветки.`), 50);
     }
+    function plBountyMap() {
+        const m = {}; const b = (playerCrimeState && playerCrimeState.bounties) || {};
+        Object.keys(b).forEach(h => { m[h] = parseInt(b[h] && b[h].amount) || 0; });
+        if (!Object.keys(m).length && playerCrimeState && parseInt(playerCrimeState.fineAmount) > 0) m[playerCrimeState.fineHold || 'Неизвестно'] = parseInt(playerCrimeState.fineAmount);
+        return m;
+    }
+    // Кража (клятва правосудия): более 10 краденых предметов с момента клятвы — падение
+    function plCountTheft(n) {
+        const p = playerPaladin; if (!p || p.vow !== 'justice' || p.fallen || p.abandoned || !plHas('p1')) return;
+        p.thefts = (p.thefts || 0) + (n || 1);
+        if (p.thefts > 10) plFall(`украдено ${p.thefts} предметов (клятва правосудия: не более 10)`);
+    }
+    window.plCountTheft = plCountTheft;
+    // Круг дозорного действует (святой урон): эффект есть и паладин стоит в круге
+    function plHolyActive() {
+        if (!plRighteous()) return false;
+        const e = (activeTimedEffects || []).find(x => x && x.plCircle === 'watch' && (x.turnsRemaining > 0 || x.turnsRemaining === Infinity));
+        return !!(e && plInCircle(e));
+    }
+    // Стоит ли игрок в своём круге. Нет сетки/зоны ещё не поставлена — верим игроку (считаем, что в круге).
+    function plInCircle(e) {
+        try {
+            const g = sessGrid(); if (!g || !e || !e.gridZoneId || !window.GridCore) return true;
+            const z = (g.zones || {})[e.gridZoneId]; if (!z || typeof z.x !== 'number') return true;
+            const t = window.GridCore.tokenOf(g, 'p', myUidG()); if (!t) return true;
+            return window.GridCore.cells({ x: z.x, y: z.y }, t) <= Math.floor((z.radiusFt || 10) / 5);
+        } catch (er) { return true; }
+    }
+    // При каждом обновлении сессии: если игрок вошёл в круг/вышел из него — пересчёт листа
+    var _plCircleSig = '';
+    window.plOnSession = function () {
+        const e = (activeTimedEffects || []).find(x => x && x.plCircle); const sig = e ? (plInCircle(e) ? '1' : '0') : '-';
+        if (sig !== _plCircleSig) { _plCircleSig = sig; if (e) { if (typeof scheduleUpdateAll === 'function') scheduleUpdateAll(); else updateAll(); } }
+    };
     // Проверка нарушений клятвы (вызывается из updateAll)
     function plSync() {
         const p = playerPaladin; if (!p || !plHas('p1') || p.fallen || p.abandoned) return;
@@ -969,9 +1008,12 @@
             const conj = (typeof skillNames !== 'undefined' ? skillNames.indexOf('Колдовство') : -1);
             if (conj >= 0 && (fullPerksManifest['Колдовство'] || []).some((pk, pi) => { for (let st = 1; st <= pk.steps; st++) { const b = document.getElementById(`perk-${conj}-${pi}-${st}`); if (b && b.checked) return true; } return false; })) { plFall('взят перк Колдовства (клятва дозорного)'); return; }
         }
-        // отложенное: нарушение уже не вернуть тем, что снял, но предупреждаем о приостановке
-        const sus = plSuspended();
-        if (sus !== !!p._sus) { p._sus = sus; }
+        if (p.vow === 'justice') { // штрафы в владениях: сумма новых штрафов с момента клятвы
+            const now = plBountyMap(), was = p.lastBounties || {}; let add = 0;
+            Object.keys(now).forEach(h => { if (now[h] > (was[h] || 0)) add += now[h] - (was[h] || 0); });
+            p.lastBounties = now;
+            if (add) { p.finesTotal = (p.finesTotal || 0) + add; if (p.finesTotal > 1000) { plFall(`штрафы в владениях за время клятвы: ${p.finesTotal} септимов (клятва правосудия: не более 1000)`); return; } }
+        }
     }
     // Колдовство при клятве дозорного — нарушение (спрашиваем до броска, вызывается из каста)
     function plConjureGuard(school) {
@@ -1014,7 +1056,8 @@
         const p = playerPaladin; if (!p || !plHas('p1') || p.vow || !window.PALADIN_VOWS[v]) return;
         const V = window.PALADIN_VOWS[v];
         if (!confirm(`Принести «${V.name}»?\nЗапреты: ${V.bans}\nНарушение клятвы лишает праведности (покаяние один раз, ${PALADIN_PENANCE_GOLD} септимов храму). Клятву потом не сменить.`)) return;
-        p.vow = v; plLog(`⚜ ${(document.getElementById('char-name') || {}).value || 'Игрок'} приносит ${V.name}.`);
+        p.vow = v; p.thefts = 0; p.finesTotal = 0; p.lastBounties = plBountyMap();
+        plLog(`⚜ ${(document.getElementById('char-name') || {}).value || 'Игрок'} приносит ${V.name}.`);
         plSave();
     };
     // Смена бога аэдра: паладину — раз в неделю и только с амулетом нового бога (вызывается из onFaithGodChange)
@@ -1035,9 +1078,16 @@
         if (!powerActionAllowed({ name: 'Круг клятвы', desc: 'Основным действием', effect: {} })) return;
         const V = window.PALADIN_VOWS[p.vow], rad = plCircleRadius();
         markCombatAction('attack'); powersUsedToday.pl_circle = true;
-        pushOrRefreshTimedEffect({ id: 'eff-plcircle-' + Date.now().toString(36), name: V.circle, effectName: V.circle, plCircle: p.vow, turnsRemaining: 5, perRound: true, hp: 0, mp: 0, value: 0,
+        const effId = 'eff-plcircle-' + Date.now().toString(36);
+        pushOrRefreshTimedEffect({ id: effId, name: V.circle, effectName: V.circle, plCircle: p.vow, gridZoneId: effId, turnsRemaining: 5, perRound: true, hp: 0, mp: 0, value: 0,
             armor: V.armor || 0, percentEffects: (V.effects || []).map(x => ({ type: x.type, value: x.value })),
-            description: `${V.icon} Священный круг радиусом ${rad} фт на 5 кругов: бонусы действуют, пока паладин в круге (следит мастер). ${V.circleDesc}` });
+            description: `${V.icon} Священный круг радиусом ${rad} фт на 5 кругов (зона на боевой сетке): бонусы действуют, пока паладин стоит в круге. ${V.circleDesc}` });
+        if (typeof gridZoneAvailable === 'function' && gridZoneAvailable()) { // круг встаёт на сетке на месте паладина
+            const myName = (document.getElementById('char-name') || {}).value || 'Игрок';
+            const zone = { id: effId, effId, uid: myUidG(), ownerName: myName, spell: V.circle, kind: 'area', place: 'self', radiusFt: rad, dmg: 0, dmgType: '', who: 'none', icon: V.icon, turns: null, unit: 'round', rounds: 5 };
+            if (V.holy) zone.holyBan = true;
+            window.CloudSync.addPendingZone(zone, myName).catch(e => alert('Зона не передана мастеру: ' + e.message));
+        }
         plLog(`${V.icon} ${(document.getElementById('char-name') || {}).value || 'Игрок'} ставит «${V.circle}» (радиус ${rad} фт, 5 кругов).`);
         renderActiveEffects(); plSave();
     };
@@ -1122,7 +1172,7 @@
         let h = `<div style="border:1px solid #d4af37; border-radius:6px; padding:8px; margin-top:8px; background:rgba(212,175,55,.08);">`;
         h += `<div class="row-name"><strong>⚜ Путь паладина</strong><span>${plFallen() ? '☠ пал' : plRighteous() ? '✔ праведен' : (p && plHas('p1') ? '⏸ приостановлен' : 'не начат')} · перков ${taken}/4</span></div>`;
         h += `<div style="font-size:12px; opacity:.85; margin:4px 0;">${window.PALADIN_COMMON_BANS} Квестов жителей выполнено: ${done}.</div>`;
-        if (p && plHas('p1') && plSuspended() && !p.fallen) h += `<div style="font-size:12px; color:#e6b800;">⏸ Сейчас бонусы не действуют: ${[((playerSupernaturalState || {}).vampirism ? 'вампиризм' : ''), ((playerSupernaturalState || {}).lycanthropy ? 'ликантропия' : ''), (lichPerk('pact') ? 'путь лича' : ''), (plBrokenByDaedric() ? 'даэдрическое оружие в руках' : '')].filter(Boolean).join(', ')}.</div>`;
+        if (p && plHas('p1') && plSuspended() && !p.fallen) h += `<div style="font-size:12px; color:#e6b800;">⏸ Сейчас бонусы не действуют: ${[((playerSupernaturalState || {}).vampirism ? 'вампиризм' : ''), ((playerSupernaturalState || {}).lycanthropy ? 'ликантропия' : ''), (lichPerk('pact') ? 'путь лича' : ''), (plBrokenByDaedric() ? 'надето даэдрическое: ' + plDaedricWorn().join(', ') : '')].filter(Boolean).join(', ')}.</div>`;
         if (p && p.fallen) {
             h += `<div style="font-size:12px; color:#e74c3c;">☠ Причина: ${escHtml(p.fallReason || 'нарушена клятва')}. Бонусы ветки и веры в аэдра отключены.</div>`;
             h += p.penanceUsed ? '<div style="font-size:12px;">Покаяние уже было — остаётся отказаться от ветки.</div>' : `<button class="btn-success" style="width:100%; margin-top:4px;" onclick="plPenance()">🙏 Покаяние (${PALADIN_PENANCE_GOLD} септимов храму, один раз)</button>`;

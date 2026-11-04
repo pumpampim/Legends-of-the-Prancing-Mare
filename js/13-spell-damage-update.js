@@ -693,6 +693,7 @@ function updateHungerPenalty() {
             }
             trueDmgNow = calc.trueDmg || 0;
             if (lichAuraId() === 'rage') penetrationPct += 5; // «Багровая ярость»: +5% игнорирования брони
+            if (plActive('p3a')) penetrationPct += 5;         // паладин, «Благословение избавителя»: +5% пробития
             actionLabel = (actionVal === 'melee' ? 'ближним оружием' : throwShot ? `метательным «${throwShot.entry.name}» (бросок, бонусное действие)` : 'дальним оружием') + sneakNote;
             const spiritE = getActiveWeaponSpirit(actionVal);
             if (spiritE) {
@@ -1098,6 +1099,7 @@ function updateHungerPenalty() {
         if (isPowerAtkNow && inCombatNow()) combatMarks.power = gameTurn || 0;
         if (hit && dmg > 0 && !aoeArea && !isSummonAct && !controlStatus && plActive('p2')) onHit = Object.assign({ name: 'Священная мощь' }, onHit || {}, { slow: Math.max((onHit && onHit.slow) || 0, 10) }); // паладин: замедление −10 фт
         if (hit && isPowerAtkNow) plAfterPowerAttack();
+        if (hit && dmg > 0 && !isSummonAct && plHolyActive()) { const holy = Math.max(1, Math.round(dmg * 0.10 * (isDaedraTarget ? 2 : 1))); trueDmgNow += holy; actionLabel += ` (☀ святая магия круга Стендарра +${holy}${isDaedraTarget ? ', по даэдра вдвое' : ''})`; }
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,
             targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, zoneDot, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea, trueDmg: trueDmgNow,

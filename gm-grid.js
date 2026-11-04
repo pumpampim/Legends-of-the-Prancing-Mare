@@ -129,6 +129,7 @@
         const logs = [], hits = [];
         Object.keys(gr.zones).forEach(zid => {
             const z = gr.zones[zid]; const names = [];
+            const curRH = parseInt(d.sessionRoundCounter) || 0, holyNew = !!z.holyBan && z.holyLastRound !== curRH, holySeen = {};
             Object.keys(gr.tokens).forEach(k => {
                 const en = ents[k]; if (!en || en.dead || !zoneCovers(z, gr.tokens[k], gr)) return;
                 if (z.follow === k) return; // заклинатель не бьёт сам себя своей аурой
@@ -144,6 +145,14 @@
                     if ((e.statusEffects || []).some(s => s.name === 'Бегство')) return;
                     e.statusEffects = (e.statusEffects || []).concat([{ id: 'zf' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Бегство', desc: 'Бежит из «' + z.spell + '»', turns: z.fleeTurns || 2, noAttack: true }]);
                     names.push(e.name + ' бежит'); return;
+                }
+                if (z.holyBan && e.summoned === true) { // Круг дозорного: призванные враги в круге — 5 святого урона за круг и изгнание через 3 круга подряд
+                    z.holy = z.holy || {}; holySeen[e.id] = 1;
+                    if (holyNew) {
+                        z.holy[e.id] = (z.holy[e.id] || 0) + 1;
+                        if (z.holy[e.id] >= 3) { e._banish = true; names.push(e.name + ' изгнан'); }
+                        else { const was = e.curHp || 0; e.curHp = Math.max(0, was - 5); if (was > 0 && e.curHp <= 0) e.diedAtTurn = d.sessionTurnCounter || 0; markHitBy(e, z.uid, true, was > 0 && e.curHp <= 0); names.push(e.name + ' −5 святого (' + z.holy[e.id] + '/3)'); }
+                    }
                 }
                 if (z.slow) {
                     e.statusEffects = (e.statusEffects || []).filter(s => s.name !== 'Замедление (' + z.spell + ')').concat([{ id: 'zs' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Замедление (' + z.spell + ')', desc: '−' + z.slow + ' фт скорости', turns: 1 }]);
@@ -172,6 +181,7 @@
                     else e.statusEffects = (e.statusEffects || []).concat([{ id: 'zr' + Date.now() + Math.random().toString(36).slice(2, 5), name: 'Гул камня', desc: 'Сопротивления снижены', turns: 2, res: add }]);
                 }
             });
+            if (z.holyBan && holyNew) { z.holyLastRound = curRH; Object.keys(z.holy || {}).forEach(id => { if (!holySeen[id]) delete z.holy[id]; }); }
             if (names.length) logs.push(`${z.icon || '✴'} «${z.spell}» (${z.ownerName || 'мастер'}): ${names.join(', ')}.`);
             if (z.unit === 'round' && typeof z.rounds === 'number') {
                 // Плащи: длительность в кругах. Счёт ведём по общему счётчику кругов сессии: сколько кругов сменилось с прошлого тика — столько и списываем.
@@ -181,7 +191,7 @@
                 if (z.rounds <= 0) { delete gr.zones[zid]; logs.push(`${z.icon || '✴'} «${z.spell}» рассеивается.`); }
             } else if (typeof z.turns === 'number') { z.turns -= 1; if (z.turns <= 0) { delete gr.zones[zid]; logs.push(`${z.icon || '✴'} «${z.spell}» рассеивается.`); } }
         });
-        return { enemies, grid: gr, logs, hits };
+        return { enemies: enemies.filter(e => !e._banish), grid: gr, logs, hits };
     }
 
     // ---------- рисование ----------
