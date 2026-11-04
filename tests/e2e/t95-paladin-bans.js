@@ -42,6 +42,9 @@ const S = require('./setup');
   // карточка появляется сама при смене веры на аэдра (без других событий)
   out.card = await pl.evaluate(() => { playerPaladin = null; document.getElementById('faith-god').value = 'none'; updateAll(); const a = document.getElementById('supernatural-status-player').innerHTML.indexOf('Путь паладина') !== -1; document.getElementById('faith-god').value = 'stendarr'; updateAll(); const b = document.getElementById('supernatural-status-player').innerHTML.indexOf('Путь паладина') !== -1; return { a, b }; });
   chk(out.card.a === false && out.card.b === true, 'карточка паладина появляется при вере в аэдра');
+  // сворачивание веток: details, состояние переживает перерисовку
+  out.fold = await pl.evaluate(() => { const d = () => document.querySelector('#supernatural-status-player details.fate-box'); const a = !!d(); fateToggle('paladin', false); renderSupernaturalStatusPlayer(); const closed = d() && !d().open; fateToggle('paladin', true); renderSupernaturalStatusPlayer(); return { a, closed, open: d() && d().open }; });
+  chk(out.fold.a && out.fold.closed && out.fold.open, 'ветки судьбы сворачиваются и помнят состояние');
   console.log(JSON.stringify(out)); console.log('issues', JSON.stringify(H.issues).slice(0, 1500));
   fails.forEach(f => console.log('FAIL ' + f));
   await H.close();

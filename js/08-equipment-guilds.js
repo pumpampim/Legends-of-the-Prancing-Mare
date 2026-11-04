@@ -242,6 +242,14 @@
 
     // Задача L: показывает активное сверхъестественное состояние на листе игрока, с кнопками
     // "Превратиться"/"Покормиться" — те же данные, что мастер видит и правит у себя.
+    // Сворачиваемый блок пути (нативный <details>); состояние помним между перерисовками и перезагрузками
+    var _fateOpen = (function () { try { return JSON.parse(localStorage.getItem('skyrim_fate_open') || '{}') || {}; } catch (e) { return {}; } })();
+    window.fateToggle = function (key, open) { _fateOpen[key] = !!open; try { localStorage.setItem('skyrim_fate_open', JSON.stringify(_fateOpen)); } catch (e) { } };
+    function fateBox(key, title, inner, defOpen) {
+        if (!inner) return '';
+        const open = (key in _fateOpen) ? _fateOpen[key] : !!defOpen;
+        return `<details class="fate-box" style="margin-top:8px;" ${open ? 'open' : ''} ontoggle="fateToggle('${key}', this.open)"><summary style="cursor:pointer; font-weight:bold; padding:4px 0;">${title}</summary>${inner}</details>`;
+    }
     function renderSupernaturalStatusPlayer() {
         const el = document.getElementById('supernatural-status-player');
         if (!el) return;
@@ -249,18 +257,18 @@
         let html = '';
         if (s.lycanthropy) {
             const w = s.werewolf;
-            html += `<div class="party-row">
+            html += fateBox('wolf', '🐺 Ликантропия', `<div class="party-row">
                 <div class="row-name"><strong>🐺 Ликантропия</strong><span>${w.heartsEaten || 0} сердец</span></div>
                 <div style="font-size:12px; opacity:.85;">Тотем: ${escHtml(w.totem || '— нет —')} · ${w.isTransformed ? `Сейчас в форме зверя (осталось ${typeof w.hoursLeft === 'number' ? w.hoursLeft : wolfFormHours()} ч — час отмечает мастер)` : (snTransformsLeft() <= 0 ? 'Превращения на сегодня закончились' : 'Превращение доступно')} · осталось превращений: ${snTransformsLeft()}/${TRANSFORMS_PER_DAY}</div>
                 ${!w.isTransformed && snTransformsLeft() > 0 ? `<button class="btn-success" style="width:100%; margin-top:4px;" onclick="playerTransformWerewolf()">Превратиться в зверя</button>` : ''}
                 ${w.isTransformed ? `<button class="btn-danger" style="width:100%; margin-top:4px;" onclick="playerRevertWerewolf()">Вернуть человеческий облик</button>` : ''}
-            </div>`;
+            </div>`, true);
         }
         if (s.vampirism) {
             const v = s.vampire;
             const period = (window.CloudSync && window.CloudSync.getSessionData() && window.CloudSync.getSessionData().timePeriod) || null;
             const sunWarning = period === 'День' ? '<br><span style="color:#e74c3c;">☀️ Сейчас день — уязвимость к солнцу: входящий урон ×2!</span>' : '';
-            html += `<div class="party-row">
+            html += fateBox('vamp', '🧛 Вампиризм' + (v.isLord ? ' · вампир-лорд' : ''), `<div class="party-row">
                 <div class="row-name"><strong>🧛 Вампиризм</strong><span>🩸 Голод по крови: ${v.hungerStage || 0}/4</span></div>
                 <div style="font-size:12px; opacity:.85;">+2 Хар, +1 Лов, +1 Сил · холод +50%, яды и болезни — иммунитет, огонь −50%${sunWarning}${vampHunger() ? `<br><span style="color:#e67e22;">🩸 Голод: −${vampHungerStatPenalty()} ко всем характеристикам${vampHungerResistDelta() ? `, холод +${vampHungerResistDelta()}% , огонь −${vampHungerResistDelta()}%` : ''}</span>` : ''}${vampHunger() >= 4 ? '<br><span style="color:#e74c3c;">🚨 4-й день без крови: стража нападает на сайт, местные жители бегут или нападают!</span>' : ''}</div>
                 <div style="display:flex; gap:6px; margin-top:4px;">
@@ -269,10 +277,10 @@
                 </div>
                 ${v.isLord ? `<div style="font-size:12px; margin-top:3px;">🦇 <strong>Вампир-лорд</strong> · ${v.lordForm ? 'сейчас в форме лорда' : 'обычный облик'}</div>
                 <button class="${v.lordForm ? 'btn-danger' : 'btn-success'}" style="width:100%; margin-top:4px;" onclick="playerToggleLordForm()">${v.lordForm ? 'Вернуть обычный облик' : 'Принять форму вампира-лорда'}</button>` : ''}
-            </div>`;
+            </div>`, true);
         }
-        html += plStatusHtml();
-        html += lichStatusHtml() || lichPathTeaserHtml();
+        html += fateBox('paladin', '⚜ Путь паладина', plStatusHtml(), plHas('p1') && !(playerPaladin && playerPaladin.abandoned));
+        { const lh = lichStatusHtml(); html += fateBox('lich', '☠ Путь лича', lh || lichPathTeaserHtml(), !!lh); }
         if (!html) html = '<p style="opacity:.6; font-size:13px;">Пока ни один путь не открыт.</p>';
         el.innerHTML = html;
         if (typeof renderLordPerks === 'function') renderLordPerks();
