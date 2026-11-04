@@ -1259,6 +1259,11 @@
                 } else if (c.type === 'trap') {
                     msgs.push(applyTrapToSelf(c));
                 } else if (c.type === 'trapDisarm') {
+                    // В бою обезвредить ловушку — основное действие хода (как зелье или атака); занят ход — команда не выполняется, мастер шлёт заново.
+                    if (inCombatNow()) {
+                        if (!combatActionAllowed('item')) { msgs.push(`«${c.trapName}»: обезвредить не вышло — основное действие хода уже потрачено, мастеру нужно повторить в следующем ходу`); gmCmdsApplied.push(c.id); return; }
+                        markCombatAction('attack');
+                    }
                     msgs.push(tryDisarmTrap(c));
                 } else if (c.type === 'keeperBarrierHit') { // мастер: барьер Перчаток Хранителя принял урон
                     keeperBarrierLeft = Math.max(0, keeperBarrierLeft - (parseInt(c.absorbed) || 0));
