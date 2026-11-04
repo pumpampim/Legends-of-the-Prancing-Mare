@@ -39,6 +39,9 @@ const S = require('./setup');
     return { has: !!e, zoneId: e && e.gridZoneId === e.id, holy: plHolyActive(), pctEmpty: !(e && e.percentEffects.length) };
   });
   chk(out.holy.has && out.holy.zoneId && out.holy.holy && out.holy.pctEmpty, 'круг дозорного: эффект, зона, святой урон');
+  // карточка появляется сама при смене веры на аэдра (без других событий)
+  out.card = await pl.evaluate(() => { playerPaladin = null; document.getElementById('faith-god').value = 'none'; updateAll(); const a = document.getElementById('supernatural-status-player').innerHTML.indexOf('Путь паладина') !== -1; document.getElementById('faith-god').value = 'stendarr'; updateAll(); const b = document.getElementById('supernatural-status-player').innerHTML.indexOf('Путь паладина') !== -1; return { a, b }; });
+  chk(out.card.a === false && out.card.b === true, 'карточка паладина появляется при вере в аэдра');
   console.log(JSON.stringify(out)); console.log('issues', JSON.stringify(H.issues).slice(0, 1500));
   fails.forEach(f => console.log('FAIL ' + f));
   await H.close();

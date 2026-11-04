@@ -1007,7 +1007,13 @@
         if (sig !== _plCircleSig) { _plCircleSig = sig; if (e) { if (typeof scheduleUpdateAll === 'function') scheduleUpdateAll(); else updateAll(); } }
     };
     // Проверка нарушений клятвы (вызывается из updateAll)
+    var _plCardSig = null;
     function plSync() {
+        // Карточка «Пути паладина» зависит от веры, уровня, очков, квестов и состояния — перерисовываем при их изменении (раньше она рисовалась только по событиям сверхъестественного)
+        try {
+            const sig = JSON.stringify([(document.getElementById('faith-god') || {}).value, playerLevelNow(), perkPointsAvailable, plQuestsDone(), playerPaladin, plSuspended(), powersUsedToday.pl_circle, powersUsedToday.pl_hands, (activeTimedEffects || []).some(e => e && e.plHands)]);
+            if (sig !== _plCardSig) { _plCardSig = sig; if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer(); }
+        } catch (e) { console.error('Паладин (панель):', e); }
         const p = playerPaladin; if (!p || !plHas('p1') || p.fallen || p.abandoned) return;
         const god = (document.getElementById('faith-god') || {}).value;
         if (god && god !== 'none' && !AEDRA_AMULETS[god]) { plFall('вера в даэдра'); return; }
