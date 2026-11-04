@@ -246,7 +246,7 @@
         const el = document.getElementById('supernatural-status-player');
         if (!el) return;
         const s = playerSupernaturalState;
-        if (!s || (!s.lycanthropy && !s.vampirism && !lichStatusHtml())) {
+        if (!s || (!s.lycanthropy && !s.vampirism && !lichStatusHtml() && !plStatusHtml())) {
             el.innerHTML = '<p style="opacity:.6; font-size:13px;">Нет сверхъестественного состояния.</p>';
             if (typeof renderLordPerks === 'function') renderLordPerks();
             return;
@@ -277,6 +277,7 @@
             </div>`;
         }
         html += lichStatusHtml();
+        html += plStatusHtml();
         el.innerHTML = html;
         if (typeof renderLordPerks === 'function') renderLordPerks();
     }
@@ -629,6 +630,7 @@
                 ${q.requirement ? `<div style="font-size:13px; opacity:.8;">🎯 Нужно: ${escHtml(q.requirement)}</div>` : ''}
                 ${q.reward ? `<div style="font-size:13px; opacity:.8;">🎁 Награда: ${escHtml(q.reward)}</div>` : ''}
                 ${q.guild ? `<div style="font-size:13px; opacity:.8;">🏛️ Гильдия: ${escHtml(q.guild)}</div>` : ''}
+                ${q.kind === 'resident' ? '<div style="font-size:13px; opacity:.8;">🤝 Помощь жителю</div>' : ''}
                 ${q.status === 'active' ? `<div style="display:flex; gap:6px; margin-top:4px;"><button style="flex:1;" onclick="markQuestDone('${jsq(q.id)}')">Отметить выполненным</button><button class="btn-danger" style="width:auto;" onclick="abandonQuest('${jsq(q.id)}')" title="Отменить квест">✕ Отменить</button></div>` : ''}
             </div>`;
     }

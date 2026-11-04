@@ -15,7 +15,8 @@
     window.repHoldKey = repHoldKey;
     function getReputationPriceMult(hold) {
         if (!hold || !playerReputationByRegion) return 1;
-        const rep = playerReputationByRegion[repHoldKey(hold)] || 0;
+        let rep = playerReputationByRegion[repHoldKey(hold)] || 0;
+        if (rep < 0 && plActive('p4') && (playerPaladin || {}).vow !== 'vengeance') rep = 0; // «Избранник Богов»: репутация не бывает отрицательной
         // Эпик 5.4: пороги последствий. Раньше любой плюс = ×0.95, любой минус = ×1.05; теперь сильная репутация заметнее.
         if (rep <= -3) return 1.25;   // подозревают: торговцы набавляют
         if (rep >= 5) return 0.9;     // уважают: скидка
@@ -32,7 +33,7 @@
     function getGuildDiscountMult() {
         const id = equippedSlots && equippedSlots.helmet;
         const it = id ? playerInventory.find(i => i.itemId === id && i.count > 0) : null;
-        return (it && THIEF_HOOD_DISCOUNT[it.name]) || 1;
+        return ((it && THIEF_HOOD_DISCOUNT[it.name]) || 1) * plBonus().buyMult; // паладин: покупки на 5% дешевле
     }
 
     function renderBuyMerchantTypeSelect() {

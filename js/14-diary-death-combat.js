@@ -550,6 +550,7 @@
             levelScheme: LEVEL_SCHEME,
             skillProgress: skillProgress,
             playerQuests: playerQuests,
+            paladin: playerPaladin,
             activeSummons: activeSummons,
             customSpells: customSpells,
             mapNotes: playerMapNotes,

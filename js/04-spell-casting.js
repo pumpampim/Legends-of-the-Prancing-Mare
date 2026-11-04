@@ -743,6 +743,7 @@
             // длящийся баф/усиление (активный эффект, как у зелий) — хп/мп ИЛИ процентный
             // (сила/стоимость заклинаний, сопротивления, скорость).
             const heal = parseInstantHealBonus(desc);
+            if (heal && heal.key === 'hp' && school === 'restor' && plBonus().healPct) heal.value = Math.round(heal.value * (1 + plBonus().healPct / 100)); // паладин: сила лечения
             if (heal && heal.key === 'hp' && school === 'restor' && (window.perkBonuses || {}).regenPerk) heal.value = Math.round(heal.value * 1.5); // перк «Регенерация»: лечение +50%
             if (heal && sb.pct && school === 'restor' && heal.key === 'hp') {
                 heal.value = Math.round(heal.value * sb.mult);
@@ -808,6 +809,7 @@
             // (у игрока нет живого листенера на чужой документ персонажа, только на сессию;
             // цель подхватит эффект сама через уже существующий механизм applyIncomingStatusEffects).
             const heal = parseInstantHealBonus(desc);
+            if (heal && heal.key === 'hp' && school === 'restor' && plBonus().healPct) heal.value = Math.round(heal.value * (1 + plBonus().healPct / 100)); // паладин: сила лечения
             if (heal && heal.key === 'hp' && school === 'restor' && (window.perkBonuses || {}).regenPerk) heal.value = Math.round(heal.value * 1.5); // перк «Регенерация»: лечение +50%
             if (heal && sb.pct && school === 'restor' && heal.key === 'hp') {
                 heal.value = Math.round(heal.value * sb.mult);
@@ -983,6 +985,7 @@
         if (!combatActionAllowed('cast')) return;
         if (enhanced) { const why = cardEnhancedReason(id); if (why) { alert(why); return; } }
         const info = spellCardInfo(id);
+        if (info && !plConjureGuard(info.school)) return; // клятва дозорного запрещает Колдовство
         const conc = !!(info && CONC_SCHOOLS.indexOf(info.school) !== -1 && info.target === 'self');
         const prev = conc ? activeConcentrationEffects() : [];
         if (prev.length && !confirm('Ты уже держишь концентрацию на «' + (prev[0].concSpell || prev[0].effectName || prev[0].name) + '». Снять предыдущий концентрационный эффект и колдовать новое?')) return;

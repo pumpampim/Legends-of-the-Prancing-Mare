@@ -1096,6 +1096,8 @@ function updateHungerPenalty() {
         if (isSummonAct) markCombatAction(actionVal); else if (quickShot || throwShot) markBonusAction(); else markCombatAction('attack'); // бросок атаки/каста — действие хода
         if (actionVal === 'ranged' && !throwShot && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
         if (isPowerAtkNow && inCombatNow()) combatMarks.power = gameTurn || 0;
+        if (hit && dmg > 0 && !aoeArea && !isSummonAct && !controlStatus && plActive('p2')) onHit = Object.assign({ name: 'Священная мощь' }, onHit || {}, { slow: Math.max((onHit && onHit.slow) || 0, 10) }); // паладин: замедление −10 фт
+        if (hit && isPowerAtkNow) plAfterPowerAttack();
         pendingPlayerAttack = hit ? {
             weaponSlot: (actionVal === 'melee' || actionVal === 'ranged') ? actionVal : null,
             targetId, dmg, dmgType, healPct, penetrationPct, controlStatus, zoneDot, poison: attackPoison, extraElem, onHit, healFlat, devourSummonId, area: aoeArea, trueDmg: trueDmgNow,
@@ -1608,12 +1610,14 @@ function updateHungerPenalty() {
             if (!penanceAllowed) { sel.value = prev; alert('Чтобы снова поклоняться аэдра, нужно пройти «покаяние» — его проводит мастер.'); return; }
             penanceAllowed = false;
         }
+        if (!plGodSwapOk(prev, next)) { sel.value = prev; return; }
         lastFaithGod = next;
         updateAll(); saveLocalStorage();
     };
     function getGodBonuses(god, rank) {
         if (!god || god === 'none' || !godBonuses[god]) return {};
         if (!wearsGodAmulet(god)) return {};
+        if (plFallen()) return {}; // павший паладин лишается и веры в аэдра, пока не покается
         let bonuses = godBonuses[god][rank] || {};
         // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра сильнее на 50% (+100 маны → +150).
         const rawBonuses = bonuses;
@@ -1688,6 +1692,7 @@ function updateHungerPenalty() {
 
     // ===== ИСПРАВЛЕННАЯ updateAll =====
     function updateAll() {
+        try { plSync(); } catch (e) { console.error('Паладин:', e); }
         // Единый источник правды для уровня — characterLevel (растёт через «Проверку»).
         // Раньше поле #char-level на главной было отдельным, свободно редактируемым числом,
         // никак не связанным с characterLevel — отсюда рассинхрон между вкладками.
@@ -2132,7 +2137,7 @@ function updateHungerPenalty() {
             if (school === 'illus') godCostPct += gb('illusionCost');
             const godCostMult = Math.max(0.1, 1 - godCostPct / 100);
             // Одеяния/капюшоны на стоимость заклинаний своей школы (и «всех школ»)
-            const gearCutPct = (gearCostCut.all || 0) + ((school && gearCostCut[school]) || 0);
+            const gearCutPct = (gearCostCut.all || 0) + ((school && gearCostCut[school]) || 0) + (school === 'restor' ? plBonus().restCostCut : 0);
             const gearCostMult = Math.max(0.1, 1 - gearCutPct / 100);
 
             // Знак «Маг» — бесплатный каст заклинаний 1 уровня (было только текстом в описании,

@@ -1157,6 +1157,11 @@
             <input type="text" id="quest-req-input" placeholder="Например: найти и вернуть амулет">
             <label>Награда</label>
             <input type="text" id="quest-reward-input" placeholder="Например: 200 септимов и зелье здоровья">
+            <label>Тип квеста</label>
+            <select id="quest-kind-select">
+                <option value="">Обычный</option>
+                <option value="resident">Помощь жителю (идёт в счёт перков паладина)</option>
+            </select>
             <label>От гильдии (необязательно — если квест гильдии, выполнение даст +1 к её прогрессу)</label>
             <select id="quest-guild-select">
                 <option value="">— не привязан к гильдии —</option>
@@ -1400,7 +1405,7 @@
 <script src="enemy-loot.js?v=8"></script>
 <script src="grid-core.js?v=6"></script>
 <script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=77"></script>
+<script src="gm.js?v=78"></script>
 <script src="js/17-icons.js?v=3"></script>
 <script src="js/gm-mobile.js?v=1"></script>
 <script src="gm-grid.js?v=8"></script>

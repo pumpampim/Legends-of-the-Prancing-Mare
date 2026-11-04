@@ -377,6 +377,7 @@
             }
             skillProgress = (data.skillProgress && typeof data.skillProgress === 'object') ? data.skillProgress : {};
             playerQuests = Array.isArray(data.playerQuests) ? data.playerQuests : [];
+            playerPaladin = (data.paladin && typeof data.paladin === 'object') ? data.paladin : null;
             activeSummons = Array.isArray(data.activeSummons) ? data.activeSummons : [];
             renderActiveSummonsList();
             renderQuestList();

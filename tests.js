@@ -562,6 +562,16 @@
         }
     }
 
+    // ---------- ВЕТКА ПАЛАДИНА ----------
+    if (W.PALADIN_PERKS) {
+        const P = W.PALADIN_PERKS;
+        eq(P.map(p => p.id), ['p1', 'p2', 'p3a', 'p3b', 'p3c', 'p4'], 'Паладин: перки ветки');
+        eq(P.filter(p => p.group === 'p3').length, 3, 'Паладин: третий перк — выбор из трёх');
+        ok(P.every((p, i, a) => i === 0 || p.level >= a[0].level), 'Паладин: уровни не ниже первого');
+        eq(Object.keys(W.PALADIN_VOWS), ['watch', 'justice', 'vengeance'], 'Паладин: три клятвы');
+        eq(W.PALADIN_PENANCE_GOLD, 1000, 'Паладин: покаяние 1000 септимов');
+    }
+
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;
     if (typeof document !== 'undefined') {

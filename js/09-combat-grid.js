@@ -815,6 +815,7 @@
     function getActiveEffectBonuses() {
         let hp = 0, mp = 0, armor = 0, speed = 0, weight = 0;
         activeTimedEffects.forEach(e => { hp += e.hp || 0; mp += e.mp || 0; armor += e.armor || 0; speed += e.speed || 0; weight += e.weight || 0; });
+        { const pb = plBonus(); hp += pb.hp; mp += pb.mp; } // ветка паладина: «защитник» +100 ХП, «провизор» +50 маны
         return { hp, mp, armor, speed, weight };
     }
 
@@ -865,6 +866,7 @@
         }
 
         activeTimedEffects.forEach(e => { if (e.turnsRemaining !== Infinity && (!e.perRound || _tickIsRound)) e.turnsRemaining -= 1; }); // perRound — длительность в кругах: списывается только на смене круга
+        try { plHandsTick(); } catch (e) { console.error('Паладин:', e); }
         activeTimedEffects = activeTimedEffects.filter(e => e.turnsRemaining > 0 || e.turnsRemaining === Infinity);
         clampTempHp(); // эффект с временными ХП мог закончиться — лишнее сгорает
         renderActiveEffects();
@@ -1079,6 +1081,7 @@
         (activeTimedEffects || []).forEach(e => {
             (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
         });
+        { const pb = plBonus(); totals.weaponDamagePercent += pb.weaponPct; totals.spellPower += pb.spellPower; totals.spellCostReduction += pb.costCut; } // ветка паладина
         if (lichStage() >= 2) { totals.spellPower += 10; totals.spellCostReduction += 10; } // высший лич: заклинания всех школ сильнее и дешевле на 10%
         return totals;
     }
@@ -1431,6 +1434,7 @@
         res.disease += gb('poisonDiseaseResist');
         res.shout += gb('shoutResist');
         res.magic += gb('magicResist');
+        res.magic += plBonus().magicRes;                                          // ветка паладина: «Священная мощь» и «защитник» по +10%
         if (lichPerk('pact')) res.magic += 10;                                   // Тёмный пакт: сопротивление магии +10%
         if (lichPerk('visage')) res.frost += 10;                                 // Лик смерти: холод +10%
         if (lichStage() >= 1) { res.frost += 50; vulnAfter.shock = (vulnAfter.shock || 0) - 25; } // лич: холод +50%, электричество −25%

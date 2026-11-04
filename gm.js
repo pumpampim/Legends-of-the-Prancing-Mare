@@ -4988,6 +4988,7 @@
             requirement: el('quest-req-input').value.trim(),
             reward: el('quest-reward-input').value.trim(),
             guild: el('quest-guild-select').value || null,
+            kind: (el('quest-kind-select') || {}).value || null,
             status: 'active'
         };
         const target = el('quest-target-player').value;
