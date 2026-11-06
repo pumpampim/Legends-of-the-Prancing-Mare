@@ -1015,6 +1015,7 @@
             if (sig !== _plCardSig) { _plCardSig = sig; if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer(); }
         } catch (e) { console.error('Паладин (панель):', e); }
         const p = playerPaladin; if (!p || !plHas('p1') || p.fallen || p.abandoned) return;
+        if (p.swapDay != null && p.swapDay > plAbsDay()) p.swapDay = plAbsDay(); // мастер перевёл дату назад: неделя считается от новой даты
         const god = (document.getElementById('faith-god') || {}).value;
         if (god && god !== 'none' && !AEDRA_AMULETS[god]) { plFall('вера в даэдра'); return; }
         if (p.vow === 'justice') {
@@ -1168,6 +1169,14 @@
         plLog(`⚜ ${(document.getElementById('char-name') || {}).value || 'Игрок'} совершает покаяние и возвращает праведность (пожертвование ${PALADIN_PENANCE_GOLD}).`);
         plSave();
     };
+    // Команды мастера: «Нарушил клятву» (то, что сайт сам не ловит) и «Простить» (без траты покаяния)
+    function plAdminOp(c) {
+        const p = playerPaladin; if (!p || !plHas('p1') || p.abandoned) return '';
+        if (c.op === 'fall') { if (p.fallen) return ''; plFall(c.reason || 'нарушил клятву (решение мастера)'); return 'мастер: паладин лишён праведности'; }
+        if (c.op === 'forgive') { if (!p.fallen) return ''; p.fallen = false; p.fallReason = ''; plLog(`⚜ ${(document.getElementById('char-name') || {}).value || 'Игрок'}: мастер возвращает праведность.`); plSave(); return 'мастер вернул праведность'; }
+        return '';
+    }
+    window.plAdminOp = plAdminOp;
     window.plAbandon = function () {
         const p = playerPaladin; if (!p || p.abandoned) return;
         const n = plPerksTaken().length;

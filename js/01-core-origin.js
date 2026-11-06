@@ -137,6 +137,7 @@
     let equipmentSets = []; // эпик 2.3: [{ id, name, slots: { helmet: itemId, ... } }], не больше 5
     let knownIngredientProps = {}; // { "Имя ингредиента": [true, false, true, false] } — по индексам свойств
     let knownEnchantments = []; // ["Урон огнем", ...] — узнаётся разрушением зачарованного предмета
+    var thrownLoose = []; // брошенное метательное, которое можно подобрать после боя: [{ itemId, name, qty, weight, price, weaponDmg, throwKind, stolen }]
     let pouchContents = []; // [{ itemId, name, effect, alchemyEffects }]
     let playerQuests = []; // [{ id, title, desc, requirement, reward, status: 'active'|'done' }]
     let activeSummons = []; // [{ id, category, name, curHp, maxHp, dmg, dmgType, speed, turnsRemaining, permanent }]

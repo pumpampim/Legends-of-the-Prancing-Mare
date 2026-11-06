@@ -1055,10 +1055,10 @@
     window.markQuestDone = function (id) {
         const q = playerQuests.find(x => x.id === id);
         if (!q || q.status !== 'active') return;
-        if (q.guild) {
-            if (!window.CloudSync || !window.CloudSync.requestQuestClaim) { alert('Квест гильдии подтверждает мастер — нужна активная сессия.'); return; }
+        if (q.guild || q.kind === 'resident') { // «Помощь жителю» тоже подтверждает мастер: от этих заданий зависят перки паладина и культиста
+            if (!window.CloudSync || !window.CloudSync.requestQuestClaim) { alert('Это задание подтверждает мастер — нужна активная сессия.'); return; }
             q.status = 'review'; renderQuestList(); saveLocalStorage();
-            window.CloudSync.requestQuestClaim({ questId: q.id, title: q.title, guild: q.guild })
+            window.CloudSync.requestQuestClaim({ questId: q.id, title: q.title, guild: q.guild || (q.kind === 'resident' ? 'Помощь жителю' : '') })
                 .then(() => alert('Заявка отправлена мастеру. Заказ и награда будут начислены после его подтверждения.'))
                 .catch(e => { q.status = 'active'; renderQuestList(); saveLocalStorage(); alert(e.message || ('Ошибка: ' + e)); });
             return;
@@ -1421,11 +1421,32 @@
         renderPouchPanelCore();
         if (typeof renderAttackActionSelect === 'function') { try { renderAttackActionSelect(); } catch (e) { } } // бросок метательного — в списке действий
     }
+    function renderThrownLoose(listEl) {
+        let box = document.getElementById('thrown-loose-box');
+        if (!box) { box = document.createElement('div'); box.id = 'thrown-loose-box'; listEl.insertAdjacentElement('afterend', box); }
+        const n = (thrownLoose || []).reduce((t, x) => t + (x.qty || 0), 0);
+        if (!n) { box.innerHTML = ''; return; }
+        const fight = typeof inCombatNow === 'function' && inCombatNow();
+        box.innerHTML = `<div class="party-row" style="margin-top:6px;"><div class="row-name"><span>🎯 Брошено в бою: ${n} шт.</span></div>
+            <div style="font-size:13px; opacity:.8; margin:2px 0;">${escHtml(thrownLoose.map(x => x.name + ' ×' + x.qty).join(', '))}${fight ? ' — подобрать можно после боя' : ''}</div>
+            <button class="btn-success" style="width:100%;" onclick="pickUpThrown()">Подобрать брошенное</button></div>`;
+    }
+    // Подобрать брошенное метательное: всё возвращается в рюкзак (в подсумок игрок кладёт его сам, как обычно)
+    window.pickUpThrown = function () {
+        if (typeof inCombatNow === 'function' && inCombatNow()) { alert('Подобрать брошенное можно после боя.'); return; }
+        if (!thrownLoose.length) return;
+        thrownLoose.forEach(x => addToInventory(x.itemId, x.name, x.qty || 1, typeof x.weight === 'number' ? x.weight : 0.3, 'Метательное', '', { thrown: true, throwKind: x.throwKind, weaponDmg: x.weaponDmg, price: x.price })); // краденое узнаётся по id «…#stolen»; флаг не передаём, чтобы не засчитать кражу паладину второй раз
+        const txt = thrownLoose.map(x => x.name + ' ×' + x.qty).join(', ');
+        thrownLoose = [];
+        renderPouchPanel(); renderInventoryList(); saveLocalStorage();
+        if (typeof alchToast === 'function') alchToast('🎯 Подобрано: ' + txt); 
+    };
     function renderPouchPanelCore() {
         const capEl = document.getElementById('pouch-capacity-info');
         const loadSelect = document.getElementById('pouch-load-select');
         const listEl = document.getElementById('pouch-contents-list');
         if (!capEl || !loadSelect || !listEl) return;
+        renderThrownLoose(listEl);
         const capacity = getPouchCapacity();
         if (!equippedSlots.pouch) {
             capEl.textContent = 'Подсумок не надет.';

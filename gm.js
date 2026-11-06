@@ -2558,6 +2558,7 @@
             }
             // Броня/оружие/украшения из кузницы — всегда добавляем поверх (не хранятся в Firestore).
             gmAllItems = gmAllItems.concat(getSmithingGiveableItems());
+            gmAllItems = gmAllItems.concat((window.thrownRecipes || []).map(w => ({ name: w.name, id: w.name, category: 'Метательное', price: w.price, weight: w.weight, dmg: w.damage, thrown: true, throwKind: w.throwKind, effect: 'Урон ' + w.damage + ' (метательное, бросок)' }))); // раньше ножей и дротиков в базе мастера не было
             gmAllItems = gmAllItems.concat(window.skillBooksData || []);
             gmAllItems = gmAllItems.concat(window.uniqueWeaponsData || []);
             gmAllItems = gmAllItems.concat(window.spellTomesData || []);
@@ -2655,6 +2656,7 @@
         if (typeof sourceItem.capacity === 'number') extra.capacity = sourceItem.capacity;
         if (typeof sourceItem.carryBonus === 'number') extra.carryBonus = sourceItem.carryBonus;
         if (sourceItem.unique) extra.unique = true;
+        if (sourceItem.thrown) { extra.thrown = true; if (sourceItem.throwKind) extra.throwKind = sourceItem.throwKind; delete extra.slot; } // метательное: в подсумок связками
         // уже зачарованная вещь из базы (ожерелье «Повышение здоровья» и т.п.) должна нести зачарование,
         // иначе игрок получает только текст в описании, а бонус не работает
         if (sourceItem.enchantment) extra.enchantment = JSON.parse(JSON.stringify(sourceItem.enchantment));
@@ -4067,7 +4069,7 @@
     function renderQuestClaims() {
         const box = el('quest-claims'); if (!box) return;
         const list = Array.isArray(lastData.questClaims) ? lastData.questClaims : [];
-        box.innerHTML = list.length ? '<div style="margin-bottom:8px;"><strong>📜 Квесты гильдий — ждут подтверждения</strong>' + list.map(c =>
+        box.innerHTML = list.length ? '<div style="margin-bottom:8px;"><strong>📜 Квесты гильдий и помощь жителям — ждут подтверждения</strong>' + list.map(c =>
             `<div class="party-row" style="display:flex; gap:6px; align-items:center; justify-content:space-between;"><span>${escapeHtml(c.name || '?')}: «${escapeHtml(c.title || '?')}» <span style="opacity:.7;">(${escapeHtml(c.guild || '')})</span></span><span style="display:flex; gap:4px;">` +
             `<button style="width:auto; padding:2px 8px;" onclick="resolveQuestClaim('${jsq(c.id)}', true)">Подтвердить</button>` +
             `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="resolveQuestClaim('${jsq(c.id)}', false)">Не выполнен</button></span></div>`).join('') + '</div>' : '';
@@ -4144,8 +4146,30 @@
                 ${s.vampire.isLord ? `<div style="font-size:12px; margin-top:4px;">Форма лорда: <strong>${s.vampire.lordForm ? 'включена' : 'выключена'}</strong> · Взято перков: ${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length}/11${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length ? '<br>' + Object.keys(s.vampire.lordPerks).filter(k => s.vampire.lordPerks[k]).map(escapeHtml).join(', ') : ''}</div>` : ''}
             </div>
             ${gmLichPanelHtml(s)}
-            ${gmCultPanelHtml(s)}`;
+            ${gmCultPanelHtml(s)}
+            ${gmPaladinPanelHtml()}`;
     }
+    // ---------- Паладин (только просмотр + «Нарушил клятву» / «Простить») ----------
+    function gmPaladinPanelHtml() {
+        const p = currentPlayerInvData && currentPlayerInvData.paladin;
+        if (!p || !p.perks || !p.perks.p1) return '';
+        const perks = (window.PALADIN_PERKS || []).filter(x => p.perks[x.id]).map(x => x.name);
+        const vow = p.vow && window.PALADIN_VOWS && window.PALADIN_VOWS[p.vow] ? window.PALADIN_VOWS[p.vow] : null;
+        const st = p.abandoned ? 'отказался от ветки' : p.fallen ? 'пал (' + escapeHtml(p.fallReason || '') + ')' : 'праведен';
+        let h = `<div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color);"><strong>⚜ Путь паладина</strong>`;
+        h += `<div style="font-size:12px; margin-top:4px;">Состояние: <strong>${st}</strong> · Клятва: <strong>${vow ? escapeHtml(vow.icon + ' ' + vow.name) : 'не принесена'}</strong>${p.penanceUsed ? ' · покаяние уже было' : ''}</div>`;
+        h += `<div style="font-size:12px;">Перки: ${escapeHtml(perks.join(', ') || '—')}${p.vow === 'justice' ? ` · краж с клятвы: ${p.thefts || 0}/10 · штрафов: ${p.finesTotal || 0}/1000` : ''}</div>`;
+        if (vow) h += `<div style="font-size:12px; opacity:.8;">Запреты: ${escapeHtml(vow.bans || '')}</div>`;
+        if (!p.abandoned) h += `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">` +
+            (!p.fallen ? `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmPaladinAdmin('fall')">⛔ Нарушил клятву</button>` : `<button style="width:auto; padding:2px 8px;" onclick="gmPaladinAdmin('forgive')">Простить (вернуть праведность)</button>`) + `</div>`;
+        return h + `</div>`;
+    }
+    window.gmPaladinAdmin = function (op) {
+        let reason = '';
+        if (op === 'fall') { reason = prompt('Чем паладин нарушил клятву? (увидит игрок)', 'нарушил клятву'); if (reason === null) return; }
+        else if (!confirm('Вернуть паладину праведность без покаяния? Его единственное покаяние останется в запасе.')) return;
+        gmSendCmd({ type: 'plAdmin', op, reason: String(reason || '').slice(0, 200) }, op === 'fall' ? '{p} лишается праведности (решение мастера).' : '{p}: мастер вернул праведность.').then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
+    };
 
     // ---------- Ветка культиста (cultist-data.js): перки выдаёт мастер ----------
     function gmCultPanelHtml(s) {
@@ -4166,7 +4190,7 @@
                 `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('offer')">✔ Принять подношение (деяние)</button>` +
                 `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('ban')">⛔ Нарушил запрет</button>` +
                 `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('unban')">Простить нарушение</button>` +
-                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('penance')">Искупление принято (−1000)</button>` +
+                (c.fallen && !c.penanceUsed ? `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('penance')">Искупление принято (−1000)</button>` : '') + // только павшему и один раз
                 `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('veil', ${c.veil ? 0 : 1})">${c.veil ? 'Снять Покров' : 'Выдать Покров (скрыть Метку)'}</button>` +
                 `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('reset')">Сбросить ветку</button></div>`;
         }
@@ -4178,7 +4202,7 @@
         const lvls = [5, 15, 25, 40], lvl = (currentPlayerInvData && currentPlayerInvData.characterLevel) || 1;
         if (lvl < lvls[i]) { alert(`Нужен ${lvls[i]}-й уровень, сейчас ${lvl}.`); return; }
         if (!confirm('Выдать перк культиста? У игрока спишется 1 очко перков (проверит ли он сам, что вера и задания подходят).')) return;
-        gmSendCmd({ type: 'cultPerk', perk: i }, '{p} получает перк культиста.').then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
+        gmSendCmd({ type: 'cultPerk', perk: i }, '{p}: перк культиста отправлен (если игрок не подходит, ответ придёт в журнал).').then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
     };
     window.gmCultAdmin = function (op, arg) {
         if (op === 'reset' && !confirm('Сбросить ветку культиста целиком? Все перки снимутся, очки вернутся.')) return;
@@ -4329,7 +4353,8 @@
                 perkPointsAvailable: parseInt(data.perkPointsAvailable) || 0,
                 customSpells: Array.isArray(data.customSpells) ? data.customSpells : [],
                 skills: Array.isArray(data.skills) ? data.skills : [],
-                race: data.race || ''
+                race: data.race || '',
+                paladin: (data.paladin && typeof data.paladin === 'object') ? data.paladin : null
             };
             renderGmPlayerPerks(data.takenPerks);
             renderGmPlayerPets(data.pets);

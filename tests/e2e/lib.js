@@ -34,6 +34,7 @@ function mergeDeep(target, src) {
   for (const k in src) {
     const v = src[k];
     if (isFV(v)) { const r = applyFV(target[k], v); if (r === undefined) delete target[k]; else target[k] = r; }
+    else if (v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length) target[k] = {}; // как Firestore: пустой словарь при merge заменяет поле целиком
     else if (v && typeof v === 'object' && !Array.isArray(v)) { if (!target[k] || typeof target[k] !== 'object' || Array.isArray(target[k])) target[k] = {}; mergeDeep(target[k], v); }
     else target[k] = clone(v);
   }

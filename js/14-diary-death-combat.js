@@ -274,7 +274,7 @@
     const inp = collectPlayerAttackInputBase(finalStr, finalDex);
     // Бросок метательного: вместо лука и стрелы считаем вещь из связки (ставит rollPlayerAttack на время расчёта)
     if (window.__throwOverride) inp.ranged = { dmg: window.__throwOverride.dmg, ammoDmg: 0, type: 'thrown', name: window.__throwOverride.name, isStaff: false, throwKind: window.__throwOverride.kind };
-    if (window.__throwOverride) { inp.enchantDmgRanged = 0; inp.elementalEnchant = Object.assign({}, inp.elementalEnchant, { ranged: false }); } // чары лука на бросок не действуют
+    if (window.__throwOverride) { inp.isPowerAttack = false; inp.isSprintAttack = false; inp.enchantDmgRanged = 0; inp.elementalEnchant = Object.assign({}, inp.elementalEnchant, { ranged: false }); } // чары лука на бросок не действуют
     return inp;
   }
   function collectPlayerAttackInputBase(finalStr, finalDex) {
@@ -545,6 +545,7 @@
             knownBrewRecipes: knownBrewRecipes,
             knownEnchantments: knownEnchantments,
             pouchContents: pouchContents,
+            thrownLoose: thrownLoose,
             activeTimedEffects: activeTimedEffects,
             gameTurn: gameTurn,
             gameRound: gameRound,
@@ -1272,7 +1273,7 @@
                 } else if (c.type === 'trapDisarm') {
                     // В бою обезвредить ловушку — основное действие хода (как зелье или атака); занят ход — команда не выполняется, мастер шлёт заново.
                     if (inCombatNow()) {
-                        if (!combatActionAllowed('item')) { msgs.push(`«${c.trapName}»: обезвредить не вышло — основное действие хода уже потрачено, мастеру нужно повторить в следующем ходу`); gmCmdsApplied.push(c.id); return; }
+                        if (!combatActionAllowed('item')) { msgs.push(`«${c.trapName}»: обезвредить не вышло — основное действие хода уже потрачено, мастеру нужно повторить в следующем ходу`); try { window.CloudSync.postCombatLog(`🪤 «${c.trapName}»: ${(document.getElementById('char-name') || {}).value || 'Игрок'} не может обезвредить — основное действие хода уже потрачено. Повтори команду в следующем ходу.`, (document.getElementById('char-name') || {}).value || 'Игрок'); } catch (e) { } gmCmdsApplied.push(c.id); return; }
                         markCombatAction('attack');
                     }
                     msgs.push(tryDisarmTrap(c));
@@ -1319,6 +1320,8 @@
                     const lm = lichGrantPerk(c.perk); if (lm) msgs.push(lm);
                 } else if (c.type === 'cultPerk' && c.perk !== undefined) { // мастер выдал перк ветки культиста
                     const cm = cuGrantPerk(c.perk); if (cm) msgs.push(cm);
+                } else if (c.type === 'plAdmin' && c.op) { // мастер: паладин нарушил клятву / прощён
+                    const pm = (typeof plAdminOp === 'function') ? plAdminOp(c) : ''; if (pm) msgs.push(pm);
                 } else if (c.type === 'cultAdmin' && c.op) { // подношение принято, запрет нарушен, Покров и т.д.
                     const cm = cuAdminOp(c); if (cm) msgs.push(cm);
                 } else if (c.type === 'lichAdmin' && c.op) { // остальные действия мастера с веткой лича

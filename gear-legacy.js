@@ -10,8 +10,9 @@
     function entryFor(item) { return L[item.name] || L[stripTier(item.name)] || null; }
     function fixItem(item) {
         if (!item || typeof item !== 'object') return false;
-        if (String(item.itemId || '').indexOf('#zen') !== -1) return false; // бонус Зенитара — своя стопка
-        const e = entryFor(item); if (!e) return false;
+        const renamed = renameItem(item);
+        if (String(item.itemId || '').indexOf('#zen') !== -1) return renamed; // бонус Зенитара — своя стопка
+        const e = entryFor(item); if (!e) return renamed;
         let ch = false;
         if (e.d) {
             ['baseWeaponDmg', 'weaponDmg', 'dmg', 'damage'].forEach(f => { if (item[f] === e.d[0]) { item[f] = e.d[1]; ch = true; } });
@@ -28,9 +29,19 @@
             else if (e.d) { const m = item.effect.match(/^Урон (\d+)(?!\s*\+)/); if (m && +m[1] === e.d[0]) { item.effect = item.effect.replace(/^Урон \d+/, 'Урон ' + e.d[1]); ch = true; } }
             if (e.a) { const m = item.effect.match(/^Сопротивление (\d+)/); if (m && +m[1] === e.a[0]) { item.effect = item.effect.replace(/^Сопротивление \d+/, 'Сопротивление ' + e.a[1]); ch = true; } }
         }
-        return ch;
+        return ch || renamed;
+    }
+    // Опечатки в названиях метательного (исправлены 2026-11-06): «Стальный …» → «Стальной …», «Двемерскый …» → «Двемерский …».
+    // Имя и id стопки меняются на месте (в т. ч. «…#stolen» и «…#zenN»), чтобы старые вещи нашли свой рецепт и размер связки.
+    const RENAME_RE = [[/^Стальный (метательн|дротик)/, 'Стальной $1'], [/^Двемерскый /, 'Двемерский ']];
+    function renameName(n) { let s = String(n || ''); RENAME_RE.forEach(([re, to]) => { s = s.replace(re, to); }); return s; }
+    function renameItem(item) {
+        if (!item || typeof item !== 'object' || typeof item.name !== 'string') return false;
+        const nn = renameName(item.name); if (nn === item.name) return false;
+        item.name = nn; if (typeof item.itemId === 'string') item.itemId = renameName(item.itemId);
+        return true;
     }
     function fixList(list) { let n = 0; (list || []).forEach(i => { if (fixItem(i)) n++; }); return n; }
     window.GEAR_LEGACY = L;
-    window.GearLegacy = { fixItem, fixList };
+    window.GearLegacy = { fixItem, fixList, renameName, renameItem };
 })();

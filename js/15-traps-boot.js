@@ -347,7 +347,7 @@
             document.getElementById('slot-neck-name').value = data.sNeck || '';
             document.getElementById('slot-circlet-name').value = data.sCirclet || '';
 
-            pouchContents = Array.isArray(data.pouchContents) ? data.pouchContents : [];
+            thrownLoose = Array.isArray(data.thrownLoose) ? data.thrownLoose : []; pouchContents = Array.isArray(data.pouchContents) ? data.pouchContents : []; try { if (window.GearLegacy && window.GearLegacy.renameItem) pouchContents.forEach(window.GearLegacy.renameItem); } catch (e) { }
             activeTimedEffects = Array.isArray(data.activeTimedEffects) ? data.activeTimedEffects : [];
             // JSON превращает Infinity в null: «бессрочные» эффекты (болезни, поддерживаемые заклинания, «хриплый голос
             // до конца дня») после перезагрузки теряли срок и пропадали на первом же ходу. Возвращаем бесконечность.

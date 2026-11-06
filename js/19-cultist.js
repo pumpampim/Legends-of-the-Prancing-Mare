@@ -71,6 +71,7 @@
     window.cuSellBonus = function () { return 1 + (bonus().sell || 0) / 100; };
     window.cuHalfBuyApplies = function (unitBase) { var c = S(); return !!(running() && c.halfBuy && (parseFloat(unitBase) || 0) <= lvl() * 50); };
     window.cuConsumeHalfBuy = function (unitBase) { var c = S(); if (c && c.halfBuy && window.cuHalfBuyApplies(unitBase)) { c.halfBuy = false; log('🤝 ' + name() + ' использует «Владыку сделок»: покупка за половину цены.'); save(); } };
+    window.cuRestoreHalfBuy = function () { var c = S(); if (c) { c.halfBuy = true; log('🤝 ' + name() + ': покупка сорвалась — «Владыка сделок» не потрачен.'); save(); } };
     // После длительного отдыха: «Вещие сны» дают +10% HP и маны
     window.cuRestBonus = function () {
         var rb = bonus().restBonus; if (!rb) return '';
@@ -118,11 +119,12 @@
     function alertSafe(t) { if (typeof window.alchToast === 'function') window.alchToast(t); else alert(t); }
     // Следующее заклинание (Откровение / Бездна) тратится при каждом платном касте
     window.cuConsumeNextSpell = function () {
-        var e = cuEffects().find(function (x) { return x.cuNextSpell; });
-        if (e) { activeTimedEffects = activeTimedEffects.filter(function (x) { return x !== e; }); try { renderActiveEffects(); } catch (er) { } scheduleSoon(); }
+        var e = cuEffects().find(function (x) { return x.cuNextSpell && !x.cuSpent; });
+        // Снимаем после расчёта урона этого же каста (он идёт сразу следом): иначе «Бездна» теряла +50% силы
+        if (e) { e.cuSpent = true; setTimeout(function () { if (!e.cuSpent) return; activeTimedEffects = activeTimedEffects.filter(function (x) { return x !== e; }); try { renderActiveEffects(); } catch (er) { } scheduleSoon(); }, 0); }
     };
     function scheduleSoon() { try { if (typeof scheduleUpdateAll === 'function') scheduleUpdateAll(); else updateAll(); } catch (e) { } }
-    window.cuNextSpellFree = function () { return cuEffects().some(function (e) { return e.cuNextSpell && e.cuNextSpell.cost >= 100; }); };
+    window.cuNextSpellFree = function () { return cuEffects().some(function (e) { return e.cuNextSpell && !e.cuSpent && e.cuNextSpell.cost >= 100; }); };
 
     // ---------- Подношения ----------
     function equippedIds() { var s = {}; Object.keys(equippedSlots || {}).forEach(function (k) { var v = equippedSlots[k]; if (v && typeof v === 'string') s[v] = 1; }); return s; }
@@ -151,17 +153,32 @@
         }
         return { ok: false };
     }
+    // Списание подношения. Краденое — с самого дешёвого, пока не наберётся сумма. Предметы — тоже с дешёвых;
+    // если нужна одна вещь, а подходящих несколько разных (оружие у Малаката, камень душ, самоцвет), игрок выбирает сам.
+    // Возвращает false, если игрок отменил выбор (тогда ничего не списано).
     function take(opt, mult) {
         mult = mult || 1;
         if (opt.k === 'stolen') {
             var need = opt.mult * lvl() * mult;
-            var st = (playerInventory || []).filter(function (it) { return it && it.count > 0 && (it.stolen || /#stolen$/.test(it.itemId || '')); }).sort(function (a, b) { return priceOf(b) - priceOf(a); });
-            st.forEach(function (it) { while (need > 0 && it.count > 0) { need -= priceOf(it); removeFromInventoryByName(it.itemId, 1); it = playerInventory.find(function (x) { return x.itemId === it.itemId; }) || { count: 0 }; } });
-        } else opt.need.forEach(function (n) {
-            var left = n.qty * mult;
-            matching(n).forEach(function (it) { if (left <= 0) return; var t = Math.min(left, it.count); left -= t; removeFromInventoryByName(it.itemId, t); });
-        });
+            var st = (playerInventory || []).filter(function (it) { return it && it.count > 0 && (it.stolen || /#stolen$/.test(it.itemId || '')); }).sort(function (a, b) { return priceOf(a) - priceOf(b); });
+            st.forEach(function (it) { var id = it.itemId, n = it.count; while (need > 0 && n > 0) { need -= priceOf(it); removeFromInventoryByName(id, 1); n--; } });
+        } else {
+            var picks = [];
+            for (var k = 0; k < opt.need.length; k++) {
+                var n = opt.need[k], qty = n.qty * mult;
+                var cand = matching(n).sort(function (a, b) { return priceOf(a) - priceOf(b); });
+                if (qty === 1 && cand.length > 1) {
+                    var ans = prompt('Что отдать Принцу? Введи номер:\n' + cand.map(function (it, i) { return (i + 1) + '. ' + it.name + (it.count > 1 ? ' (×' + it.count + ')' : '') + ' — ' + Math.round(priceOf(it)) + ' зол.'; }).join('\n'), '1');
+                    if (ans === null) return false;
+                    var ch = cand[(parseInt(ans) || 1) - 1]; if (!ch) return false;
+                    cand = [ch];
+                }
+                picks.push({ cand: cand, qty: qty });
+            }
+            picks.forEach(function (p) { var left = p.qty; p.cand.forEach(function (it) { if (left <= 0) return; var t = Math.min(left, it.count); left -= t; removeFromInventoryByName(it.itemId, t); }); });
+        }
         try { renderInventoryList(); } catch (e) { }
+        return true;
     }
     function goldEl() { return el('char-gold'); }
     function markOffered(how) {
@@ -183,7 +200,7 @@
         var h = haveFor(opt);
         if (!h.ok) { alert('Не хватает: ' + (opt.k === 'stolen' ? 'краденого на ' + h.need + ' золота (есть ' + h.have + ')' : h.rows) + '.'); return; }
         if (!confirm('Принести подношение: ' + opt.text + '? Предметы будут списаны.')) return;
-        take(opt); markOffered(opt.text);
+        if (take(opt) === false) return; markOffered(opt.text);
     };
     window.cuPenance = function (optIdx) {
         var c = S(); if (!c || !c.fallen || c.abandoned) return;
@@ -199,16 +216,18 @@
             if (g < gold) { alert('Нужно ' + gold + ' септимов храму (есть ' + g + ').'); return; }
             var h = haveFor(opt, mult); if (!h.ok) { alert('Не хватает: ' + (opt.k === 'stolen' ? 'краденого на ' + h.need + ' (есть ' + h.have + ')' : h.rows) + ' (подношение ×' + mult + ').'); return; }
             if (!confirm('Искупление: ' + gold + ' септимов и подношение ×' + mult + ' (' + opt.text + '). Один раз. Продолжить?')) return;
-            goldEl().value = g - gold; take(opt, mult);
+            if (take(opt, mult) === false) return; goldEl().value = g - gold;
         }
         c.fallen = false; c.fallReason = ''; c.penanceUsed = true; c.lastOffer = absDay(); c.banned = false;
         log('🕯 ' + name() + ' искупает вину перед ' + d.name + '.'); save();
     };
     window.cuAbandon = function () {
         var c = S(); if (!c || c.abandoned) return;
-        var n = Object.keys(c.perks || {}).filter(function (k) { return c.perks[k]; }).length;
-        if (!confirm('Отказаться от пути культиста? Очки перков (' + n + ') вернутся. Метка исчезнет. Снова встать на путь можно только по решению мастера.')) return;
-        perkPointsAvailable += n; clearAll(c); c.abandoned = false; c.god = null; c.fallen = false; c.banned = false;  c.halfBuy = false; c.lastOffer = null; c.swapDay = absDay();
+        var n = Object.keys(c.perks || {}).filter(function (k) { return c.perks[k]; }).length, back = Math.max(0, n - 1);
+        var left = (c.swapDay == null) ? 0 : window.CULT_OFFER_DAYS - (absDay() - c.swapDay);
+        if (n && left > 0) { alert('Отказаться от пути или сменить Принца можно раз в ' + window.CULT_OFFER_DAYS + ' дн.: ещё ' + left + ' дн.'); return; }
+        if (!confirm('Отказаться от пути культиста? Перки сгорят, вернётся ' + back + ' очк. перков (на одно меньше, как при смене Принца). Метка исчезнет. Снова встать на путь можно только по решению мастера.')) return;
+        perkPointsAvailable += back; clearAll(c); c.abandoned = false; c.god = null; c.fallen = false; c.banned = false;  c.halfBuy = false; c.lastOffer = null; c.swapDay = absDay();
         dropCuEffects(); log('🕯 ' + name() + ' отказывается от пути культиста.'); save();
     };
     function fall(reason) {
@@ -230,21 +249,23 @@
     };
 
     // ---------- Перки: выдаёт мастер ----------
+    // Отказ в перке от мастера: игрок видит окно, мастер — запись в журнале сессии (раньше мастер видел «получает перк» и при отказе)
+    function refuse(t) { alert(t); log('🕯 ' + name() + ': ' + t); return ''; }
     window.cuGrantPerk = function (idx) {
         idx = parseInt(idx); if (!(idx >= 0 && idx <= 3)) return '';
         var c = ensure(), g = faith(), d = GODS()[g];
         if (c.abandoned) c.abandoned = false;
-        if (!c.god) { if (!d) { alert('Перк культиста не выдан: игрок не верит ни в одного Принца Даэдра.'); return ''; } }
-        else if (g !== c.god) { alert('Перк культиста не выдан: вера игрока (' + g + ') не совпадает с Принцем пути.'); return ''; }
-        if (conflict()) { alert('Перк культиста не выдан: путь культиста несовместим с путём паладина и лича.'); return ''; }
-        if (c.fallen) { alert('Перк не выдан: культист пал, сначала искупление.'); return ''; }
+        if (!c.god) { if (!d) { return refuse('Перк культиста не выдан: игрок не верит ни в одного Принца Даэдра.'); } }
+        else if (g !== c.god) { return refuse('Перк культиста не выдан: вера игрока (' + g + ') не совпадает с Принцем пути.'); }
+        if (conflict()) { return refuse('Перк культиста не выдан: путь культиста несовместим с путём паладина и лича.'); }
+        if (c.fallen) { return refuse('Перк не выдан: культист пал, сначала искупление.'); }
         var god = c.god || g, pd = GODS()[god].perks[idx];
         if (c.perks[idx]) return '';
-        if (idx > 0 && !c.perks[idx - 1]) { alert('Перк «' + pd.name + '» не выдан: сначала нужен предыдущий перк ветки.'); return ''; }
-        if (lvl() < pd.level) { alert('Перк «' + pd.name + '» не выдан: нужен ' + pd.level + '-й уровень.'); return ''; }
+        if (idx > 0 && !c.perks[idx - 1]) { return refuse('Перк «' + pd.name + '» не выдан: сначала нужен предыдущий перк ветки.'); }
+        if (lvl() < pd.level) { return refuse('Перк «' + pd.name + '» не выдан: нужен ' + pd.level + '-й уровень.'); }
         var qd = (playerQuests || []).filter(function (q) { return q && q.kind === 'resident' && q.status === 'done'; }).length;
-        if (pd.quests && qd < pd.quests) { alert('Перк «' + pd.name + '» не выдан: нужно выполнить ' + pd.quests + ' заданий жителей (выполнено ' + qd + ').'); return ''; }
-        if (perkPointsAvailable <= 0) { alert('Перк «' + pd.name + '» не выдан: нет свободного очка перков.'); return ''; }
+        if (pd.quests && qd < pd.quests) { return refuse('Перк «' + pd.name + '» не выдан: нужно выполнить ' + pd.quests + ' заданий жителей (выполнено ' + qd + ').'); }
+        if (perkPointsAvailable <= 0) { return refuse('Перк «' + pd.name + '» не выдан: нет свободного очка перков.'); }
         perkPointsAvailable -= 1; c.god = god; c.perks[idx] = true;
         if (idx === 0) { c.lastOffer = absDay(); c.banned = false; c.halfBuy = false; }
         log('🕯 ' + name() + ' получает перк культиста ' + GODS()[god].name + ' «' + pd.name + '».');
@@ -264,9 +285,11 @@
         if (!c) return '';
         if (c0.op === 'offer') {
             var d = def(), opt = d && d.offer.opts.filter(function (o) { return o.k === 'deed'; })[0];
-            if (opt && opt.gold) { var gg = parseInt(goldEl().value) || 0, pr = lvl() * opt.gold; if (gg < pr) { alert('Подношение не принято: нужно ещё ' + pr + ' септимов (есть ' + gg + ').'); return ''; } goldEl().value = gg - pr; }
+            if (opt && opt.gold) { var gg = parseInt(goldEl().value) || 0, pr = lvl() * opt.gold; if (gg < pr) return refuse('подношение не принято: нужно ' + pr + ' септимов (есть ' + gg + ')'); goldEl().value = gg - pr; }
             markOffered('деяние, подтверждено мастером'); return 'подношение принято';
         }
+        if (c0.op === 'penance' && !c.fallen) return refuse('искупление не нужно: культист не пал');
+        if (c0.op === 'penance' && c.penanceUsed) return refuse('искупление уже было один раз');
         if (c0.op === 'penance') { c.fallen = false; c.fallReason = ''; c.penanceUsed = true; c.lastOffer = absDay(); c.banned = false; var g2 = parseInt(goldEl().value) || 0; goldEl().value = Math.max(0, g2 - window.CULT_PENANCE_GOLD); save(); return 'искупление принято'; }
         if (c0.op === 'ban') { c.banned = true; save(); return 'запрет Принца нарушен: дары отключены до подношения'; }
         if (c0.op === 'unban') { c.banned = false; save(); return 'нарушение прощено'; }
@@ -288,10 +311,11 @@
         if (o.invis) { e.invisible = true; e.cuInvis2 = true; }
         if (o.hitPct) e.cuHitPct = o.hitPct;
         if (o.hitExtra) e.cuHitExtra = { dmg: Math.round(L * o.hitExtra.mult), type: o.hitExtra.type, label: o.hitExtra.label + ' +' + Math.round(L * o.hitExtra.mult) };
-        if (o.nextSpell) { e.cuNextSpell = o.nextSpell; e.percentEffects = [{ type: 'spellCostReduction', value: o.nextSpell.cost }, { type: 'spellPower', value: o.nextSpell.power }].filter(function (x) { return x.value; }); }
+        if (o.nextSpell) { e.cuNextSpell = o.nextSpell; e.cuSpent = false; e.percentEffects = [{ type: 'spellCostReduction', value: o.nextSpell.cost }, { type: 'spellPower', value: o.nextSpell.power }].filter(function (x) { return x.value; }); }
         if (o.killAction) e.cuKillAction = true;
         if (o.killHeal) e.cuKillHeal = o.killHeal;
         if (o.immune) e.cuImmune = true;
+        if (o.untilCombatEnd) e.cuCombatEnd = true; // «Козни»: до конца боя
         if (o.regenPct) e.regenHp = Math.max(1, Math.round(mh * o.regenPct / 100));
         return e;
     }
@@ -481,14 +505,25 @@
             var sig = JSON.stringify([faith(), lvl(), perkPointsAvailable, S(), conflict(), powersUsedToday.cu0, powersUsedToday.cu1, powersUsedToday.cu2, powersUsedToday.cu3, absDay()]);
             if (sig !== _sig) { _sig = sig; if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer(); }
         } catch (e) { console.error('Культист (панель):', e); }
-        var c = S(); if (!started() || c.fallen) return;
+        // «до конца боя»: в сессии больше нет живых врагов — эффект спадает
+        try { if (cuEffects().some(function (e) { return e.cuCombatEnd; }) && typeof inCombatNow === 'function' && !inCombatNow()) { activeTimedEffects = activeTimedEffects.filter(function (e) { return !(e && e.cuCombatEnd); }); try { renderActiveEffects(); } catch (er) { } } } catch (e) { }
+        var c = S(); if (!c) return;
+        // Мастер перевёл дату назад: отсчёты (подношение, неделя, смена Принца) начинаются с новой даты
+        var now = absDay();
+        if (c.lastOffer != null && c.lastOffer > now) c.lastOffer = now;
+        if (c.swapDay != null && c.swapDay > now) c.swapDay = now;
+        if (c.weekUsed) [0, 1, 2, 3].forEach(function (i) { if (c.weekUsed[i] != null && c.weekUsed[i] > now) c.weekUsed[i] = now; });
+        if (!started() || c.fallen) return;
+        // Стал оборотнем или вампиром-лордом: вера сама сменилась на Хирсина / Молаг Бала — культист другого Принца падает (решение Никиты 2026-11-06)
+        var sh = playerSupernaturalState && playerSupernaturalState.faithShift;
+        if (sh && sh.god && sh.god !== c.god) { fall('стал(а) ' + (sh.god === 'hircine' ? 'оборотнем — вера перешла к Хирсину' : 'вампиром-лордом — вера перешла к Молаг Балу')); return; }
         if (daysSince() > 2 * window.CULT_OFFER_DAYS) fall('пропущено два срока подношения подряд');
     };
     // Следим за павшими союзниками (окно «Королевы зари»)
     window.cuOnSession = function () {
         var c = S(); if (!c || !has(3)) return;
         var sess = window.CloudSync.getSessionData() || {}, ps = sess.participants || {}, seen = c.fallenSeen || (c.fallenSeen = {}), tick = parseInt(sess.sessionTickCounter) || 0;
-        Object.keys(ps).forEach(function (u) { if (ps[u].fallen) { if (!seen[u]) seen[u] = { tick: tick, ts: Date.now() }; } else if (seen[u]) delete seen[u]; });
+        Object.keys(ps).forEach(function (u) { if (ps[u].fallen) { if (!seen[u]) seen[u] = { tick: tick, ts: Date.now() }; } else if (seen[u]) seen[u] = null; }); // null, а не delete: облако сливает лист по полям и удалённый ключ вернулся бы
     };
 
     // ---------- Панель игрока ----------
@@ -513,6 +548,7 @@
         d.perks.forEach(function (p, i) {
             var hv = has(i), usedT = hv && usedNow(i, p);
             var tag = p.type === 'passive' ? 'пассив' : p.type === 'day' ? 'раз в день' : 'раз в неделю';
+            if (!p.a && p.type !== 'passive') tag += ', срабатывает само';
             h += '<div style="padding:4px 0; border-top:1px dashed var(--border-color); opacity:' + (hv ? 1 : .65) + ';"><strong>' + (hv ? '✔ ' : '🔒 ') + escHtml(p.name) + '</strong> <span style="font-size:11px; opacity:.8;">(ур. ' + p.level + (p.quests ? ', заданий ' + p.quests : '') + ', ' + tag + (p.act ? ', ' + (p.act === 'bonus' ? 'бонусное' : 'основное') : '') + ')</span><div style="font-size:12px;">' + escHtml(p.desc) + '</div>';
             if (hv && p.a && p.type !== 'passive' && !(p.a.sp === undefined && !p.a.self && !p.a.t && !p.a.ar && !p.a.zone && !p.a.heal && !p.a.cleanse && !p.a.ally)) {
                 var dis = !active(i) || usedT;

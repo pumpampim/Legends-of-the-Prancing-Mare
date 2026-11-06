@@ -419,6 +419,7 @@ window.nextDay = function () {
     // Прокатываем дату
     godDay = { light: 0, heavy: 0 }; // новый день — счётчик алкоголя Сангвина обнуляется
     mageSignFreeUsed = false; // новый день — снова доступен бесплатный каст знака «Маг»
+    thrownLoose = [];         // не подобранное за день брошенное метательное остаётся на месте боя
     powersUsedToday = {};     // новый день — «раз в день» способности снова доступны
     keeperBarrierLeft = KEEPER_BARRIER_MAX; // барьер Перчаток Хранителя восстанавливается
     try { stopBalladIfMine(); } catch (e) { } // ночью бард перестаёт играть
@@ -650,6 +651,10 @@ function updateHungerPenalty() {
             if (actionVal === 'ranged' && throwShot) {
                 // метательное расходуется из связки в подсумке
                 throwShot.entry.qty -= 1;
+                { // брошенное лежит на месте боя — после боя его можно подобрать (решение Никиты 2026-11-06)
+                    const en = throwShot.entry, lo = thrownLoose.find(x => x.itemId === en.itemId && !!x.stolen === !!en.stolen);
+                    if (lo) lo.qty += 1; else thrownLoose.push({ itemId: en.itemId, name: en.name, qty: 1, weight: en.weight, price: en.price, weaponDmg: en.weaponDmg, throwKind: en.throwKind, stolen: !!en.stolen });
+                }
                 if (throwShot.entry.qty <= 0) pouchContents.splice(throwShot.idx, 1);
                 renderPouchPanel(); renderInventoryList();
             } else if (actionVal === 'ranged') {
@@ -696,7 +701,7 @@ function updateHungerPenalty() {
             if (lichAuraId() === 'rage') penetrationPct += 5; // «Багровая ярость»: +5% игнорирования брони
             if (plActive('p3a')) penetrationPct += 5;         // паладин, «Благословение избавителя»: +5% пробития
             actionLabel = (actionVal === 'melee' ? 'ближним оружием' : throwShot ? `метательным «${throwShot.entry.name}» (бросок, бонусное действие)` : 'дальним оружием') + sneakNote;
-            const spiritE = getActiveWeaponSpirit(actionVal);
+            const spiritE = throwShot ? null : getActiveWeaponSpirit(actionVal); // дух оружия на луке броску не передаётся
             if (spiritE) {
                 const w = spiritE.weaponSpirit;
                 const boostD = getSkillBoostPercent('Разрушение') + ((typeof getActivePercentBonuses === 'function') ? getActivePercentBonuses().spellPower : 0);
@@ -955,7 +960,7 @@ function updateHungerPenalty() {
         }
         // Бонусы богов к атаке (по таблице богов: плоские прибавки, условия по цели).
         const isWeaponAtk = actionVal === 'melee' || actionVal === 'ranged';
-        const isPowerAtkNow = isWeaponAtk && document.getElementById('chk-power-attack').checked;
+        const isPowerAtkNow = isWeaponAtk && !throwShot && document.getElementById('chk-power-attack').checked; // бросок метательного силовым не бывает
         const tgtMeta = getEnemyMeta(target);
         const tgtSt = Array.isArray(target.statusEffects) ? target.statusEffects : [];
         const tgtPoisoned = tgtSt.some(x => /^яд/i.test(String(x.source || '')) || /яд|отравл/i.test(String(x.name || '')));
@@ -968,7 +973,7 @@ function updateHungerPenalty() {
             if (gb('pureDmg')) godExtra.push({ type: 'physical', dmg: gb('pureDmg'), pen: 100, label: '🩸 Намира: чистый урон' });
             if (tgtPoisoned && gb('poisonLifeSteal')) godExtra.push({ type: 'physical', dmg: gb('poisonLifeSteal'), pen: 100, heal: true, label: '🕷 Мефала: поглощение (цель отравлена)' });
             { // уникальное оружие: поглощение здоровья и доп. стихийный урон из описания
-                const uwI = playerInventory.find(i => i.itemId === (actionVal === 'ranged' ? equippedSlots.rangedWeapon : equippedSlots.meleeWeapon));
+                const uwI = throwShot ? null : playerInventory.find(i => i.itemId === (actionVal === 'ranged' ? equippedSlots.rangedWeapon : equippedSlots.meleeWeapon)); // свойства лука броску не передаются
                 const uw = uniqueWeaponHitProps(uwI);
                 const uwN = uwI ? uwI.name : 'оружие';
                 uw.elem.forEach(e => godExtra.push({ type: e.type, dmg: e.dmg, label: `${e.label.split(' ')[0]} «${uwN}»: ${e.label.split(' ')[1]}` }));
@@ -990,7 +995,7 @@ function updateHungerPenalty() {
         const isDaedraTarget = tgtMeta.kind === 'daedra';
         if (dmg && (actionVal === 'melee' || actionVal === 'ranged')) { // чары «Урон по нежити» (награда Соратников)
             const wIdU = actionVal === 'ranged' ? equippedSlots.rangedWeapon : equippedSlots.meleeWeapon;
-            const wItU = wIdU ? playerInventory.find(i => i.itemId === wIdU) : null;
+            const wItU = (wIdU && !throwShot) ? playerInventory.find(i => i.itemId === wIdU) : null;
             if (weaponEnchantLive(wItU) && wItU.enchantment.name === 'Урон по нежити' && typeof wItU.enchantment.value === 'number' && isUndeadTarget) {
                 dmg += wItU.enchantment.value; actionLabel += ` (💀 +${wItU.enchantment.value} по нежити)`;
             }
@@ -1089,15 +1094,16 @@ function updateHungerPenalty() {
             logSkillSuccessByName(skillNameForProgress, hit ? 1 : MISS_SKILL_PROGRESS); // промах — четверть успеха (как неудачная готовка)
         }
 
+        // Бросок (½) и «Быстрая стрельба» (⅓) делим до бонусов культиста — они считаются от настоящего урона удара
+        if (throwShot) { dmg = Math.max(1, Math.round(dmg / 2)); actionLabel += ' (🎯 урон броска: половина выстрела)'; }
+        if (quickShot) { dmg = Math.max(1, Math.round(dmg / 3)); actionLabel += ' (⚡ «Быстрая стрельба»: доп. действие, ⅓ урона)'; }
         if (hit && dmg > 0 && !isSummonAct) { try { const cx = cuAttackExtras({ actionVal, target, dmg, sneak: !!(document.getElementById('chk-sneak-attack') || {}).checked, invisUsed: window._cuInvisUsed || false }); cx.extra.forEach(x => godExtra.push(x)); lifestealPct += cx.vamp; actionLabel += cx.note; } catch (e) { console.error('Культист:', e); } } // ветка культиста
         window._cuInvisUsed = false;
         // Малакат лечит % ХП только при УБИЙСТВЕ силовой атакой — см. godProcs.killHeal.
         const healPct = lifestealPct;
 
         // Яд на оружии сработает на ближайшем попадании обычной атакой оружием (расходуется на один удар).
-        const attackPoison = (hit && weaponPoison && !throwShot && (actionVal === 'melee' || actionVal === 'ranged')) ? weaponPoison : null;
-        if (throwShot) { dmg = Math.max(1, Math.round(dmg / 2)); actionLabel += ' (🎯 урон броска: половина выстрела)'; }
-        if (quickShot) { dmg = Math.max(1, Math.round(dmg / 3)); actionLabel += ' (⚡ «Быстрая стрельба»: доп. действие, ⅓ урона)'; }
+        const attackPoison = (hit && weaponPoison && (actionVal === 'melee' || actionVal === 'ranged')) ? weaponPoison : null; // яд на метательном тоже срабатывает (решение Никиты 2026-11-06)
         if (isSummonAct) markCombatAction(actionVal); else if (quickShot || throwShot) markBonusAction(); else markCombatAction('attack'); // бросок атаки/каста — действие хода
         if (actionVal === 'ranged' && !throwShot && inCombatNow() && (document.getElementById('wep-ranged-type') || {}).value === 'crossbow') combatMarks.xbow = gameTurn || 0;
         if (isPowerAtkNow && inCombatNow()) combatMarks.power = gameTurn || 0;
@@ -1384,7 +1390,7 @@ function updateHungerPenalty() {
                 if (res.killed && res.enemy) healMsg += soulEaterKill(res.enemy);
                 if (res.killed && res.enemy) healMsg += lordCountKill(res.enemy);
                 if (res.killed && res.enemy) healMsg += lichOnKill(res.enemy, !!attackWeaponSlot, attackWeaponSlot);
-                if (res.killed && counterHits[attackTargetId]) { delete counterHits[attackTargetId]; saveLocalStorage(); }
+                if (res.killed && counterHits[attackTargetId]) { counterHits[attackTargetId] = 0; saveLocalStorage(); }
                 if (res.killed && lordXNow && lordXNow.healKill) { snLordKillHeal('убийство'); healMsg += ' 🩸 Лечение кровью: +50% ХП.'; }
                 // Зачарование «Захват души» / «Похититель душ»: добивающий удар оружием забирает душу бесплатно.
                 if (res.killed && attackWeaponSlot && (weaponHasSoulTrap(attackWeaponSlot) || lichPerk('bearer')) && !res.enemy.soulTaken && !soulTakenLocal[res.enemy.id]) {

@@ -175,7 +175,7 @@
         const key = marketBought[marketKey(item.name)] ? marketKey(item.name) : item.name;
         const r = marketBought[key]; if (!r) return;
         r.qty -= Math.min(qty, r.qty);
-        if (r.qty <= 0) delete marketBought[key];
+        if (r.qty <= 0) marketBought[key] = null; // null, а не delete: облако сливает лист по полям, удалённый ключ вернулся бы
     }
 
     // ---- Потолок цены продажи для СДЕЛАННЫХ игроком вещей ----
@@ -330,8 +330,8 @@
         const goldNow = parseInt(goldInput.value) || 0;
         if (total > goldNow) { alert('Не хватает золота.'); return; }
         goldInput.value = goldNow - total; saveLocalStorage(true);
-        cuConsumeHalfBuy(it.price);
-        window.CloudSync.buyFromMerchantStock(key, idx, total, qty, { name: it.name, sig: it.sig || '', price: it.price }).catch(e => { goldInput.value = (parseInt(goldInput.value) || 0) + total; updateAll(); saveLocalStorage(true); throw e; }).then(() => {
+        const halfBuyUsed = cuHalfBuyApplies(it.price); cuConsumeHalfBuy(it.price);
+        window.CloudSync.buyFromMerchantStock(key, idx, total, qty, { name: it.name, sig: it.sig || '', price: it.price }).catch(e => { goldInput.value = (parseInt(goldInput.value) || 0) + total; if (halfBuyUsed) cuRestoreHalfBuy(); updateAll(); saveLocalStorage(true); throw e; }).then(() => {
             noteMarketBuy(it.name, qty, price);
             if (it.playerItem) { // вещь, которую игрок сам продал торговцу, — возвращается со всеми прежними свойствами (чары, улучшения)
                 const pi = Object.assign({}, it.playerItem);

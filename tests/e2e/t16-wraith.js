@@ -18,6 +18,7 @@ const S = require('./setup');
   const acts = await pl.evaluate(() => { window.renderAttackTargetSelect(); return Array.from(document.getElementById('attack-action-select').options).map(o => o.value + '=' + o.text); });
   const act = (acts.find(x => /Огненная стрела/.test(x)) || '').split('=')[0];
   console.log('act', act);
+  await pl.evaluate(() => { document.getElementById('max-mp').value = 9999; document.getElementById('cur-mp').value = 9999; }); // промах + повтор раньше упирался в ману
   const rr = await S.plAttack(pl, b, act, { tries: 12 }); const last = rr[rr.length - 1];
   await pl.evaluate(() => document.getElementById('cur-mp').value = 999);
   await wait(1200);

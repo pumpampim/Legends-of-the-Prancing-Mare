@@ -1274,7 +1274,7 @@
 
         // Квесты гильдий: игрок подаёт ЗАЯВКУ, +1 заказ и награды начисляются только после решения мастера (gm.js: resolveQuestClaim).
         requestQuestClaim: function (q) {
-            if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Квест гильдии подтверждает мастер — нужна активная сессия.'));
+            if (!currentUser || !db || !currentSessionCode) return Promise.reject(new Error('Это задание подтверждает мастер — нужна активная сессия.'));
             const ref = db.collection('sessions').doc(currentSessionCode);
             const uid = currentUser.uid;
             return db.runTransaction(tx => tx.get(ref).then(doc => {

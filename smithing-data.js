@@ -1285,13 +1285,13 @@ const thrownRecipes = [
         ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
-        name: "Стальный метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        name: "Стальной метательный нож", category: "Метательное", subcat: "Метательные ножи",
         damage: 11, weight: 0.3, price: 6, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
         yieldCount: 6, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
-        name: "Двемерскый метательный нож", category: "Метательное", subcat: "Метательные ножи",
+        name: "Двемерский метательный нож", category: "Метательное", subcat: "Метательные ножи",
         damage: 15, weight: 0.4, price: 12, slot: null, isAmmo: false, thrown: true, throwKind: "knife",
         yieldCount: 6, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
@@ -1315,13 +1315,13 @@ const thrownRecipes = [
         ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
-        name: "Стальный метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        name: "Стальной метательный топорик", category: "Метательное", subcat: "Метательные топорики",
         damage: 17, weight: 1.0, price: 12, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
         yieldCount: 3, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
     },
     {
-        name: "Двемерскый метательный топорик", category: "Метательное", subcat: "Метательные топорики",
+        name: "Двемерский метательный топорик", category: "Метательное", subcat: "Метательные топорики",
         damage: 23, weight: 1.3, price: 24, slot: null, isAmmo: false, thrown: true, throwKind: "axe",
         yieldCount: 3, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полено", qty: 1 }, { name: "Полоски кожи", qty: 1 }]
@@ -1345,13 +1345,13 @@ const thrownRecipes = [
         ingredients: [{ name: "Железный слиток", qty: 1 }, { name: "Полено", qty: 1 }]
     },
     {
-        name: "Стальный дротик", category: "Метательное", subcat: "Дротики",
+        name: "Стальной дротик", category: "Метательное", subcat: "Дротики",
         damage: 8, weight: 0.1, price: 4, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
         yieldCount: 12, perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 1 }, { name: "Полено", qty: 1 }]
     },
     {
-        name: "Двемерскый дротик", category: "Метательное", subcat: "Дротики",
+        name: "Двемерский дротик", category: "Метательное", subcat: "Дротики",
         damage: 11, weight: 0.15, price: 8, slot: null, isAmmo: false, thrown: true, throwKind: "dart",
         yieldCount: 12, perkHint: "Двемерские доспехи",
         ingredients: [{ name: "Двемерский слиток", qty: 1 }, { name: "Полено", qty: 1 }]
