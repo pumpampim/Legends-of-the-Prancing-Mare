@@ -255,6 +255,15 @@
         idx = parseInt(idx); if (!(idx >= 0 && idx <= 3)) return '';
         var c = ensure(), g = faith(), d = GODS()[g];
         if (c.abandoned) c.abandoned = false;
+        // Пал, став оборотнем/вампиром-лордом: сразу может начать путь Хирсина/Молаг Бала (решение Никиты 2026-11-06).
+        // Старые перки сгорают, очков возвращается на одно меньше — как при смене Принца; ожидания 14 дней нет.
+        if (c.fallen && c.shiftFall && c.shiftFall === g && c.god !== g) {
+            var nOld = Object.keys(c.perks || {}).filter(function (k) { return c.perks[k]; }).length;
+            perkPointsAvailable += Math.max(0, nOld - 1); clearAll(c);
+            log('🕯 ' + name() + ' оставляет путь ' + (def() ? def().name : 'Принца') + ' и начинает путь ' + (d ? d.name : g) + '.');
+            c.god = null; c.fallen = false; c.fallReason = ''; c.banned = false; c.halfBuy = false; c.lastOffer = null; c.penanceUsed = false; c.shiftFall = null; c.swapDay = absDay();
+            dropCuEffects();
+        }
         if (!c.god) { if (!d) { return refuse('Перк культиста не выдан: игрок не верит ни в одного Принца Даэдра.'); } }
         else if (g !== c.god) { return refuse('Перк культиста не выдан: вера игрока (' + g + ') не совпадает с Принцем пути.'); }
         if (conflict()) { return refuse('Перк культиста не выдан: путь культиста несовместим с путём паладина и лича.'); }
@@ -516,7 +525,7 @@
         if (!started() || c.fallen) return;
         // Стал оборотнем или вампиром-лордом: вера сама сменилась на Хирсина / Молаг Бала — культист другого Принца падает (решение Никиты 2026-11-06)
         var sh = playerSupernaturalState && playerSupernaturalState.faithShift;
-        if (sh && sh.god && sh.god !== c.god) { fall('стал(а) ' + (sh.god === 'hircine' ? 'оборотнем — вера перешла к Хирсину' : 'вампиром-лордом — вера перешла к Молаг Балу')); return; }
+        if (sh && sh.god && sh.god !== c.god) { c.shiftFall = sh.god; fall('стал(а) ' + (sh.god === 'hircine' ? 'оборотнем — вера перешла к Хирсину' : 'вампиром-лордом — вера перешла к Молаг Балу')); return; }
         if (daysSince() > 2 * window.CULT_OFFER_DAYS) fall('пропущено два срока подношения подряд');
     };
     // Следим за павшими союзниками (окно «Королевы зари»)

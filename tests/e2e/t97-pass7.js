@@ -65,9 +65,11 @@ const S = require('./setup');
     if (!playerSupernaturalState.vampire) playerSupernaturalState.vampire = { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 };
     playerSupernaturalState.lycanthropy = true; lichAfterStateChange(); updateAll(); await new Promise(r => setTimeout(r, 200)); updateAll();
     const r = { faith: document.getElementById('faith-god').value, fallen: playerSupernaturalState.cult.fallen };
+    cuGrantPerk(0); r.newGod = playerSupernaturalState.cult.god; r.newOk = !playerSupernaturalState.cult.fallen && !!playerSupernaturalState.cult.perks[0];
     playerSupernaturalState.lycanthropy = false; lichAfterStateChange(); updateAll(); return r;
   });
   chk(out.wolf.faith === 'hircine' && out.wolf.fallen, 'культист Малаката стал оборотнем: вера Хирсин, путь пал');
+  chk(out.wolf.newGod === 'hircine' && out.wolf.newOk, 'павший из-за ликантропии сразу начинает путь Хирсина');
   // метательное: силовая не ставится, подбор после боя
   out.thr = await pl.evaluate((eid) => {
     const pouch = allItems.find(i => i.name === 'Подсумок на 4 зелья');
