@@ -188,8 +188,9 @@
         const got = [];
         res.drops.forEach(d => {
             const info = (window.allItems || []).find(i => i.name === d.name) || {};
-            addToInventory(d.name, d.name, d.qty, info.weight || 0.5, info.category || 'Шкуры', '', { price: info.price || 1 });
-            got.push(`${d.name} ×${d.qty}`);
+            const dq = d.qty + cuHuntExtra(); // культист Хирсина: +10% добычи
+            addToInventory(d.name, d.name, dq, info.weight || 0.5, info.category || 'Шкуры', '', { price: info.price || 1 });
+            got.push(`${d.name} ×${dq}`);
         });
         resultEl.innerHTML = `<strong>🏹 Добыт зверь: ${escHtml(res.animal)}</strong><div>Добыча: ${got.map(escHtml).join(', ')}</div><span style="opacity:.75;">(${escHtml(where)})</span>`;
         renderInventoryList();
@@ -816,7 +817,7 @@
             resultEl.innerHTML = `<span style="color:#e74c3c;">Не хватает маны: нужно ${finalCost}, есть ${curMp}.</span>`;
             return;
         }
-        consumeMageSignFreeCast(costInput);
+        cuConsumeNextSpell(); consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
         markCombatAction('attack');
         updateVitalBars();

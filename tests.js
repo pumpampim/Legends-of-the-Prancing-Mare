@@ -572,6 +572,19 @@
         eq(W.PALADIN_PENANCE_GOLD, 1000, 'Паладин: покаяние 1000 септимов');
     }
 
+    // ---------- ВЕТКА КУЛЬТИСТА ----------
+    if (W.CULT_GODS) {
+        const G = W.CULT_GODS, keys = Object.keys(G);
+        eq(keys.length, 16, 'Культист: 16 Принцев Даэдра');
+        ok(keys.every(k => G[k].perks.length === 4 && [5, 15, 25, 40].every((l, i) => G[k].perks[i].level === l)), 'Культист: у каждого Принца 4 перка на 5/15/25/40 ур.');
+        ok(keys.every(k => G[k].perks.every((p, i) => p.quests === [0, 15, 25, 40][i])), 'Культист: задания жителей 0/15/25/40');
+        ok(keys.every(k => G[k].perks.every(p => ['passive', 'day', 'week'].indexOf(p.type) !== -1)), 'Культист: тип перка пассив/день/неделя');
+        ok(keys.every(k => G[k].perks[3].type !== 'day'), 'Культист: перк 40 уровня не чаще раза в неделю');
+        ok(keys.every(k => G[k].ban && G[k].offer && G[k].offer.opts.length), 'Культист: у каждого Принца запрет и подношение');
+        eq(W.CULT_OFFER_DAYS, 14, 'Культист: подношение раз в 2 недели');
+        eq(W.CULT_PENANCE_GOLD, 1000, 'Культист: искупление 1000 септимов');
+    }
+
     // ---------- ВЫВОД ----------
     const passed = results.filter(r => r.pass).length, failed = results.length - passed;
     if (typeof document !== 'undefined') {

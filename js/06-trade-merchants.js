@@ -284,6 +284,7 @@
         const holidayDiscount = getActiveHolidayDiscount(merchantKey);
         if (holidayDiscount) price *= (1 - holidayDiscount / 100);
         price *= getGuildDiscountMult();
+        price *= cuBuyMult(); // культист: Метка +10% к покупкам, скидки «Сделка»/«Хороший торг»
         if (merchantKey && /^blacksmith/.test(String(merchantKey)) && companionsMember()) price *= 0.9; // Соратники: −10% у кузнецов, не зависит от Красноречия
         if (gb('prices')) price *= (1 - gb('prices') / 100);
         // «Голос императора»: имперцы торгуют на 5% выгоднее — и при продаже (getRacialPriceBonus), и при покупке
@@ -307,7 +308,7 @@
         if ((stock.disposition || 0) <= -2) { alert('Торговец отказывается вести дела.'); return; }
         const dispositionMult = { '-1': 1.25, '0': 1, '1': 0.9, '2': 0.8 }[String(stock.disposition || 0)] || 1;
         const repMult = getReputationPriceMult(stock.hold);
-        const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category, key) * repMult * dispositionMult)); // цена за 1 шт.
+        const price = Math.max(1, Math.round(computeBuyPrice(it.price, it.category, key) * repMult * dispositionMult * (cuHalfBuyApplies(it.price) ? 0.5 : 1))); // цена за 1 шт.; культист «Владыка сделок»: половина цены
         const goldInput = document.getElementById('char-gold');
         const myGold = parseInt(goldInput.value) || 0;
         if (price > myGold) { alert('Не хватает золота.'); return; }
@@ -329,6 +330,7 @@
         const goldNow = parseInt(goldInput.value) || 0;
         if (total > goldNow) { alert('Не хватает золота.'); return; }
         goldInput.value = goldNow - total; saveLocalStorage(true);
+        cuConsumeHalfBuy(it.price);
         window.CloudSync.buyFromMerchantStock(key, idx, total, qty, { name: it.name, sig: it.sig || '', price: it.price }).catch(e => { goldInput.value = (parseInt(goldInput.value) || 0) + total; updateAll(); saveLocalStorage(true); throw e; }).then(() => {
             noteMarketBuy(it.name, qty, price);
             if (it.playerItem) { // вещь, которую игрок сам продал торговцу, — возвращается со всеми прежними свойствами (чары, улучшения)

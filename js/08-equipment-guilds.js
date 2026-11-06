@@ -280,6 +280,7 @@
             </div>`, true);
         }
         html += fateBox('paladin', '⚜ Путь паладина', plStatusHtml(), plHas('p1') && !(playerPaladin && playerPaladin.abandoned));
+        { const ch = cuStatusHtml(); html += fateBox('cult', '🕯 Путь культиста', ch, cuRunning()); }
         { const lh = lichStatusHtml(); html += fateBox('lich', '☠ Путь лича', lh || lichPathTeaserHtml(), !!lh); }
         if (!html) html = '<p style="opacity:.6; font-size:13px;">Пока ни один путь не открыт.</p>';
         el.innerHTML = html;
@@ -608,6 +609,7 @@
     // только когда consume=true — то есть при реальном броске игрока).
     function getSessionRollBonus(consume) {
         const out = { value: 0, notes: [] };
+        try { const cb = cuRollBonus(); if (cb) { out.value += cb; out.notes.push('+' + cb + ' «Козни»'); } } catch (e) { } // культист Боэтии
         const sess = window.CloudSync && window.CloudSync.getSessionData ? window.CloudSync.getSessionData() : null;
         const myUid = window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null;
         if (!sess || !myUid) return out;

@@ -637,6 +637,7 @@ window.toggleSkillPanel = function (idx) {
         let p = 0;
         if (MAGIC_SCHOOL_SKILLS.includes(skillName)) p += gb('allSchoolsBonus');
         if (skillName === 'Разрушение') p += gb('destructionSkill');
+        try { p += cuSkillPts(skillName); } catch (e) { } // культист: пассивы Принцев и «Сделка»
         return p;
     }
 

@@ -532,5 +532,6 @@
         mult /= getReputationPriceMult(holdOverride !== undefined ? holdOverride : ((session && session.currentHold) || null));
         // Отношение живого торговца (−1 … +2): как и при покупке, только наоборот — друг платит больше, недруг меньше.
         mult /= DISPOSITION_PRICE_MULT[String(disposition || 0)] || 1;
+        mult *= cuSellBonus(); // культист: «Хороший торг» +10% к продаже
         return Math.max(0, Math.round(base * mult));
     }

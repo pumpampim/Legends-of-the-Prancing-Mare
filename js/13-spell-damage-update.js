@@ -375,7 +375,7 @@ window.deployCampSite = function (useMagic) {
         const curMpEl = document.getElementById('cur-mp');
         const curMp = parseInt(curMpEl.value) || 0;
         if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
-        if (!enhancedCast) consumeMageSignFreeCast(costInput);
+        cuConsumeNextSpell(); if (!enhancedCast) consumeMageSignFreeCast(costInput);
         curMpEl.value = curMp - finalCost;
         markCombatAction('attack');
         updateVitalBars();
@@ -425,6 +425,7 @@ window.nextDay = function () {
     activeTimedEffects = activeTimedEffects.filter(e => !e.untilDayEnd); // «до конца дня» (хриплый голос после боевого клича)
     clampTempHp();
     const longRestNotes = applyLongRest();
+    { const rn = cuRestBonus(); if (rn) longRestNotes.push(rn); } // культист Вермины: «Вещие сны»
     const craftReport = (typeof window.processCraftQueue === 'function') ? window.processCraftQueue() : null;
     gameDayNum++;
     if (gameDayNum > 30) {
@@ -796,7 +797,7 @@ function updateHungerPenalty() {
             const curMpEl = document.getElementById('cur-mp');
             const curMp = parseInt(curMpEl.value) || 0;
             if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
-            if (!enhancedCast) consumeMageSignFreeCast(costInput);
+            cuConsumeNextSpell(); if (!enhancedCast) consumeMageSignFreeCast(costInput);
             curMpEl.value = curMp - finalCost;
             updateVitalBars();
             saveLocalStorage();
@@ -930,7 +931,7 @@ function updateHungerPenalty() {
             const curMpEl = document.getElementById('cur-mp');
             const curMp = parseInt(curMpEl.value) || 0;
             if (finalCost > curMp) { alert(`Не хватает маны: нужно ${finalCost}, есть ${curMp}.`); return; }
-            if (!enhCtl) consumeMageSignFreeCast(costInput);
+            cuConsumeNextSpell(); if (!enhCtl) consumeMageSignFreeCast(costInput);
             curMpEl.value = curMp - finalCost;
             updateVitalBars();
             saveLocalStorage();
@@ -1082,11 +1083,14 @@ function updateHungerPenalty() {
             activeTimedEffects = activeTimedEffects.filter(x => x !== invisEff);
             renderActiveEffects(); updateAll(); saveLocalStorage();
             actionLabel += ' (🫥 из невидимости)';
+            window._cuInvisUsed = invisEff.cuInvis2 ? 'x2' : true;
         }
         if (skillNameForProgress && typeof logSkillSuccessByName === 'function') {
             logSkillSuccessByName(skillNameForProgress, hit ? 1 : MISS_SKILL_PROGRESS); // промах — четверть успеха (как неудачная готовка)
         }
 
+        if (hit && dmg > 0 && !isSummonAct) { try { const cx = cuAttackExtras({ actionVal, target, dmg, sneak: !!(document.getElementById('chk-sneak-attack') || {}).checked, invisUsed: window._cuInvisUsed || false }); cx.extra.forEach(x => godExtra.push(x)); lifestealPct += cx.vamp; actionLabel += cx.note; } catch (e) { console.error('Культист:', e); } } // ветка культиста
+        window._cuInvisUsed = false;
         // Малакат лечит % ХП только при УБИЙСТВЕ силовой атакой — см. godProcs.killHeal.
         const healPct = lifestealPct;
 
@@ -1286,6 +1290,7 @@ function updateHungerPenalty() {
         });
         const killMpNow = pendingPlayerAttack.killMp || 0;
         if (killMpNow) mainHit = mainHit.then(r0 => { if (r0 && r0.killed) { gainOwnMp(killMpNow); alertSafe(`🗡 Убийство: +${killMpNow} маны.`); } return r0; });
+        mainHit = mainHit.then(r0 => { if (r0 && r0.killed) { try { cuOnKill(); } catch (e) { console.error(e); } } return r0; }); // культист: «Танец клинков», «Клятва мести»
         const onHitNow = pendingPlayerAttack.onHit || null;
         if (onHitNow) mainHit = mainHit.then(r0 => {
             let pp = Promise.resolve();
@@ -1613,12 +1618,14 @@ function updateHungerPenalty() {
             penanceAllowed = false;
         }
         if (!plGodSwapOk(prev, next)) { sel.value = prev; return; }
+        if (!cuGodSwapOk(prev, next)) { sel.value = prev; return; }
         lastFaithGod = next;
         updateAll(); saveLocalStorage();
     };
     function getGodBonuses(god, rank) {
         if (!god || god === 'none' || !godBonuses[god]) return {};
         if (!wearsGodAmulet(god)) return {};
+        if (cuFallen()) return {}; // павший культист лишается даров Принца
         if (plFallen()) return {}; // павший паладин лишается и веры в аэдра, пока не покается
         let bonuses = godBonuses[god][rank] || {};
         // «Сапоги Хранителя»: при полном комплекте Хранителя бонусы 3-го ранга веры аэдра сильнее на 50% (+100 маны → +150).
@@ -1695,6 +1702,7 @@ function updateHungerPenalty() {
     // ===== ИСПРАВЛЕННАЯ updateAll =====
     function updateAll() {
         try { plSync(); } catch (e) { console.error('Паладин:', e); }
+        try { cuSync(); } catch (e) { console.error('Культист:', e); }
         // Единый источник правды для уровня — characterLevel (растёт через «Проверку»).
         // Раньше поле #char-level на главной было отдельным, свободно редактируемым числом,
         // никак не связанным с characterLevel — отсюда рассинхрон между вкладками.
@@ -1830,6 +1838,7 @@ function updateHungerPenalty() {
             baseHp += diseaseMaxHpMod();
             baseHp += equipBonuses.hp;
             baseHp += activeEffectBonuses.hp;
+            baseHp += Math.round(baseHp * cuMaxHpMult() / 100); // культист: Малакат/Намира +10%
             // Форма зверя даёт +50 хп; «Животная энергия» (27 сердец) — ещё +100 сверху.
             if (playerSupernaturalState && playerSupernaturalState.werewolf && playerSupernaturalState.werewolf.isTransformed) {
                 const hearts = playerSupernaturalState.werewolf.heartsEaten || 0;
@@ -1858,6 +1867,7 @@ function updateHungerPenalty() {
             baseMp += activeEffectBonuses.mp;
             if (perks.restorationManaBonus) baseMp += Math.round(ownMpPool * perks.restorationManaBonus);
             if (snLordForm()) baseMp += 100; // форма вампира-лорда: +100 маны
+            baseMp += Math.round(baseMp * cuMaxMpMult() / 100); // культист: Хермеус +10%
             baseMp += lichManaBonus(); // лич: +50 маны (низший) / +100 (высший)
             if (snLordForm() && snLordPerk('Сила Могилы')) baseMp += 50;
             document.getElementById('max-mp').value = Math.round(baseMp);
@@ -2152,7 +2162,7 @@ function updateHungerPenalty() {
 
             const paidCost = Math.round(base * armorMult * schoolMult * skillBoostMult * activeBuffCostMult * godCostMult * gearCostMult);
             finalCostInput.dataset.paidCost = paidCost; // цена без бесплатного каста — для усиленного каста (он бесплатным не бывает)
-            finalCostInput.value = (spiritFree || signFreeTier1) ? 0 : paidCost;
+            finalCostInput.value = (spiritFree || signFreeTier1 || cuNextSpellFree()) ? 0 : paidCost; // культист: «Бездна» Хермеуса — бесплатно
 
             // Полная разбивка в подсказке — раньше игрок видел только голую итоговую цифру,
             // без единого объяснения, откуда она взялась (штраф брони/скидка школы/зачарование

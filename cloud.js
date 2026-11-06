@@ -1907,6 +1907,7 @@
         if (typeof window.renderCorpseRaiseSelect === 'function') window.renderCorpseRaiseSelect();
         if (typeof window.processSoulTraps === 'function') { try { window.processSoulTraps(data); } catch (e) { console.error(e); } }
         if (typeof window.plOnSession === 'function') { try { window.plOnSession(); } catch (e) { console.error(e); } }
+        if (typeof window.cuOnSession === 'function') { try { window.cuOnSession(); } catch (e) { console.error(e); } }
         if (typeof window.renderBuyList === 'function') window.renderBuyList();
         if (typeof window.renderSellList === 'function') window.renderSellList();
         if (typeof window.renderGroupCheckPlayerPanel === 'function') window.renderGroupCheckPlayerPanel();

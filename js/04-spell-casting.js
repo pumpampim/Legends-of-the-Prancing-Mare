@@ -1147,7 +1147,7 @@
         lastSpellCastCost = finalCost;
         let curMp = parseInt(document.getElementById('cur-mp').value) || 0;
         if (curMp >= finalCost) {
-            if (!enhanced) consumeMageSignFreeCast(card.querySelector('.spell-final-cost')); // усиленный каст бесплатный лимит не тратит
+            cuConsumeNextSpell(); if (!enhanced) consumeMageSignFreeCast(card.querySelector('.spell-final-cost')); // усиленный каст бесплатный лимит не тратит
             document.getElementById('cur-mp').value = curMp - finalCost;
             markCombatAction('attack'); // каст в бою — действие хода (после него оружие в этом ходу не сменить)
             const targetSelect = card.querySelector('.spell-target-select');

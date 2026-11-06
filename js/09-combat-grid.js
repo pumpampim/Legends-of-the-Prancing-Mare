@@ -1083,6 +1083,7 @@
             (e.percentEffects || []).forEach(p => { if (totals[p.type] !== undefined) totals[p.type] += p.value; });
         });
         { const pb = plBonus(); totals.weaponDamagePercent += pb.weaponPct; totals.spellPower += pb.spellPower; totals.spellCostReduction += pb.costCut; } // ветка паладина
+        { const cb = cuBonus(); totals.weaponDamagePercent += cb.w; totals.spellPower += cb.sp; } // ветка культиста
         if (lichStage() >= 2) { totals.spellPower += 10; totals.spellCostReduction += 10; } // высший лич: заклинания всех школ сильнее и дешевле на 10%
         return totals;
     }
@@ -1435,6 +1436,7 @@
         res.disease += gb('poisonDiseaseResist');
         res.shout += gb('shoutResist');
         res.magic += gb('magicResist');
+        { const cb = cuBonus(); res.magic += cb.mres; res.poison += cb.poisonRes; } // ветка культиста: сопротивление магии/яду
         res.magic += plBonus().magicRes;                                          // ветка паладина: «Священная мощь» и «защитник» по +10%
         if (lichPerk('pact')) res.magic += 10;                                   // Тёмный пакт: сопротивление магии +10%
         if (lichPerk('visage')) res.frost += 10;                                 // Лик смерти: холод +10%
@@ -1444,6 +1446,8 @@
         if (snVampire()) { res.poison = 100; res.disease = 100; } // вампир: полный иммунитет к ядам и болезням
         if (lichStage() >= 1 && lichAlive()) { res.poison = 100; res.disease = 100; } // лич: иммунитет к ядам и болезням (кроме «Заёмной жизни»)
         if ((document.getElementById('char-race') || {}).value === 'argonian') res.disease = 100; // аргонианин: иммунитет к болезням
+        if (cuImmuneNow()) res.disease = 100; // культист: «Закалка» Периайт, «Прилив скверны» Намиры
+        if (cuPoisonImmuneNow()) res.poison = 100;
         Object.keys(vulnAfter).forEach(k => { res[k] += vulnAfter[k]; });
         // Знак «Ученик» — уязвимость к магии 10% (было только текстом в описании). В отличие от
         // обычного резиста это НЕ клампится до 0 — именно доп. урон сверху, а не "просто нет резиста".

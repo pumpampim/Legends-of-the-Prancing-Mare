@@ -3338,7 +3338,7 @@
             lycanthropy: false, vampirism: false,
             werewolf: { heartsEaten: 0, totem: HIRCINE_TOTEMS[0], hasTransformedToday: false, transformsToday: 0, isTransformed: false },
             vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {} },
-            lich: null, faithShift: null
+            lich: null, faithShift: null, cult: null
         };
     }
 
@@ -4143,8 +4143,52 @@
                 <div class="checkbox-group" style="margin-top:8px;"><input type="checkbox" id="sn-vamp-lord" ${s.vampire.isLord ? 'checked' : ''} onchange="toggleVampireLord(this.checked)"><label for="sn-vamp-lord"><strong>Вампир-лорд</strong> (открывает игроку ветку перков вампира-лорда и форму лорда)</label></div>
                 ${s.vampire.isLord ? `<div style="font-size:12px; margin-top:4px;">Форма лорда: <strong>${s.vampire.lordForm ? 'включена' : 'выключена'}</strong> · Взято перков: ${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length}/11${Object.keys(s.vampire.lordPerks || {}).filter(k => s.vampire.lordPerks[k]).length ? '<br>' + Object.keys(s.vampire.lordPerks).filter(k => s.vampire.lordPerks[k]).map(escapeHtml).join(', ') : ''}</div>` : ''}
             </div>
-            ${gmLichPanelHtml(s)}`;
+            ${gmLichPanelHtml(s)}
+            ${gmCultPanelHtml(s)}`;
     }
+
+    // ---------- Ветка культиста (cultist-data.js): перки выдаёт мастер ----------
+    function gmCultPanelHtml(s) {
+        const c = s.cult, gods = window.CULT_GODS || {}, d = c && c.god ? gods[c.god] : null;
+        let h = `<div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color);"><strong>🕯 Путь культиста${d ? ' — ' + escapeHtml(d.name) : ''}</strong>`;
+        h += `<p style="font-size:12px; opacity:.75; margin:4px 0;">Принц определяется верой игрока (он должен верить в Принца Даэдра, не быть лича/паладином). Перки: 5, 15, 25 и 40 ур., заданий жителей 0/15/25/40, 1 очко перков за каждый. Игрок раз в 2 недели несёт подношение; деяния подтверждаете вы.</p>`;
+        const names = d ? d.perks.map(p => p.name) : ['Перк 1 (5 ур.)', 'Перк 2 (15 ур.)', 'Перк 3 (25 ур.)', 'Перк 4 (40 ур.)'];
+        const lvls = [5, 15, 25, 40];
+        names.forEach((nm, i) => {
+            const owned = !!(c && c.perks && c.perks[i]);
+            h += `<div style="font-size:12px; margin-top:5px;">${owned ? '✅' : '▫️'} <strong>${escapeHtml(nm)}</strong> (${lvls[i]} ур.)${d ? ' — ' + escapeHtml(d.perks[i].desc) : ''}<br>` +
+                (owned ? `<button class="btn-danger" style="width:auto; padding:2px 8px; margin-top:2px;" onclick="gmCultAdmin('revoke', ${i})">Снять (и следующие)</button>`
+                       : `<button class="btn-success" style="width:auto; padding:2px 8px; margin-top:2px;" onclick="gmCultGrant(${i})">Выдать (спишется очко)</button>`) + `</div>`;
+        });
+        if (c && c.god) {
+            h += `<div style="font-size:12px; margin-top:8px;">Состояние: <strong>${c.fallen ? 'пал (' + escapeHtml(c.fallReason || '') + ')' : c.banned ? 'нарушен запрет' : 'в силе'}</strong> · Метка: <strong>${c.veil ? 'скрыта (Покров)' : 'видна'}</strong>${d ? '<br>Запрет: ' + escapeHtml(d.ban) : ''}</div>`;
+            h += `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('offer')">✔ Принять подношение (деяние)</button>` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('ban')">⛔ Нарушил запрет</button>` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('unban')">Простить нарушение</button>` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('penance')">Искупление принято (−1000)</button>` +
+                `<button style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('veil', ${c.veil ? 0 : 1})">${c.veil ? 'Снять Покров' : 'Выдать Покров (скрыть Метку)'}</button>` +
+                `<button class="btn-danger" style="width:auto; padding:2px 8px;" onclick="gmCultAdmin('reset')">Сбросить ветку</button></div>`;
+        }
+        return h + `</div>`;
+    }
+    window.gmCultPanelHtml = gmCultPanelHtml;
+    window.gmCultGrant = function (i) {
+        if (!currentInvPlayerUid) { alert('Выбери игрока.'); return; }
+        const lvls = [5, 15, 25, 40], lvl = (currentPlayerInvData && currentPlayerInvData.characterLevel) || 1;
+        if (lvl < lvls[i]) { alert(`Нужен ${lvls[i]}-й уровень, сейчас ${lvl}.`); return; }
+        if (!confirm('Выдать перк культиста? У игрока спишется 1 очко перков (проверит ли он сам, что вера и задания подходят).')) return;
+        gmSendCmd({ type: 'cultPerk', perk: i }, '{p} получает перк культиста.').then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
+    };
+    window.gmCultAdmin = function (op, arg) {
+        if (op === 'reset' && !confirm('Сбросить ветку культиста целиком? Все перки снимутся, очки вернутся.')) return;
+        if (op === 'revoke' && !confirm('Снять этот перк и все следующие? Очки вернутся игроку.')) return;
+        if (op === 'offer' && !confirm('Деяние подношения выполнено? (У Клавикуса с игрока спишется золото.)')) return;
+        if (op === 'penance' && !confirm('Искупление принято? С игрока спишется 1000 септимов.')) return;
+        const cmd = { type: 'cultAdmin', op };
+        if (op === 'revoke') cmd.perk = arg; if (op === 'veil') cmd.on = !!arg;
+        gmSendCmd(cmd, { offer: '{p}: подношение принято мастером.', ban: '{p} нарушил запрет Принца.', unban: '{p}: нарушение прощено.', penance: '{p} искупил вину перед Принцем.' }[op] || null).then(ok => { if (ok) setTimeout(renderSupernaturalPanel, 600); });
+    };
 
     // ---------- Ветка «Рыцарь смерти (лич)» ----------
     function gmLichPanelHtml(s) {
@@ -4311,7 +4355,8 @@
                 werewolf: Object.assign(defaultSn.werewolf, data.supernaturalState.werewolf || {}),
                 vampire: Object.assign(defaultSn.vampire, data.supernaturalState.vampire || {}, { lordPerks: (data.supernaturalState.vampire || {}).lordPerks || {} }),
                 lich: window.lichNormalize ? window.lichNormalize(data.supernaturalState.lich) : (data.supernaturalState.lich || null),
-                faithShift: data.supernaturalState.faithShift || null
+                faithShift: data.supernaturalState.faithShift || null,
+                cult: data.supernaturalState.cult || null
             } : defaultSn;
             currentCrimeState = window.StCrime.normalize(data.crimeState);
             // Снимок листа игрока приходит на каждое его сохранение — недописанная сумма штрафа и прочие поля не теряются.

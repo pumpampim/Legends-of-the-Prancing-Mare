@@ -247,6 +247,15 @@
         } else if (e.action === 'revive') {
             reviveByQuest(true);
             alert('✨ Мастер воскресил тебя. ХП: ' + document.getElementById('cur-hp').value + '.');
+        } else if (e.action === 'allyRevive') { // «Королева зари» Азуры: союзник возвращает павшего без траты жизни
+            if (deathState.fallen) {
+                deathState.fallen = false; deathState.minimized = false;
+                const maxHpA = parseInt(document.getElementById('max-hp').value) || 1;
+                document.getElementById('cur-hp').value = Math.max(1, Math.ceil(maxHpA * (parseInt(e.hpPct) || 50) / 100));
+                _dLog('🌅 ' + _dName() + ' возвращён(а) к жизни Королевой зари (жизнь не потрачена).');
+                updateVitalBars(); updateAll(); saveLocalStorage(true);
+                alert('🌅 Тебя вернули к жизни! ХП: ' + document.getElementById('cur-hp').value + '. Жизнь не потрачена.');
+            }
         } else if (e.action === 'addLives') {
             _dSetLives(_dLives() + (parseInt(e.n) || 0));
             alert('Мастер изменил число свободных жизней: теперь ' + _dLives() + '.');
@@ -649,7 +658,8 @@
             werewolf: Object.assign({ heartsEaten: 0, totem: '— нет —', hasTransformedToday: false, transformsToday: 0, isTransformed: false }, data.supernaturalState.werewolf || {}),
             vampire: (function (v) { if (v.lordPerksLegacy === undefined) v.lordPerksLegacy = Object.keys(v.lordPerks || {}).filter(k => v.lordPerks[k]).length; return v; })(Object.assign({ hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 }, data.supernaturalState.vampire || {})),
             lich: (window.lichNormalize || (x => null))(data.supernaturalState.lich),
-            faithShift: data.supernaturalState.faithShift || null
+            faithShift: data.supernaturalState.faithShift || null,
+            cult: data.supernaturalState.cult || null
         } : null;
         try { lichAfterStateChange(); } catch (e) { console.error('Лич:', e); }
         if (!_gmSame && typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer();
@@ -1307,6 +1317,10 @@
                     if (m) msgs.push(m);
                 } else if (c.type === 'lichPerk' && c.perk) { // мастер выдал перк ветки «Рыцарь смерти» после ритуала
                     const lm = lichGrantPerk(c.perk); if (lm) msgs.push(lm);
+                } else if (c.type === 'cultPerk' && c.perk !== undefined) { // мастер выдал перк ветки культиста
+                    const cm = cuGrantPerk(c.perk); if (cm) msgs.push(cm);
+                } else if (c.type === 'cultAdmin' && c.op) { // подношение принято, запрет нарушен, Покров и т.д.
+                    const cm = cuAdminOp(c); if (cm) msgs.push(cm);
                 } else if (c.type === 'lichAdmin' && c.op) { // остальные действия мастера с веткой лича
                     const lm = lichAdminOp(c); if (lm) msgs.push(lm);
                 } else if (c.type === 'quest' && c.quest && c.quest.id) { // мастер выдал квест — кладём в лист (раньше его стирало автосохранение)
