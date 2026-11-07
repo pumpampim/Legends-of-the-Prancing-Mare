@@ -169,8 +169,12 @@
         if (!victims.length && !around.length) { alert('Отметь, на ком сработала ловушка.'); return; }
         const parts = (lastData && lastData.participants) || {};
         const names = u => (parts[u] || {}).name || 'игрок';
-        victims.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited })));
-        around.forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { radius: true })));
+        // Святой круг паладина: стоящих в нём ловушка не задевает (считается обезвреженной для них).
+        const holy = u => !!(window.GmGrid && window.GmGrid.inHolyCircle && window.GmGrid.inHolyCircle(lastData && lastData.grid, u));
+        const shielded = victims.concat(around).filter(holy);
+        victims.filter(u => !holy(u)).forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { axes: tr.axes, ignite: tr.ignited })));
+        around.filter(u => !holy(u)).forEach(u => gmSendTrapCmd(u, gmTrapCmdFor(t, { radius: true })));
+        if (shielded.length) gmPostLogEntryText(`✝ Святой круг: ловушка не задевает — ${shielded.map(names).join(', ')}.`);
         gmSaveTraps(trapsArr().map(x => x.id === id ? Object.assign({}, tr, gmTrapStateAfterTrigger(t, tr), { victims: victims.slice() }) : x));
         gmPostLogEntryText(`🪤 Срабатывает ${t.icon} ${t.name}${tr.label ? ' (' + tr.label + ')' : ''}: ${victims.map(names).join(', ')}${around.length ? (victims.length ? '; рядом — ' : 'рядом — ') + around.map(names).join(', ') : ''}.${t.alarm ? ' 🔔 Враги знают, где вы!' : ''}`);
     };
@@ -256,7 +260,7 @@
                 const x = Object.assign({}, tr);
                 for (let k = d0; k < t0; k++) {
                     if (x.state === 'active') {
-                        (x.victims || []).forEach(u => sends.push([u, gmTrapCmdFor(t, { perTurn: true, ignite: x.ignited })]));
+                        (x.victims || []).forEach(u => { if (window.GmGrid && window.GmGrid.inHolyCircle && window.GmGrid.inHolyCircle(dd.grid, u)) return; /* святой круг: ловушка обезврежена */ sends.push([u, gmTrapCmdFor(t, { perTurn: true, ignite: x.ignited })]); });
                         if (t.perTurn && t.perTurn.activeTurns) { x.left = (x.left || 0) - 1; if (x.left <= 0) { x.state = 'cooldown'; x.left = t.perTurn.cooldownTurns || 0; x.victims = []; } }
                     } else if (x.state === 'cooldown') {
                         x.left = (x.left || 0) - 1; if (x.left <= 0) { x.state = 'ready'; x.left = 0; }

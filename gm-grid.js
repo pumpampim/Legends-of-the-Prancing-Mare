@@ -127,6 +127,19 @@
         const gr = norm(d.grid); const ents = entitiesOf(Object.assign({}, d, { enemies: enemiesIn }));
         const enemies = enemiesIn.map(e => Object.assign({}, e));
         const logs = [], hits = [];
+        // Святой круг паладина: чужие магические стены, чьи клетки попали в круг, рассеиваются (клетки внутри круга снимаются).
+        Object.keys(gr.zones).forEach(hid => {
+            const hz = gr.zones[hid]; if (!hz || !hz.holyBan) return;
+            const hc = hz.follow ? gr.tokens[hz.follow] : { x: hz.x, y: hz.y }; if (!hc || typeof hc.x !== 'number') return;
+            const rc = Math.floor((hz.radiusFt || 5) / 5);
+            Object.keys(gr.zones).forEach(wid => {
+                const w = gr.zones[wid]; if (!w || w.kind !== 'wall' || w.holyBan || (hz.uid && w.uid === hz.uid)) return;
+                const left = (w.cells || []).filter(c => G().cells(hc, { x: c[0], y: c[1] }) > rc);
+                if (left.length === (w.cells || []).length) return;
+                if (left.length) w.cells = left; else delete gr.zones[wid];
+                logs.push(`✝ Святой круг рассеивает «${w.spell || 'стену'}»${left.length ? ' (часть клеток)' : ''}.`);
+            });
+        });
         Object.keys(gr.zones).forEach(zid => {
             const z = gr.zones[zid]; const names = [];
             const curRH = parseInt(d.sessionRoundCounter) || 0, holyNew = !!z.holyBan && z.holyLastRound !== curRH, holySeen = {};
@@ -534,7 +547,13 @@
     }
 
     // ---------- публичное ----------
+    // Стоит ли игрок в святом круге паладина (для ловушек: внутри круга они считаются обезвреженными).
+    function inHolyCircle(g, uid) {
+        const gr = norm(g); const t = gr.tokens[G().tokenKey('p', uid)]; if (!t) return false;
+        return Object.keys(gr.zones).some(k => gr.zones[k] && gr.zones[k].holyBan && zoneCovers(gr.zones[k], t, gr));
+    }
     window.GmGrid = {
+        inHolyCircle,
         onSnapshot(d) {
             data = d || {};
             if (!painting && !dragFrom) grid = norm(data.grid);
