@@ -931,6 +931,8 @@
             const it = playerInventory.find(i => i.itemId === id);
             if (it && /даэдр/i.test(String(it.name || '') + ' ' + String(it.category || ''))) out.push(it.name);
         });
+        // Призванное заклинанием оружие (Призванный меч/кинжал/секира/лук) — тоже даэдрическое, пока оно в руке
+        try { (activeSummons || []).forEach(sm => { if (sm && sm.category === 'weapon') out.push(sm.name || 'Призванное оружие'); }); } catch (e) { }
         return out;
     }
     function plBrokenByDaedric() { return plDaedricWorn().length > 0; }
@@ -1011,7 +1013,7 @@
     function plSync() {
         // Карточка «Пути паладина» зависит от веры, уровня, очков, квестов и состояния — перерисовываем при их изменении (раньше она рисовалась только по событиям сверхъестественного)
         try {
-            const sig = JSON.stringify([(document.getElementById('faith-god') || {}).value, playerLevelNow(), perkPointsAvailable, plQuestsDone(), playerPaladin, plSuspended(), powersUsedToday.pl_circle, powersUsedToday.pl_hands, (activeTimedEffects || []).some(e => e && e.plHands)]);
+            const sig = JSON.stringify([(document.getElementById('faith-god') || {}).value, playerLevelNow(), perkPointsAvailable, plQuestsDone(), playerPaladin, plSuspended(), (activeSummons || []).some(x => x && x.category === 'weapon'), powersUsedToday.pl_circle, powersUsedToday.pl_hands, (activeTimedEffects || []).some(e => e && e.plHands)]);
             if (sig !== _plCardSig) { _plCardSig = sig; if (typeof renderSupernaturalStatusPlayer === 'function') renderSupernaturalStatusPlayer(); }
         } catch (e) { console.error('Паладин (панель):', e); }
         const p = playerPaladin; if (!p || !plHas('p1') || p.fallen || p.abandoned) return;

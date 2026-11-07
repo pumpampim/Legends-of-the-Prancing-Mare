@@ -195,6 +195,7 @@
 
         auth.onAuthStateChanged(user => {
             currentUser = user;
+            try { const u = document.getElementById('gm-my-uid'); if (u) u.textContent = user.uid; } catch (e) { }
             updateStatusBar();
             if (!user) {
                 showOverlay(true);

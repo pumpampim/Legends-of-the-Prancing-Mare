@@ -24,8 +24,9 @@ const S = require('./setup');
   out.grant = await pl.evaluate(() => { cuGrantPerk(0); cuGrantPerk(1); cuGrantPerk(2); cuGrantPerk(3); const c = playerSupernaturalState.cult; return { god: c.god, perks: Object.keys(c.perks).length, pts: perkPointsAvailable, running: cuRunning(), buy: cuBuyMult() }; });
   chk(out.grant.god === 'boethiah' && out.grant.perks === 4 && out.grant.pts === 8 && out.grant.running, 'четыре перка Боэтии выданы, 4 очка списаны');
   chk(Math.abs(out.grant.buy - 1.1) < 1e-9, 'Метка: покупки +10%');
-  out.veil = await pl.evaluate(() => { cuAdminOp({ op: 'veil', on: true }); const a = cuBuyMult(); cuAdminOp({ op: 'veil', on: false }); return a; });
-  chk(out.veil === 1, 'Покров скрывает Метку (цены обычные)');
+  chk(await pl.evaluate(() => Math.abs(cuSellBonus() - 0.9) < 1e-9), 'Метка: торговцы покупают у культиста на 10% дешевле');
+  out.veil = await pl.evaluate(() => { cuAdminOp({ op: 'veil', on: true }); const a = [cuBuyMult(), cuSellBonus()]; cuAdminOp({ op: 'veil', on: false }); return a; });
+  chk(out.veil[0] === 1 && out.veil[1] === 1, 'Покров скрывает Метку (цены обычные)');
   // самоусиление Боэтии: «Козни» +2 к кубам; «Предательский удар»
   out.kozni = await pl.evaluate(() => { const b0 = getSessionRollBonus(false).value; cuUse(2); const b1 = getSessionRollBonus(false).value; cuUse(2); return { b0, b1, used: !!powersUsedToday.cu2, effs: activeTimedEffects.filter(e => e.cuD20).length }; });
   chk(out.kozni.b1 - out.kozni.b0 === 2 && out.kozni.used && out.kozni.effs === 1, '«Козни»: +2 к кубам раз в день');

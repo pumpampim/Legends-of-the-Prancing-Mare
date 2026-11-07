@@ -59,7 +59,7 @@
     window.cuFallen = fallen;
     window.cuPoisonImmuneNow = function () { return cuEffects().some(function (e) { return e.cuImmune; }); };
     window.cuRunning = running;
-    // Метка Принца видна: покупки дороже на 10%. Договор «Хороший торг»/«Сделка» дают скидку; не складываются — берётся лучшее.
+    // Метка Принца видна: торговцы продают ему на 10% дороже и покупают у него на 10% дешевле. Договор «Хороший торг»/«Сделка» дают скидку; не складываются — берётся лучшее.
     function marked() { var c = S(); return !!(started() && !c.veil); }
     window.cuBuyMult = function () {
         var m = 1, b = bonus();
@@ -68,7 +68,7 @@
         if (marked()) m *= 1.10;
         return m;
     };
-    window.cuSellBonus = function () { return 1 + (bonus().sell || 0) / 100; };
+    window.cuSellBonus = function () { var m = 1 + (bonus().sell || 0) / 100; return marked() ? m * 0.9 : m; };
     window.cuHalfBuyApplies = function (unitBase) { var c = S(); return !!(running() && c.halfBuy && (parseFloat(unitBase) || 0) <= lvl() * 50); };
     window.cuConsumeHalfBuy = function (unitBase) { var c = S(); if (c && c.halfBuy && window.cuHalfBuyApplies(unitBase)) { c.halfBuy = false; log('🤝 ' + name() + ' использует «Владыку сделок»: покупка за половину цены.'); save(); } };
     window.cuRestoreHalfBuy = function () { var c = S(); if (c) { c.halfBuy = true; log('🤝 ' + name() + ': покупка сорвалась — «Владыка сделок» не потрачен.'); save(); } };
@@ -549,7 +549,7 @@
         if (!on) h += '<div style="font-size:12px; margin-top:4px; opacity:.85;">Перки культиста выдаёт мастер за очки перков (5, 15, 25 и 40 ур., квесты жителей 0/15/25/40).</div>';
         if (on) {
             var left = window.CULT_OFFER_DAYS - daysSince();
-            h += '<div style="font-size:12px; margin-top:4px;">Метка: ' + (marked() ? '<span style="color:#c0392b;">видна (покупки +10%)</span>' : 'скрыта «Покровом»') + ' · Подношение: ' + (left >= 0 ? 'через ' + left + ' дн.' : 'просрочено на ' + (-left) + ' дн.') + '</div>';
+            h += '<div style="font-size:12px; margin-top:4px;">Метка: ' + (marked() ? '<span style="color:#c0392b;">видна (покупки +10%, продажа −10%)</span>' : 'скрыта «Покровом»') + ' · Подношение: ' + (left >= 0 ? 'через ' + left + ' дн.' : 'просрочено на ' + (-left) + ' дн.') + '</div>';
             if (c.fallen) h += '<div style="font-size:12px; color:#e74c3c;">☠ ' + escHtml(c.fallReason || '') + '</div>';
         }
         // перки

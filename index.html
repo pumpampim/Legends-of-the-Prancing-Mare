@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <script src="js/00-error-log.js?v=1"></script>
-    <script src="js/00-hooks.js?v=1"></script>
+    <script src="js/00-error-log.js?v=4e098b07"></script>
+    <script src="js/00-hooks.js?v=90b116ea"></script>
     <script>
         /* 6.1: размер шрифта — раньше только 16px из CSS, теперь 'normal'|'large'|'huge' из localStorage['skyrim_fontSize'],
            потому что на телефоне и за большим столом мелкий текст читать тяжело. Ставим ДО отрисовки, чтобы не мигало. */
@@ -543,38 +543,38 @@
     </script>
 
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
-    <link rel="stylesheet" href="vendor/fonts.css?v=1">
+    <link rel="stylesheet" href="vendor/fonts.css?v=8cf25e67">
 
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=68db90d1">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
-    <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
-    <script src="vendor/firebase/firebase-auth-compat.js?v=10.13.2"></script>
-    <script src="vendor/firebase/firebase-firestore-compat.js?v=10.13.2"></script>
-    <script src="perks.js?v=11"></script>
-    <script src="items-data.js?v=24"></script>
-    <script src="cooking-data.js?v=11"></script>
-    <script src="smithing-data.js?v=19"></script>
-    <script src="gear-legacy.js?v=2"></script>
-    <script src="enchant-data.js?v=5"></script>
-    <script src="spell-data.js?v=10"></script>
-    <script src="lich-data.js?v=1"></script>
-    <script src="paladin-data.js?v=2"></script>
-    <script src="cultist-data.js?v=2"></script>
-    <script src="alchemy-data.js?v=7"></script>
-    <script src="fish-data.js?v=3"></script>
-    <script src="hunt-data.js?v=3"></script>
-    <script src="holidays-data.js?v=4"></script>
-    <script src="skill-books-data.js?v=4"></script>
-    <script src="unique-weapons-data.js?v=4"></script>
-    <script src="spell-tomes-data.js?v=5"></script>
-<script src="powers-data.js?v=8"></script>
-    <script src="enemies-data.js?v=11"></script>
-    <script src="enemy-loot.js?v=8"></script>
-    <script src="pets-data.js?v=2"></script>
-    <script src="holds-map.js?v=4"></script>
-    <script src="combat-bonuses.js?v=15"></script>
-    <script src="builds-data.js?v=3"></script>
+    <script src="vendor/firebase/firebase-app-compat.js?v=6430f95a"></script>
+    <script src="vendor/firebase/firebase-auth-compat.js?v=be9a4a53"></script>
+    <script src="vendor/firebase/firebase-firestore-compat.js?v=62807db1"></script>
+    <script src="perks.js?v=3d602279"></script>
+    <script src="items-data.js?v=59d30064"></script>
+    <script src="cooking-data.js?v=79d16ca7"></script>
+    <script src="smithing-data.js?v=91b3a24a"></script>
+    <script src="gear-legacy.js?v=9ee79d81"></script>
+    <script src="enchant-data.js?v=22e192d0"></script>
+    <script src="spell-data.js?v=602484c7"></script>
+    <script src="lich-data.js?v=bfcd25f3"></script>
+    <script src="paladin-data.js?v=b222d9b4"></script>
+    <script src="cultist-data.js?v=669827cb"></script>
+    <script src="alchemy-data.js?v=9a89a3da"></script>
+    <script src="fish-data.js?v=32312443"></script>
+    <script src="hunt-data.js?v=ce3ed3ba"></script>
+    <script src="holidays-data.js?v=ba750361"></script>
+    <script src="skill-books-data.js?v=ad3ebaec"></script>
+    <script src="unique-weapons-data.js?v=08d379e4"></script>
+    <script src="spell-tomes-data.js?v=1650ba61"></script>
+<script src="powers-data.js?v=4587d290"></script>
+    <script src="enemies-data.js?v=e33a113d"></script>
+    <script src="enemy-loot.js?v=519a3728"></script>
+    <script src="pets-data.js?v=698f56d0"></script>
+    <script src="holds-map.js?v=e8a80b09"></script>
+    <script src="combat-bonuses.js?v=71b4448c"></script>
+    <script src="builds-data.js?v=2581d485"></script>
 </head>
 <body>
 
@@ -2150,29 +2150,29 @@
     </div>
 
 <!-- Основной скрипт листа игрока: бывший один большой <script>, разрезан на файлы по темам без изменения кода; порядок загрузки важен -->
-<script src="js/01-core-origin.js?v=4"></script>
-<script src="js/02-powers-time.js?v=3"></script>
-<script src="js/03-creation-spells.js?v=4"></script>
-<script src="js/04-spell-casting.js?v=4"></script>
-<script src="js/05-inventory.js?v=6"></script>
-<script src="js/06-trade-merchants.js?v=11"></script>
-<script src="js/07-craft-enchant-equip.js?v=5"></script>
-<script src="js/08-equipment-guilds.js?v=13"></script>
-<script src="js/09-combat-grid.js?v=5"></script>
-<script src="js/10-resist-gear-fish-hunt.js?v=3"></script>
-<script src="js/11-session-trade-map.js?v=7"></script>
-<script src="js/12-supernatural-lich.js?v=10"></script>
-<script src="js/19-cultist.js?v=3"></script>
-<script src="js/13-spell-damage-update.js?v=19"></script>
-<script src="js/14-diary-death-combat.js?v=11"></script>
-<script src="js/15-traps-boot.js?v=5"></script>
+<script src="js/01-core-origin.js?v=fe38fb78"></script>
+<script src="js/02-powers-time.js?v=e4091726"></script>
+<script src="js/03-creation-spells.js?v=22848e21"></script>
+<script src="js/04-spell-casting.js?v=ee1c5b78"></script>
+<script src="js/05-inventory.js?v=8e8596e8"></script>
+<script src="js/06-trade-merchants.js?v=4e9f7135"></script>
+<script src="js/07-craft-enchant-equip.js?v=8c9ad2bb"></script>
+<script src="js/08-equipment-guilds.js?v=59f010e7"></script>
+<script src="js/09-combat-grid.js?v=877f039d"></script>
+<script src="js/10-resist-gear-fish-hunt.js?v=1b16d4da"></script>
+<script src="js/11-session-trade-map.js?v=cb5ed5bb"></script>
+<script src="js/12-supernatural-lich.js?v=ec48ce1a"></script>
+<script src="js/19-cultist.js?v=8dcf1680"></script>
+<script src="js/13-spell-damage-update.js?v=20fcba66"></script>
+<script src="js/14-diary-death-combat.js?v=625f1719"></script>
+<script src="js/15-traps-boot.js?v=5750c0f0"></script>
 
 <!-- Firebase: конфиг проекта + логика облачной синхронизации -->
-<script src="crime-core.js?v=1"></script>
-<script src="firebase-config.js?v=4"></script>
-<script src="combat-calc.js?v=5"></script>
-<script src="grid-core.js?v=6"></script>
-<script src="cloud.js?v=54"></script>
+<script src="crime-core.js?v=600867f0"></script>
+<script src="firebase-config.js?v=afb8108c"></script>
+<script src="combat-calc.js?v=6d3b7b7e"></script>
+<script src="grid-core.js?v=f68b550b"></script>
+<script src="cloud.js?v=be7afb8c"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
@@ -2496,10 +2496,10 @@
     renderTop();
 })();
 </script>
-<script src="art-data.js?v=1"></script>
-<script src="js/16-game-ui.js?v=11"></script>
-<script src="js/17-icons.js?v=3"></script>
-<script src="js/18-hints.js?v=1"></script>
+<script src="art-data.js?v=12e907ac"></script>
+<script src="js/16-game-ui.js?v=ffc365d2"></script>
+<script src="js/17-icons.js?v=ccd923cc"></script>
+<script src="js/18-hints.js?v=a119b399"></script>
 
 </body>
 </html>

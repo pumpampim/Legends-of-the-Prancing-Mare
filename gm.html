@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <script src="js/00-error-log.js?v=1"></script>
+    <script src="js/00-error-log.js?v=4e098b07"></script>
     <title>Экран Мастера — «Скурим» TTRPG</title>
 
     <!-- Определение поддержки WebP — максимально рано, ДО загрузки style.css (см. пояснение
@@ -16,9 +16,9 @@
 
     <!-- Шрифты — см. пояснение в index.html -->
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
-    <link rel="stylesheet" href="vendor/fonts.css?v=1">
+    <link rel="stylesheet" href="vendor/fonts.css?v=8cf25e67">
 
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=68db90d1">
 
     <!-- window.onerror → баннер, та же защита что и у игрока — см. подробный комментарий
          в index.html. Мастер тем более часто смотрит экран с телефона/планшета во время игры. -->
@@ -46,9 +46,9 @@
     </script>
 
     <!-- Firebase SDK -->
-    <script src="vendor/firebase/firebase-app-compat.js?v=10.13.2"></script>
-    <script src="vendor/firebase/firebase-auth-compat.js?v=10.13.2"></script>
-    <script src="vendor/firebase/firebase-firestore-compat.js?v=10.13.2"></script>
+    <script src="vendor/firebase/firebase-app-compat.js?v=6430f95a"></script>
+    <script src="vendor/firebase/firebase-auth-compat.js?v=be9a4a53"></script>
+    <script src="vendor/firebase/firebase-firestore-compat.js?v=62807db1"></script>
 </head>
 <body>
 
@@ -666,6 +666,7 @@
         <!-- ===== НОВЫЙ БЛОК: БАЗА ПРЕДМЕТОВ ===== -->
        <div class="panel" data-gm-tab="refs">
     <h2>📦 База предметов</h2>
+    <p style="font-size:12px; opacity:.8; margin:0 0 8px;">Писать в базу предметов могут только мастера из списка в консоли Firebase (документ config/gms, поле uids). Ваш UID: <code id="gm-my-uid" style="user-select:all;">—</code></p>
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
         <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
         <select id="gm-item-category" onchange="filterGmItems()">
@@ -1376,41 +1377,41 @@
     </div>
 </div>
 
-<script src="firebase-config.js?v=4"></script>
-<script src="js/gm-errors.js?v=1"></script>
-<script src="enemy-ranks.js?v=5"></script>
-<script src="crime-core.js?v=1"></script>
-<script src="items-data.js?v=24"></script>
-<script src="smithing-data.js?v=19"></script>
-    <script src="gear-legacy.js?v=2"></script>
-<script src="enchant-data.js?v=5"></script>
-<script src="holidays-data.js?v=4"></script>
-<script src="random-events-data.js?v=3"></script>
-<script src="skill-books-data.js?v=4"></script>
-<script src="unique-weapons-data.js?v=4"></script>
-<script src="holds-data.js?v=3"></script>
-<script src="rumors-data.js?v=3"></script>
-<script src="holds-map.js?v=4"></script>
-<script src="spell-tomes-data.js?v=5"></script>
-<script src="cooking-data.js?v=11"></script>
-<script src="alchemy-data.js?v=7"></script>
-<script src="fish-data.js?v=3"></script>
-<script src="spell-data.js?v=10"></script>
-<script src="lich-data.js?v=1"></script>
-<script src="cultist-data.js?v=3"></script>
-<script src="paladin-data.js?v=2"></script>
-<script src="enemies-data.js?v=11"></script>
-<script src="art-data.js?v=1"></script>
-<script src="pets-data.js?v=2"></script>
-<script src="traps-data.js?v=1"></script>
-<script src="combat-bonuses.js?v=14"></script>
-<script src="combat-calc.js?v=5"></script>
-<script src="enemy-loot.js?v=8"></script>
-<script src="grid-core.js?v=6"></script>
-<script src="dungeon-presets-data.js?v=3"></script>
-<script src="gm.js?v=81"></script>
-<script src="js/17-icons.js?v=3"></script>
-<script src="js/gm-mobile.js?v=1"></script>
-<script src="gm-grid.js?v=9"></script>
+<script src="firebase-config.js?v=afb8108c"></script>
+<script src="js/gm-errors.js?v=61aa0b9e"></script>
+<script src="enemy-ranks.js?v=218aac8a"></script>
+<script src="crime-core.js?v=600867f0"></script>
+<script src="items-data.js?v=59d30064"></script>
+<script src="smithing-data.js?v=91b3a24a"></script>
+    <script src="gear-legacy.js?v=9ee79d81"></script>
+<script src="enchant-data.js?v=22e192d0"></script>
+<script src="holidays-data.js?v=ba750361"></script>
+<script src="random-events-data.js?v=eda77f46"></script>
+<script src="skill-books-data.js?v=ad3ebaec"></script>
+<script src="unique-weapons-data.js?v=08d379e4"></script>
+<script src="holds-data.js?v=f03eab95"></script>
+<script src="rumors-data.js?v=d37946aa"></script>
+<script src="holds-map.js?v=e8a80b09"></script>
+<script src="spell-tomes-data.js?v=1650ba61"></script>
+<script src="cooking-data.js?v=79d16ca7"></script>
+<script src="alchemy-data.js?v=9a89a3da"></script>
+<script src="fish-data.js?v=32312443"></script>
+<script src="spell-data.js?v=602484c7"></script>
+<script src="lich-data.js?v=bfcd25f3"></script>
+<script src="cultist-data.js?v=669827cb"></script>
+<script src="paladin-data.js?v=b222d9b4"></script>
+<script src="enemies-data.js?v=e33a113d"></script>
+<script src="art-data.js?v=12e907ac"></script>
+<script src="pets-data.js?v=698f56d0"></script>
+<script src="traps-data.js?v=fcc0c805"></script>
+<script src="combat-bonuses.js?v=71b4448c"></script>
+<script src="combat-calc.js?v=6d3b7b7e"></script>
+<script src="enemy-loot.js?v=519a3728"></script>
+<script src="grid-core.js?v=f68b550b"></script>
+<script src="dungeon-presets-data.js?v=7ad2b40a"></script>
+<script src="gm.js?v=7ac23ccb"></script>
+<script src="js/17-icons.js?v=ccd923cc"></script>
+<script src="js/gm-mobile.js?v=96805317"></script>
+<script src="gm-grid.js?v=19893cff"></script>
 </body>
 </html>

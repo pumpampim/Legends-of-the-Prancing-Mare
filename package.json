@@ -6,7 +6,9 @@
     "test": "node tests/unit.js && node tests/e2e/run.js",
     "test:unit": "node tests/unit.js",
     "test:e2e": "node tests/e2e/run.js",
-    "test:slow": "node tests/e2e/run.js --slow"
+    "test:slow": "node tests/e2e/run.js --slow",
+    "versions": "node tools/bump-versions.js",
+    "versions:check": "node tools/bump-versions.js --check"
   },
   "devDependencies": {
     "playwright": "^1.48.2"
