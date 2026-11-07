@@ -3,16 +3,25 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Персонажи: читать может любой вошедший в аккаунт участник группы.
-    // Писать может как сам владелец (обычное автосохранение листа), так и
-    // любой другой авторизованный участник группы — это осознанное упрощение:
-    // именно так мастер выдаёт предметы (gmGiveItemFromTable) и открывает
-    // рецепты кузницы (toggleRecipeKnown) через чужой документ персонажа.
-    // Для закрытой группы друзей это нормально; для публичного сервиса
-    // тут нужны более строгие правила (например, проверка через Cloud
-    // Functions, что пишущий — действительно мастер общей с игроком сессии).
+    // Писать может сам владелец (автосохранение листа) и мастер той сессии, в которой сейчас играет владелец:
+    // игрок записывает код своей сессии в поле sessionCode (js/cloud.js, linkCharacterSession), правило сверяет
+    // его с gmUid сессии. Так мастер выдаёт предметы (gmGiveItemFromTable), открывает рецепты и шлёт команды
+    // (gmCmds), а посторонний пользователь чужой лист испортить не может.
+    // Переходный случай: у листа, который игрок ещё не пересохранил после обновления, поля sessionCode нет —
+    // такой лист пока открыт для записи всем вошедшим, как раньше. Когда у всех игроков поле появится
+    // (достаточно один раз открыть сайт), эту строку надо убрать: условие !('sessionCode' in resource.data).
+    function isSessionGm(code) {
+      return code is string
+        && exists(/databases/$(database)/documents/sessions/$(code))
+        && get(/databases/$(database)/documents/sessions/$(code)).data.gmUid == request.auth.uid;
+    }
     match /characters/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.uid == uid ||
+        !('sessionCode' in resource.data) ||
+        isSessionGm(resource.data.sessionCode)
+      );
     }
 
     // Сессии: упрощённые правила, рассчитанные на закрытую группу друзей,
@@ -25,11 +34,14 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.gmUid == request.auth.uid;
       // Обновлять может мастер сессии всегда, остальные — пока мастер их не выгнал (kicked.{uid}),
       // и никто, кроме мастера, не может менять сам список выгнанных (gmKickPlayer в gm.js).
-      allow update: if request.auth != null && (
-        resource.data.gmUid == request.auth.uid ||
-        (!(request.auth.uid in resource.data.get('kicked', {})) &&
-         request.resource.data.get('kicked', {}) == resource.data.get('kicked', {}))
-      );
+      // Мастера сессии (gmUid) не может сменить никто, иначе любой игрок сделал бы себя мастером чужих листов.
+      allow update: if request.auth != null
+        && request.resource.data.gmUid == resource.data.gmUid
+        && (
+          resource.data.gmUid == request.auth.uid ||
+          (!(request.auth.uid in resource.data.get('kicked', {})) &&
+           request.resource.data.get('kicked', {}) == resource.data.get('kicked', {}))
+        );
       // Раньше delete был запрещён вообще для всех — теперь мастер может удалить СВОЮ ЖЕ сессию
       // (нужно для автоматической чистки старых закрытых сессий, см. cleanupOldClosedSessions
       // в gm.js — иначе закрытые сессии копились бы в базе вечно).
@@ -43,14 +55,8 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // Справочник владений: данжи (описание/враги/лут/особенности), которые
-    // мастер заполняет и дополняет сам на странице holds.html. Читает кто
-    // угодно из группы, пишет тоже — как и везде здесь, это упрощение для
-    // закрытой группы друзей.
-    match /holds_dungeons/{holdId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
+    // Справочник владений (holds.html) живёт в браузере, в облако ничего не пишет, поэтому коллекции holds_dungeons
+    // больше нет: правило убрано, всё не перечисленное Firestore запрещает.
 
     // Пресеты данжей мастера (ТЗ-2, эпик 2): личные заготовки, переживают смену устройства.
     // Читает и пишет только сам мастер — игрокам пресеты не нужны, они видят копию

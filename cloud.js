@@ -54,6 +54,19 @@
     }
     function saveStampOf(d) { return (d && d.saveBy) ? (parseInt(d.saveSeq) || 0) + ':' + d.saveBy : null; }
 
+    // Код текущей сессии в листе персонажа (characters/{uid}.sessionCode): по нему правила Firestore пускают мастера
+    // этой сессии писать в лист (выдать предмет, послать команду). Не часть листа: не попадает в saveHash и слияние.
+    let linkedSessionCode;   // что уже записано в облако (undefined — ещё не писали)
+    function linkCharacterSession() {
+        if (!currentUser || !db) return;
+        const want = currentSessionCode || null;
+        if (linkedSessionCode === want) return;
+        const uid = currentUser.uid;
+        db.collection('characters').doc(uid).update({ sessionCode: want })
+            .then(() => { if (currentUser && currentUser.uid === uid) linkedSessionCode = want; })
+            .catch(() => { /* листа в облаке ещё нет (новый игрок) — повторим после первого сохранения */ });
+    }
+
     function el(id) { return document.getElementById(id); }
 
     function showOverlay(show) {
@@ -196,6 +209,7 @@
             } else {
                 if (unsubSession) { unsubSession(); unsubSession = null; }
                 currentSessionCode = null;
+                linkedSessionCode = undefined;
             }
         });
     }
@@ -434,6 +448,7 @@
                     return { wrote: full, merged: true, lost: m.lost };
                 })).then(r => {
                     saveInFlight = false;
+                    linkCharacterSession();
                     if (!saveQueued && !pendingSave) stSaveState('saved');
                     if (r.wrote && !r.merged) {
                         if (syncedStamp === base) { syncedStamp = myStamp; syncedData = data; }
@@ -1608,6 +1623,7 @@
             }
             currentSessionCode = code;
             localStorage.setItem(SESSION_KEY, code);
+            linkCharacterSession();
 
             // Берём текущие показатели прямо из листа персонажа, чтобы не мигать нулями
             const curHp = Number((el('cur-hp') || {}).value) || 0;
@@ -1663,6 +1679,7 @@
         }).catch(() => {});
         if (unsubSession) { unsubSession(); unsubSession = null; }
         currentSessionCode = null;
+        linkCharacterSession();
         lastSessionData = null;   // раньше после выхода «старая» сессия оставалась в getSessionData()
         localStorage.removeItem(SESSION_KEY);
         if (typeof window.updateCombatDock === 'function') window.updateCombatDock();
