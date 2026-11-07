@@ -19,6 +19,8 @@ jobs:
         run: for f in *.js js/*.js; do node --check "$f" || exit 1; done
       - name: Версии подключений (?v=)
         run: node tools/bump-versions.js --check
+      - name: gm.js собран из gm-src
+        run: node tools/build-gm.js --check
       - name: Юнит-тесты (tests.js)
         run: npm run test:unit
       - name: Сценарии стенда (игрок + мастер)

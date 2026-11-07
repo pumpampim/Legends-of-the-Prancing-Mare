@@ -7,6 +7,7 @@
     "test:unit": "node tests/unit.js",
     "test:e2e": "node tests/e2e/run.js",
     "test:slow": "node tests/e2e/run.js --slow",
+    "build:gm": "node tools/build-gm.js",
     "versions": "node tools/bump-versions.js",
     "versions:check": "node tools/bump-versions.js --check"
   },
