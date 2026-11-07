@@ -1,0 +1,48 @@
+// Рисованные аватары врагов и иконки предметов (art-data.js, img/): у каждого слага есть файл,
+// мастер видит картинку врага вместо SVG, в сумке на телефоне иконки грузятся.
+const fs = require('fs'), path = require('path');
+const { setupSession, wait } = require('./setup');
+(async () => {
+  const SITE = path.join(__dirname, '..', '..');
+  global.window = {}; require(path.join(SITE, 'art-data.js'));
+  const miss = [];
+  Object.keys(window.ENEMY_ART_READY).forEach(s => { if (!fs.existsSync(path.join(SITE, 'img/enemies', s + '.webp'))) miss.push('enemy ' + s); });
+  Object.keys(window.ITEM_ART_READY).forEach(k => { if (!fs.existsSync(path.join(SITE, 'img/items', k + '.webp'))) miss.push('item ' + k); });
+  if (miss.length) console.log('FAIL нет файлов: ' + miss.join(', ')); else console.log('ok: все файлы на месте');
+
+  const { gm, players, H } = await setupSession();
+  const pl = players[0];
+  await gm.evaluate(async () => {
+    for (const nm of ['Бандит', 'Фалмер (шаман)', 'Волк']) {
+      const idx = window.enemiesData.findIndex(e => e.name === nm); const sel = document.getElementById('enemy-db-select');
+      if (sel.options.length < 2) populateEnemyDbSelect(); sel.value = String(idx); window.onEnemyDbPicked(); window.addEnemy();
+    }
+  });
+  await wait(2000);
+  const av = await gm.evaluate(async () => {
+    const imgs = [...document.querySelectorAll('img.enemy-avatar')];
+    await Promise.all(imgs.map(i => i.decode().catch(() => {})));
+    return imgs.map(i => ({ src: i.getAttribute('src').slice(0, 40), w: i.naturalWidth }));
+  });
+  console.log('gm avatars', JSON.stringify(av));
+  if (av.length < 3) console.log('FAIL мало аватаров у мастера');
+  av.forEach(a => { if (!/^img\/enemies\/[a-z-]+\.webp$/.test(a.src) || !a.w) console.log('FAIL аватар не картинка: ' + JSON.stringify(a)); });
+  if (!av.some(a => a.src === 'img/enemies/falmer-shaman.webp')) console.log('FAIL фалмер-шаман не нашёлся');
+
+  await pl.setViewportSize({ width: 390, height: 800 }); await wait(800);
+  const bag = await pl.evaluate(async () => {
+    [['Железный меч', 'Одноручное', 'melee'], ['Зелье здоровья', 'Зелья', ''], ['Капуста', 'Продукты', ''], ['Железный шлем', 'Тяжёлая броня', 'helmet']]
+      .forEach(([n, c, s]) => playerInventory.push({ itemId: n, name: n, count: 1, weight: 1, category: c, slot: s || undefined, price: 10 }));
+    updateAll(); if (window.renderInventory) renderInventory();
+    const b = document.querySelector('#st-tabbar [data-g="bag"], #st-tabbar button:nth-child(3)'); b && b.click();
+    await new Promise(r => setTimeout(r, 800));
+    const imgs = [...document.querySelectorAll('.st-bag-cell img.st-art')];
+    await Promise.all(imgs.map(i => i.decode().catch(() => {})));
+    return imgs.map(i => ({ src: i.getAttribute('src'), w: i.naturalWidth }));
+  });
+  console.log('bag icons', JSON.stringify(bag));
+  if (bag.length < 3) console.log('FAIL в сумке меньше 3 рисованных иконок');
+  bag.forEach(a => { if (!a.w) console.log('FAIL иконка не загрузилась: ' + a.src); });
+  for (const k of ['sword', 'potion-health', 'helm']) if (!bag.some(a => a.src === 'img/items/' + k + '.webp')) console.log('FAIL нет иконки ' + k);
+  await H.close();
+})();

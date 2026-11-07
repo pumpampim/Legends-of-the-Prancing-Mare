@@ -254,6 +254,9 @@
     function itemIcon(it) {
         var n = String(it.name || '').toLowerCase(), c = String(it.category || '').toLowerCase(), k = 'chest', broad = 'other';
         try { broad = classifyItemBroad(it); } catch (e) { }
+        // Рисованная иконка по виду предмета (art-data.js, img/items/*.webp); без неё — SVG-контур, как раньше.
+        var art = window.itemArtUrl ? window.itemArtUrl(it, broad) : '';
+        if (art) return '<img class="st-art" src="' + art + '" alt="" loading="lazy" decoding="async">';
         var has = function (re) { return re.test(n) || re.test(c); };
         if (broad === 'weapon') k = has(/лук|арбалет/) ? 'bow' : has(/стрел|болт|боеприпас/) ? 'arrow' : has(/кинжал|нож/) ? 'dagger' : has(/топор|секир|колун/) ? 'axe' : has(/молот|булав|палиц/) ? 'hammer' : 'sword';
         else if (broad === 'armor') k = has(/шлем|капюшон|колпак|маска|шапк/) || it.slot === 'helmet' ? 'helm' : has(/щит/) || it.slot === 'shield' ? 'shield' : has(/сапог|ботин/) || it.slot === 'boots' ? 'boot' : has(/перчат|наруч|рукавиц/) || it.slot === 'gloves' ? 'glove' : 'tunic';

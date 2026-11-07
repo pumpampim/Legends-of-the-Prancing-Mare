@@ -1463,6 +1463,9 @@
     function enemyAvatarData(enemy) {
         const name = String(enemy && enemy.name || '?');
         if (_avatarCache.has(name)) return _avatarCache.get(name);
+        // Рисованный аватар (art-data.js, img/enemies/*.webp); нет такого врага в списке — SVG-лицо, как раньше.
+        const art = window.enemyArtUrl ? window.enemyArtUrl(name) : '';
+        if (art) { _avatarCache.set(name, art); return art; }
         let hash = 0; for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
         const kind = /волк|саблезуб|медвед|мамонт|краб|рыба|злокрыс|паук|корус/i.test(name) ? 'beast' :
                      /скелет|драугр|нежить|привед/i.test(name) ? 'undead' :
