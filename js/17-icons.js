@@ -136,7 +136,9 @@
         '🍖': 'meat', '🥩': 'meat', '🍞': 'bread', '👑': 'crown', '🌙': 'moon', '💪': 'hammer', '🌑': 'hood', '🌕': 'moon', '⭐': 'star', '🌟': 'star', '⚠': 'warn', 'ℹ': 'info', '🏔': 'mountain', '⛰': 'mountain',
         '📦': 'chest', '🧰': 'chest', '🥾': 'boot', '👢': 'boot', '⛑': 'helm', '🪖': 'helm', '🧤': 'glove', '📿': 'necklace', '🪓': 'axe', '🏛': 'castle', '🧙': 'staff', '🪨': 'mountain', '🔷': 'drop', '💧': 'drop', '🩸': 'blood', '🍄': 'shroom', '🧀': 'bread', '🍺': 'mug', '🍻': 'mug', '🐴': 'horse', '🐎': 'horse', '🕷': 'spider', '🐀': 'paw', '🐕': 'paw', '🐶': 'paw'
     };
+    // Нарисованные ИИ картинки (img/ui/<ключ>.webp); список готовых — window.UI_ART_READY из art-data.js. Нет файла — рисованный контур.
     function svg(key) {
+        if (window.UI_ART_READY && window.UI_ART_READY[key]) return '<img class="sk-pic" src="img/ui/' + key + '.webp" alt="" draggable="false">';
         return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + P[key] + '</svg>';
     }
     window.stDrawnIcon = function (key) { return P[key] ? svg(key) : ''; };

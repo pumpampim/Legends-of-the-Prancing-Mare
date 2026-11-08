@@ -178,6 +178,8 @@
         return 'misc';
     }
     window.ITEM_ART_KINDS = ITEM_KINDS;
+    var UI_READY = {}; 'alembic anvil axe banner basket blood bolt book boot bow bowl bread burst castle cauldron chest city coffin college compass crown dagger die drop eye fang fish flame gem gift globe glove hammer hand handshake heart helm herb hood horse hourglass house key lock lute map mask meat moon mountain mug necklace orb paw pick pinch potion pray purse quill ring rod satchel scales scroll shield shop shout shroom skull sleep snow sparkle spider staff star sun sword swords target tent tome tunic village wolf'.split(' ').forEach(function (k) { if (k) UI_READY[k] = 1; });
+    window.UI_ART_READY = UI_READY;
     window.ITEM_ART_READY = ITEM_READY;
     window.itemArtKind = itemArtKind;
     window.itemArtUrl = function (it, broad) { var k = itemArtKind(it, broad); return ITEM_READY[k] ? 'img/items/' + k + '.webp' : ''; };

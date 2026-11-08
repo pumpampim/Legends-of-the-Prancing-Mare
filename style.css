@@ -2153,6 +2153,7 @@ body.st-game-ui .st-tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-in
 /* ===== Рисованные иконки вместо эмодзи (js/17-icons.js, 2026-10-30) =====
    Сам эмодзи остаётся в тексте для кода и экранных читалок, но визуально скрыт. */
 .sk-ic { display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin: 0 .12em; color: var(--accent-color, #c8a566); flex: 0 0 auto; }
+.sk-ic img.sk-pic { width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 1px rgba(200,165,102,.55), 0 1px 3px rgba(0,0,0,.6); }
 .sk-ic svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 2px rgba(0,0,0,.6)); }
 .sk-ic-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .btn-danger .sk-ic, button.btn-danger .sk-ic { color: #f0b8a8; }
