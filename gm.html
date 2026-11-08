@@ -361,6 +361,26 @@
         </div>
 
         <div class="grid-2">
+            <!-- ===== ПОМЕСТЬЯ: участок, местность, жители ===== -->
+            <div class="panel" data-gm-tab="world" id="gm-estate-panel">
+                <h2>🏡 Поместья</h2>
+                <p style="font-size:13px; opacity:.75;">Создай участок отряду, нарисуй местность (кисть, зажми и води), жители заходят сами из вкладки «Поместье». Новый участок 50×50.</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <input type="text" id="gm-estate-name" placeholder="Озёрный дом" style="flex:2 1 160px;">
+                    <button class="btn-success" style="width:auto;" onclick="gmEstateCreate()">+ Создать</button>
+                </div>
+                <div id="gm-estate-list" style="margin:6px 0;"></div>
+                <div id="gm-estate-edit" style="display:none;">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
+                        <label style="margin:0;">Кисть</label><select id="gm-estate-brush" style="width:auto;"></select>
+                        <button style="width:auto;" onclick="gmEstateFillAll()">Залить всё кистью</button>
+                        <button style="width:auto;" onclick="gmEstateClearTokens()">Убрать всех жителей</button>
+                        <button class="btn-danger" style="width:auto;" onclick="gmEstateDelete()">Удалить участок</button>
+                    </div>
+                    <div style="overflow:auto; max-height:70vh; border:1px solid var(--border-color);"><canvas id="gm-estate-canvas" style="display:block; cursor:crosshair; touch-action:none;"></canvas></div>
+                </div>
+            </div>
+
             <!-- ===== ЛОВУШКИ: поставить, сработать на игроках, ход ловушек, обезвреживание ===== -->
             <div class="panel" data-gm-tab="combat" id="gm-traps-panel">
                 <h2>🪤 Ловушки</h2>
@@ -1401,6 +1421,7 @@
 <script src="cultist-data.js?v=669827cb"></script>
 <script src="paladin-data.js?v=b222d9b4"></script>
 <script src="enemies-data.js?v=e33a113d"></script>
+<script src="estate.js?v=9654b87a"></script>
 <script src="art-data.js?v=12e907ac"></script>
 <script src="pets-data.js?v=698f56d0"></script>
 <script src="traps-data.js?v=fcc0c805"></script>
@@ -1409,7 +1430,7 @@
 <script src="enemy-loot.js?v=519a3728"></script>
 <script src="grid-core.js?v=f68b550b"></script>
 <script defer src="dungeon-presets-data.js?v=7ad2b40a"></script>
-<script src="gm.js?v=e1456db8"></script>
+<script src="gm.js?v=0eeafb25"></script>
 <script src="js/17-icons.js?v=ccd923cc"></script>
 <script src="js/gm-mobile.js?v=96805317"></script>
 <script src="gm-grid.js?v=f26a2a1c"></script>

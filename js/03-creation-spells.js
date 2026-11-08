@@ -201,6 +201,7 @@
         try { ev.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch (e) { }
         if (tabId === 'tab7') { initTab7IfNeeded(); renderForageBars(); }
         if (tabId === 'tab13' && typeof window.renderPlayerMap === 'function') { if (typeof window.markPlacesSeen === 'function') window.markPlacesSeen(); window.renderPlayerMap(true); }
+        if (tabId === 'tab17' && window.Estate) window.Estate.render();
         if (tabId === 'tab5' && typeof renderTradePanel === 'function') renderTradePanel();
         if (tabId === 'tab10' && typeof window.renderTheftVictims === 'function') window.renderTheftVictims();
         if (tabId === 'tab14') { if (typeof window.markJournalSeen === 'function') window.markJournalSeen(); renderDiary(); }

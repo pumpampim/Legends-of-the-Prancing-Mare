@@ -39,6 +39,7 @@
         { tab: 'tab13', label: 'Карта', icon: 'map' },
         { tab: 'tab11', label: 'Календарь', icon: 'calendar' },
         { tab: 'tab14', label: 'Дневник', icon: 'diary' },
+        { tab: 'tab17', label: 'Поместье', icon: 'map' },
         { settings: true, label: 'Настройки', icon: 'gear' }
     ];
     function tabBtn(tabId) { return document.querySelector('.nav-tabs .tab-link[onclick*="\'' + tabId + '\'"]'); }

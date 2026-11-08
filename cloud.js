@@ -877,6 +877,11 @@
                 result = { skipped: false, turn, round };
             })).then(() => result);
         },
+        // Поместье: запись по точечным путям в документ сессии (estates.<id>.tokens.<uid> и т. п.), без перезаписи чужих полей.
+        estateWrite: function (patch) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            return db.collection('sessions').doc(currentSessionCode).update(patch);
+        },
         // Длительная зона (плащ/аура/круг/стена/камень) от игрока — в очередь мастера
         addPendingZone: function (zone, authorName) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
@@ -1899,6 +1904,7 @@
         // Выгнанных мастером не показываем в отряде, даже если запоздавшая запись снова создала их строку.
         Object.keys(data.kicked || {}).forEach(uid => { if (data.participants) delete data.participants[uid]; });
         lastSessionData = data;
+        try { if (window.Estate) window.Estate.onSession(data); } catch (e) { console.error(e); }
         stCheckLogGrowth(data.combatLog || []);
         if (typeof window.updateCombatDock === 'function') window.updateCombatDock();
         renderPlayerWhispers(data.playerWhispers || [], data.participants || {});

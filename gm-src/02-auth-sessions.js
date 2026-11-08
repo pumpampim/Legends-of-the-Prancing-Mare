@@ -218,6 +218,7 @@
         try { if (window.GmGrid) window.GmGrid.onSnapshot(lastData); } catch (e) { console.error(e); }
         try { renderMuseumRequests(); renderQuestClaims(); renderPlayerLimits(); } catch (e) { console.error(e); }
         try { renderTheftCases(); } catch (e) { console.error(e); }
+        try { renderEstates(); } catch (e) { console.error(e); }
         renderAll();
     });
     // Heartbeat "мастер онлайн" — раз в 20 сек, пока открыта эта вкладка с активной сессией.

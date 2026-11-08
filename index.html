@@ -696,6 +696,7 @@
         <button class="tab-link" onclick="openTab(event, 'tab12')">🏪 Торговля</button>
         <button class="tab-link" id="tab13-btn" onclick="openTab(event, 'tab13')">🗺️ Карта</button>
         <button class="tab-link" id="tab14-btn" onclick="openTab(event, 'tab14')">📖 Дневник</button>
+        <button class="tab-link" id="tab17-btn" onclick="openTab(event, 'tab17')">🏡 Поместье</button>
         <button class="tab-link" id="tab15-btn" onclick="openTab(event, 'tab15')">📜 Квесты и гильдии</button>
         <button class="tab-link" id="tab16-btn" onclick="openTab(event, 'tab16')">🌙 Ветки судьбы</button>
     </div>
@@ -2054,6 +2055,14 @@
         </div>
     </div>
 
+    <div id="tab17" class="tab-content">
+        <div class="panel">
+            <h2>🏡 Поместье</h2>
+            <p style="font-size:13px; opacity:.75;">Дом и участок вашего отряда. Ходите по поместью фишкой: нажмите на клетку, чтобы пройти. Строить и обставлять его можно вместе с мастером.</p>
+            <div id="estate-box"></div>
+        </div>
+    </div>
+
     <div id="tab14" class="tab-content">
         <div class="panel">
             <h2>📜 Журнал сессии</h2>
@@ -2152,7 +2161,7 @@
 <!-- Основной скрипт листа игрока: бывший один большой <script>, разрезан на файлы по темам без изменения кода; порядок загрузки важен -->
 <script src="js/01-core-origin.js?v=fe38fb78"></script>
 <script src="js/02-powers-time.js?v=e4091726"></script>
-<script src="js/03-creation-spells.js?v=22848e21"></script>
+<script src="js/03-creation-spells.js?v=ba7d45a0"></script>
 <script src="js/04-spell-casting.js?v=ee1c5b78"></script>
 <script src="js/05-inventory.js?v=8e8596e8"></script>
 <script src="js/06-trade-merchants.js?v=4e9f7135"></script>
@@ -2172,7 +2181,7 @@
 <script src="firebase-config.js?v=afb8108c"></script>
 <script src="combat-calc.js?v=6d3b7b7e"></script>
 <script src="grid-core.js?v=f68b550b"></script>
-<script src="cloud.js?v=be7afb8c"></script>
+<script src="cloud.js?v=f83d7df1"></script>
 <script>
 /* ===== Эпик 6: UX (6.3 кубик, 6.5 поиск, 6.6 восстановление, 6.7 цифры вкладок) ===== */
 (function () {
@@ -2369,7 +2378,7 @@
         skills: { title: 'Навыки', tabs: ['tab2', 'tab7', 'tab10'], hint: 'Ветки перков · Профессии · Проверка' },
         magic: { title: 'Магия', tabs: ['tab4', 'tab16'], hint: 'Книга заклинаний · Ветки судьбы' },
         items: { title: 'Предметы', tabs: ['tab5', 'tab15', 'tab12'], hint: 'Инвентарь · Квесты и гильдии · Торговля' },
-        map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14'], hint: 'Карта · Календарь · Дневник' },
+        map: { title: 'Карта', tabs: ['tab13', 'tab11', 'tab14', 'tab17'], hint: 'Карта · Календарь · Дневник · Поместье' },
         hero: { title: 'Герой', tabs: ['tab1', 'tab3', 'tab6'], hint: 'Главная и статы · Боевой пост · Сессия' }
     };
     var MOBILE_GROUPS = {
@@ -2377,12 +2386,12 @@
         fight: { title: 'Бой', tabs: ['tab3', 'tab6'], hint: 'Боевой пост · Сессия' },
         bag: { title: 'Сумка', tabs: ['tab5', 'tab15', 'tab12'], hint: 'Инвентарь · Квесты и гильдии · Торговля' },
         magic: { title: 'Магия', tabs: ['tab4', 'tab16'], hint: 'Книга заклинаний · Ветки судьбы' },
-        more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14'], hint: 'Профессии · Карта · Календарь · Дневник' }
+        more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14', 'tab17'], hint: 'Профессии · Карта · Календарь · Дневник · Поместье' }
     };
     var mqMobile = window.matchMedia('(max-width: 900px)');
     var GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS;
     window.stNavGroups = GROUPS;
-    var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь', tab15: 'Квесты', tab16: 'Ветки судьбы', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник' };
+    var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь', tab15: 'Квесты', tab16: 'Ветки судьбы', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник', tab17: 'Поместье' };
     var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
     var hub = document.getElementById('st-hub'), cur = 'hero', curTab = 'tab1';
     function btnFor(tabId) { return document.querySelector('.nav-tabs .tab-link[onclick*="\'' + tabId + '\'"]'); }
@@ -2496,8 +2505,9 @@
     renderTop();
 })();
 </script>
-<script src="art-data.js?v=12e907ac"></script>
-<script src="js/16-game-ui.js?v=ffc365d2"></script>
+<script src="estate.js?v=9654b87a"></script>
+    <script src="art-data.js?v=12e907ac"></script>
+<script src="js/16-game-ui.js?v=c45779c0"></script>
 <script src="js/17-icons.js?v=ccd923cc"></script>
 <script src="js/18-hints.js?v=a119b399"></script>
 
