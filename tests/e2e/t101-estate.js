@@ -19,7 +19,7 @@ const S = require('./setup');
   // ход: кликаем эмуляцией через Estate.click с координатами канваса
   const moved = await pl.evaluate(async () => {
     const cv = document.getElementById('estate-canvas'), r = cv.getBoundingClientRect();
-    cv.dispatchEvent(new MouseEvent('click', { clientX: r.left + 10 * 14 + 7, clientY: r.top + 12 * 14 + 7, bubbles: true }));
+    cv.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + 10 * 14 + 7, clientY: r.top + 12 * 14 + 7, bubbles: true }));
     await new Promise(res => setTimeout(res, 1200));
     return document.getElementById('estate-info').textContent;
   });
@@ -31,7 +31,7 @@ const S = require('./setup');
     await CloudSync.estateWrite(patch);
     await new Promise(res => setTimeout(res, 1200));
     const cv = document.getElementById('estate-canvas'), r = cv.getBoundingClientRect();
-    cv.dispatchEvent(new MouseEvent('click', { clientX: r.left + 20 * 14 + 7, clientY: r.top + 12 * 14 + 7, bubbles: true }));
+    cv.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + 20 * 14 + 7, clientY: r.top + 12 * 14 + 7, bubbles: true }));
     await new Promise(res => setTimeout(res, 800));
     return document.getElementById('estate-info').textContent;
   });

@@ -882,6 +882,12 @@
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
             return db.collection('sessions').doc(currentSessionCode).update(patch);
         },
+        // Транзакция над документом сессии для поместья: fn(данные сессии) возвращает patch с точечными путями или бросает Error.
+        estateTx: function (fn) {
+            if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));
+            const ref = db.collection('sessions').doc(currentSessionCode);
+            return db.runTransaction(tx => tx.get(ref).then(doc => { const patch = fn(doc.data() || {}); if (patch && Object.keys(patch).length) tx.update(ref, patch); }));
+        },
         // Длительная зона (плащ/аура/круг/стена/камень) от игрока — в очередь мастера
         addPendingZone: function (zone, authorName) {
             if (!currentSessionCode || !db) return Promise.reject(new Error('Не в сессии.'));

@@ -366,7 +366,8 @@
                 <h2>🏡 Поместья</h2>
                 <p style="font-size:13px; opacity:.75;">Создай участок отряду, нарисуй местность (кисть, зажми и води), жители заходят сами из вкладки «Поместье». Новый участок 50×50.</p>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                    <input type="text" id="gm-estate-name" placeholder="Озёрный дом" style="flex:2 1 160px;">
+                    <select id="gm-estate-preset" style="flex:1 1 200px;"><option value="lakeview">Озёрный дом (пустой участок 50×50, стройка +40%)</option><option value="solitude">Гордость шпиля (готовый городской дом)</option><option value="">Свой участок…</option></select>
+                    <input type="text" id="gm-estate-name" placeholder="Название (для своего участка)" style="flex:2 1 160px;">
                     <button class="btn-success" style="width:auto;" onclick="gmEstateCreate()">+ Создать</button>
                 </div>
                 <div id="gm-estate-list" style="margin:6px 0;"></div>
@@ -375,8 +376,14 @@
                         <label style="margin:0;">Кисть</label><select id="gm-estate-brush" style="width:auto;"></select>
                         <button style="width:auto;" onclick="gmEstateFillAll()">Залить всё кистью</button>
                         <button style="width:auto;" onclick="gmEstateClearTokens()">Убрать всех жителей</button>
+                        <button class="btn-success" style="width:auto;" onclick="gmEstateAdvance(1)">▶ Рабочий день</button>
+                        <button style="width:auto;" onclick="gmEstateAdvance(7)">▶▶ Неделя</button>
+                        <button style="width:auto;" onclick="gmEstateRaid()">🦹 Налёт воров</button>
+                        <button style="width:auto;" onclick="gmEstateGiveMats()">📦 Выдать материалы</button>
+                        <button style="width:auto;" onclick="gmEstateResetWings()">Сбросить крылья</button>
                         <button class="btn-danger" style="width:auto;" onclick="gmEstateDelete()">Удалить участок</button>
                     </div>
+                    <div id="gm-estate-info" style="font-size:13px; margin-bottom:6px;"></div>
                     <div style="overflow:auto; max-height:70vh; border:1px solid var(--border-color);"><canvas id="gm-estate-canvas" style="display:block; cursor:crosshair; touch-action:none;"></canvas></div>
                 </div>
             </div>
@@ -1401,7 +1408,7 @@
 <script src="js/gm-errors.js?v=61aa0b9e"></script>
 <script src="enemy-ranks.js?v=218aac8a"></script>
 <script src="crime-core.js?v=600867f0"></script>
-<script src="items-data.js?v=59d30064"></script>
+<script src="items-data.js?v=65f8888c"></script>
 <script src="smithing-data.js?v=91b3a24a"></script>
     <script src="gear-legacy.js?v=9ee79d81"></script>
 <script src="enchant-data.js?v=22e192d0"></script>
@@ -1421,7 +1428,8 @@
 <script src="cultist-data.js?v=669827cb"></script>
 <script src="paladin-data.js?v=b222d9b4"></script>
 <script src="enemies-data.js?v=e33a113d"></script>
-<script src="estate.js?v=9654b87a"></script>
+<script src="estate-data.js?v=4f846671"></script>
+<script src="estate.js?v=f2ec4236"></script>
 <script src="art-data.js?v=12e907ac"></script>
 <script src="pets-data.js?v=698f56d0"></script>
 <script src="traps-data.js?v=fcc0c805"></script>
@@ -1430,7 +1438,7 @@
 <script src="enemy-loot.js?v=519a3728"></script>
 <script src="grid-core.js?v=f68b550b"></script>
 <script defer src="dungeon-presets-data.js?v=7ad2b40a"></script>
-<script src="gm.js?v=0eeafb25"></script>
+<script src="gm.js?v=580234d9"></script>
 <script src="js/17-icons.js?v=ccd923cc"></script>
 <script src="js/gm-mobile.js?v=96805317"></script>
 <script src="gm-grid.js?v=f26a2a1c"></script>

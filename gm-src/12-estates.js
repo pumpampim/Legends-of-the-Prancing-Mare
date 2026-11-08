@@ -38,14 +38,32 @@
                 cv.addEventListener('touchmove', ev => { ev.preventDefault(); paint(ev); }, { passive: false });
                 cv.addEventListener('touchend', end);
             }
+            const inf = el('gm-estate-info'), D0 = window.ESTATE_DATA;
+            if (inf) inf.innerHTML = `День ${est.day || 0} · разметки: ${Object.keys(est.plan || {}).length} · склад: ${Object.keys(est.stock || {}).map(m => (D0.MATERIALS[m] || {}).name + ' ' + est.stock[m]).join(', ') || 'пусто'} · крылья: ${(est.wings || []).map(w => (D0.WINGS[w] || {}).name).join(', ') || 'не выбраны'} · персонал: ${Object.keys(est.staff || {}).map(r => (D0.STAFF[r] || {}).name).join(', ') || 'нет'}${est.visitor ? ' · торговец: ' + escapeHtml((D0.TRADER_KINDS[est.visitor.kind] || '') ) : ''}`;
             if (!_gmEstatePaint) window.Estate.draw(cv, est, { cs: 14, names: gmEstateNames() });
         }
     }
     window.renderEstates = renderEstates;
+    // Транзакции поместья: мастер пишет по тем же правилам, что и игроки.
+    window.Estate.setRunner(fn => {
+        if (!currentCode) return Promise.reject(new Error('Нет сессии.'));
+        const ref = db.collection('sessions').doc(currentCode);
+        return db.runTransaction(tx => tx.get(ref).then(doc => { const patch = fn(doc.data() || {}); if (patch && Object.keys(patch).length) tx.update(ref, patch); }));
+    });
+    const gmEstateRun = fn => window.Estate.mutate(_gmEstateSel, fn).catch(e => alert(e.message || e));
+    window.gmEstateAdvance = function (n) {
+        gmEstateRun(e => window.Estate.R.advance(e, n)).then(r => { if (r) alert('День поместья: ' + r.est.day + '.\n' + (r.ret.length ? r.ret.join('\n') : 'Ничего нового.')); });
+    };
+    window.gmEstateRaid = function () { if (confirm('Устроить налёт воров? Без управляющего и охранника они унесут до трёх стопок из хранилища.')) gmEstateRun(e => window.Estate.R.raid(e)); };
+    window.gmEstateResetWings = function () { gmEstateRun(e => { e.wings = []; e.wingsLocked = false; return ['wings', 'wingsLocked']; }); };
+    window.gmEstateGiveMats = function () {
+        const n = parseInt(prompt('Сколько каждого материала выдать на склад поместья?', '50')) || 0; if (n < 1) return;
+        gmEstateRun(e => { Object.keys(window.ESTATE_DATA.MATERIALS).forEach(m => { e.stock[m] = (e.stock[m] || 0) + n; }); return ['stock']; });
+    };
     window.gmEstateCreate = function () {
         if (!currentCode) { alert('Сначала открой сессию.'); return; }
-        const name = (el('gm-estate-name').value || '').trim() || 'Поместье';
-        const e = window.Estate.make(name, null, 50, 50);
+        const pid = (el('gm-estate-preset') || {}).value, name = (el('gm-estate-name').value || '').trim() || 'Поместье';
+        const e = (pid && window.Estate.preset(pid)) || window.Estate.make(name, null, 50, 50);
         _gmEstateSel = e.id; el('gm-estate-name').value = '';
         gmEstateWrite({ ['estates.' + e.id]: e });
     };
