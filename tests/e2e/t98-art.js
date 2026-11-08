@@ -8,6 +8,10 @@ const { setupSession, wait } = require('./setup');
   const miss = [];
   Object.keys(window.ENEMY_ART_READY).forEach(s => { if (!fs.existsSync(path.join(SITE, 'img/enemies', s + '.webp'))) miss.push('enemy ' + s); });
   Object.keys(window.ITEM_ART_READY).forEach(k => { if (!fs.existsSync(path.join(SITE, 'img/items', k + '.webp'))) miss.push('item ' + k); });
+  Object.keys(window.SPELL_ART_READY).forEach(k => { if (!fs.existsSync(path.join(SITE, 'img/spells', k + '.webp'))) miss.push('spell ' + k); });
+  const sp = new Function(fs.readFileSync(path.join(SITE, 'spell-data.js'), 'utf8') + ';return spellsData;')(), noArt = [];
+  Object.keys(sp).forEach(sc => Object.keys(sp[sc]).forEach(t => sp[sc][t].forEach(x => { if (!window.spellArtUrl(x.name)) noArt.push(x.name); })));
+  if (noArt.length) console.log('FAIL у заклинаний нет иконки: ' + noArt.slice(0, 10).join(', '));
   if (miss.length) console.log('FAIL нет файлов: ' + miss.join(', ')); else console.log('ok: все файлы на месте');
 
   const { gm, players, H } = await setupSession();
