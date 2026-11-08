@@ -320,6 +320,7 @@
 
         const html = `
             <div class="spell-card" id="card-${id}" data-seq="${seq}" data-fav="${loadedData && loadedData.favorite ? 1 : 0}">
+                ${(!isCustomName && window.spellArtUrl && window.spellArtUrl(name)) ? '<img class="st-spell-art" alt="" loading="lazy" src="' + window.spellArtUrl(name) + '">' : ''}
                 <div style="font-size:11px; opacity:.65; margin-bottom:2px;">Школа: ${escHtml(SCHOOL_CODE_TO_SKILL[school] || school)}</div>
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:4px;">
                     <button type="button" class="st-fav-btn" id="fav-${id}" onclick="toggleSpellFavorite('${id}')" title="Избранное: попадает наверх списка заклинаний в боевой панели" style="width:auto; flex:0 0 auto; margin:0; padding:0 6px; background:transparent; border:none; font-size:20px; cursor:pointer; color:#e6b800;">${loadedData && loadedData.favorite ? '★' : '☆'}</button>
