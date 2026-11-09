@@ -13,6 +13,7 @@
     function gmEstateNames() { const out = {}, p = (lastData && lastData.participants) || {}; Object.keys(p).forEach(u => { out[u] = p[u].name || p[u].charName || ''; }); return out; }
     function renderEstates() {
         const box = el('gm-estate-list'); if (!box || !window.Estate) return;
+        try { window.Estate.autoSync(lastData); } catch (e) { console.error(e); }
         const list = gmEstates();
         if (list.length && !list.some(e => e.id === _gmEstateSel)) _gmEstateSel = list[0].id;
         box.innerHTML = list.length ? list.map(e => `<button style="width:auto; margin:2px;${e.id === _gmEstateSel ? ' outline:2px solid var(--accent-color);' : ''}" onclick="gmEstatePick('${escapeHtml(e.id)}')">🏡 ${escapeHtml(e.name)} <span style="opacity:.6;">(${Object.keys(e.tokens || {}).length} жит.)</span></button>`).join('') : '<span style="opacity:.6;">Участков пока нет.</span>';
@@ -51,8 +52,11 @@
         return db.runTransaction(tx => tx.get(ref).then(doc => { const patch = fn(doc.data() || {}); if (patch && Object.keys(patch).length) tx.update(ref, patch); }));
     });
     const gmEstateRun = fn => window.Estate.mutate(_gmEstateSel, fn).catch(e => alert(e.message || e));
+    // День поместья = день партии: кнопка двигает общий счётчик дней сессии, поместья догоняют его сами (Estate.autoSync).
     window.gmEstateAdvance = function (n) {
-        gmEstateRun(e => window.Estate.R.advance(e, n)).then(r => { if (r) alert('День поместья: ' + r.est.day + '.\n' + (r.ret.length ? r.ret.join('\n') : 'Ничего нового.')); });
+        if (!currentCode) return;
+        const inc = firebase.firestore.FieldValue.increment(n);
+        return db.collection('sessions').doc(currentCode).update({ gameDayCounter: inc, gameDayPlayerMax: firebase.firestore.FieldValue.increment(n) }).catch(e => alert('Ошибка: ' + e.message));
     };
     window.gmEstateRaid = function () { if (confirm('Устроить налёт воров? Без управляющего и охранника они унесут до трёх стопок из хранилища.')) gmEstateRun(e => window.Estate.R.raid(e)); };
     window.gmEstateResetWings = function () { gmEstateRun(e => { e.wings = []; e.wingsLocked = false; return ['wings', 'wingsLocked']; }); };
@@ -63,7 +67,7 @@
     window.gmEstateCreate = function () {
         if (!currentCode) { alert('Сначала открой сессию.'); return; }
         const pid = (el('gm-estate-preset') || {}).value, name = (el('gm-estate-name').value || '').trim() || 'Поместье';
-        const e = (pid && window.Estate.preset(pid)) || window.Estate.make(name, null, 50, 50);
+        const e = (pid && window.Estate.preset(pid)) || window.Estate.make(name, null, 50, 50); e.dayBase = parseInt(lastData && lastData.gameDayCounter) || 0;
         _gmEstateSel = e.id; el('gm-estate-name').value = '';
         gmEstateWrite({ ['estates.' + e.id]: e });
     };

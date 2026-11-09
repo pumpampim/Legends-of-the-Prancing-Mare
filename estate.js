@@ -23,10 +23,30 @@
     function make(name, owner, w, h, opts) {
         opts = opts || {};
         return { id: 'es' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name || 'Поместье', w: w || 50, h: h || 50, cells: {}, tokens: {}, owner: owner || null, created: Date.now(),
-            found: {}, build: {}, roof: {}, plan: {}, planSeq: 0, furn: {}, stock: {}, store: {}, wings: opts.kind === 'house' ? ['kitchen', 'bedroom'] : [], wingsLocked: opts.kind === 'house', staff: {}, day: 0,
+            found: {}, build: {}, roof: {}, plan: {}, planSeq: 0, furn: {}, stock: {}, store: {}, wings: opts.kind === 'house' ? ['kitchen', 'bedroom'] : [], wingsLocked: opts.kind === 'house', staff: {}, day: 0, dayBase: null, floors: {}, orders: [], built: {}, wingSlot: {}, used: {},
             costMult: opts.costMult || 1, kind: opts.kind || 'manor', noBuild: opts.kind === 'house', log: [] };
     }
     // Готовые участки: «Озёрный дом» — пустая земля 50×50, стройка дороже на 40%; «Гордость шпиля» — готовый городской дом.
+    // ---------------- этажи ----------------
+    // Этаж 0 лежит в самом участке (found/build/roof/plan/furn), остальные — в e.floors[L]. withLevel на время подменяет эти слои,
+    // поэтому все правила ниже работают с «текущим этажом» без изменений; e._base — слои земли (для проверки фундамента).
+    const LV = ['found', 'build', 'roof', 'plan', 'furn'];
+    function withLevel(e, L, fn) {
+        L = Number(L) || 0; if (!L) return fn(e);
+        e.floors = e.floors || {}; const f = e.floors[L] = e.floors[L] || {}, saved = {};
+        LV.forEach(k => { saved[k] = e[k]; e[k] = f[k] || {}; }); e._base = saved;
+        try { return fn(e); } finally { LV.forEach(k => { f[k] = e[k]; e[k] = saved[k]; }); delete e._base; }
+    }
+    function getLevel(e, L) { L = Number(L) || 0; if (!L) return e; const f = (e.floors || {})[L] || {}; return { found: f.found || {}, build: f.build || {}, roof: f.roof || {}, plan: f.plan || {}, furn: f.furn || {} }; }
+    function levelsOf(e) { return [0].concat(Object.keys(e.floors || {}).map(Number).sort((a, b) => a - b)).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b); }
+    // Вид участка на этаже L для рисования и ходьбы (без копирования данных). Земля и местность — только на этаже 0.
+    function view(e, L) { L = Number(L) || 0; if (!L) return e; const o = getLevel(e, L); return Object.assign({}, e, { cells: {}, found: o.found, build: o.build, roof: o.roof, plan: o.plan, furn: o.furn, level: L }); }
+    // Все слои мебели участка (по этажам) — для лимитов и условий вроде «есть очаг».
+    function allFurn(e) { const a = [e.furn]; if (e._base) a.push(e._base.furn); Object.keys(e.floors || {}).forEach(L => { const f = e.floors[L].furn; if (f && a.indexOf(f) < 0) a.push(f); }); return a; }
+    const countFurn = (e, t) => allFurn(e).reduce((n, fm) => n + Object.keys(fm).filter(k => fm[k].t === t).length, 0);
+    function wingCount(e, w) { return allFurn(e).reduce((n, fm) => n + Object.keys(fm).filter(k => (D().FURN[fm[k].t] || {}).wing === w).length, 0); }
+    function wingActive(e, w) { const I = D().WING_INFO[w]; return e.wings.indexOf(w) >= 0 && !!I && wingCount(e, w) >= I.need; }
+
     function preset(id, owner) {
         const P = (D().PRESETS || {})[id]; if (!P) return null;
         const e = make(P.name, owner, P.w, P.h, { kind: P.kind, costMult: P.costMult });
@@ -38,6 +58,7 @@
             e.build[key(14, 19)] = 'door'; e.build[key(8, 12)] = 'window'; e.build[key(21, 12)] = 'window';
             e.furn[key(10, 10)] = { t: 'hearth' }; e.furn[key(12, 12)] = { t: 'table' };
             e.furn[key(19, 10)] = { t: 'bed' }; e.furn[key(19, 12)] = { t: 'bed' }; e.furn[key(10, 17)] = { t: 'chest' };
+            if (window.ESTATE_PLANS) window.ESTATE_PLANS.apply(e, window.ESTATE_PLANS.solShell(e), withLevel);
         }
         return e;
     }
@@ -46,6 +67,7 @@
         if (x < 0 || y < 0 || x >= est.w || y >= est.h) return false;
         const t = terrain()[typeAt(est, x, y)]; if (t && !t.pass) return false;
         const k = key(x, y), b = est.build && est.build[k]; if (b === 'wall' || b === 'window') return false;
+        if (est.level && b !== 'floor' && b !== 'door') return false;
         const f = est.furn && est.furn[k]; if (f && D().FURN[f.t] && D().FURN[f.t].block) return false;
         return true;
     }
@@ -70,6 +92,19 @@
     function tokenColor(uid) { let h = 0; for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) % 360; return 'hsl(' + h + ',65%,45%)'; }
 
     // ---------------- рисование ----------------
+    // Текстуры (img/estate/<имя>.webp, нарисованы нейросетью в духе Скайрима): плитка в 4 клетки; нет файла — рисуется цветом.
+    const TEX = {};
+    function texImg(n) {
+        const v = TEX[n]; if (v !== undefined) return v || null;
+        TEX[n] = null; if (typeof Image === 'undefined') return null;
+        const i = new Image(); i.onload = () => { TEX[n] = i; try { if (window.Estate && window.Estate.redraw) window.Estate.redraw(); } catch (e) { } }; i.onerror = () => { TEX[n] = false; }; i.src = 'img/estate/' + n + '.webp'; return null;
+    }
+    function fillTex(c, n, color, x, y, w, h, cs, alpha) {
+        const im = texImg(n);
+        if (im) { c._tp = c._tp || {}; const kk = n + '@' + cs; let p = c._tp[kk]; if (!p) { p = c.createPattern(im, 'repeat'); if (p && p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scale(cs * 4 / im.width)); c._tp[kk] = p; } c.fillStyle = p || color; }
+        else c.fillStyle = color;
+        if (alpha != null) c.globalAlpha = alpha; c.fillRect(x, y, w, h); if (alpha != null) c.globalAlpha = 1;
+    }
     const LAYER_COLOR = { found: '#77716a', floor: '#8a6d4b', wall: '#4a423c', door: '#6b4423', window: '#7fb4d8' };
     // opts: cs, me (uid), names, hover, showRoof, mode
     function draw(cv, est, opts) {
@@ -77,14 +112,15 @@
         const cs = opts.cs || 14, W = est.w * cs, H = est.h * cs;
         if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
         const c = cv.getContext('2d'), T = terrain(), FU = D() ? D().FURN : {};
-        const me = opts.me, mt = est.tokens && est.tokens[me];
-        const showRoof = opts.showRoof !== false && !(mt && est.roof && est.roof[key(mt.x, mt.y)]);
+        const me = opts.me, mt = est.tokens && est.tokens[me], lvl = Number(opts.level) || 0;
+        const showRoof = opts.showRoof !== false && !(mt && (Number(mt.l) || 0) === lvl && est.roof && est.roof[key(mt.x, mt.y)]);
         for (let x = 0; x < est.w; x++) for (let y = 0; y < est.h; y++) {
             const k = key(x, y), d = T[typeAt(est, x, y)] || EXTRA.grass;
-            c.fillStyle = d.color; c.fillRect(x * cs, y * cs, cs, cs);
-            if (est.found && est.found[k]) { c.fillStyle = LAYER_COLOR.found; c.fillRect(x * cs, y * cs, cs, cs); }
+            if (lvl) { c.fillStyle = '#14171b'; c.fillRect(x * cs, y * cs, cs, cs); } else fillTex(c, typeAt(est, x, y), d.color, x * cs, y * cs, cs, cs, cs);
+            if (lvl && opts.ghost) { const gb = opts.ghost.build && opts.ghost.build[k]; if (gb) { c.fillStyle = 'rgba(255,255,255,.07)'; c.fillRect(x * cs, y * cs, cs, cs); } }
+            if (est.found && est.found[k]) fillTex(c, 'foundation', LAYER_COLOR.found, x * cs, y * cs, cs, cs, cs);
             const b = est.build && est.build[k];
-            if (b) { c.fillStyle = LAYER_COLOR[b]; c.fillRect(x * cs, y * cs, cs, cs); if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (b === 'door' || b === 'window') { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
+            if (b) { fillTex(c, b === 'door' || b === 'window' ? 'floor' : b, LAYER_COLOR[b], x * cs, y * cs, cs, cs, cs); if (b === 'door' || b === 'window') { c.fillStyle = LAYER_COLOR[b]; c.globalAlpha = .55; c.fillRect(x * cs, y * cs, cs, cs); c.globalAlpha = 1; } if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (b === 'door' || b === 'window') { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
         }
         c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1;
         if (cs >= 10) { for (let x = 0; x <= est.w; x++) { c.beginPath(); c.moveTo(x * cs + .5, 0); c.lineTo(x * cs + .5, H); c.stroke(); } for (let y = 0; y <= est.h; y++) { c.beginPath(); c.moveTo(0, y * cs + .5); c.lineTo(W, y * cs + .5); c.stroke(); } }
@@ -100,12 +136,12 @@
             c.strokeStyle = '#ffd24a'; c.setLineDash([3, 2]); c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); c.setLineDash([]);
             c.fillStyle = '#ffd24a'; c.font = Math.floor(cs * 0.55) + 'px sans-serif'; c.fillText((D().PIECES[p.t] || {}).icon ? D().PIECES[p.t].name[0] : '?', x * cs + cs / 2, y * cs + cs / 2 + 1);
         });
-        if (showRoof) Object.keys(est.roof || {}).forEach(k => { const [x, y] = k.split('_').map(Number); c.fillStyle = 'rgba(122,58,46,.62)'; c.fillRect(x * cs, y * cs, cs, cs); });
+        if (showRoof) Object.keys(est.roof || {}).forEach(k => { const [x, y] = k.split('_').map(Number); fillTex(c, 'roof', '#7a3a2e', x * cs, y * cs, cs, cs, cs, .7); });
         if (opts.sel) { c.fillStyle = 'rgba(255,210,74,.4)'; opts.sel.forEach(q => c.fillRect(q[0] * cs, q[1] * cs, cs, cs)); }
         if (opts.hover) { c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(opts.hover.x * cs, opts.hover.y * cs, cs, cs); }
         const names = opts.names || {};
         Object.keys(est.tokens || {}).forEach(uid => {
-            const t = est.tokens[uid]; if (!t) return;
+            const t = est.tokens[uid]; if (!t || (Number(t.l) || 0) !== lvl) return;
             c.fillStyle = tokenColor(uid); c.beginPath(); c.arc(t.x * cs + cs / 2, t.y * cs + cs / 2, cs * 0.42, 0, 7); c.fill();
             c.lineWidth = uid === opts.me ? 3 : 1.5; c.strokeStyle = uid === opts.me ? '#ffd24a' : '#000'; c.stroke();
             c.fillStyle = '#fff'; c.font = 'bold ' + Math.max(8, Math.floor(cs * 0.55)) + 'px sans-serif';
@@ -147,15 +183,15 @@
             const ok = [];
             cellKeys(cells).forEach(k => {
                 const [x, y] = k.split('_').map(Number); if (!inb(e, x, y) || e.plan[pk(P.layer, k)]) return;
-                if (P.layer === 'found') { const t = terrain()[typeAt(e, x, y)]; if ((t && !t.pass) || e.found[k]) return; }
+                if (P.layer === 'found') { if (e._base) return; const t = terrain()[typeAt(e, x, y)]; if ((t && !t.pass) || e.found[k]) return; }
                 else {
-                    if (!e.found[k]) return;
+                    if (!(e._base ? e._base.found : e.found)[k]) return;
                     if (P.layer === 'build' && (e.build[k] || (e.furn[k] && op !== 'floor'))) return;
                     if (P.layer === 'roof' && e.roof[k]) return;
                 }
                 ok.push(k);
             });
-            if (!ok.length) fail('Сюда это не построить (нужен фундамент, свободная клетка или проходимая местность).');
+            if (!ok.length) fail(e._base ? 'Сюда это не построить: этаж строится над фундаментом первого этажа, на свободной клетке.' : 'Сюда это не построить (нужен фундамент, свободная клетка или проходимая местность).');
             takeMats(e, costOf(e, P.cost, ok.length));
             ok.forEach(k => { e.plan[pk(P.layer, k)] = { t: op, w: P.work, n: ++e.planSeq }; });
             return ['stock', 'plan', 'planSeq'];
@@ -187,15 +223,44 @@
             list = (list || []).filter((w, i, a) => D().WINGS[w] && a.indexOf(w) === i);
             if (list.length > D().MAX_WINGS) fail('Можно выбрать не больше ' + D().MAX_WINGS + ' крыльев.');
             if (!list.length) fail('Выберите хотя бы одно крыло.');
-            e.wings = list; e.wingsLocked = true; return ['wings', 'wingsLocked'];
+            e.wings = list; e.wingsLocked = true; e.wingSlot = {}; list.forEach((w, i) => { e.wingSlot[w] = i; }); return ['wings', 'wingsLocked', 'wingSlot'];
+        },
+        // Услуга управляющего: готовая постройка по плану, строится заданное число дней партии.
+        order(e, id) {
+            const PL = window.ESTATE_PLANS, P = PL && PL.PKG[id]; if (!P) fail('Нет такой услуги.');
+            if (P.kind !== (e.kind === 'house' ? 'house' : 'manor')) fail('Эту услугу управляющий здесь не предлагает.');
+            if (!e.staff.steward) fail('Сначала наймите управляющего: услуги продаёт он.');
+            e.built = e.built || {}; e.orders = e.orders || [];
+            if (e.built[id]) fail('Это уже построено.'); if (e.orders.some(o => o.id === id)) fail('Этот заказ уже в работе.');
+            if (P.wing && e.wings.indexOf(P.wing) < 0) fail('Это крыло не выбрано.');
+            if (P.need) {
+                if (P.need.indexOf('wing:') === 0) { if (e.wings.indexOf(P.need.slice(5)) < 0) fail('Нужно крыло «' + D().WINGS[P.need.slice(5)].name + '».'); }
+                else if (!e.built[P.need]) fail('Сначала закажите: ' + PL.nameOf(P.need) + '.');
+            }
+            if (PL.conflicts(e, PL.planOf(e, id), getLevel)) fail('Место занято постройкой или разметкой: сначала снесите или отмените её.');
+            e.orders.push({ id, left: P.days, since: e.day }); pushLog(e, 'Заказано у управляющего: ' + PL.nameOf(id) + ' (дней партии: ' + P.days + ').'); return ['orders', 'log'];
+        },
+        finishOrders(e, ev) {
+            const PL = window.ESTATE_PLANS; e.built = e.built || {}; if (!(e.orders || []).length || !PL) return;
+            e.orders.forEach(o => { o.left--; });
+            const ready = e.orders.filter(o => o.left <= 0); e.orders = e.orders.filter(o => o.left > 0);
+            ready.forEach(o => { PL.apply(e, PL.planOf(e, o.id), withLevel); e.built[o.id] = 1; ev.push('Управляющий закончил: ' + PL.nameOf(o.id) + '.'); });
+        },
+        // Пользование крылом раз в день партии на игрока. Возвращает описание эффекта.
+        useWing(e, w, uid) {
+            const I = D().WING_INFO[w]; if (!I || !I.use) fail('У этого крыла нет действия.');
+            if (!wingActive(e, w)) fail('Крыло ещё не обставлено: нужно предметов крыла — ' + I.need + ' (стоит ' + wingCount(e, w) + ').');
+            e.used = e.used || {}; const kk = w + '|' + uid; if (e.used[kk] === e.day) fail('Сегодня (день ' + e.day + ') ты уже пользовался этим крылом. Новый день наступит вместе с днём партии.');
+            e.used[kk] = e.day; e.usedNow = I.use; return ['used'];
         },
         furn(e, t, x, y) {
             const F = D().FURN[t]; if (!F) fail('Неизвестная мебель.'); const k = key(x, y);
             if (!inb(e, x, y)) fail('Вне участка.'); if (e.furn[k]) fail('Клетка занята мебелью.');
             if (F.indoor) { if (e.build[k] !== 'floor') fail('«' + F.name + '» ставится на пол внутри дома.'); }
+            else if (e._base) fail('«' + F.name + '» ставится на пол внутри дома.');
             else if (e.build[k] || e.found[k] || !passable(e, x, y)) fail('«' + F.name + '» ставится на открытую землю.');
             if (F.wing && e.wings.indexOf(F.wing) < 0) fail('Нужно крыло «' + D().WINGS[F.wing].name + '» (выберите его среди пяти крыльев).');
-            if (F.limit && Object.keys(e.furn).filter(q => e.furn[q].t === t).length >= F.limit) fail('«' + F.name + '»: не больше ' + F.limit + ' штук.');
+            if (F.limit && countFurn(e, t) >= F.limit) fail('«' + F.name + '»: не больше ' + F.limit + ' штук.');
             takeMats(e, F.mats); e.furn[k] = { t }; return ['stock', 'furn'];
         },
         plant(e, x, y, crop) {
@@ -210,7 +275,7 @@
             const out = { name: f.crop.id, qty: f.t === 'glassbed' ? D().YIELD_GLASSBED : D().YIELD_PLANTER };
             delete f.crop; e.harvested = out; return ['furn'];
         },
-        storeCap(e) { return D().BASE_STORE_STACKS + D().CHEST_STACKS * Object.keys(e.furn).filter(k => e.furn[k].t === 'chest').length; },
+        storeCap(e) { return D().BASE_STORE_STACKS + D().CHEST_STACKS * countFurn(e, 'chest') + (wingActive(e, 'armory') ? (D().WING_INFO.armory.store || 0) : 0); },
         storeKey(name) { return String(name).replace(/[.\/\[\]*~]/g, '_'); },
         put(e, rec, qty) {
             const kk = R.storeKey(rec.itemId || rec.name);
@@ -223,7 +288,7 @@
             const out = Object.assign({}, r, { count: qty }); r.count -= qty; if (r.count <= 0) delete e.store[kk]; e.taken = out; return ['store'];
         },
         brew(e) {
-            const M = D().MEAD; if (!Object.keys(e.furn).some(k => e.furn[k].t === 'hearth')) fail('Для медовухи нужен очаг в кухне.');
+            const M = D().MEAD; if (!countFurn(e, 'hearth')) fail('Для медовухи нужен очаг в кухне.');
             const src = e.store[R.storeKey(M.in)]; if (!src || src.count < M.inQty) fail('Нужно мёда: ' + M.inQty + '.');
             R.take(e, R.storeKey(M.in), M.inQty); delete e.taken;
             R.put(e, { itemId: M.out, name: M.out, category: 'Напитки', weight: 1 }, M.outQty); return ['store'];
@@ -236,12 +301,12 @@
         pay(e, role) { const s = e.staff[role]; if (!s) fail('Он не нанят.'); s.paidUntil = Math.max(s.paidUntil, e.day) + 30; return ['staff']; },
         fire(e, role) { if (!e.staff[role]) fail('Он не нанят.'); delete e.staff[role]; return ['staff']; },
         // Выработка одного рабочего дня: стройка по очереди разметки.
-        work(e) {
-            let cap = D().BASE_WORK + (e.staff.builder ? D().BUILDER_WORK : 0), done = 0;
+        work(e, ref) {
+            ref = ref || { cap: D().BASE_WORK + (e.staff.builder ? D().BUILDER_WORK : 0) }; let done = 0;
             Object.keys(e.plan).sort((a, b) => e.plan[a].n - e.plan[b].n).forEach(k => {
-                if (cap <= 0) return; const p = e.plan[k];
-                if (p.w <= cap + 1e-9) { cap -= p.w; const P = D().PIECES[p.t]; (e[P.layer] = e[P.layer] || {})[k.replace('~r', '')] = P.layer === 'build' ? p.t : 1; delete e.plan[k]; done++; }
-                else { p.w = Math.round((p.w - cap) * 100) / 100; cap = 0; }
+                if (ref.cap <= 0) return; const p = e.plan[k], cap = ref.cap;
+                if (p.w <= cap + 1e-9) { ref.cap -= p.w; const P = D().PIECES[p.t]; (e[P.layer] = e[P.layer] || {})[k.replace('~r', '')] = P.layer === 'build' ? p.t : 1; delete e.plan[k]; done++; }
+                else { p.w = Math.round((p.w - cap) * 100) / 100; ref.cap = 0; }
             });
             return done;
         },
@@ -249,7 +314,9 @@
         advance(e, days) {
             const ev = [];
             for (let i = 0; i < (days || 1); i++) {
-                e.day++; const n = R.work(e); if (n) ev.push('Построено клеток: ' + n + '.');
+                e.day++; const ref = { cap: D().BASE_WORK + (e.staff.builder ? D().BUILDER_WORK : 0) }; let n = 0;
+                levelsOf(e).forEach(L => { n += withLevel(e, L, () => R.work(e, ref)); }); if (n) ev.push('Построено клеток: ' + n + '.');
+                R.finishOrders(e, ev);
                 Object.keys(e.staff).forEach(r => { if (e.staff[r].paidUntil < e.day) { ev.push(D().STAFF[r].name + ' ушёл: жалованье не продлено.'); delete e.staff[r]; } });
                 if (e.day % 7 === 0) {
                     const add = {}, bump = (nm, q) => { add[nm] = (add[nm] || 0) + q; };
@@ -265,6 +332,13 @@
             }
             ev.forEach(t => pushLog(e, t)); return ev;
         },
+        // Дни поместья = дни партии (sessions.gameDayCounter): догоняем счётчик сессии, не больше 90 суток за раз.
+        sync(e, counter) {
+            counter = parseInt(counter) || 0;
+            if (e.dayBase == null) { e.dayBase = counter - (e.day || 0); return []; }
+            const n = counter - e.dayBase - (e.day || 0); if (n <= 0) return [];
+            return R.advance(e, Math.min(n, 90));
+        },
         raid(e) {
             if (e.staff.steward || e.staff.guard) { pushLog(e, 'Воры сунулись в дом, но охрана их отогнала.'); return ['log']; }
             const ks = Object.keys(e.store), lost = [];
@@ -274,24 +348,27 @@
     };
     // ---------------- транзакции и общая часть ----------------
     const Tx = { runner: null };
-    const FIELDS = ['day', 'found', 'build', 'roof', 'plan', 'planSeq', 'furn', 'stock', 'store', 'staff', 'visitor', 'log', 'wings', 'wingsLocked'];
-    function mutate(id, fn, fields) {
+    const FIELDS = ['day', 'found', 'build', 'roof', 'plan', 'planSeq', 'furn', 'stock', 'store', 'staff', 'visitor', 'log', 'wings', 'wingsLocked', 'dayBase', 'floors', 'orders', 'built', 'wingSlot', 'used'];
+    function mutate(id, fn, fields, level) {
+        level = Number(level) || 0; if (level && fields) fields = fields.concat(['floors']);
         const runner = Tx.runner || (window.CloudSync && window.CloudSync.estateTx);
         if (!runner) return Promise.reject(new Error('Не в сессии.'));
         let result = null;
         return runner(session => {
             const src = session.estates && session.estates[id]; if (!src) fail('Поместье не найдено.');
-            const e = clone(src);
+            const e = clone(src); e._counter = parseInt(session.gameDayCounter) || 0;
             ['found', 'build', 'roof', 'plan', 'furn', 'stock', 'store', 'staff', 'cells', 'tokens'].forEach(f => { e[f] = e[f] || {}; });
+            e.floors = e.floors || {}; e.orders = e.orders || []; e.built = e.built || {}; e.wingSlot = e.wingSlot || {}; e.used = e.used || {};
             e.wings = e.wings || []; e.day = e.day || 0; e.planSeq = e.planSeq || 0; e.log = e.log || [];
-            result = fn(e); const patch = {};
+            result = level ? withLevel(e, level, () => fn(e)) : fn(e); const patch = {};
             (fields || FIELDS).forEach(f => { patch['estates.' + id + '.' + f] = e[f] === undefined ? firebase.firestore.FieldValue.delete() : clone(e[f]); });
             result = { ret: result, est: e }; return patch;
         }).then(() => result);
     }
     const nowSession = () => (UI.data || {});
     const $ = id => document.getElementById(id);
-    const UI = { sel: '', data: null, mode: 'walk', arg: '', showRoof: true, sig: '', drag: null, busy: false };
+    const UI = { sel: '', data: null, mode: 'walk', arg: '', showRoof: true, sig: '', drag: null, busy: false, lv: 0, lvTok: null };
+    const PLN = () => window.ESTATE_PLANS || { PKG: {}, LEVELS: {}, priceOf: () => 0, nameOf: x => x };
 
     // ---------------- игрок ----------------
     function myUid() { return window.CloudSync && window.CloudSync.getCurrentUid ? window.CloudSync.getCurrentUid() : null; }
@@ -319,8 +396,16 @@
         const toolBtns = tools.map(t => '<button class="est-tool' + (UI.mode === t[0] ? ' active' : '') + '" style="width:auto; padding:3px 8px; margin:2px;' + (UI.mode === t[0] ? ' outline:2px solid var(--accent-color);' : '') + '" onclick="Estate.setMode(\'' + t[0] + '\')">' + t[1] + '</button>').join('');
         const furnOpts = Object.keys(d.FURN).map(k => { const F = d.FURN[k]; const locked = F.wing && e.wings.indexOf(F.wing) < 0; return '<option value="' + k + '"' + (UI.mode === 'furn' && UI.arg === k ? ' selected' : '') + '>' + F.icon + ' ' + esc(F.name) + ' — ' + F.gold + ' зол.' + (Object.keys(F.mats).length ? ' + ' + esc(fmtCost(F.mats)) : '') + (locked ? ' 🔒 ' + esc(d.WINGS[F.wing].name) : '') + '</option>'; }).join('');
         const cropOpts = Object.keys(d.CROPS).map(k => '<option value="' + esc(k) + '"' + (UI.mode === 'plant' && UI.arg === k ? ' selected' : '') + '>' + d.CROPS[k].icon + ' ' + esc(k) + '</option>').join('');
-        const wingsHtml = e.wingsLocked ? '<div>Выбрано: ' + e.wings.map(w => d.WINGS[w].icon + ' ' + esc(d.WINGS[w].name)).join(', ') + '</div>' :
-            '<div style="display:flex; flex-wrap:wrap; gap:4px 12px;">' + Object.keys(d.WINGS).map(w => '<label style="margin:0;"><input type="checkbox" class="est-wing" value="' + w + '"> ' + d.WINGS[w].icon + ' ' + esc(d.WINGS[w].name) + '</label>').join('') + '</div><button style="width:auto; margin-top:4px;" onclick="Estate.pickWings()">Выбрать крылья (до ' + d.MAX_WINGS + ', насовсем)</button>';
+        const wingInfo = w => { const I = d.WING_INFO[w] || {}; return '<div style="font-size:12px; opacity:.75; margin:0 0 4px 22px;">' + esc(I.effect || '') + (I.need ? ' Нужно предметов крыла: ' + I.need + '.' : '') + '</div>'; };
+        const me2 = myUid();
+        const wingsHtml = e.wingsLocked ? e.wings.map(w => {
+            const I = d.WING_INFO[w] || {}, on = wingActive(e, w), sl = (e.wingSlot || {})[w], slotName = sl != null && PLN().SLOTS && PLN().SLOTS[sl] ? PLN().SLOTS[sl].name : '';
+            const used = (e.used || {})[w + '|' + me2] === e.day;
+            return '<div style="padding:4px 0; border-bottom:1px solid var(--border-color);">' + d.WINGS[w].icon + ' <b>' + esc(d.WINGS[w].name) + '</b> — ' + (on ? '<span style="color:#2ecc71;">действует</span>' : '<span style="opacity:.7;">не обставлено (' + wingCount(e, w) + '/' + (I.need || 1) + ')</span>') + (slotName ? ' · место: ' + slotName : '') +
+                (I.use && on ? ' <button style="width:auto; padding:1px 8px;"' + (used ? ' disabled' : '') + ' onclick="Estate.useWing(\'' + w + '\')">' + esc(I.use.label) + (used ? ' (сегодня уже)' : '') + '</button>' : '') +
+                '<div style="font-size:12px; opacity:.75;">' + esc(I.effect || '') + '</div></div>';
+        }).join('') :
+            '<div>' + Object.keys(d.WINGS).map(w => '<label style="margin:0;"><input type="checkbox" class="est-wing" value="' + w + '"> ' + d.WINGS[w].icon + ' ' + esc(d.WINGS[w].name) + '</label>' + wingInfo(w)).join('') + '</div><button style="width:auto; margin-top:4px;" onclick="Estate.pickWings()">Выбрать крылья (до ' + d.MAX_WINGS + ', насовсем)</button>';
         const cap = R.storeCap(e), stacks = Object.keys(e.store);
         const storeRows = stacks.length ? stacks.map(k => '<div style="display:flex; justify-content:space-between; gap:6px; padding:2px 0; border-bottom:1px solid var(--border-color);"><span>' + esc(e.store[k].name || k) + ' ×' + e.store[k].count + '</span><button style="width:auto; padding:1px 8px;" onclick="Estate.takeItem(\'' + esc(k) + '\')">Взять</button></div>').join('') : '<span style="opacity:.6;">Пусто.</span>';
         let bag = '';
@@ -336,13 +421,22 @@
         const plots = Object.keys(e.furn).filter(k => e.furn[k].crop).map(k => { const f = e.furn[k], left = d.GROW_DAYS - (e.day - f.crop.at); return esc(f.crop.id) + (left > 0 ? ' (ещё ' + left + ' дн.)' : ' ✨ созрело'); }).join(', ');
         const log = (e.log || []).slice(-6).reverse().map(l => '<div style="font-size:12px; opacity:.8;">День ' + l.d + ': ' + esc(l.t) + '</div>').join('');
         const queue = Object.keys(e.plan).length;
-        return '<div id="estate-msg" style="min-height:18px; font-size:13px; margin:4px 0;"></div>' +
+        const PL = PLN(), kindNow = e.kind === 'house' ? 'house' : 'manor', hasSt = !!e.staff.steward;
+        const svc = Object.keys(PL.PKG).filter(id => PL.PKG[id].kind === kindNow && (!PL.PKG[id].wing || e.wings.indexOf(PL.PKG[id].wing) >= 0)).map(id => {
+            const P = PL.PKG[id], done = !!(e.built || {})[id], ord = (e.orders || []).find(o => o.id === id), price = PL.priceOf(e, id);
+            let need = ''; if (P.need) { if (P.need.indexOf('wing:') === 0) { if (e.wings.indexOf(P.need.slice(5)) < 0) need = 'нужно крыло «' + d.WINGS[P.need.slice(5)].name + '»'; } else if (!(e.built || {})[P.need]) need = 'сначала: ' + PL.nameOf(P.need); }
+            const st = done ? '<span style="color:#2ecc71;">✔ построено</span>' : ord ? '<span style="color:#e6a23c;">⏳ строится, осталось дней партии: ' + ord.left + '</span>' : need ? '<span style="opacity:.7;">🔒 ' + esc(need) + '</span>' : '<button style="width:auto; padding:1px 8px;"' + (hasSt ? '' : ' disabled title="нужен управляющий"') + ' onclick="Estate.order(\'' + id + '\')">Заказать — ' + price + ' зол.</button>';
+            return '<div style="padding:4px 0; border-bottom:1px solid var(--border-color);"><b>' + esc(PL.nameOf(id)) + '</b> · ' + P.days + ' дн. · ' + st + '<div style="font-size:12px; opacity:.75;">' + esc(P.desc || ((d.WINGS[P.wing] || {}).name ? 'Крыло «' + d.WINGS[P.wing].name + '» целиком: стены, крыша, двери и обстановка по месту.' : '')) + '</div></div>';
+        }).join('');
+        const stewardHtml = '<details open class="panel" style="margin:6px 0;"><summary><b>Услуги управляющего</b> ' + (hasSt ? '' : '<span style="opacity:.7;">(сначала наймите его в «Персонале»)</span>') + '</summary><div style="font-size:12px; opacity:.75; margin:4px 0;">Готовые постройки и обстановка за золото, без материалов со склада. Строится сама, пока идут дни партии. Можно строить и самим руками — как раньше.</div>' + svc + '</details>';
+        const lvBar = '<div style="margin:4px 0;">Этаж: ' + [-1, 0, 1].map(L => '<button style="width:auto; padding:3px 10px; margin:2px;' + (UI.lv === L ? ' outline:2px solid var(--accent-color);' : '') + '" onclick="Estate.setLevel(' + L + ')">' + esc(PL.LEVELS[String(L)] || L) + '</button>').join('') + '</div>';
+        return '<div id="estate-msg" style="min-height:18px; font-size:13px; margin:4px 0;"></div>' + lvBar + stewardHtml +
             '<div class="panel" style="margin:6px 0;"><b>Режим</b><div>' + toolBtns + '</div>' +
             '<div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;"><select id="est-furn" style="flex:2 1 220px;"><option value="">🪑 Поставить мебель…</option>' + furnOpts + '</select><button style="width:auto;" onclick="Estate.setFurnMode()">Ставить</button>' +
             '<select id="est-crop" style="flex:1 1 130px;"><option value="">🌱 Посадить…</option>' + cropOpts + '</select><button style="width:auto;" onclick="Estate.setPlantMode()">Сажать</button>' +
             '<button style="width:auto;" onclick="Estate.toggleRoof()">' + (UI.showRoof ? 'Скрыть крышу' : 'Показать крышу') + '</button></div></div>' +
             '<details open class="panel" style="margin:6px 0;"><summary><b>Склад материалов и магазины</b></summary><div style="margin:6px 0;">' + matsHave + '</div>' + shops +
-            '<div style="font-size:12px; opacity:.75;">Разметка: ' + queue + ' клеток ждёт работы. В сутки отряд делает ' + (d.BASE_WORK + (e.staff.builder ? d.BUILDER_WORK : 0)) + ' рабочих дней (строитель +' + d.BUILDER_WORK + '). Рабочий день проводит мастер. Стройка дороже в ×' + (e.costMult || 1) + '. День поместья: ' + e.day + '.</div>' +
+            '<div style="font-size:12px; opacity:.75;">Разметка: ' + queue + ' клеток ждёт работы. В сутки отряд делает ' + (d.BASE_WORK + (e.staff.builder ? d.BUILDER_WORK : 0)) + ' рабочих дней (строитель +' + d.BUILDER_WORK + '). Каждый новый день партии стройка двигается сама. Стройка дороже в ×' + (e.costMult || 1) + '. День поместья: ' + e.day + '.</div>' +
             '<div style="font-size:12px; opacity:.75;">Цена детали на клетку: ' + Object.keys(d.PIECES).map(p => d.PIECES[p].name + ' — ' + esc(fmtCost(costOf(e, d.PIECES[p].cost, 1)))).join('; ') + '.</div></details>' +
             '<details class="panel" style="margin:6px 0;"><summary><b>Крылья</b> (' + (e.wingsLocked ? e.wings.length : 0) + '/' + d.MAX_WINGS + ')</summary>' + wingsHtml + '</details>' +
             '<details class="panel" style="margin:6px 0;"><summary><b>Хранилище</b> (' + stacks.length + '/' + cap + ' мест)</summary>' + storeRows +
@@ -352,7 +446,7 @@
             '<div>' + log + '</div>';
     }
     function sigOf(e) {
-        return JSON.stringify([e.day, e.stock, e.store, e.wings, e.wingsLocked, e.staff, Object.keys(e.plan || {}).length, Object.keys(e.furn || {}).map(k => k + (e.furn[k].t) + (e.furn[k].crop ? e.furn[k].crop.at : '')).join(), e.visitor, (e.log || []).length, UI.mode, UI.arg, UI.showRoof]);
+        return JSON.stringify([UI.lv, e.orders, e.built, e.used, e.wingSlot, e.day, e.stock, e.store, e.wings, e.wingsLocked, e.staff, Object.keys(e.plan || {}).length, Object.keys(e.furn || {}).map(k => k + (e.furn[k].t) + (e.furn[k].crop ? e.furn[k].crop.at : '')).join(), e.visitor, (e.log || []).length, UI.mode, UI.arg, UI.showRoof]);
     }
     function renderPlayer() {
         const box = $('estate-box'); if (!box) return;
@@ -360,7 +454,8 @@
         if (!list.length) { box.innerHTML = '<p style="opacity:.7;">У вашего отряда пока нет поместья. Его открывает мастер.</p>'; return; }
         if (!list.some(e => e.id === UI.sel)) UI.sel = list[0].id;
         const est = list.find(e => e.id === UI.sel), me = myUid();
-        ['found', 'build', 'roof', 'plan', 'furn', 'stock', 'store', 'staff'].forEach(f => { est[f] = est[f] || {}; }); est.wings = est.wings || []; est.day = est.day || 0;
+        ['found', 'build', 'roof', 'plan', 'furn', 'stock', 'store', 'staff', 'floors', 'built', 'used', 'wingSlot'].forEach(f => { est[f] = est[f] || {}; }); est.wings = est.wings || []; est.day = est.day || 0; est.orders = est.orders || [];
+        { const tk = est.tokens && est.tokens[me], tl = tk ? Number(tk.l) || 0 : 0; if (UI.lvTok !== tl) { UI.lvTok = tl; UI.lv = tl; } }
         if (!$('estate-canvas')) {
             box.innerHTML = '<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px;"><select id="estate-select" onchange="Estate.pick(this.value)"></select>' +
                 '<span id="estate-info" style="font-size:13px; opacity:.8;"></span></div>' +
@@ -373,7 +468,7 @@
         }
         $('estate-select').innerHTML = list.map(e => '<option value="' + esc(e.id) + '"' + (e.id === UI.sel ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('');
         const t = est.tokens && est.tokens[me];
-        $('estate-info').textContent = t ? 'Ты на клетке ' + t.x + ':' + t.y + '. Режим «Ходить»: нажми на клетку, чтобы пройти.' : 'Тебя нет в поместье: нажми «Войти».';
+        $('estate-info').textContent = t ? 'Ты на клетке ' + t.x + ':' + t.y + ', ' + String(PLN().LEVELS[String(Number(t.l) || 0)] || 'этаж').toLowerCase() + '. Режим «Ходить»: нажми на клетку; чтобы подняться или спуститься, дойди до лестницы.' : 'Тебя нет в поместье: нажми «Войти».';
         let enter = $('estate-enter');
         if (!t && !enter) { enter = document.createElement('button'); enter.id = 'estate-enter'; enter.textContent = 'Войти в поместье'; enter.style.cssText = 'width:auto; margin:4px 0;'; enter.onclick = () => Estate.enter(); $('estate-info').after(enter); }
         if (t && enter) enter.remove();
@@ -382,7 +477,12 @@
         const sg = est.id + sigOf(est);
         if (sg !== UI.sig) { UI.sig = sg; const msg = $('estate-msg') ? $('estate-msg').textContent : ''; $('estate-panels').innerHTML = panelsHtml(est); if (msg && $('estate-msg')) $('estate-msg').textContent = msg; }
         $('estate-canvas').style.touchAction = UI.mode === 'walk' ? 'auto' : 'none';
-        draw($('estate-canvas'), est, { cs: 14, me, names: nm, showRoof: UI.showRoof, sel: UI.drag ? UI.drag.cells : null });
+        paint(est, UI.drag ? UI.drag.cells : null);
+    }
+    // Рисует вид текущего этажа; на верхних и нижних этажах контур первого этажа виден бледным следом.
+    function paint(est, sel) {
+        const cv = $('estate-canvas'); if (!cv || !est) return;
+        draw(cv, view(est, UI.lv), { cs: 14, me: myUid(), names: namesOf(), showRoof: UI.showRoof, sel: sel || null, level: UI.lv, ghost: UI.lv ? est : null });
     }
     function write(patch) { return window.CloudSync && window.CloudSync.estateWrite ? window.CloudSync.estateWrite(patch) : Promise.reject(new Error('Не в сессии.')); }
     const BUILD_MODES = ['found', 'floor', 'wall', 'door', 'window', 'roof', 'demolish', 'cancel'];
@@ -391,10 +491,21 @@
         addToInventory(name, name, qty, base.weight || 0.1, base.category || '', '', extra && extra.rest || undefined);
     }
     const Estate = window.Estate = {
-        make, preset, typeAt, passable, spawnCell, reach, draw, cellFromEvent, visibleTo, terrain, PAINT, key, tokenColor, R, mutate, costOf, costText, clone,
+        make, preset, typeAt, passable, spawnCell, reach, draw, view, withLevel, getLevel, levelsOf, wingActive, wingCount, countFurn, cellFromEvent, visibleTo, terrain, PAINT, key, tokenColor, R, mutate, costOf, costText, clone,
         setRunner(fn) { Tx.runner = fn; },
-        onSession(d) { UI.data = d; try { renderPlayer(); } catch (e) { console.error(e); } },
+        onSession(d) { UI.data = d; Estate.autoSync(d); try { renderPlayer(); } catch (e) { console.error(e); } },
+        // Любой клиент (игрок или мастер) подтягивает дни поместья к дню партии; транзакция следит, чтобы день не посчитался дважды.
+        autoSync(d) {
+            const all = (d && d.estates) || {}, counter = parseInt(d && d.gameDayCounter) || 0; UI.synced = UI.synced || {};
+            Object.keys(all).forEach(id => {
+                const e = all[id]; if (!e) return;
+                const need = e.dayBase == null || counter - e.dayBase > (e.day || 0); if (!need) return;
+                const tag = id + ':' + counter + ':' + (e.day || 0) + ':' + (e.dayBase == null ? 'n' : 'b'); if (UI.synced[tag]) return; UI.synced[tag] = 1;
+                mutate(id, x => R.sync(x, x._counter)).catch(() => { });
+            });
+        },
         render() { UI.sig = ''; renderPlayer(); },
+        redraw() { const e = curEstate(); if (e && $('estate-canvas')) paint(e, UI.drag ? UI.drag.cells : null); },
         pick(id) { UI.sel = id; UI.sig = ''; renderPlayer(); },
         setMode(m) { UI.mode = m; UI.arg = ''; UI.sig = ''; renderPlayer(); },
         setFurnMode() { const v = $('est-furn').value; if (!v) return; UI.mode = 'furn'; UI.arg = v; UI.sig = ''; renderPlayer(); },
@@ -409,24 +520,52 @@
             const est = curEstate(), me = myUid(); if (!est || !me) return;
             const cell = cellFromEvent($('estate-canvas'), est, ev); if (!cell) return;
             if (UI.mode === 'walk') return Estate.walk(est, me, cell);
-            if (BUILD_MODES.indexOf(UI.mode) >= 0) { ev.preventDefault(); UI.drag = { cells: [[cell.x, cell.y]] }; draw($('estate-canvas'), est, { cs: 14, me, names: namesOf(), showRoof: UI.showRoof, sel: UI.drag.cells }); return; }
+            if (BUILD_MODES.indexOf(UI.mode) >= 0) { ev.preventDefault(); UI.drag = { cells: [[cell.x, cell.y]] }; paint(est, UI.drag.cells); return; }
             Estate.cellAction(est, cell);
         },
         move(ev) {
             if (!UI.drag) return; const est = curEstate(); if (!est) return;
             const cell = cellFromEvent($('estate-canvas'), est, ev); if (!cell) return;
-            if (!UI.drag.cells.some(c => c[0] === cell.x && c[1] === cell.y)) { UI.drag.cells.push([cell.x, cell.y]); draw($('estate-canvas'), est, { cs: 14, me: myUid(), names: namesOf(), showRoof: UI.showRoof, sel: UI.drag.cells }); }
+            if (!UI.drag.cells.some(c => c[0] === cell.x && c[1] === cell.y)) { UI.drag.cells.push([cell.x, cell.y]); paint(est, UI.drag.cells); }
         },
         up() {
             if (!UI.drag) return; const cells = UI.drag.cells; UI.drag = null; const est = curEstate(); if (!est) return;
             const op = UI.mode, id = est.id;
-            run(mutate(id, e => op === 'demolish' ? R.demolish(e, cells) : op === 'cancel' ? R.cancel(e, cells) : R.place(e, op, cells)))
+            run(mutate(id, e => op === 'demolish' ? R.demolish(e, cells) : op === 'cancel' ? R.cancel(e, cells) : R.place(e, op, cells), undefined, UI.lv))
                 .then(() => say(op === 'demolish' ? 'Снесено.' : op === 'cancel' ? 'Разметка отменена.' : 'Размечено клеток: ' + cells.length + '. Ждёт рабочего дня.')).catch(() => { });
         },
         walk(est, me, cell) {
             const t = est.tokens && est.tokens[me]; if (!t) return;
-            if (reach(est, t, cell) == null) { const i = $('estate-info'); if (i) i.textContent = 'Туда не пройти.'; return; }
-            write({ ['estates.' + est.id + '.tokens.' + me]: { x: cell.x, y: cell.y } }).catch(e => alert('Ошибка: ' + e.message));
+            const tl = Number(t.l) || 0;
+            if (tl !== UI.lv) { UI.lv = tl; UI.sig = ''; renderPlayer(); return; }
+            const v = view(est, tl);
+            if (reach(v, t, cell) == null) { const i = $('estate-info'); if (i) i.textContent = 'Туда не пройти.'; return; }
+            const k = key(cell.x, cell.y), f = v.furn[k], F = f && D().FURN[f.t];
+            let to = { x: cell.x, y: cell.y, l: tl }, note = '';
+            if (F && F.stair) {
+                const L2 = tl + F.stair, o = getLevel(est, L2), g = o.furn[k], G2 = g && D().FURN[g.t];
+                if (G2 && G2.stair === -F.stair && (L2 === 0 || o.build[k] === 'floor')) { to.l = L2; note = 'Ты ' + (F.stair > 0 ? 'поднялся' : 'спустился') + ': ' + (PLN().LEVELS[String(L2)] || 'этаж') + '.'; }
+                else note = 'Эта лестница пока никуда не ведёт.';
+            }
+            write({ ['estates.' + est.id + '.tokens.' + me]: to }).then(() => { if (note) say(note, /никуда/.test(note)); }).catch(e => alert('Ошибка: ' + e.message));
+        },
+        setLevel(L) { UI.lv = Number(L) || 0; UI.sig = ''; renderPlayer(); },
+        order(id) {
+            const est = curEstate(); if (!est) return; const PL = PLN(), price = PL.priceOf(est, id);
+            if (!confirm(PL.nameOf(id) + ': ' + price + ' золота, строится ' + PL.PKG[id].days + ' дн. партии. Заказать?')) return;
+            if (!spend(price)) { say('Не хватает золота: нужно ' + price + '.', true); return; }
+            run(mutate(est.id, e => R.order(e, id), ['orders', 'log'])).then(() => say('Заказано: ' + PL.nameOf(id) + '. Управляющий построит за ' + PL.PKG[id].days + ' дн. партии.')).catch(() => refund(price));
+        },
+        useWing(w) {
+            const est = curEstate(), me = myUid(); if (!est || !me) return; const I = D().WING_INFO[w], t = est.tokens && est.tokens[me];
+            if (!t) { say('Сначала войди в поместье.', true); return; }
+            const fm = getLevel(est, Number(t.l) || 0).furn;
+            const near = Object.keys(fm).some(k => { if (fm[k].t !== I.use.furn) return false; const q = k.split('_').map(Number); return Math.max(Math.abs(q[0] - t.x), Math.abs(q[1] - t.y)) <= 1; });
+            if (!near) { say('Подойди к предмету: ' + D().FURN[I.use.furn].name + ' (в соседнюю клетку, на нужном этаже).', true); return; }
+            run(mutate(est.id, e => R.useWing(e, w, me), ['used'])).then(() => {
+                try { pushOrRefreshTimedEffect({ id: I.use.id, name: I.use.name, effectName: I.use.name, turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: I.use.desc }); renderActiveEffects(); saveLocalStorage(true); } catch (x) { console.error(x); }
+                say('Эффект «' + I.use.name + '» получен до следующего сна.');
+            }).catch(() => { });
         },
         click(ev) { Estate.down(ev); },
         cellAction(est, cell) {
@@ -434,14 +573,14 @@
             if (UI.mode === 'furn') {
                 const F = D().FURN[UI.arg]; if (!F) return;
                 if (!spend(F.gold)) { say('Не хватает золота: нужно ' + F.gold + '.', true); return; }
-                run(mutate(id, e => R.furn(e, UI.arg, cell.x, cell.y))).then(() => say('Поставлено: ' + F.name + '.')).catch(() => refund(F.gold));
+                run(mutate(id, e => R.furn(e, UI.arg, cell.x, cell.y), undefined, UI.lv)).then(() => say('Поставлено: ' + F.name + '.')).catch(() => refund(F.gold));
             } else if (UI.mode === 'plant') {
-                run(mutate(id, e => R.plant(e, cell.x, cell.y, UI.arg))).then(() => say('Посажено: ' + UI.arg + '. Созреет через ' + D().GROW_DAYS + ' дней.')).catch(() => { });
+                run(mutate(id, e => R.plant(e, cell.x, cell.y, UI.arg), undefined, UI.lv)).then(() => say('Посажено: ' + UI.arg + '. Созреет через ' + D().GROW_DAYS + ' дней.')).catch(() => { });
             } else if (UI.mode === 'harvest') {
-                run(mutate(id, e => R.harvest(e, cell.x, cell.y))).then(r => { const h = r.est.harvested; addItemToBag(h.name, h.qty); say('Собрано: ' + h.name + ' ×' + h.qty + ' (в сумке).'); }).catch(() => { });
+                run(mutate(id, e => R.harvest(e, cell.x, cell.y), undefined, UI.lv)).then(r => { const h = r.est.harvested; addItemToBag(h.name, h.qty); say('Собрано: ' + h.name + ' ×' + h.qty + ' (в сумке).'); }).catch(() => { });
             } else if (UI.mode === 'sleep') {
                 const me = myUid(), t = est.tokens && est.tokens[me]; if (!t) { say('Сначала войди в поместье.', true); return; }
-                const near = Object.keys(est.furn || {}).some(k => { const f = est.furn[k]; if (f.t !== 'bed') return false; const [x, y] = k.split('_').map(Number); return Math.max(Math.abs(x - t.x), Math.abs(y - t.y)) <= 1; });
+                const near = Object.keys(getLevel(est, Number(t.l) || 0).furn || {}).some(k => { const f = getLevel(est, Number(t.l) || 0).furn[k]; if (f.t !== 'bed') return false; const [x, y] = k.split('_').map(Number); return Math.max(Math.abs(x - t.x), Math.abs(y - t.y)) <= 1; });
                 if (!near) { say('Подойди к кровати (в соседнюю клетку).', true); return; }
                 try { pushOrRefreshTimedEffect({ id: 'eff-wellrested', name: 'Выспался', effectName: 'Выспался', turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: '😴 +10% к получаемому опыту до следующего сна (мастер учитывает при наградах).' }); renderActiveEffects(); saveLocalStorage(true); } catch (e) { console.error(e); }
                 say('Ты выспался: +10% опыта до следующего сна.');

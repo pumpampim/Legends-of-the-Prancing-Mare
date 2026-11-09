@@ -35,6 +35,19 @@ window.ESTATE_DATA = (function () {
         trophy: { name: 'Комната трофеев', icon: '🏆' }, bedroom: { name: 'Спальни', icon: '🛏️' }
     };
     const MAX_WINGS = 5;
+    // Что даёт крыло. need — сколько предметов крыла должно стоять, чтобы оно считалось действующим.
+    // use — предмет, у которого можно «пользоваться» крылом раз в день партии (эффект действует до следующего сна, учитывает мастер).
+    const WING_INFO = {
+        armory: { need: 2, store: 10, effect: '+10 мест в хранилище. У оружейной стойки раз в день: «Заточка», +1 к урону оружием до сна.', use: { furn: 'rack', label: 'Взять оружие со стойки', id: 'eff-armory', name: 'Заточка', desc: '⚔️ +1 к урону оружием до следующего сна (мастер учитывает).' } },
+        library: { need: 2, effect: 'У книжного шкафа раз в день: «Начитанность», +1 успех к проверкам знаний и Интеллекта до сна.', use: { furn: 'bookcase', label: 'Почитать', id: 'eff-library', name: 'Начитанность', desc: '📚 +1 успех к проверкам знаний и Интеллекта до следующего сна (мастер учитывает).' } },
+        kitchen: { need: 2, effect: 'У очага раз в день: «Сытный стол», +5 временных ОЗ до сна. С поваром готовит блюдо.', use: { furn: 'hearth', label: 'Поесть у очага', id: 'eff-kitchen', name: 'Сытный стол', desc: '🍲 +5 временных ОЗ до следующего сна (мастер учитывает).' } },
+        alchemy: { need: 1, effect: 'У алхимического стола раз в день: «Домашняя лаборатория», первое сваренное зелье даёт +1 порцию.', use: { furn: 'alchtable', label: 'Работать в лаборатории', id: 'eff-alchemy', name: 'Домашняя лаборатория', desc: '⚗️ Первое сваренное сегодня зелье даёт +1 порцию (мастер учитывает).' } },
+        enchant: { need: 2, effect: 'У стола зачарования раз в день: «Спокойная башня», одно зачарование сегодня на 10% дешевле.', use: { furn: 'enchtable', label: 'Зачаровывать в башне', id: 'eff-enchant', name: 'Спокойная башня', desc: '🔮 Одно зачарование сегодня на 10% дешевле (мастер учитывает).' } },
+        greenhouse: { need: 1, effect: 'Каждую неделю +2 лаванды в хранилище. Шесть грядок под стеклом растят круглый год.' },
+        smithy: { need: 2, effect: 'У точила раз в день: «Острый клинок», +1 к урону до сна. Ремонт и ковка дома без платы кузнецу.', use: { furn: 'grindstone', label: 'Наточить оружие', id: 'eff-smithy', name: 'Острый клинок', desc: '🔨 Оружие наточено: +1 к урону до следующего сна (мастер учитывает).' } },
+        trophy: { need: 1, effect: 'У трофейной стены раз в день: «Слава», +1 успех к проверкам Харизмы перед жителями до сна.', use: { furn: 'trophy', label: 'Полюбоваться трофеями', id: 'eff-trophy', name: 'Слава', desc: '🏆 +1 успех к проверкам Харизмы перед жителями до следующего сна (мастер учитывает).' } },
+        bedroom: { need: 1, effect: 'В постели раз в день: «Выспался», +10% опыта до следующего сна.', use: { furn: 'bed', label: 'Лечь спать', id: 'eff-wellrested', name: 'Выспался', desc: '😴 +10% к получаемому опыту до следующего сна (мастер учитывает при наградах).' } }
+    };
     // Мебель. gold — золото, mats — материалы со склада. indoor — только на пол; block — загораживает клетку.
     // wing — нужно выбранное крыло. weekly — недельная выработка в хранилище. limit — не больше штук на участок.
     const FURN = {
@@ -61,6 +74,8 @@ window.ESTATE_DATA = (function () {
         hive: { name: 'Улей', icon: '🐝', gold: 60, mats: { plank: 3 }, indoor: false, block: true, weekly: { 'Мёд': 3 } },
         coop: { name: 'Курятник', icon: '🐔', gold: 80, mats: { plank: 4 }, indoor: false, block: true, weekly: { 'Куриное яйцо': 3 } },
         cowpen: { name: 'Коровник', icon: '🐄', gold: 120, mats: { plank: 6 }, indoor: false, block: true, weekly: { 'Кувшин молока': 3 } },
+        stairup: { name: 'Лестница вверх', icon: '🪜', gold: 40, mats: { plank: 6 }, indoor: true, block: false, stair: 1 },
+        stairdown: { name: 'Лестница вниз', icon: '⬇️', gold: 40, mats: { plank: 6 }, indoor: true, block: false, stair: -1 },
         mill: { name: 'Мельница', icon: '🌾', gold: 200, mats: { plank: 6, stone: 6, iron: 2 }, indoor: false, block: true }
     };
     // Что можно сажать. yieldN — штук с грядки за урожай; growDays — дней роста. По решению Никиты: растят и сельхоз, и алхимические растения.
@@ -72,7 +87,7 @@ window.ESTATE_DATA = (function () {
     const GREENHOUSE_WEEKLY = { 'Лаванда': 2 };
     // Персонал: цены в месяц (септимы). Жалование платят вперёд; не продлили месяц — работник уходит.
     const STAFF = {
-        steward: { name: 'Управляющий', icon: '🧑‍💼', wage: 750, desc: 'Ведёт хозяйство, охраняет хранилище от краж.' },
+        steward: { name: 'Управляющий', icon: '🧑‍💼', wage: 750, desc: 'Ведёт хозяйство, охраняет хранилище от краж. Продаёт готовые дом, этажи, крылья и обстановку комнат.' },
         guard: { name: 'Охранник', icon: '💂', wage: 600, desc: 'Охраняет дом, пока отряд в походе (кражи не проходят).' },
         cook: { name: 'Повар', icon: '🧑‍🍳', wage: 500, desc: 'Готовит блюдо из запасов дома раз в сутки (по решению мастера).' },
         builder: { name: 'Строитель', icon: '👷', wage: 500, desc: 'Прибавляет 4 рабочих дня в сутки к стройке.' },
@@ -88,5 +103,5 @@ window.ESTATE_DATA = (function () {
         lakeview: { name: 'Озёрный дом', w: 50, h: 50, costMult: 1.4, kind: 'manor' },
         solitude: { name: 'Гордость шпиля', w: 30, h: 30, costMult: 1, kind: 'house' }
     };
-    return { MATERIALS, SHOPS, PIECES, WINGS, MAX_WINGS, FURN, CROPS, GROW_DAYS, YIELD_PLANTER, YIELD_GLASSBED, GREENHOUSE_WEEKLY, STAFF, TRADER_KINDS, BASE_WORK, BUILDER_WORK, BASE_STORE_STACKS, CHEST_STACKS, MEAD, PRESETS };
+    return { WING_INFO, MATERIALS, SHOPS, PIECES, WINGS, MAX_WINGS, FURN, CROPS, GROW_DAYS, YIELD_PLANTER, YIELD_GLASSBED, GREENHOUSE_WEEKLY, STAFF, TRADER_KINDS, BASE_WORK, BUILDER_WORK, BASE_STORE_STACKS, CHEST_STACKS, MEAD, PRESETS };
 })();
