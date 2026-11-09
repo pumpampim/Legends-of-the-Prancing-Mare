@@ -582,8 +582,8 @@
                 const me = myUid(), t = est.tokens && est.tokens[me]; if (!t) { say('Сначала войди в поместье.', true); return; }
                 const near = Object.keys(getLevel(est, Number(t.l) || 0).furn || {}).some(k => { const f = getLevel(est, Number(t.l) || 0).furn[k]; if (f.t !== 'bed') return false; const [x, y] = k.split('_').map(Number); return Math.max(Math.abs(x - t.x), Math.abs(y - t.y)) <= 1; });
                 if (!near) { say('Подойди к кровати (в соседнюю клетку).', true); return; }
-                try { pushOrRefreshTimedEffect({ id: 'eff-wellrested', name: 'Выспался', effectName: 'Выспался', turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: '😴 +10% к получаемому опыту до следующего сна (мастер учитывает при наградах).' }); renderActiveEffects(); saveLocalStorage(true); } catch (e) { console.error(e); }
-                say('Ты выспался: +10% опыта до следующего сна.');
+                try { pushOrRefreshTimedEffect({ id: 'eff-wellrested', name: 'Выспался', effectName: 'Выспался', turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: '😴 +10% к прогрессу навыков за удачные проверки до следующего сна (считается автоматически).' }); renderActiveEffects(); saveLocalStorage(true); } catch (e) { console.error(e); }
+                say('Ты выспался: +10% к росту навыков до следующего сна.');
             }
         },
         buyMat(mat, inputId) {

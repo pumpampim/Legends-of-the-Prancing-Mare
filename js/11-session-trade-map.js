@@ -411,6 +411,7 @@
         if (!skillInput) return;
         const skillName = skillNames[skillIdx];
         const needed = getSuccessesNeededForSkill(getOwnSkillValue(skillName)); // от своего навыка: вера и вещи не тормозят рост
+        if ((activeTimedEffects || []).some(e => e && e.id === 'eff-wellrested')) amount = Math.round(amount * 1.1 * 100) / 100; // «Выспался» (поместье): +10% к прогрессу навыка за успехи
         skillProgress[skillIdx] = Math.round(((skillProgress[skillIdx] || 0) + amount) * 100) / 100;
 
         if (skillProgress[skillIdx] >= needed) {
