@@ -36,6 +36,12 @@ const BUILDS = [
   { id: 'archer', kind: 'ranged', boost: 'Повышение навыка:«Стрельба»', boostSlots: ['helmet', 'gloves', 'ring', 'neck'],
     stats: { str: 12, dex: 26, con: 18, int: 10, wis: 14, cha: 10 }, skills: { 'Стрельба': 100, 'Легкая броня': 100, 'Скрытность': 100, 'Кузнечное дело': 60 },
     gear: [['Эбонитовый лук', 'ranged'], ['Эбонитовая стрела', 'ammo'], ['Стеклянная броня', 'chest'], ['Стеклянный шлем', 'helmet'], ['Стеклянные перчатки', 'gloves'], ['Стеклянные сапоги', 'boots']], gods: ARCH_GODS },
+  { id: 'assassin', kind: 'melee', sneak: true, boost: 'Повышение навыка:«Одноручное оружие»', boostSlots: ['gloves', 'boots', 'ring', 'neck'],
+    stats: { str: 18, dex: 26, con: 18, int: 10, wis: 10, cha: 10 }, skills: { 'Одноручное оружие': 100, 'Скрытность': 100, 'Легкая броня': 100, 'Алхимия': 100, 'Кузнечное дело': 60 },
+    gear: [['Эбонитовый меч', 'melee'], ['Стеклянная броня', 'chest'], ['Стеклянный шлем', 'helmet'], ['Стеклянные перчатки', 'gloves'], ['Стеклянные сапоги', 'boots']], gods: WAR_GODS },
+  { id: 'dual', kind: 'melee', boost: 'Повышение навыка:«Одноручное оружие»', boostSlots: ['gloves', 'boots', 'ring', 'neck'],
+    stats: { str: 22, dex: 22, con: 20, int: 10, wis: 10, cha: 10 }, skills: { 'Одноручное оружие': 100, 'Легкая броня': 100, 'Кузнечное дело': 80, 'Алхимия': 60 },
+    gear: [['Эбонитовый меч', 'melee'], ['Эбонитовый меч', 'melee_offhand'], ['Стеклянная броня', 'chest'], ['Стеклянный шлем', 'helmet'], ['Стеклянные перчатки', 'gloves'], ['Стеклянные сапоги', 'boots']], gods: WAR_GODS },
   { id: 'destruction', kind: 'spell', boost: 'Повышение навыка:«Разрушение»', boostSlots: ['circlet', 'ring', 'neck'],
     stats: { str: 10, dex: 12, con: 18, int: 26, wis: 20, cha: 10 }, skills: { 'Разрушение': 100, 'Восстановление': 80, 'Изменение': 80, 'Зачарование': 60 },
     gear: [['Роба разрушения', 'robe'], ['Медный обруч с рубином', 'circlet']], gods: MAGE_GODS }
@@ -66,7 +72,7 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
       const sel = document.getElementById('attack-action-select'); sel.value = action;
       if (sel.value !== action) return { err: 'no action ' + action };
       document.getElementById('chk-power-attack').checked = !!opts.power;
-      document.getElementById('chk-sneak-attack').checked = false;
+      document.getElementById('chk-sneak-attack').checked = !!opts.sneak;
       document.getElementById('chk-enhanced-cast').checked = !!opts.enhanced;
       for (let i = 0; i < 60; i++) {
         const mp0 = parseInt(document.getElementById('cur-mp').value) || 0;
@@ -92,12 +98,14 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
     return r;
   }
   async function measure(action, opts) {
-    const xs = [], mods = [], costs = []; let ik = 0, err = null, log = '';
+    const xs = [], mods = [], costs = []; let ik = 0, err = null, log = '', skip = 0; const action2 = a => a;
     for (let i = 0; i < K; i++) {
       const r = await hitOnce(action, opts);
       if (r.err) { err = r.err + (r.al ? ' ' + r.al.join('|') : ''); break; }
       if (r.instakill) { ik++; continue; }
+      if (r.lost < 20 && action2(action) === 'ranged') { i--; skip++; if (skip > 40) { err = 'no ammo'; break; } continue; } // кончились стрелы стенда: удар «луком в ближнем бою» не считаем
       xs.push(r.lost); if (r.mod !== null) mods.push(r.mod); costs.push(r.cost); log = r.log;
+      if (process.env.DEBUGLOW && r.lost < 20) console.error('LOW', r.lost, r.log);
     }
     const avg = xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0;
     return { avg, min: Math.min(...xs), max: Math.max(...xs), mod: mods[0], cost: costs[0], ik, err, log };
@@ -197,6 +205,12 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
         if (sn === 'lich1' || sn === 'lich2') { fg.value = 'ideal'; }
         if (sn === 'lord' || sn === 'lordform') { fg.value = 'molag'; fr.value = 3; }
         if (sn === 'wolf') { fg.value = 'hircine'; fr.value = 3; }
+        if (sn === 'paladin' || sn === 'paladinC') { // ветка паладина: перки 1, 2, 3а (избавитель), 4; клятва возмездия; C = круг активен
+          lastFaithGod = god; characterLevel = 45; document.getElementById('char-level').value = 45; perkPointsAvailable = 6;
+          playerQuests = []; for (let i = 0; i < 40; i++) playerQuests.push({ id: 'q' + i, title: 'q' + i, status: 'done', kind: 'resident' });
+          plTakePerk('p1'); plChooseVow('vengeance'); plTakePerk('p2'); plTakePerk('p3a'); plTakePerk('p4');
+          if (sn === 'paladinC') { powersUsedToday.pl_circle = false; plUseCircle(); }
+        }
         updateAll();
         if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
         document.getElementById('cur-hp').value = document.getElementById('max-hp').value;
@@ -208,7 +222,7 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
       if (sn === 'lordform') { row.bite = await measure('bite', {}); return row; }
       if (sn === 'wolf') { row.claw = await measure('claw', {}); row.clawPower = await measure('claw', { power: true }); return row; }
       if (action) {
-        row.hit = await measure(action, {});
+        row.hit = await measure(action, { sneak: !!b.sneak });
         if (b.kind === 'melee') row.power = await measure(action, { power: true });
       } else {
         // маг: лучшие кандидаты, обычный и усиленный каст
@@ -238,15 +252,18 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
     plan.push(['molag', baseEnch, 'lord']);
     if (b.kind !== 'spell') plan.push(['molag', baseEnch, 'lordform']);
     if (b.kind !== 'spell') plan.push(['hircine', baseEnch, 'wolf']);
+    if (b.kind !== 'spell') { plan.push(['kynareth', 1, 'paladin']); plan.push(['kynareth', 1, 'paladinC']); }
     plan.push(['none', baseEnch, 'lich1']);
     plan.push(['none', baseEnch, 'lich2']);
+    const PLAN = process.env.PLAN ? process.env.PLAN.split(',') : null; // например PLAN=none:1:none,none:1:vampire
     for (const [g, e, sn] of plan) {
+      if (PLAN && !PLAN.includes(g + ':' + e + ':' + sn)) continue;
       const row = await scenario(g, e, sn);
       console.error(b.id, g, e, sn, JSON.stringify(row).slice(0, 400));
       out.push(row);
     }
   }
-  const file = path.join(__dirname, 'out-balance-faith' + (ONLY ? '-' + ONLY.join('_') : '') + '.json');
+  const file = path.join(__dirname, 'out-balance-faith' + (ONLY ? '-' + ONLY.join('_') : '') + (process.env.TAG ? '-' + process.env.TAG : '') + '.json');
   fs.writeFileSync(file, JSON.stringify(out, null, 1));
   console.log('written', file, out.length);
   console.log('issues', JSON.stringify(H.issues).slice(0, 1500));
