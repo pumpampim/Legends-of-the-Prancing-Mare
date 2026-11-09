@@ -54,6 +54,7 @@ const { setupSession, wait } = require('./setup');
     return { n: imgs.length, bad: imgs.filter(i => !i.naturalWidth).length, txt: document.querySelectorAll('.sk-ic .sk-ic-t').length };
   });
   console.log('ui icons', JSON.stringify(ui));
+  if (ui.n < 5) console.log('FAIL у школ магии нет картинок: ' + ui.n);
   if (ui.bad) console.log('FAIL иконки интерфейса не загрузились: ' + ui.bad);
   await H.close();
 })();

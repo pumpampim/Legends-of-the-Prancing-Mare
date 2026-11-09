@@ -137,11 +137,13 @@
         '📦': 'chest', '🧰': 'chest', '🥾': 'boot', '👢': 'boot', '⛑': 'helm', '🪖': 'helm', '🧤': 'glove', '📿': 'necklace', '🪓': 'axe', '🏛': 'castle', '🧙': 'staff', '🪨': 'mountain', '🔷': 'drop', '💧': 'drop', '🩸': 'blood', '🍄': 'shroom', '🧀': 'bread', '🍺': 'mug', '🍻': 'mug', '🐴': 'horse', '🐎': 'horse', '🕷': 'spider', '🐀': 'paw', '🐕': 'paw', '🐶': 'paw'
     };
     // Нарисованные ИИ картинки (img/ui/<ключ>.webp); список готовых — window.UI_ART_READY из art-data.js. Нет файла — рисованный контур.
-    function svg(key) {
-        if (window.UI_ART_READY && window.UI_ART_READY[key]) return '<img class="sk-pic" src="img/ui/' + key + '.webp" alt="" draggable="false">';
+    function svg(key, pic) {
+        if (pic && window.UI_ART_READY && window.UI_ART_READY[key]) return '<img class="sk-pic" src="img/ui/' + key + '.webp" alt="" draggable="false">';
         return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + P[key] + '</svg>';
     }
-    window.stDrawnIcon = function (key) { return P[key] ? svg(key) : ''; };
+    window.stDrawnIcon = function (key) { return P[key] ? svg(key, false) : ''; };
+    // Картинки вместо контурных иконок только в заголовках школ магии («Школа Разрушения» и т.д.)
+    function isSchoolHead(node) { var h = node.parentNode && node.parentNode.closest && node.parentNode.closest('.profession-header'); return !!h && /Школа/.test(h.textContent); }
     // одно эмодзи с необязательным селектором варианта (FE0F)
     var RE = new RegExp('(' + Object.keys(MAP).map(function (k) { return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).sort(function (a, b) { return b.length - a.length; }).join('|') + ')️?', 'g');
     var SKIP = 'input, textarea, select, option, script, style, svg, .sk-ic, #st-hub, [contenteditable="true"]';
@@ -154,7 +156,7 @@
         while ((m = RE.exec(v))) {
             if (m.index > last) frag.appendChild(document.createTextNode(v.slice(last, m.index)));
             var span = document.createElement('span'); span.className = 'sk-ic'; span.setAttribute('data-k', MAP[m[1]]);
-            span.innerHTML = svg(MAP[m[1]]) + '<span class="sk-ic-t"></span>';
+            span.innerHTML = svg(MAP[m[1]], isSchoolHead(node)) + '<span class="sk-ic-t"></span>';
             span.lastChild.textContent = m[0];
             frag.appendChild(span);
             last = m.index + m[0].length;

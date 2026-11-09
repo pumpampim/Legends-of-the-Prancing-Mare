@@ -178,7 +178,7 @@
         return 'misc';
     }
     window.ITEM_ART_KINDS = ITEM_KINDS;
-    var UI_READY = {}; ''.split(' ').forEach(function (k) { if (k) UI_READY[k] = 1; });
+    var UI_READY = {}; 'flame sun herb eye skull'.split(' ').forEach(function (k) { if (k) UI_READY[k] = 1; });
     window.UI_ART_READY = UI_READY;
     window.ITEM_ART_READY = ITEM_READY;
     window.itemArtKind = itemArtKind;
