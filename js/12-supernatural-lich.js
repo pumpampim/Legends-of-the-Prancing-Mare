@@ -12,7 +12,7 @@
     // вампир-лорд — только −1 ко всем хар-кам за день. На 4-й день (стадия 4) стража нападает, жители бегут/атакуют.
     function vampHunger() { const s = playerSupernaturalState; return (s && s.vampirism && s.vampire) ? Math.min(4, Math.max(0, s.vampire.hungerStage || 0)) : 0; }
     function vampHungerStatPenalty() { const s = playerSupernaturalState; const h = vampHunger(); return h * ((s && s.vampire && s.vampire.isLord) ? 1 : 2); }
-    var VAMPIRE_STAT_BONUS = { str: 1, dex: 1, con: 0, cha: 2, int: 0, wis: 0 }; // Фракции.xlsx: вампиризм +2 Хар, +1 Лов, +1 Сил
+    var VAMPIRE_STAT_BONUS = { str: 4, dex: 4, con: 0, cha: 5, int: 0, wis: 0 }; // Фракции.xlsx было +2 Хар, +1 Лов, +1 Сил; Никита 2026-11-09: +3 к каждому бонусу
     function vampHungerResistDelta() { const s = playerSupernaturalState; return (s && s.vampire && s.vampire.isLord) ? 0 : vampHunger() * 10; }
     function snLordForm() { const s = playerSupernaturalState; return !!(s && s.vampirism && s.vampire && s.vampire.isLord && s.vampire.lordForm); }
     function snLordPerk(n) { const s = playerSupernaturalState; return !!(s && s.vampirism && s.vampire && s.vampire.isLord && s.vampire.lordPerks && s.vampire.lordPerks[n]); }
