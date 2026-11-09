@@ -484,6 +484,8 @@
         const cv = $('estate-canvas'); if (!cv || !est) return;
         draw(cv, view(est, UI.lv), { cs: 14, me: myUid(), names: namesOf(), showRoof: UI.showRoof, sel: sel || null, level: UI.lv, ghost: UI.lv ? est : null });
     }
+    // Баффы поместья держатся до длительного отдыха («Следующий день») или до нового сна в поместье — что раньше.
+    function clearEstateBuffs() { try { activeTimedEffects = activeTimedEffects.filter(x => !x.estateBuff); } catch (x) { } }
     function write(patch) { return window.CloudSync && window.CloudSync.estateWrite ? window.CloudSync.estateWrite(patch) : Promise.reject(new Error('Не в сессии.')); }
     const BUILD_MODES = ['found', 'floor', 'wall', 'door', 'window', 'roof', 'demolish', 'cancel'];
     function addItemToBag(name, qty, extra) {
@@ -563,7 +565,7 @@
             const near = Object.keys(fm).some(k => { if (fm[k].t !== I.use.furn) return false; const q = k.split('_').map(Number); return Math.max(Math.abs(q[0] - t.x), Math.abs(q[1] - t.y)) <= 1; });
             if (!near) { say('Подойди к предмету: ' + D().FURN[I.use.furn].name + ' (в соседнюю клетку, на нужном этаже).', true); return; }
             run(mutate(est.id, e => R.useWing(e, w, me), ['used'])).then(() => {
-                try { pushOrRefreshTimedEffect({ id: I.use.id, name: I.use.name, effectName: I.use.name, turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: I.use.desc }); renderActiveEffects(); saveLocalStorage(true); } catch (x) { console.error(x); }
+                try { if (w === 'bedroom') clearEstateBuffs(); pushOrRefreshTimedEffect({ id: I.use.id, name: I.use.name, effectName: I.use.name, estateBuff: true, turnsRemaining: Infinity, perRound: false, hp: I.use.hp || 0, mp: 0, value: 0, description: I.use.desc }); renderActiveEffects(); saveLocalStorage(true); } catch (x) { console.error(x); }
                 say('Эффект «' + I.use.name + '» получен до следующего сна.');
             }).catch(() => { });
         },
@@ -582,7 +584,7 @@
                 const me = myUid(), t = est.tokens && est.tokens[me]; if (!t) { say('Сначала войди в поместье.', true); return; }
                 const near = Object.keys(getLevel(est, Number(t.l) || 0).furn || {}).some(k => { const f = getLevel(est, Number(t.l) || 0).furn[k]; if (f.t !== 'bed') return false; const [x, y] = k.split('_').map(Number); return Math.max(Math.abs(x - t.x), Math.abs(y - t.y)) <= 1; });
                 if (!near) { say('Подойди к кровати (в соседнюю клетку).', true); return; }
-                try { pushOrRefreshTimedEffect({ id: 'eff-wellrested', name: 'Выспался', effectName: 'Выспался', turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: '😴 +10% к прогрессу навыков за удачные проверки до следующего сна (считается автоматически).' }); renderActiveEffects(); saveLocalStorage(true); } catch (e) { console.error(e); }
+                try { clearEstateBuffs(); pushOrRefreshTimedEffect({ id: 'eff-wellrested', name: 'Выспался', effectName: 'Выспался', estateBuff: true, turnsRemaining: Infinity, perRound: false, hp: 0, mp: 0, value: 0, description: '😴 +10% к прогрессу навыков за удачные проверки до следующего сна (считается автоматически).' }); renderActiveEffects(); saveLocalStorage(true); } catch (e) { console.error(e); }
                 say('Ты выспался: +10% к росту навыков до следующего сна.');
             }
         },

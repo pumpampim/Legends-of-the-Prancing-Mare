@@ -423,6 +423,7 @@ window.nextDay = function () {
     powersUsedToday = {};     // новый день — «раз в день» способности снова доступны
     keeperBarrierLeft = KEEPER_BARRIER_MAX; // барьер Перчаток Хранителя восстанавливается
     try { stopBalladIfMine(); } catch (e) { } // ночью бард перестаёт играть
+    activeTimedEffects = activeTimedEffects.filter(e => !e.estateBuff); // баффы поместья («Выспался», «Заточка» и др.) снимает длительный отдых
     activeTimedEffects = activeTimedEffects.filter(e => !e.untilDayEnd); // «до конца дня» (хриплый голос после боевого клича)
     clampTempHp();
     const longRestNotes = applyLongRest();
