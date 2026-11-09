@@ -2511,3 +2511,21 @@ body.st-pc-cards .st-combat-dock .st-dock-tg.on { background: none; color: #e9e6
 body.st-pc-cards .st-dock-center button { border-radius: 0; background: none; border: 0; border-bottom: 1px solid rgba(233,230,221,.28); color: #e9e6dd; text-transform: uppercase; letter-spacing: .1em; font-size: 12px; clip-path: none; }
 body.st-pc-cards .st-dock-center button:hover { background: linear-gradient(90deg, rgba(233,230,221,.12), transparent); }
 body.st-pc-cards #tab1 input[type="text"], body.st-pc-cards #tab1 input[type="number"], body.st-pc-cards #tab1 select, body.st-pc-cards #tab1 textarea { background: #0f1215; color: #e9e6dd; border: 1px solid rgba(233,230,221,.25); border-radius: 0; }
+
+/* ПК: все панели и вкладки в духе меню Skyrim — без рамок с уголками, тонкие линии, тёмные поля и плоские кнопки */
+body.st-pc-cards .panel::before, body.st-pc-cards .panel::after, body.st-pc-cards .tab-content::before, body.st-pc-cards .tab-content::after { display: none; }
+body.st-pc-cards .panel { background: none; border: 0; border-top: 1px solid rgba(233,230,221,.18); border-radius: 0; box-shadow: none; backdrop-filter: none; }
+body.st-pc-cards .panel .panel { background: none; border: 0; border-top: 1px solid rgba(233,230,221,.12); box-shadow: none; }
+body.st-pc-cards .tab-content { border: 0; border-radius: 0; box-shadow: none; background: rgba(8,10,13,.78); }
+body.st-pc-cards .panel h2, body.st-pc-cards .panel h3, body.st-pc-cards .tab-content h2, body.st-pc-cards .tab-content h3 { font-weight: 500; font-size: 15px; letter-spacing: .2em; color: #c9b074; text-shadow: none; border-bottom: 1px solid rgba(233,230,221,.14); }
+body.st-pc-cards .panel h2::before, body.st-pc-cards .panel h2::after, body.st-pc-cards .panel h3::before, body.st-pc-cards .panel h3::after, body.st-pc-cards .tab-content h2::before, body.st-pc-cards .tab-content h2::after { content: none; }
+body.st-pc-cards .btn, body.st-pc-cards .btn-sm, body.st-pc-cards .btn-danger, body.st-pc-cards .btn-success, body.st-pc-cards .panel button:not(.tab-link):not(.st-hero-av):not(.st-dock-tg) { background: none; border: 1px solid rgba(233,230,221,.3); border-radius: 0; clip-path: none; box-shadow: none; color: #e9e6dd; text-transform: uppercase; letter-spacing: .1em; font-size: 13px; text-shadow: none; }
+body.st-pc-cards .btn:hover, body.st-pc-cards .panel button:not(.tab-link):hover { background: linear-gradient(90deg, rgba(233,230,221,.12), transparent); }
+body.st-pc-cards .btn-danger { border-color: #b5443b; color: #e8a89f; }
+body.st-pc-cards .btn-success { border-color: #5f9a58; color: #a8d4a2; }
+body.st-pc-cards input[type="text"], body.st-pc-cards input[type="number"], body.st-pc-cards input[type="password"], body.st-pc-cards select, body.st-pc-cards textarea { background: #0f1215; color: #e9e6dd; border: 1px solid rgba(233,230,221,.25); border-radius: 0; box-shadow: none; }
+body.st-pc-cards input:focus, body.st-pc-cards select:focus, body.st-pc-cards textarea:focus { border-color: #c9b074; outline: none; }
+body.st-pc-cards .vital-bar { background: none !important; border-color: rgba(233,230,221,.2) !important; border-radius: 0; box-shadow: none; }
+body.st-pc-cards .vital-bar label[style] { color: #c9b074 !important; letter-spacing: .14em; }
+body.st-pc-cards .day-controls, body.st-pc-cards .turn-controls, body.st-pc-cards .turn-round-box, body.st-pc-cards #tab1 .alert-box:not([style*="display:none"]) { background: none !important; border: 0; border-top: 1px solid rgba(233,230,221,.14); border-radius: 0; box-shadow: none; }
+body.st-pc-cards .date-display { background: none; border: 0; border-bottom: 1px solid rgba(233,230,221,.28); border-radius: 0; color: #e9e6dd; }
