@@ -8334,7 +8334,7 @@
             if (cv && !_gmEstateBound) {
                 _gmEstateBound = true;
                 const cellOf = ev => { const e2 = gmEstateCur(); return e2 ? window.Estate.cellFromEvent(cv, e2, ev) : null; };
-                const paint = ev => { if (!_gmEstatePaint) return; const c = cellOf(ev); if (c) { _gmEstatePaint[c.x + '_' + c.y] = el('gm-estate-brush').value; const e2 = gmEstateCur(); if (e2) { e2.cells = Object.assign({}, e2.cells, _gmEstatePaint); window.Estate.draw(cv, e2, { cs: 14, names: gmEstateNames() }); } } };
+                const paint = ev => { if (!_gmEstatePaint || _gmEstLv) return; const c = cellOf(ev); if (c) { _gmEstatePaint[c.x + '_' + c.y] = el('gm-estate-brush').value; const e2 = gmEstateCur(); if (e2) { e2.cells = Object.assign({}, e2.cells, _gmEstatePaint); window.Estate.draw(cv, e2, { cs: 14, names: gmEstateNames() }); } } };
                 const end = () => {
                     if (!_gmEstatePaint) return; const cells = _gmEstatePaint; _gmEstatePaint = null;
                     const patch = {}; Object.keys(cells).forEach(k => { patch['estates.' + _gmEstateSel + '.cells.' + k] = cells[k] === 'grass' ? firebase.firestore.FieldValue.delete() : cells[k]; });
@@ -8349,9 +8349,11 @@
             }
             const inf = el('gm-estate-info'), D0 = window.ESTATE_DATA;
             if (inf) inf.innerHTML = `День ${est.day || 0} · разметки: ${Object.keys(est.plan || {}).length} · склад: ${Object.keys(est.stock || {}).map(m => (D0.MATERIALS[m] || {}).name + ' ' + est.stock[m]).join(', ') || 'пусто'} · крылья: ${(est.wings || []).map(w => (D0.WINGS[w] || {}).name).join(', ') || 'не выбраны'} · персонал: ${Object.keys(est.staff || {}).map(r => (D0.STAFF[r] || {}).name).join(', ') || 'нет'}${est.visitor ? ' · торговец: ' + escapeHtml((D0.TRADER_KINDS[est.visitor.kind] || '') ) : ''}`;
-            if (!_gmEstatePaint) window.Estate.draw(cv, est, { cs: 14, names: gmEstateNames() });
+            const lb = el('gm-estate-levels'); if (lb) lb.innerHTML = 'Этаж: ' + [-1, 0, 1].map(L => `<button style="width:auto; padding:2px 10px; margin:0 3px;${_gmEstLv === L ? ' outline:2px solid var(--accent-color);' : ''}" onclick="gmEstateLevel(${L})">${({ '-1': 'Подвал', '0': 'Первый этаж', '1': 'Второй этаж' })[L]}</button>`).join('') + (_gmEstLv ? ' <span style="opacity:.7;">(рисовать местность можно только на первом этаже)</span>' : '');
+            if (!_gmEstatePaint) window.Estate.draw(cv, window.Estate.view(est, _gmEstLv), { cs: 14, names: gmEstateNames(), level: _gmEstLv, ghost: _gmEstLv ? est : null });
         }
     }
+    let _gmEstLv = 0; window.gmEstateLevel = L => { _gmEstLv = Number(L) || 0; renderEstates(); };
     window.renderEstates = renderEstates;
     // Транзакции поместья: мастер пишет по тем же правилам, что и игроки.
     window.Estate.setRunner(fn => {
