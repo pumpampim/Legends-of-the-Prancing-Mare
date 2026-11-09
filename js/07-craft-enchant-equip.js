@@ -240,6 +240,17 @@
         });
     }
 
+    // Бафф поместья «Спокойная башня» (eff-enchant): одно зачарование не тратит камень душ; бафф при этом сгорает.
+    function spendSoulGemForEnchant(gemKey) {
+        const eff = (activeTimedEffects || []).find(e => e && e.id === 'eff-enchant');
+        if (eff) {
+            activeTimedEffects = activeTimedEffects.filter(e => e !== eff);
+            try { renderActiveEffects(); } catch (e) { }
+            try { alert('«Спокойная башня»: камень душ «' + gemKey + '» не потрачен.'); } catch (e) { }
+            return;
+        }
+        removeFromInventoryByName(gemKey, 1);
+    }
     window.enchantItem = function () {
         const { item, effect } = getPickedEnchantItemAndEffect();
         const resultEl = document.getElementById('enchant-result');
@@ -254,7 +265,7 @@
         const calc = applyPortablePentagramPenalty(applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, window.perkBonuses), effect));
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
 
-        removeFromInventoryByName(gemKey, 1);
+        spendSoulGemForEnchant(gemKey);
         const oldItemId = item.itemId;
         // Слоты, где вещь была надета, — запоминаем ДО списания: списание снимает пропавшую вещь со слота,
         // и раньше зачарованные перчатки оказывались в рюкзаке, а слот пустел.
@@ -343,7 +354,7 @@
         const skill = getEnchantSkill();
         const calc = applyPortablePentagramPenalty(applyGodEnchantBonus(window.calcEnchantPower(effect, soulGem, skill, getStaffEnchantPerks()), effect));
         const desc = calc.boolean ? effect.description : `${effect.name}: ${calc.value}${calc.unit ? ' ' + calc.unit : ''}`;
-        removeFromInventoryByName(gemKey, 1);
+        spendSoulGemForEnchant(gemKey);
         const name = `Посох: ${effect.name}`;
         const gemMult = (window.soulGemPower && window.soulGemPower[soulGem]) || 1;
         addToInventory(name + '#' + Date.now(), name, 1, 8, 'Посох', desc, {
