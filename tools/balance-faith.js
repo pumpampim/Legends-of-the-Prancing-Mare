@@ -170,12 +170,12 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 
     // Сценарий: god, ench (0 нет, 1 оружие, 2 полный набор), sn (none|lord|lordform|wolf|lich1|lich2|vampire)
     async function scenario(god, ench, sn) {
-      await pl.evaluate(([b, god, ench, sn, AEDRA, WEP_FIRE, BOOST_W, BOOST_D]) => {
+      await pl.evaluate(([b, god, ench, sn, AEDRA, WEP_FIRE, BOOST_W, BOOST_D, HUNGER]) => {
         const inv = n => playerInventory.find(i => i.name === n);
         const bySlot = s => equippedSlots[s] ? playerInventory.find(i => i.itemId === equippedSlots[s]) : null;
         // сверхъестественное
         const s = { lycanthropy: false, vampirism: false, werewolf: { heartsEaten: 0, totem: '— нет —', transformsToday: 0, isTransformed: false }, vampire: { hungerStage: 0, isLord: false, lordForm: false, lordPerks: {}, reflexLeft: 0, abilities: {}, lordKills: 0 }, lich: null, faithShift: null };
-        if (sn === 'vampire' || sn === 'lord' || sn === 'lordform') { s.vampirism = true; s.vampire.hungerStage = 1; }
+        if (sn === 'vampire' || sn === 'lord' || sn === 'lordform') { s.vampirism = true; s.vampire.hungerStage = HUNGER; }
         if (sn === 'lord' || sn === 'lordform') {
           s.vampire.isLord = true; s.vampire.lordKills = 156; s.vampire.lordForm = sn === 'lordform';
           ['Сила Могилы', 'Хватка вампира', 'Вызов гаргульи', 'Трупное проклятье', 'Обнаружение существ', 'Туманная форма', 'Сверхъестественные рефлексы', 'Лечение кровью', 'Неземные желания', 'Ядовитые когти', 'Плащ ночи'].forEach(n => { s.vampire.lordPerks[n] = true; });
@@ -215,7 +215,7 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
         if (typeof renderAttackActionSelect === 'function') renderAttackActionSelect();
         document.getElementById('cur-hp').value = document.getElementById('max-hp').value;
         document.getElementById('cur-mp').value = document.getElementById('max-mp').value;
-      }, [b, god, ench, sn, AEDRA, WEP_FIRE, BOOST_W, BOOST_D]);
+      }, [b, god, ench, sn, AEDRA, WEP_FIRE, BOOST_W, BOOST_D, +(process.env.HUNGER || 1)]);
       await wait(150);
       const sh = await sheetNow();
       const row = { build: b.id, god, ench, sn, sheet: sh };
