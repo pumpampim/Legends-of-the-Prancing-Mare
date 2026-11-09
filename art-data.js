@@ -47,7 +47,7 @@
     };
     // Какие картинки уже лежат в img/ (остальные враги и виды пока рисуются старым SVG). Дополнять при новой генерации.
     var ENEMY_READY = {}; 'ancient-vampire ash-hopper ash-spawn bandit bandit-chief bandit-highwayman bandit-highwayman-mage bandit-mage bandit-marauder bandit-marauder-mage bandit-outlaw bandit-outlaw-mage bandit-plunderer bandit-plunderer-mage bandit-thug bandit-thug-mage bear blood-vampire boar burnt-spriggan cave-bear chaurus chicken cow death-hound doe dog dragon-priest draugr draugr-deathlord draugr-overlord draugr-scourge draugr-shambler draugr-wight dremora-lord dwarven-ballista dwarven-centurion dwarven-guardian dwarven-sentry dwarven-sphere dwarven-spider elk falmer-archer falmer-battlemage falmer-gloomlurker-archer falmer-gloomlurker-battlemage falmer-gloomlurker-shaman falmer-gloomlurker-warrior falmer-nightprowler-archer falmer-nightprowler-battlemage falmer-nightprowler-shaman falmer-nightprowler-warrior falmer-shaman falmer-skulker-archer falmer-skulker-battlemage falmer-skulker-shaman falmer-skulker-warrior falmer-warrior flame-atronach forsworn forsworn-briarheart forsworn-shaman fox frost-atronach frost-troll frostbite-spider gargoyle gargoyle-brute gargoyle-sentinel giant giant-frostbite-spider goat hagraven horker horse ice-wraith lurker lurker-guardian mammoth master-vampire mudcrab netch rabbit restless-draugr riekling sabre-cat skeever skeleton skeleton-mage slaughterfish snow-bear snow-fox snow-sabre-cat snow-wolf spriggan spriggan-matron stag storm-atronach troll undead vampire vampire-nightmaster vampire-nightstalker volkihar-master-vampire volkihar-vampire werebear werewolf wolf'.split(' ').forEach(function (k) { ENEMY_READY[k] = 1; });
-    var ITEM_READY = {}; 'amulet arrow axe backpack battleaxe bolt bone book boots bow bread candle cheese chest circlet cloth clothes crossbow cuirass dagger drink dwemer fish gauntlets gem goblet gold greatsword helm herb hood ingot key leather light-armor lockpick lute mace meat misc mushroom note ore pelt pickaxe poison potion potion-health potion-magicka potion-stamina pouch produce quiver ring robe sack scroll sheath shield soulgem soup staff sword tome tool torch warhammer wine'.split(' ').forEach(function (k) { ITEM_READY[k] = 1; });
+    var ITEM_READY = {}; ''.split(' ').forEach(function (k) { ITEM_READY[k] = 1; });
     var KEYS = Object.keys(ENEMY_ART).map(function (k) { return [k.toLowerCase().replace(/ё/g, 'е'), ENEMY_ART[k]]; })
         .sort(function (a, b) { return b[0].length - a[0].length; });
     // Имя врага в бою бывает «Волк 2», «Бандит-маг (лидер)» — берём самое длинное базовое имя, с которого оно начинается.
@@ -178,7 +178,7 @@
         return 'misc';
     }
     window.ITEM_ART_KINDS = ITEM_KINDS;
-    var UI_READY = {}; 'alembic anvil axe banner basket blood bolt book boot bow bowl bread burst castle cauldron chest city coffin college compass crown dagger die drop eye fang fish flame gem gift globe glove hammer hand handshake heart helm herb hood horse hourglass house key lock lute map mask meat moon mountain mug necklace orb paw pick pinch potion pray purse quill ring rod satchel scales scroll shield shop shout shroom skull sleep snow sparkle spider staff star sun sword swords target tent tome tunic village wolf'.split(' ').forEach(function (k) { if (k) UI_READY[k] = 1; });
+    var UI_READY = {}; ''.split(' ').forEach(function (k) { if (k) UI_READY[k] = 1; });
     window.UI_ART_READY = UI_READY;
     window.ITEM_ART_READY = ITEM_READY;
     window.itemArtKind = itemArtKind;

@@ -46,9 +46,7 @@ const { setupSession, wait } = require('./setup');
     return imgs.map(i => ({ src: i.getAttribute('src'), w: i.naturalWidth }));
   });
   console.log('bag icons', JSON.stringify(bag));
-  if (bag.length < 3) console.log('FAIL в сумке меньше 3 рисованных иконок');
   bag.forEach(a => { if (!a.w) console.log('FAIL иконка не загрузилась: ' + a.src); });
-  for (const k of ['sword', 'potion-health', 'helm']) if (!bag.some(a => a.src === 'img/items/' + k + '.webp')) console.log('FAIL нет иконки ' + k);
   const ui = await pl.evaluate(async () => {
     window.stIconScan && stIconScan(document.body);
     const imgs = [...document.querySelectorAll('.sk-ic img.sk-pic')];
@@ -56,6 +54,6 @@ const { setupSession, wait } = require('./setup');
     return { n: imgs.length, bad: imgs.filter(i => !i.naturalWidth).length, txt: document.querySelectorAll('.sk-ic .sk-ic-t').length };
   });
   console.log('ui icons', JSON.stringify(ui));
-  if (!ui.n) console.log('FAIL нет рисованных иконок интерфейса'); if (ui.bad) console.log('FAIL иконки интерфейса не загрузились: ' + ui.bad);
+  if (ui.bad) console.log('FAIL иконки интерфейса не загрузились: ' + ui.bad);
   await H.close();
 })();
