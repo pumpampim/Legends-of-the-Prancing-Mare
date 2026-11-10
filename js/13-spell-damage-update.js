@@ -198,7 +198,9 @@
             const ctrl = PLAYER_CONTROL_SPELLS[s.name];
             if (ctrl) opts += `<option value="control:${escHtml(s.id)}">🌀 ${escHtml(s.name)} (${escHtml(ctrl.desc)})</option>`;
         });
-        select.innerHTML = opts;
+        const _prevAct = select.value;
+        if (select._opts !== opts) { select.innerHTML = opts; select._opts = opts; }
+        if (_prevAct && Array.from(select.options).some(o => o.value === _prevAct)) select.value = _prevAct;
         updateAttackActionInfo();
         initSectionAccordions();
     }

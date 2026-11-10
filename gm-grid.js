@@ -209,6 +209,14 @@
 
     // ---------- рисование ----------
     const COLORS = { e: '#b03a2e', p: '#2e86c1', s: '#8e44ad' };
+    // Портрет врага на фишке: рисованный аватар (art-data.js), грузится один раз, после загрузки перерисовывает сетку.
+    const _tokPics = {};
+    function tokenPic(en) {
+        if (!en || en.kind !== 'e' || !window.enemyArtUrl) return null;
+        const url = window.enemyArtUrl(en.name); if (!url) return null;
+        const v = _tokPics[url]; if (v !== undefined) return v || null;
+        _tokPics[url] = null; const im = new Image(); im.onload = () => { _tokPics[url] = im; try { render(); } catch (e) { } }; im.onerror = () => { _tokPics[url] = false; }; im.src = url; return null;
+    }
     function render() {
         const cv = $('gg-canvas'); if (!cv || !grid) return;
         const cs = view.cs, W = grid.w * cs, H = grid.h * cs;
@@ -260,9 +268,11 @@
             const cx = t.x * cs + n * cs / 2, cy = t.y * cs + n * cs / 2, r = n * cs * 0.44;
             c.globalAlpha = en.dead ? 0.35 : 1;
             c.fillStyle = COLORS[en.kind] || '#777'; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+            const pic = tokenPic(en);
+            if (pic && !en.dead) { c.save(); c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.clip(); c.drawImage(pic, cx - r, cy - r, r * 2, r * 2); c.restore(); }
             c.strokeStyle = k === selKey ? '#f1c40f' : 'rgba(0,0,0,.6)'; c.lineWidth = k === selKey ? 3 : 1.5; c.stroke(); c.lineWidth = 1;
             c.fillStyle = '#fff'; c.font = 'bold ' + Math.max(9, Math.floor(cs * 0.42 * (n > 1 ? 1.6 : 1))) + 'px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-            c.fillText(en.dead ? '☠' : String(en.name || '?').trim().charAt(0).toUpperCase(), cx, cy + 1);
+            if (!(tokenPic(en) && !en.dead)) c.fillText(en.dead ? '☠' : String(en.name || '?').trim().charAt(0).toUpperCase(), cx, cy + 1);
             c.globalAlpha = 1;
         });
         if (view.labels) Object.keys(grid.tokens).forEach(k => {

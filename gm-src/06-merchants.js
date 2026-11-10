@@ -440,6 +440,38 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Обновить ассортимент сразу всех работающих торговцев (то же, что кнопка у одного, но по всем в списке).
+    window.refreshAllMerchantStocks = function () {
+        if (!currentCode) { alert('Нет сессии.'); return; }
+        const cur = (lastData && lastData.merchantStocks) || {};
+        const keys = Object.keys(cur);
+        if (!keys.length) { alert('Работающих торговцев ещё нет.'); return; }
+        if (!confirm('Обновить ассортимент у всех ' + keys.length + ' торговцев? Золото вернётся к базовому (вклады игроков сохранятся), отношение не изменится.')) return;
+        const ref = db.collection('sessions').doc(currentCode);
+        let done = 0, skipped = [];
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            done = 0; skipped = [];
+            const stocks = Object.assign({}, ((doc.exists && doc.data()) || {}).merchantStocks || {});
+            Object.keys(stocks).forEach(key => {
+                const old = stocks[key] || {}; const at = key.indexOf('@');
+                if (at < 0) { skipped.push(key); return; }
+                const typeKey = key.slice(0, at), hold = key.slice(at + 1), def = LIVING_MERCHANT_TYPES[typeKey];
+                if (!def) { skipped.push(old.label || key); return; }
+                let items; try { items = buildMerchantItems(typeKey, hold); } catch (e) { items = []; }
+                if (!items.length) { skipped.push((old.label || def.label) + ' — ' + hold); return; }
+                const investors = Array.isArray(old.investors) ? old.investors.slice() : [];
+                const n = { gold: def.gold + 500 * investors.length, items: stripUndefinedDeep(items), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: old.label || def.label, hold: hold, disposition: old.disposition || 0 };
+                if (investors.length) n.investors = investors;
+                if (def.pets || old.pets) n.pets = true;
+                stocks[key] = n; done++;
+            });
+            tx.update(ref, { merchantStocks: stocks });
+        })).then(() => {
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ Обновлено торговцев: ${done}.</span>` + (skipped.length ? `<br><span style="color:#e67e22;">Пропущены (нет товаров): ${skipped.map(escapeHtml).join(', ')}</span>` : '');
+            renderMerchantStaleness();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     // Задача C: "раз в неделю" не бывает автоматически без общего счётчика игровых дней (у
     // календаря на листе игрока нет привязки к сессии) — вместо тихого автосброса посреди игры
     // мастер явно видит, у кого ассортимент устарел (7+ игровых дней), и жмёт обновить сам.

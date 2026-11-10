@@ -191,6 +191,7 @@
             var pct = e.maxHp > 0 ? Math.max(0, Math.min(100, e.curHp / e.maxHp * 100)) : 0;
             var res = ''; try { res = window.StCombat ? window.StCombat.resistSummary(e) : ''; } catch (x) { }
             return '<button type="button" class="st-fight-target' + (e.id === cur ? ' on' : '') + '" data-id="' + esc(e.id) + '">' +
+                (window.enemyArtUrl && window.enemyArtUrl(e.name) ? '<img class="st-fight-tav" alt="" src="' + window.enemyArtUrl(e.name) + '" style="width:36px; height:36px; object-fit:cover; border-radius:6px; margin-right:6px; vertical-align:middle;">' : '') +
                 '<span class="st-fight-tname">' + (s.markedTarget === e.id ? '🎯 ' : '') + esc(e.name) + '</span>' +
                 '<span class="st-fight-thp">' + e.curHp + '/' + e.maxHp + '</span>' +
                 '<span class="st-fight-tbar"><i style="width:' + pct + '%"></i></span>' +

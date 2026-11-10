@@ -249,7 +249,54 @@
                     `<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">${statusKey && GM_STATUS_EFFECTS[statusKey] ? 'Без урона — при применении на цель ляжет «' + GM_STATUS_EFFECTS[statusKey].name + '».' : 'Эффект без прямого урона — примени вручную по описанию.'}</span>`);
         resultBox.style.display = 'block';
         if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
+        // Активный блок прямо в атаке: игрок закрывается щитом — второй встречный бросок режет урон (вместо отдельного инструмента).
+        if (hit && dmg > 0 && tgt.kind === 'player' && (actionVal === 'weapon' || physShot) && gmShieldBlockChecked()) gmMergedActiveBlock(pendingGmAttack, enemy, enemyTotal, textEl);
     };
+
+    // Блок щитом внутри атаки НПС: враг (его итог атаки + прогрессия оружия) против 1d20 + мод. хар-ки щита + навык «Блокирование».
+    function gmMergedActiveBlock(pa, enemy, enemyTotal, textEl) {
+        const shieldType = (el('gm-attack-shield-type') || {}).value || 'heavy';
+        db.collection('characters').doc(pa.targetUid).get().then(doc => {
+            if (pendingGmAttack !== pa) return; // пока читали лист, мастер уже бросил другую атаку
+            const data = doc.exists ? doc.data() : {};
+            if (!(data.equippedSlots && data.equippedSlots.shield)) { textEl.innerHTML += '<br><span style="opacity:.8;">🛡 Щита в руке нет — активный блок не бросается.</span>'; return; }
+            const es = data.effectiveStats;
+            const stats = (es && !Array.isArray(es) && typeof es === 'object') ? ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => es[k]) : (es || data.stats || [10, 10, 10, 10, 10, 10]);
+            const statMod = calcAbilityMod(parseInt(stats[shieldType === 'heavy' ? 2 : 1]) || 10);
+            const skillMod = Math.floor((parseInt((data.effectiveSkills || data.skills || [])[3]) || 10) / 10); // Блокирование
+            const SB = [0, 20, 25, 30, 35, 40]; let steps = 0;
+            for (let k = 1; k <= 5; k++) if ((data.perkStates || {})['skill3-perk0-step' + k]) steps = k;
+            const pct = SB[steps];
+            const prog = Math.max(0, Math.floor(((enemy.weaponDmg || 0) - 10) / 10));
+            const eTot = enemyTotal + prog, pRoll = Math.floor(Math.random() * 20) + 1, pTot = pRoll + statMod + skillMod, diff = eTot - pTot;
+            const outcome = diff <= 0 ? 'success' : diff <= 4 ? 'partial' : 'broken';
+            const perk = i => !!(data.perkStates || {})['skill3-perk' + i + '-step1'];
+            const arrowNoDmg = perk(1) && !!pa.isRangedAtk && outcome !== 'broken';
+            const label = { success: '✅ Блок успешен', partial: '🟡 Частичный блок', broken: '❌ Блок пробит' }[outcome];
+            let note;
+            pa.blockRolled = true;
+            if (arrowNoDmg) { pa.dmg = 0; note = '«Отбивание стрел»: стрела попала в щит — урона нет.'; if (outcome === 'success') pa.blockEffects = { debuff: true }; }
+            else if (outcome === 'success') { const base = pa.dmg; pa.dmg = Math.round(base * (1 - pct / 100)); note = `урон ${base} → ${pa.dmg} (срез ${pct}%, «Щитоносец»), враг теряет равновесие (−2 к следующему броску).`; pa.blockEffects = { debuff: true }; }
+            else if (outcome === 'partial') note = 'урон режется только бронёй и сопротивлением, без процента блока.';
+            else { note = 'полный урон бронёй + «Ошеломление» (−3 к следующему броску).'; pa.blockEffects = { stagger: true }; }
+            if (perk(3) && outcome === 'success') note += ' «Быстрые рефлексы»: у игрока дополнительное действие.';
+            pa.logTextBase += ` 🛡 Активный блок (${shieldType === 'heavy' ? 'тяжёлый щит' : 'лёгкий щит'}): враг ${eTot} vs игрок ${pTot} — ${label.replace(/^\S+\s/, '')}`;
+            textEl.innerHTML += `<br><span style="color:#6cc;">🛡 <strong>Активный блок</strong>: враг ${eTot} (атака ${enemyTotal}${prog ? ' +' + prog + ' прогр.' : ''}) vs игрок 1d20 (${pRoll}) +${statMod} +${skillMod} = ${pTot} → <strong>${label}</strong>, ${note}</span>`;
+            if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
+        }).catch(e => alert('Блок не бросился: ' + e.message));
+    }
+    // Последствия блока при «Применить»: дебафф врагу или «Ошеломление» игроку.
+    function gmApplyBlockEffects(pa) {
+        const be = pa && pa.blockEffects; if (!be) return;
+        if (be.debuff) {
+            gmUpdateEnemies((lastData.enemies || []).map(e => e.id === pa.enemyId ? Object.assign({}, e, { statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску', turns: 1, rollPenalty: -2 }] }) : e)).catch(e => console.error(e));
+        }
+        if (be.stagger) {
+            const patch = {};
+            patch['participants.' + pa.targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'stag-' + Date.now() + Math.random().toString(36).slice(2, 6), name: pa.enemyName, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1, rollPenalty: -3, fromGm: true });
+            db.collection('sessions').doc(currentCode).update(patch).catch(e => console.error(e));
+        }
+    }
 
     // Заклинания в enemies-data.js не хранят тип урона отдельно — определяем по названию.
     function mapEnemyDmgType(spellName) {
@@ -330,6 +377,7 @@
         if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') { gmApplyAttackToCompanion(); return; }
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
+        gmApplyBlockEffects(pendingGmAttack);
         if (!dmg && !statusKey) {
             gmPostLogEntryText(logTextBase + '.');
             pendingGmAttack = null;
@@ -338,7 +386,7 @@
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked() && !pendingGmAttack.blockRolled, isRangedAtk: pendingGmAttack.isRangedAtk });
             const resist = ir.resist;
             let finalDmg = (dmg && !ir.zero) ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
             const defNotes = ir.notes.filter(n => /Отбивание|Защита от стихий|сопр\. магии/.test(n));

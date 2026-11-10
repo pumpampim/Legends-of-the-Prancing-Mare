@@ -400,113 +400,7 @@
     // безопасный лагерь (isMagicallySafe) пропускает бросок полностью. При засаде лагерь
     // прерывается (campState.active=false) и мастер добавляет врагов обычным инструментом ниже —
     // этот бросок НЕ генерирует бой сам, только решает, нужен ли он.
-    // ---------- Активный блок (скрытые кубы) ----------
-    // ОТДЕЛЬНЫЙ инструмент от обычной атаки (rollGmAttack/applyGmAttackDamage) — та функция НЕ
-    // трогается этим кодом вообще. Нужен полный документ игрока (stats/skills/perkStates) — этих
-    // полей нет в lastData.participants (там только имя+ХП+МП, синхронизируемые отдельно), поэтому
-    // читаем characters/{uid} напрямую в момент броска, не заранее.
-    let pendingBlockResult = null;
-
-    function populateBlockSelects() {
-        const atkSel = el('block-attacker-select');
-        const tgtSel = el('block-target-select');
-        // Пересобираем на каждом снимке (враги и игроки приходят и уходят), сохраняя выбранное значение.
-        // Раньше списки заполнялись один раз — новые враги в них не появлялись до перезагрузки.
-        const fill = (sel, html) => { if (!sel) return; const prev = sel.value; if (sel.innerHTML !== html) { sel.innerHTML = html; if (Array.from(sel.options).some(o => o.value === prev)) sel.value = prev; } };
-        fill(atkSel, (lastData.enemies || []).filter(e => (e.curHp || 0) > 0).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('') || '<option value="">Нет врагов в бою</option>');
-        fill(tgtSel, Object.keys(lastData.participants || {}).map(uid => `<option value="${uid}">${escapeHtml((lastData.participants[uid] || {}).name || uid)}</option>`).join('') || '<option value="">Нет игроков</option>');
-    }
-
-    window.rollActiveBlock = function () {
-        const enemyId = el('block-attacker-select').value;
-        const targetUid = el('block-target-select').value;
-        const shieldType = el('block-shield-type').value;
-        const enemy = (lastData.enemies || []).find(e => e.id === enemyId);
-        if (!enemy || !targetUid) { alert('Выбери атакующего и защищающегося.'); return; }
-
-        db.collection('characters').doc(targetUid).get().then(doc => {
-            if (!doc.exists) { alert('Не нашёл документ игрока.'); return; }
-            const data = doc.data();
-            // effectiveStats в листе — объект {str,dex,con,int,wis,cha} (итоговые, с расой/знаком); старые сейвы — массив. Приводим к массиву.
-            const es = data.effectiveStats;
-            const stats = (es && !Array.isArray(es) && typeof es === 'object') ? ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => es[k])
-                : (es || data.stats || [10, 10, 10, 10, 10, 10]); // str,dex,con,int,wis,cha
-            const statMod = shieldType === 'heavy' ? calcAbilityMod(parseInt(stats[2]) || 10) : calcAbilityMod(parseInt(stats[1]) || 10);
-            const blockSkill = parseInt((data.effectiveSkills || data.skills || [])[3]) || 10; // Блокирование — индекс 3 в skillNames (с расовым бонусом)
-            const skillMod = Math.floor(blockSkill / 10);
-            // "Щитоносец" — skillIdx 3 (Блокирование), perkIdx 0, 5 ступеней → 20/25/30/35/40% среза урона.
-            const SHIELDBEARER_PCT = [0, 20, 25, 30, 35, 40];
-            let shieldbearerSteps = 0;
-            for (let s = 1; s <= 5; s++) { if ((data.perkStates || {})['skill3-perk0-step' + s]) shieldbearerSteps = s; }
-            const blockReductionPct = SHIELDBEARER_PCT[shieldbearerSteps];
-
-            // Атака врага: 1д20 + атакующий мод (СИЛ/ЛОВ, как у обычной атаки) + прогрессирующий
-            // бонус от урона оружия — floor((урон-10)/10), по прямой формуле из документа.
-            const atkMod = calcAbilityMod(enemy.isRanged ? (enemy.dex || 10) : (enemy.str || 10)) + (enemy.isRanged ? gmWeatherRanged() : 0); // погода мешает стрелкам
-            const progressiveBonus = Math.max(0, Math.floor(((enemy.weaponDmg || 0) - 10) / 10));
-            const enemyRoll = Math.floor(Math.random() * 20) + 1;
-            const enemyTotal = enemyRoll + atkMod + progressiveBonus;
-
-            const playerRoll = Math.floor(Math.random() * 20) + 1;
-            const playerTotal = playerRoll + statMod + skillMod;
-
-            const diff = enemyTotal - playerTotal;
-            let outcome, outcomeLabel;
-            if (diff <= 0) { outcome = 'success'; outcomeLabel = '✅ Блок успешен'; }
-            else if (diff <= 4) { outcome = 'partial'; outcomeLabel = '🟡 Частичный блок'; }
-            else { outcome = 'broken'; outcomeLabel = '❌ Блок пробит'; }
-
-            const hasBlkPerk = (pi) => !!(data.perkStates || {})['skill3-perk' + pi + '-step1'];
-            const arrowNoDmg = hasBlkPerk(1) && !!enemy.isRanged && outcome !== 'broken';
-            const blkNotes = [];
-            if (arrowNoDmg) blkNotes.push('🏹 «Отбивание стрел»: стрела попала в щит — урона нет.');
-            if (hasBlkPerk(4) && outcome !== 'broken') blkNotes.push('🛡 «Защита от стихий»: пока блок держится — 50% сопротивление огню, холоду и электричеству (для стихийной атаки срежь урон вдвое).');
-            if (hasBlkPerk(3) && outcome === 'success') blkNotes.push('⏱ «Быстрые рефлексы»: при блоке силовой атаки игрок получает дополнительное действие.');
-            pendingBlockResult = { enemy, targetUid, outcome, blockReductionPct, enemyTotal, playerTotal, arrowNoDmg };
-            const resBox = el('block-result');
-            resBox.style.display = 'block';
-            resBox.innerHTML = `<div style="font-size:13px;">Враг: 1d20(${enemyRoll})+${atkMod}+${progressiveBonus}(прогресс.) = <strong>${enemyTotal}</strong><br>` +
-                `Игрок: 1d20(${playerRoll})+${statMod}(хар-ка)+${skillMod}(навык) = <strong>${playerTotal}</strong><br>` +
-                `<strong style="font-size:15px;">${outcomeLabel}</strong> (разница ${diff})<br>` +
-                (outcome === 'success' ? `Урон срезан на ${blockReductionPct}% (перк «Щитоносец»), враг получает −2 к следующему броску.` :
-                 outcome === 'partial' ? `Урон снижается только на сопротивление щита/брони самого по себе — примени как обычный урон с резистом.` :
-                 `Игрок получает ПОЛНЫЙ урон (только бронёй) + статус «Ошеломление» (−3 к следующему броску).`) +
-                (blkNotes.length ? '<br><span style="color:#6cc;">' + blkNotes.join('<br>') + '</span>' : '');
-            el('block-apply-btn').style.display = 'block';
-        }).catch(e => alert('Ошибка: ' + e.message));
-    };
-
-    window.applyActiveBlockResult = function () {
-        if (!pendingBlockResult) return;
-        const { enemy, targetUid, outcome, blockReductionPct, arrowNoDmg } = pendingBlockResult;
-        const baseDmg = enemyWeaponDamage(enemy).total;
-        let finalDmgNote = '';
-        const patch = {};
-        if (arrowNoDmg) {
-            finalDmgNote = 'Перк «Отбивание стрел»: стрела попала в щит — урон 0.';
-            if (outcome === 'success') patch.enemies = (lastData.enemies || []).map(e => e.id === enemy.id ? { ...e, statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску (блок щитом)', turns: 1 }] } : e);
-        } else if (outcome === 'success') {
-            const dmg = Math.round(baseDmg * (1 - blockReductionPct / 100));
-            finalDmgNote = `Урон после среза блоком: ${dmg} (из ${baseDmg}, срез ${blockReductionPct}%) — резист/броня цели по обычным правилам применяются сверху вручную.`;
-            // Дебафф врагу — через statusEffects на самом враге (та же структура, что у управляющих заклинаний игрока).
-            const enemies = (lastData.enemies || []).map(e => e.id === enemy.id ? { ...e, statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску (блок отбил атаку).', turns: 1 }] } : e);
-            patch.enemies = enemies;
-        } else if (outcome === 'partial') {
-            finalDmgNote = `Урон снижается только сопротивлением самого щита/брони (не процентом блока) — реши сопротивление щита сам и примени урон как обычно.`;
-        } else {
-            finalDmgNote = `Игрок получает ПОЛНЫЙ урон ${baseDmg} (срез только бронёй по обычным правилам) + статус «Ошеломление».`;
-            patch['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
-                id: 'stag-' + Date.now() + Math.random().toString(36).slice(2, 6),
-                name: enemy.name, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1, rollPenalty: -3, fromGm: true
-            });
-        }
-        patch.combatLog = firebase.firestore.FieldValue.arrayUnion({ ts: Date.now(), author: 'Мастер', text: `🛡️ Активный блок: ${enemy.name} vs блокирующий — ${outcome === 'success' ? 'успех' : outcome === 'partial' ? 'частично' : 'пробит'}. ${finalDmgNote}` });
-        db.collection('sessions').doc(currentCode).update(patch).then(() => {
-            el('block-result').style.display = 'none';
-            el('block-apply-btn').style.display = 'none';
-            pendingBlockResult = null;
-        }).catch(e => alert('Ошибка: ' + e.message));
-    };
+    // Активный блок теперь часть атаки НПС (gm-src/08-attacks-loot-gens.js: gmMergedActiveBlock).
 
     window.resolveCampNight = function () {
         const campState = lastData.campState;
@@ -1270,7 +1164,6 @@
         renderWhispers(lastData.whispers || [], lastData.gmWhispers || []);
         populateGmWhisperTarget();
         renderCampStatusGm(lastData.campState);
-        populateBlockSelects();
         populateRecipePlayerSelect();
         populateInvPlayerSelect();
         populateCalcPlayerSelects();
@@ -2122,7 +2015,7 @@
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked() && !pendingGmAttack.blockRolled, isRangedAtk: pendingGmAttack.isRangedAtk });
             const pv = ir.zero ? { finalDmg: 0, notes: [] } : window.StCombat.previewDamage({ resist: { [dmgType]: ir.resist } }, dmg, dmgType, 0);
             pv.notes = ir.notes.concat(pv.notes.filter(n => !/^резист/.test(n)));
             const pt = ((lastData && lastData.participants) || {})[targetUid] || {};
@@ -3792,6 +3685,38 @@
         }).catch(e => alert('Ошибка: ' + e.message));
     };
 
+    // Обновить ассортимент сразу всех работающих торговцев (то же, что кнопка у одного, но по всем в списке).
+    window.refreshAllMerchantStocks = function () {
+        if (!currentCode) { alert('Нет сессии.'); return; }
+        const cur = (lastData && lastData.merchantStocks) || {};
+        const keys = Object.keys(cur);
+        if (!keys.length) { alert('Работающих торговцев ещё нет.'); return; }
+        if (!confirm('Обновить ассортимент у всех ' + keys.length + ' торговцев? Золото вернётся к базовому (вклады игроков сохранятся), отношение не изменится.')) return;
+        const ref = db.collection('sessions').doc(currentCode);
+        let done = 0, skipped = [];
+        db.runTransaction(tx => tx.get(ref).then(doc => {
+            done = 0; skipped = [];
+            const stocks = Object.assign({}, ((doc.exists && doc.data()) || {}).merchantStocks || {});
+            Object.keys(stocks).forEach(key => {
+                const old = stocks[key] || {}; const at = key.indexOf('@');
+                if (at < 0) { skipped.push(key); return; }
+                const typeKey = key.slice(0, at), hold = key.slice(at + 1), def = LIVING_MERCHANT_TYPES[typeKey];
+                if (!def) { skipped.push(old.label || key); return; }
+                let items; try { items = buildMerchantItems(typeKey, hold); } catch (e) { items = []; }
+                if (!items.length) { skipped.push((old.label || def.label) + ' — ' + hold); return; }
+                const investors = Array.isArray(old.investors) ? old.investors.slice() : [];
+                const n = { gold: def.gold + 500 * investors.length, items: stripUndefinedDeep(items), updatedAt: Date.now(), generatedOnDay: lastData.gameDayCounter || 0, label: old.label || def.label, hold: hold, disposition: old.disposition || 0 };
+                if (investors.length) n.investors = investors;
+                if (def.pets || old.pets) n.pets = true;
+                stocks[key] = n; done++;
+            });
+            tx.update(ref, { merchantStocks: stocks });
+        })).then(() => {
+            el('merchant-gen-result').innerHTML = `<span style="color:#2ecc71;">✅ Обновлено торговцев: ${done}.</span>` + (skipped.length ? `<br><span style="color:#e67e22;">Пропущены (нет товаров): ${skipped.map(escapeHtml).join(', ')}</span>` : '');
+            renderMerchantStaleness();
+        }).catch(e => alert('Ошибка: ' + e.message));
+    };
+
     // Задача C: "раз в неделю" не бывает автоматически без общего счётчика игровых дней (у
     // календаря на листе игрока нет привязки к сессии) — вместо тихого автосброса посреди игры
     // мастер явно видит, у кого ассортимент устарел (7+ игровых дней), и жмёт обновить сам.
@@ -4367,7 +4292,7 @@
             if (typeof window.gmRenderTeachSpells === 'function') window.gmRenderTeachSpells();
             { const ss = el('inv-skill-decrease-select'); if (ss) { const cur = ss.value; ss.innerHTML = SKILL_NAMES_BY_IDX.map((n, i) => `<option value="${i}">${escapeHtml(n)} — ${getEffectiveSkillFromData(currentPlayerInvData, i)}</option>`).join(''); /* как у игрока: с расовым бонусом */ if (cur !== '') ss.value = cur; } }
             el('inv-gold-block').style.display = 'block';
-            { const dd = el('inv-date-day'), dm = el('inv-date-month'), dy = el('inv-date-year'); if (dd && document.activeElement !== dd && document.activeElement !== dm && document.activeElement !== dy) { dd.value = parseInt(data.gameDayNum) || 10; dm.value = isNaN(parseInt(data.gameMonth)) ? 6 : parseInt(data.gameMonth); dy.value = parseInt(data.gameYear) || 201; } }
+            { const dd = el('inv-date-day'), dm = el('inv-date-month'), dy = el('inv-date-year'); if (dd && !dd._dirtyHook) { dd._dirtyHook = 1; [dd, dm, dy, el('inv-date-food')].forEach(x => x && ['input', 'change'].forEach(ev => x.addEventListener(ev, () => { window._gmDateDirty = currentInvPlayerUid || true; }))); } if (dd && window._gmDateDirty !== (currentInvPlayerUid || true) && document.activeElement !== dd && document.activeElement !== dm && document.activeElement !== dy) { dd.value = parseInt(data.gameDayNum) || 10; dm.value = isNaN(parseInt(data.gameMonth)) ? 6 : parseInt(data.gameMonth); dy.value = parseInt(data.gameYear) || 201; } }
             el('inv-gold-current').textContent = formatNumber(currentPlayerInvData.gold);
             el('inv-level-block').style.display = 'block';
             el('inv-level-current').textContent = currentPlayerInvData.characterLevel;
@@ -4498,7 +4423,7 @@
         if (!(d >= 1 && d <= 30) || !(y >= 1)) { alert('День 1–30, год — положительное число.'); return; }
         const food = !!el('inv-date-food').checked;
         const mn = el('inv-date-month').options[m].text;
-        gmSendCmd({ type: 'setDate', day: d, month: m, year: y, resetFood: food }, `игроку {p} выставлена дата: ${d} ${mn} 4Э ${y}${food ? ', голод сброшен' : ' (без смены дня и голода)'}.`);
+        window._gmDateDirty = null; gmSendCmd({ type: 'setDate', day: d, month: m, year: y, resetFood: food }, `игроку {p} выставлена дата: ${d} ${mn} 4Э ${y}${food ? ', голод сброшен' : ' (без смены дня и голода)'}.`);
     };
     // «Покаяние»: игрок-даэдропоклонник получает право один раз снова выбрать бога-аэдра.
     window.gmPenance = function () { gmSendCmd({ type: 'penance' }, 'игрок {p} прошёл покаяние — может вернуться к аэдра.'); };
@@ -5535,7 +5460,54 @@
                     `<strong style="color:#2ecc71;">✅ Попадание!</strong> <span style="opacity:.7;">${statusKey && GM_STATUS_EFFECTS[statusKey] ? 'Без урона — при применении на цель ляжет «' + GM_STATUS_EFFECTS[statusKey].name + '».' : 'Эффект без прямого урона — примени вручную по описанию.'}</span>`);
         resultBox.style.display = 'block';
         if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
+        // Активный блок прямо в атаке: игрок закрывается щитом — второй встречный бросок режет урон (вместо отдельного инструмента).
+        if (hit && dmg > 0 && tgt.kind === 'player' && (actionVal === 'weapon' || physShot) && gmShieldBlockChecked()) gmMergedActiveBlock(pendingGmAttack, enemy, enemyTotal, textEl);
     };
+
+    // Блок щитом внутри атаки НПС: враг (его итог атаки + прогрессия оружия) против 1d20 + мод. хар-ки щита + навык «Блокирование».
+    function gmMergedActiveBlock(pa, enemy, enemyTotal, textEl) {
+        const shieldType = (el('gm-attack-shield-type') || {}).value || 'heavy';
+        db.collection('characters').doc(pa.targetUid).get().then(doc => {
+            if (pendingGmAttack !== pa) return; // пока читали лист, мастер уже бросил другую атаку
+            const data = doc.exists ? doc.data() : {};
+            if (!(data.equippedSlots && data.equippedSlots.shield)) { textEl.innerHTML += '<br><span style="opacity:.8;">🛡 Щита в руке нет — активный блок не бросается.</span>'; return; }
+            const es = data.effectiveStats;
+            const stats = (es && !Array.isArray(es) && typeof es === 'object') ? ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => es[k]) : (es || data.stats || [10, 10, 10, 10, 10, 10]);
+            const statMod = calcAbilityMod(parseInt(stats[shieldType === 'heavy' ? 2 : 1]) || 10);
+            const skillMod = Math.floor((parseInt((data.effectiveSkills || data.skills || [])[3]) || 10) / 10); // Блокирование
+            const SB = [0, 20, 25, 30, 35, 40]; let steps = 0;
+            for (let k = 1; k <= 5; k++) if ((data.perkStates || {})['skill3-perk0-step' + k]) steps = k;
+            const pct = SB[steps];
+            const prog = Math.max(0, Math.floor(((enemy.weaponDmg || 0) - 10) / 10));
+            const eTot = enemyTotal + prog, pRoll = Math.floor(Math.random() * 20) + 1, pTot = pRoll + statMod + skillMod, diff = eTot - pTot;
+            const outcome = diff <= 0 ? 'success' : diff <= 4 ? 'partial' : 'broken';
+            const perk = i => !!(data.perkStates || {})['skill3-perk' + i + '-step1'];
+            const arrowNoDmg = perk(1) && !!pa.isRangedAtk && outcome !== 'broken';
+            const label = { success: '✅ Блок успешен', partial: '🟡 Частичный блок', broken: '❌ Блок пробит' }[outcome];
+            let note;
+            pa.blockRolled = true;
+            if (arrowNoDmg) { pa.dmg = 0; note = '«Отбивание стрел»: стрела попала в щит — урона нет.'; if (outcome === 'success') pa.blockEffects = { debuff: true }; }
+            else if (outcome === 'success') { const base = pa.dmg; pa.dmg = Math.round(base * (1 - pct / 100)); note = `урон ${base} → ${pa.dmg} (срез ${pct}%, «Щитоносец»), враг теряет равновесие (−2 к следующему броску).`; pa.blockEffects = { debuff: true }; }
+            else if (outcome === 'partial') note = 'урон режется только бронёй и сопротивлением, без процента блока.';
+            else { note = 'полный урон бронёй + «Ошеломление» (−3 к следующему броску).'; pa.blockEffects = { stagger: true }; }
+            if (perk(3) && outcome === 'success') note += ' «Быстрые рефлексы»: у игрока дополнительное действие.';
+            pa.logTextBase += ` 🛡 Активный блок (${shieldType === 'heavy' ? 'тяжёлый щит' : 'лёгкий щит'}): враг ${eTot} vs игрок ${pTot} — ${label.replace(/^\S+\s/, '')}`;
+            textEl.innerHTML += `<br><span style="color:#6cc;">🛡 <strong>Активный блок</strong>: враг ${eTot} (атака ${enemyTotal}${prog ? ' +' + prog + ' прогр.' : ''}) vs игрок 1d20 (${pRoll}) +${statMod} +${skillMod} = ${pTot} → <strong>${label}</strong>, ${note}</span>`;
+            if (typeof window.previewGmAttack === 'function') window.previewGmAttack();
+        }).catch(e => alert('Блок не бросился: ' + e.message));
+    }
+    // Последствия блока при «Применить»: дебафф врагу или «Ошеломление» игроку.
+    function gmApplyBlockEffects(pa) {
+        const be = pa && pa.blockEffects; if (!be) return;
+        if (be.debuff) {
+            gmUpdateEnemies((lastData.enemies || []).map(e => e.id === pa.enemyId ? Object.assign({}, e, { statusEffects: [...(e.statusEffects || []), { id: 'blk-' + Date.now(), name: 'Потеря равновесия', desc: '−2 к следующему броску', turns: 1, rollPenalty: -2 }] }) : e)).catch(e => console.error(e));
+        }
+        if (be.stagger) {
+            const patch = {};
+            patch['participants.' + pa.targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({ id: 'stag-' + Date.now() + Math.random().toString(36).slice(2, 6), name: pa.enemyName, effectName: 'Ошеломление', description: '−3 к кубам на весь следующий ход.', turnsRemaining: 1, rollPenalty: -3, fromGm: true });
+            db.collection('sessions').doc(currentCode).update(patch).catch(e => console.error(e));
+        }
+    }
 
     // Заклинания в enemies-data.js не хранят тип урона отдельно — определяем по названию.
     function mapEnemyDmgType(spellName) {
@@ -5616,6 +5588,7 @@
         if (pendingGmAttack.targetKind && pendingGmAttack.targetKind !== 'player') { gmApplyAttackToCompanion(); return; }
         const { targetUid, dmg, dmgType, statusKey, logTextBase, targetName } = pendingGmAttack; // раньше targetName здесь не доставался — ниже, в ветке заражения болезнью, был ReferenceError
         gmVerminaFearCheck(targetUid, pendingGmAttack.enemyId, pendingGmAttack.enemyName);
+        gmApplyBlockEffects(pendingGmAttack);
         if (!dmg && !statusKey) {
             gmPostLogEntryText(logTextBase + '.');
             pendingGmAttack = null;
@@ -5624,7 +5597,7 @@
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked() && !pendingGmAttack.blockRolled, isRangedAtk: pendingGmAttack.isRangedAtk });
             const resist = ir.resist;
             let finalDmg = (dmg && !ir.zero) ? Math.max(0, Math.round(dmg * (1 - resist / 100))) : 0;
             const defNotes = ir.notes.filter(n => /Отбивание|Защита от стихий|сопр\. магии/.test(n));

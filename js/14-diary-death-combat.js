@@ -980,6 +980,8 @@
         if (!item) return null;
         if (item.slot === 'shield') return 'shield';
         const wt = String(item.weaponType || ''), n = String(item.name || '').toLowerCase(), cat = String(item.category || '');
+        // Ножны, колчаны и сырьё (глаз/клык саблезуба, «меч» в названии ножен) оружием не считаются — иначе «сабл…»/«меч…» принимались за клинок.
+        if (sheathInfo(item) || /Ножн|Колчан|Ингредиент|Алхим|Зелья|Еда|Продукт|Шкур|Трофе|Материал|Руд|Слитк|Книг|Свит|Подсумк|Камн|Драгоценн/i.test(cat) || (/ножны|колчан/i.test(n))) return null;
         if (item.slot === 'ranged' || /^ranged/.test(wt)) return (/арбалет/.test(n) || wt === 'ranged:арбалет') ? 'crossbow' : 'bow';
         if (isKastetItem(item)) return null; // кастеты носят на руках, ножен под них нет
         if (/посох/.test(n) || wt === 'twohand:посох' || item.isStaff || /^Посох/.test(cat)) return 'staff';
@@ -996,7 +998,7 @@
         if (wt === 'onehand:булава' || /булав/.test(n)) return 'mace';
         if (wt === 'onehand:топор' || /топор/.test(n)) return 'axe';
         if (/кастет/.test(n) || wt === 'onehand:кастет') return null;
-        if (wt === 'onehand' || /меч|клинок|сабл|ятаган|катан/.test(n)) return 'sword';
+        if (wt === 'onehand' || (/меч|клинок|сабл|ятаган|катан/.test(n) && (wt || item.slot === 'weapon' || /Оруж|Меч|Одноруч|Двуруч/i.test(cat)))) return 'sword';
         return null;
     }
     function sheathItemAt(slotKey) { const sl = sheathSlots[slotKey]; return sl && sl.id ? playerInventory.find(i => i.itemId === sl.id && i.count > 0) : null; }

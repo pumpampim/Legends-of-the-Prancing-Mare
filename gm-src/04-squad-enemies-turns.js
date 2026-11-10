@@ -833,7 +833,7 @@
         }
         db.collection('characters').doc(targetUid).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
-            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked(), isRangedAtk: pendingGmAttack.isRangedAtk });
+            const ir = gmPlayerIncomingResist(data, dmgType, { shieldBlock: gmShieldBlockChecked() && !pendingGmAttack.blockRolled, isRangedAtk: pendingGmAttack.isRangedAtk });
             const pv = ir.zero ? { finalDmg: 0, notes: [] } : window.StCombat.previewDamage({ resist: { [dmgType]: ir.resist } }, dmg, dmgType, 0);
             pv.notes = ir.notes.concat(pv.notes.filter(n => !/^резист/.test(n)));
             const pt = ((lastData && lastData.participants) || {})[targetUid] || {};

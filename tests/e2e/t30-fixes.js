@@ -65,7 +65,7 @@ const { setupSession, wait, gmAddEnemy, gmGive, plEquip } = require('./setup');
   const sess = () => gm.evaluate(async () => (await firebase.firestore().collection('sessions').doc(localStorage.getItem('ttrpg_gm_session_code')).get()).data());
   R.addEnemy = await sess().then(d => { const e = d.enemies[d.enemies.length - 1]; return { dmg: e.weaponDmg, loot: e.loot }; });
   await gmAddEnemy(gm, 'Драугр');
-  R.block = await gm.evaluate(() => Array.from(document.getElementById('block-attacker-select').options).map(o => o.text));
+  R.block = await gm.evaluate(() => Array.from(document.getElementById('gm-attack-attacker-select').options).map(o => o.text));
   await wait(800);
   // potion in combat = action
   R.potion = await pl.evaluate(() => {

@@ -367,7 +367,7 @@
     }
     const nowSession = () => (UI.data || {});
     const $ = id => document.getElementById(id);
-    const UI = { sel: '', data: null, mode: 'walk', arg: '', showRoof: true, sig: '', drag: null, busy: false, lv: 0, lvTok: null };
+    const UI = { sel: '', data: null, mode: 'walk', arg: '', showRoof: true, sig: '', drag: null, busy: false, lv: 0, lvTok: null, cs: 14 };
     const PLN = () => window.ESTATE_PLANS || { PKG: {}, LEVELS: {}, priceOf: () => 0, nameOf: x => x };
 
     // ---------------- игрок ----------------
@@ -401,7 +401,7 @@
         const wingsHtml = e.wingsLocked ? e.wings.map(w => {
             const I = d.WING_INFO[w] || {}, on = wingActive(e, w), sl = (e.wingSlot || {})[w], slotName = sl != null && PLN().SLOTS && PLN().SLOTS[sl] ? PLN().SLOTS[sl].name : '';
             const used = (e.used || {})[w + '|' + me2] === e.day;
-            return '<div style="padding:4px 0; border-bottom:1px solid var(--border-color);">' + d.WINGS[w].icon + ' <b>' + esc(d.WINGS[w].name) + '</b> — ' + (on ? '<span style="color:#2ecc71;">действует</span>' : '<span style="opacity:.7;">не обставлено (' + wingCount(e, w) + '/' + (I.need || 1) + ')</span>') + (slotName ? ' · место: ' + slotName : '') +
+            return '<div style="padding:4px 0; border-bottom:1px solid var(--border-color);">' + d.WINGS[w].icon + ' <b>' + esc(d.WINGS[w].name) + '</b> — ' + (on ? '<span style="color:#2ecc71;">действует</span>' : (e.kind !== 'house' && !(e.built || {})['lv_wing_' + w] && !wingCount(e, w)) ? '<span style="opacity:.7;">ещё не построено (закажите у управляющего или стройте сами)</span>' : '<span style="opacity:.7;">не обставлено (' + wingCount(e, w) + '/' + (I.need || 1) + ')</span>') + (slotName ? ' · место: ' + slotName : '') +
                 (I.use && on ? ' <button style="width:auto; padding:1px 8px;"' + (used ? ' disabled' : '') + ' onclick="Estate.useWing(\'' + w + '\')">' + esc(I.use.label) + (used ? ' (сегодня уже)' : '') + '</button>' : '') +
                 '<div style="font-size:12px; opacity:.75;">' + esc(I.effect || '') + '</div></div>';
         }).join('') :
@@ -438,7 +438,7 @@
             '<details open class="panel" style="margin:6px 0;"><summary><b>Склад материалов и магазины</b></summary><div style="margin:6px 0;">' + matsHave + '</div>' + shops +
             '<div style="font-size:12px; opacity:.75;">Разметка: ' + queue + ' клеток ждёт работы. В сутки отряд делает ' + (d.BASE_WORK + (e.staff.builder ? d.BUILDER_WORK : 0)) + ' рабочих дней (строитель +' + d.BUILDER_WORK + '). Каждый новый день партии стройка двигается сама. Стройка дороже в ×' + (e.costMult || 1) + '. День поместья: ' + e.day + '.</div>' +
             '<div style="font-size:12px; opacity:.75;">Цена детали на клетку: ' + Object.keys(d.PIECES).map(p => d.PIECES[p].name + ' — ' + esc(fmtCost(costOf(e, d.PIECES[p].cost, 1)))).join('; ') + '.</div></details>' +
-            '<details class="panel" style="margin:6px 0;"><summary><b>Крылья</b> (' + (e.wingsLocked ? e.wings.length : 0) + '/' + d.MAX_WINGS + ')</summary>' + wingsHtml + '</details>' +
+            '<details class="panel" style="margin:6px 0;"><summary><b>Крылья</b> (' + (e.wingsLocked ? (e.kind === 'house' ? e.wings.filter(w => wingActive(e, w)).length : e.wings.filter(w => (e.built || {})['lv_wing_' + w]).length) + ' построено из ' + e.wings.length + ' выбранных' : 'не выбраны, можно до ' + d.MAX_WINGS) + ')</summary>' + wingsHtml + '</details>' +
             '<details class="panel" style="margin:6px 0;"><summary><b>Хранилище</b> (' + stacks.length + '/' + cap + ' мест)</summary>' + storeRows +
             '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;"><select id="est-put-item" style="flex:2 1 160px;">' + bag + '</select><input type="number" id="est-put-qty" value="1" min="1" style="width:60px;"><button style="width:auto;" onclick="Estate.putItem()">Положить</button><button style="width:auto;" onclick="Estate.brew()">🍯 Сварить медовуху (2 мёда → 1)</button></div></details>' +
             '<details class="panel" style="margin:6px 0;"><summary><b>Огород и хозяйство</b></summary><div>Растёт: ' + (plots || 'ничего') + '</div><div style="font-size:12px; opacity:.75;">Сажай через режим «Сажать» на грядку, собирай через «Собрать». Рост ' + d.GROW_DAYS + ' дней. Раз в неделю: улей — мёд, курятник — яйца, коровник — молоко, мельница — мука, теплица — лаванда.</div></details>' +
@@ -457,11 +457,18 @@
         ['found', 'build', 'roof', 'plan', 'furn', 'stock', 'store', 'staff', 'floors', 'built', 'used', 'wingSlot'].forEach(f => { est[f] = est[f] || {}; }); est.wings = est.wings || []; est.day = est.day || 0; est.orders = est.orders || [];
         { const tk = est.tokens && est.tokens[me], tl = tk ? Number(tk.l) || 0 : 0; if (UI.lvTok !== tl) { UI.lvTok = tl; UI.lv = tl; } }
         if (!$('estate-canvas')) {
+            try { const sv = parseInt(localStorage.getItem('estate_cs')); if (sv >= 8 && sv <= 44) UI.cs = sv; } catch (x) { }
             box.innerHTML = '<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px;"><select id="estate-select" onchange="Estate.pick(this.value)"></select>' +
                 '<span id="estate-info" style="font-size:13px; opacity:.8;"></span></div>' +
+                '<div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;"><span style="font-size:13px; opacity:.8;">Масштаб:</span><button type="button" style="width:auto; padding:2px 12px;" onclick="Estate.zoom(-1)" title="Мельче">➖</button><button type="button" style="width:auto; padding:2px 12px;" onclick="Estate.zoom(1)" title="Крупнее">➕</button><button type="button" style="width:auto; padding:2px 10px;" onclick="Estate.zoom(0)" title="Обычный">1:1</button><span id="estate-zoom-val" style="font-size:12px; opacity:.7;"></span></div>' +
                 '<div style="overflow:auto; max-height:70vh; border:1px solid var(--border-color);"><canvas id="estate-canvas" style="display:block; cursor:pointer;"></canvas></div>' +
                 '<div id="estate-who" style="font-size:12px; opacity:.75; margin:4px 0;"></div><div id="estate-panels"></div>';
             const cv = $('estate-canvas');
+            cv.addEventListener('wheel', ev => { if (ev.ctrlKey) { ev.preventDefault(); Estate.zoom(ev.deltaY < 0 ? 1 : -1); } }, { passive: false });
+            { const pts = {}; let d0 = 0, cs0 = 14; // щипок двумя пальцами
+              cv.addEventListener('pointerdown', ev => { pts[ev.pointerId] = [ev.clientX, ev.clientY]; const k = Object.keys(pts); if (k.length === 2) { d0 = Math.hypot(pts[k[0]][0] - pts[k[1]][0], pts[k[0]][1] - pts[k[1]][1]); cs0 = UI.cs || 14; } });
+              cv.addEventListener('pointermove', ev => { if (!pts[ev.pointerId]) return; pts[ev.pointerId] = [ev.clientX, ev.clientY]; const k = Object.keys(pts); if (k.length === 2 && d0 > 0) { const d = Math.hypot(pts[k[0]][0] - pts[k[1]][0], pts[k[0]][1] - pts[k[1]][1]); Estate.zoomTo(cs0 * d / d0); } });
+              ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => cv.addEventListener(n, ev => { delete pts[ev.pointerId]; d0 = 0; })); }
             cv.addEventListener('pointerdown', ev => Estate.down(ev));
             cv.addEventListener('pointermove', ev => Estate.move(ev));
             window.addEventListener('pointerup', ev => Estate.up(ev));
@@ -473,6 +480,7 @@
         if (!t && !enter) { enter = document.createElement('button'); enter.id = 'estate-enter'; enter.textContent = 'Войти в поместье'; enter.style.cssText = 'width:auto; margin:4px 0;'; enter.onclick = () => Estate.enter(); $('estate-info').after(enter); }
         if (t && enter) enter.remove();
         const nm = namesOf();
+        { const z = $('estate-zoom-val'); if (z) z.textContent = Math.round((UI.cs || 14) / 14 * 100) + '%'; }
         $('estate-who').textContent = 'Здесь: ' + (Object.keys(est.tokens || {}).map(u => nm[u] || '?').join(', ') || 'никого');
         const sg = est.id + sigOf(est);
         if (sg !== UI.sig) { UI.sig = sg; const msg = $('estate-msg') ? $('estate-msg').textContent : ''; $('estate-panels').innerHTML = panelsHtml(est); if (msg && $('estate-msg')) $('estate-msg').textContent = msg; }
@@ -482,7 +490,7 @@
     // Рисует вид текущего этажа; на верхних и нижних этажах контур первого этажа виден бледным следом.
     function paint(est, sel) {
         const cv = $('estate-canvas'); if (!cv || !est) return;
-        draw(cv, view(est, UI.lv), { cs: 14, me: myUid(), names: namesOf(), showRoof: UI.showRoof, sel: sel || null, level: UI.lv, ghost: UI.lv ? est : null });
+        draw(cv, view(est, UI.lv), { cs: UI.cs || 14, me: myUid(), names: namesOf(), showRoof: UI.showRoof, sel: sel || null, level: UI.lv, ghost: UI.lv ? est : null });
     }
     // Баффы поместья держатся до длительного отдыха («Следующий день») или до нового сна в поместье — что раньше.
     function clearEstateBuffs() { try { activeTimedEffects = activeTimedEffects.filter(x => !x.estateBuff); } catch (x) { } }
@@ -507,6 +515,9 @@
             });
         },
         render() { UI.sig = ''; renderPlayer(); },
+        // Масштаб клетки для просмотра (только на экране игрока): 8..44 пикселя, шаг ×1.25.
+        zoomTo(cs) { UI.cs = Math.max(8, Math.min(44, Math.round(cs))); try { localStorage.setItem('estate_cs', String(UI.cs)); } catch (x) { } const z = $('estate-zoom-val'); if (z) z.textContent = Math.round(UI.cs / 14 * 100) + '%'; Estate.redraw(); },
+        zoom(dir) { Estate.zoomTo(dir === 0 ? 14 : dir > 0 ? (UI.cs || 14) * 1.25 : (UI.cs || 14) / 1.25); },
         redraw() { const e = curEstate(); if (e && $('estate-canvas')) paint(e, UI.drag ? UI.drag.cells : null); },
         pick(id) { UI.sel = id; UI.sig = ''; renderPlayer(); },
         setMode(m) { UI.mode = m; UI.arg = ''; UI.sig = ''; renderPlayer(); },

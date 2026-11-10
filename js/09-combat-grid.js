@@ -260,7 +260,7 @@
                 armor: (plain && plain.key === 'armor') ? plain.value : 0,
                 value: plain ? plain.value : 0,
                 percentEffects: percentEffects,
-                fromFood: !!(opts && opts.fromFood)
+                fromFood: !!(opts && opts.fromFood), fromItem: true
             });
         }
         // Блюдо с алхимической добавкой («Утончённый вкус») — её эффект поверх эффекта блюда.

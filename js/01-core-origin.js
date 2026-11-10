@@ -215,8 +215,27 @@
         cur.value = Math.max(c, Math.min(newMax, c + delta));
         if (typeof scheduleUpdateAll === 'function') scheduleUpdateAll();
     }
+    // Зелья одного рода не стакаются: одно зелье «+хп», одно «+урон», по одному на каждый навык. Остаётся сильнейшее (при равенстве — свежее).
+    function potionBuffClass(e) {
+        if (!e || !(e.fromAlchemy || e.fromItem) || e.fromFood || e.estateBuff || e.statusFlag || e.turnsRemaining === Infinity) return null;
+        const pe = (e.percentEffects || []).find(x => x && x.type === 'weaponDamagePercent');
+        if (pe) return { cls: 'dmg', mag: pe.value || 0 };
+        if ((e.hp || 0) > 0 && !e.armor && !e.speed) return { cls: 'hp', mag: e.hp };
+        const m = /^Повышение (?:навыка: |искусства )?(.+)$/.exec(String(e.effectName || ''));
+        if (m && e.fromAlchemy && (e.value || 0) > 0) return { cls: 'skill:' + m[1].toLowerCase(), mag: e.value };
+        return null;
+    }
     function pushOrRefreshTimedEffect(entry) {
         const key = entry.effectName || entry.name;
+        { const nc = potionBuffClass(entry);
+          if (nc) {
+              const rival = activeTimedEffects.find(e => (e.effectName || e.name) !== key && (() => { const c = potionBuffClass(e); return c && c.cls === nc.cls; })());
+              if (rival) {
+                  const rc = potionBuffClass(rival);
+                  if (rc.mag > nc.mag) { try { if (window.alchToast) window.alchToast('Зелья одного рода не складываются: уже действует более сильное («' + (rival.name || rival.effectName) + '»).'); } catch (e) { } return rival; }
+                  activeTimedEffects = activeTimedEffects.filter(e => e !== rival);
+              }
+          } }
         const existing = activeTimedEffects.find(e => (e.effectName || e.name) === key);
         if (existing) {
             const keepId = existing.id;

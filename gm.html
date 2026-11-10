@@ -351,7 +351,8 @@
             <button class="btn-success" style="width:100%; margin-top:8px;" onclick="rollGmAttack()"><span class="skyrim-icon icon-dice" aria-hidden="true"></span> Бросить</button>
             <div id="gm-attack-roll-result" style="margin-top:10px; padding:8px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; font-size:15px; display:none;">
                 <div id="gm-attack-roll-text"></div>
-                <label style="font-size:13px; font-weight:normal; margin-top:6px; display:block;" title="Перки Блокирования: «Отбивание стрел» — стрела в щит без урона; «Защита от стихий» — +50% к огню/холоду/электричеству"><input type="checkbox" id="gm-attack-shield-block" style="width:auto;" onchange="previewGmAttack()"> 🛡 Игрок закрывается щитом (учесть перки Блокирования)</label>
+                <label style="font-size:13px; font-weight:normal; margin-top:6px; display:block;" title="Перки Блокирования: «Отбивание стрел» — стрела в щит без урона; «Защита от стихий» — +50% к огню/холоду/электричеству"><input type="checkbox" id="gm-attack-shield-block" style="width:auto;" onchange="previewGmAttack()"> 🛡 Игрок закрывается щитом: активный блок (встречный бросок, срез урона) и перки Блокирования</label>
+                <select id="gm-attack-shield-type" style="width:auto; margin-top:4px; font-size:13px;" title="Чем блокирует"><option value="heavy">Тяжёлый щит (Телосложение)</option><option value="light">Лёгкий щит / парирование (Ловкость)</option></select>
                 <div id="gm-attack-preview" style="font-size:13px; margin-top:6px; opacity:.9;"></div>
                 <div style="display:flex; gap:6px; margin-top:8px;">
                     <button type="button" style="flex:0 0 auto; width:auto;" onclick="previewGmAttack()" title="Посчитать урон с учётом резистов игрока — ничего не записывает">🎯 Предпросмотр</button>
@@ -649,6 +650,7 @@
                 <label>Владение</label>
                 <select id="merchant-hold-select"></select>
                 <button class="btn-success" style="width:100%; margin-top:6px;" onclick="refreshMerchantStock()">🔄 Обновить ассортимент</button>
+                <button class="btn-success" style="width:100%; margin-top:6px;" onclick="refreshAllMerchantStocks()">🔄 Обновить ассортимент всех торговцев</button>
                 <div id="merchant-gen-result" style="margin-top:8px; font-size:13px;"></div>
                 <div id="merchant-staleness-list" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border-color);"></div>
             </div>
@@ -1062,24 +1064,6 @@
             <div id="guild-info-body" style="margin-top:8px;"></div>
         </div>
 
-        <!-- ===== АКТИВНЫЙ БЛОК (скрытые кубы) ===== -->
-        <div class="panel" data-gm-tab="combat">
-            <h2>🛡️ Активный блок</h2>
-            <p style="font-size:12px; opacity:.75;">Отдельный инструмент от обычной атаки — не трогает её вообще. Оба броска скрытые, результат видишь только ты (игрок узнаёт только исход).</p>
-            <label>Атакующий (враг)</label>
-            <select id="block-attacker-select"></select>
-            <label>Защищающийся (игрок)</label>
-            <select id="block-target-select"></select>
-            <label>Чем блокирует</label>
-            <select id="block-shield-type">
-                <option value="heavy">Тяжёлый щит (Телосложение)</option>
-                <option value="light">Лёгкий щит/парирование оружием (Ловкость)</option>
-            </select>
-            <button class="btn-success" style="width:100%; margin-top:6px;" onclick="rollActiveBlock()">🎲 Бросить (скрытно)</button>
-            <div id="block-result" style="margin-top:8px; display:none;"></div>
-            <button id="block-apply-btn" class="btn-success" style="width:100%; margin-top:6px; display:none;" onclick="applyActiveBlockResult()">Применить</button>
-        </div>
-
         <!-- ===== ПОХОДНЫЙ ЛАГЕРЬ ===== -->
         <div class="panel" data-gm-tab="scene">
             <h2>⛺ Походный лагерь</h2>
@@ -1428,9 +1412,9 @@
 <script src="cultist-data.js?v=669827cb"></script>
 <script src="paladin-data.js?v=b222d9b4"></script>
 <script src="enemies-data.js?v=e33a113d"></script>
-<script src="estate-data.js?v=273605d6"></script>
+<script src="estate-data.js?v=6c5967e7"></script>
 <script src="estate-plans.js?v=05ec73b9"></script>
-<script src="estate.js?v=9028cc5f"></script>
+<script src="estate.js?v=a2079910"></script>
 <script src="art-data.js?v=c9b45ba1"></script>
 <script src="pets-data.js?v=698f56d0"></script>
 <script src="traps-data.js?v=fcc0c805"></script>
@@ -1439,9 +1423,9 @@
 <script src="enemy-loot.js?v=519a3728"></script>
 <script src="grid-core.js?v=f68b550b"></script>
 <script defer src="dungeon-presets-data.js?v=7ad2b40a"></script>
-<script src="gm.js?v=f211c94d"></script>
+<script src="gm.js?v=4658ae8a"></script>
 <script src="js/17-icons.js?v=154e0c04"></script>
 <script src="js/gm-mobile.js?v=96805317"></script>
-<script src="gm-grid.js?v=f26a2a1c"></script>
+<script src="gm-grid.js?v=648511df"></script>
 </body>
 </html>

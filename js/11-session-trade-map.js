@@ -1144,8 +1144,25 @@
         if (alive.some(e => e.id === prev)) select.value = prev;
         else if (marked) select.value = marked;
         try { gridAnnotateTargets(); } catch (e) { }
+        try { updateTargetPortrait(); } catch (e) { }
         if (typeof updateCombatDock === 'function') updateCombatDock();
     };
+    // Портрет выбранной цели рядом со списком целей (рисованный аватар из art-data.js; нет рисунка — скрыт).
+    function updateTargetPortrait() {
+        const select = document.getElementById('attack-target-select'); if (!select) return;
+        let img = document.getElementById('attack-target-portrait');
+        if (!img) {
+            img = document.createElement('img'); img.id = 'attack-target-portrait'; img.alt = ''; img.className = 'st-target-portrait';
+            img.style.cssText = 'width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid var(--border-color); vertical-align:middle; margin:4px 8px 4px 0; display:none;';
+            select.parentNode.insertBefore(img, select);
+            select.addEventListener('change', () => { try { updateTargetPortrait(); } catch (e) { } });
+        }
+        const session = window.CloudSync ? window.CloudSync.getSessionData() : null;
+        const en = ((session && session.enemies) || []).find(e => e.id === select.value);
+        const url = en && window.enemyArtUrl ? window.enemyArtUrl(en.name) : '';
+        if (url) { if (img.getAttribute('src') !== url) img.setAttribute('src', url); img.style.display = 'inline-block'; } else img.style.display = 'none';
+    }
+    window.updateTargetPortrait = updateTargetPortrait;
 
 
     // ========================================================================
