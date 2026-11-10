@@ -99,6 +99,15 @@
         TEX[n] = null; if (typeof Image === 'undefined') return null;
         const i = new Image(); i.onload = () => { TEX[n] = i; try { if (window.Estate && window.Estate.redraw) window.Estate.redraw(); } catch (e) { } }; i.onerror = () => { TEX[n] = false; }; i.src = 'img/estate/' + n + '.webp'; return null;
     }
+    // Спрайты мебели и дверей (img/estate/furn/<тип>.webp): целая клетка; нет файла — остаются эмодзи.
+    const SPR = {}, SPR_READY = 'alchtable bed bookcase chair chest coop cowpen door dummy enchtable forge glassbed grindstone hearth hive lamp larder mill planter rack ripe rug shelf soulcase sprout stairdown stairup table trophy window'.split(' ');
+    function sprImg(n) {
+        if (SPR_READY.indexOf(n) < 0) return null;
+        const v = SPR[n]; if (v !== undefined) return v || null;
+        SPR[n] = null; if (typeof Image === 'undefined') return null;
+        const i = new Image(); i.onload = () => { SPR[n] = i; try { if (window.Estate && window.Estate.redraw) window.Estate.redraw(); } catch (e) { } }; i.onerror = () => { SPR[n] = false; }; i.src = 'img/estate/furn/' + n + '.webp'; return null;
+    }
+    function drawSpr(c, n, x, y, cs, k) { const im = sprImg(n); if (!im) return false; k = k || 1; const d = cs * k, o = (cs - d) / 2; c.drawImage(im, x + o, y + o, d, d); return true; }
     function fillTex(c, n, color, x, y, w, h, cs, alpha) {
         const im = texImg(n);
         if (im) { c._tp = c._tp || {}; const kk = n + '@' + cs; let p = c._tp[kk]; if (!p) { p = c.createPattern(im, 'repeat'); if (p && p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scale(cs * 4 / im.width)); c._tp[kk] = p; } c.fillStyle = p || color; }
@@ -120,7 +129,7 @@
             if (lvl && opts.ghost) { const gb = opts.ghost.build && opts.ghost.build[k]; if (gb) { c.fillStyle = 'rgba(255,255,255,.07)'; c.fillRect(x * cs, y * cs, cs, cs); } }
             if (est.found && est.found[k]) fillTex(c, 'foundation', LAYER_COLOR.found, x * cs, y * cs, cs, cs, cs);
             const b = est.build && est.build[k];
-            if (b) { fillTex(c, b === 'door' || b === 'window' ? 'floor' : b, LAYER_COLOR[b], x * cs, y * cs, cs, cs, cs); if (b === 'door' || b === 'window') { c.fillStyle = LAYER_COLOR[b]; c.globalAlpha = .55; c.fillRect(x * cs, y * cs, cs, cs); c.globalAlpha = 1; } if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (b === 'door' || b === 'window') { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
+            if (b) { fillTex(c, b === 'door' || b === 'window' ? 'floor' : b, LAYER_COLOR[b], x * cs, y * cs, cs, cs, cs); const sprDone = (b === 'door' || b === 'window') && drawSpr(c, b, x * cs, y * cs, cs); if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = LAYER_COLOR[b]; c.globalAlpha = .55; c.fillRect(x * cs, y * cs, cs, cs); c.globalAlpha = 1; } if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
         }
         c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1;
         if (cs >= 10) { for (let x = 0; x <= est.w; x++) { c.beginPath(); c.moveTo(x * cs + .5, 0); c.lineTo(x * cs + .5, H); c.stroke(); } for (let y = 0; y <= est.h; y++) { c.beginPath(); c.moveTo(0, y * cs + .5); c.lineTo(W, y * cs + .5); c.stroke(); } }
@@ -128,7 +137,8 @@
         Object.keys(est.furn || {}).forEach(k => {
             const f = est.furn[k], d = FU[f.t]; if (!d) return; const [x, y] = k.split('_').map(Number);
             c.font = Math.floor(cs * 0.75) + 'px serif'; c.fillStyle = '#fff';
-            c.fillText(d.icon, x * cs + cs / 2, y * cs + cs / 2 + 1);
+            if (!drawSpr(c, f.t, x * cs, y * cs, cs)) c.fillText(d.icon, x * cs + cs / 2, y * cs + cs / 2 + 1);
+            if (f.crop) { const ripeS = (est.day || 0) - f.crop.at >= D().GROW_DAYS; if (drawSpr(c, ripeS ? 'ripe' : 'sprout', x * cs, y * cs, cs, 0.7)) return; }
             if (f.crop) { const ripe = (est.day || 0) - f.crop.at >= D().GROW_DAYS; c.font = Math.floor(cs * 0.5) + 'px serif'; c.fillText(ripe ? '✨' : '🌱', x * cs + cs * .72, y * cs + cs * .3); }
         });
         Object.keys(est.plan || {}).forEach(k => {
