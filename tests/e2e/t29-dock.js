@@ -2,7 +2,7 @@ const { setupSession, wait } = require('./setup');
 (async () => {
   const { gm, players, H } = await setupSession();
   const pl = players[0];
-  await gm.evaluate(async () => { const idx = window.enemiesData.findIndex(e => e.name === 'Бандит'); const sel = document.getElementById('enemy-db-select'); if (sel.options.length < 2) populateEnemyDbSelect(); sel.value = String(idx); window.onEnemyDbPicked(); window.addEnemy(); });
+  await gm.evaluate(async () => { const idx = window.enemiesData.findIndex(e => e.name === 'Бандит'); window.gmSelectEnemyDb(idx); window.addEnemy(); });
   await wait(1500);
   for (const w of [360, 414]) {
     await pl.setViewportSize({ width: w, height: 700 }); await wait(800);

@@ -702,8 +702,7 @@
         } else if (act === 'enemy') {
             if (!currentCode) { alert('Нет активной сессии.'); return; }
             const idx = b.dataset.idx;
-            el('enemy-db-select').value = idx;
-            window.onEnemyDbPicked();
+            window.gmSelectEnemyDb(parseInt(idx));
             window.addEnemy();
             el('prep-result').textContent = 'В бой добавлен: ' + window.enemiesData[parseInt(idx)].name;
         }

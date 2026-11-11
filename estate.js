@@ -34,8 +34,8 @@
     function withLevel(e, L, fn) {
         L = Number(L) || 0; if (!L) return fn(e);
         e.floors = e.floors || {}; const f = e.floors[L] = e.floors[L] || {}, saved = {};
-        LV.forEach(k => { saved[k] = e[k]; e[k] = f[k] || {}; }); e._base = saved;
-        try { return fn(e); } finally { LV.forEach(k => { f[k] = e[k]; e[k] = saved[k]; }); delete e._base; }
+        LV.forEach(k => { saved[k] = e[k]; e[k] = f[k] || {}; }); e._base = saved; e._lv = L;
+        try { return fn(e); } finally { LV.forEach(k => { f[k] = e[k]; e[k] = saved[k]; }); delete e._base; delete e._lv; }
     }
     function getLevel(e, L) { L = Number(L) || 0; if (!L) return e; const f = (e.floors || {})[L] || {}; return { found: f.found || {}, build: f.build || {}, roof: f.roof || {}, plan: f.plan || {}, furn: f.furn || {} }; }
     function levelsOf(e) { return [0].concat(Object.keys(e.floors || {}).map(Number).sort((a, b) => a - b)).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b); }
@@ -99,15 +99,56 @@
         TEX[n] = null; if (typeof Image === 'undefined') return null;
         const i = new Image(); i.onload = () => { TEX[n] = i; try { if (window.Estate && window.Estate.redraw) window.Estate.redraw(); } catch (e) { } }; i.onerror = () => { TEX[n] = false; }; i.src = 'img/estate/' + n + '.webp'; return null;
     }
-    // Спрайты мебели и дверей (img/estate/furn/<тип>.webp): целая клетка; нет файла — остаются эмодзи.
-    const SPR = {}, SPR_READY = 'alchtable bed bookcase chair chest coop cowpen door dummy enchtable forge glassbed grindstone hearth hive lamp larder mill planter rack ripe rug shelf soulcase sprout stairdown stairup table trophy window'.split(' ');
-    function sprImg(n) {
-        if (SPR_READY.indexOf(n) < 0) return null;
-        const v = SPR[n]; if (v !== undefined) return v || null;
-        SPR[n] = null; if (typeof Image === 'undefined') return null;
-        const i = new Image(); i.onload = () => { SPR[n] = i; try { if (window.Estate && window.Estate.redraw) window.Estate.redraw(); } catch (e) { } }; i.onerror = () => { SPR[n] = false; }; i.src = 'img/estate/furn/' + n + '.webp'; return null;
+    // Мебель, двери и окна рисуются из тех же текстур, что и земля: материалы (дерево, ткань, железо, солома, земля) + простые формы сверху.
+    function matStyle(c, n, color, cs) {
+        const im = texImg(n); if (!im) return color;
+        c._tp = c._tp || {}; const kk = 'm' + n + '@' + cs; let p = c._tp[kk];
+        if (!p) { p = c.createPattern(im, 'repeat'); if (p && p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scale(cs * 2 / im.width)); c._tp[kk] = p; }
+        return p || color;
     }
-    function drawSpr(c, n, x, y, cs, k) { const im = sprImg(n); if (!im) return false; k = k || 1; const d = cs * k, o = (cs - d) / 2; c.drawImage(im, x + o, y + o, d, d); return true; }
+    const MAT = { wood: '#5b3d24', cloth: '#8c2f2f', metal: '#4b4f55', straw: '#c9a24a', soil: '#4a3320', wall: '#6b645c', roof: '#7a3a2e', floor: '#8a6d4b' };
+    function drawFurnTex(c, t, x, y, cs) {
+        const u = cs / 10, lw = Math.max(1, cs / 16);
+        const R = (n, a, b, w, h, edge) => { c.fillStyle = matStyle(c, n, MAT[n], cs); c.fillRect(x + a * u, y + b * u, w * u, h * u); c.strokeStyle = edge || 'rgba(0,0,0,.7)'; c.lineWidth = lw; c.strokeRect(x + a * u + lw / 2, y + b * u + lw / 2, w * u - lw, h * u - lw); };
+        const F = (color, a, b, w, h) => { c.fillStyle = color; c.fillRect(x + a * u, y + b * u, w * u, h * u); };
+        const C = (color, cx, cy, r, edge) => { c.beginPath(); c.arc(x + cx * u, y + cy * u, r * u, 0, 7); c.fillStyle = color; c.fill(); if (edge) { c.strokeStyle = edge; c.lineWidth = lw; c.stroke(); } };
+        const L = (color, a, b, a2, b2, w) => { c.strokeStyle = color; c.lineWidth = Math.max(1, (w || 1) * cs / 14); c.beginPath(); c.moveTo(x + a * u, y + b * u); c.lineTo(x + a2 * u, y + b2 * u); c.stroke(); };
+        const glow = (color, cx, cy, r) => { const g = c.createRadialGradient(x + cx * u, y + cy * u, 0, x + cx * u, y + cy * u, r * u); g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(x, y, cs, cs); };
+        const soilBed = () => { R('wood', .6, .6, 8.8, 8.8); c.fillStyle = matStyle(c, 'soil', MAT.soil, cs); c.fillRect(x + 1.6 * u, y + 1.6 * u, 6.8 * u, 6.8 * u); };
+        switch (t) {
+            case 'bed': R('wood', .8, .4, 8.4, 9.2); R('cloth', 1.4, 3.2, 7.2, 6, 'rgba(0,0,0,.5)'); F('#e8dcc4', 1.8, 1, 6.4, 2); L('rgba(0,0,0,.45)', 1.8, 3, 8.2, 3, 1); break;
+            case 'table': R('wood', .8, 1.6, 8.4, 6.8); L('rgba(0,0,0,.35)', 1, 5, 9, 5, 1); C('#d9d2c0', 3.5, 5, .9, 'rgba(0,0,0,.5)'); C('#d9d2c0', 6.6, 5, .9, 'rgba(0,0,0,.5)'); break;
+            case 'chair': R('wood', 2.4, 3, 5.2, 5); R('wood', 2.4, 1.6, 5.2, 1.6); break;
+            case 'rug': R('cloth', .6, .6, 8.8, 8.8); c.strokeStyle = '#d4af37'; c.lineWidth = lw; c.strokeRect(x + 1.6 * u, y + 1.6 * u, 6.8 * u, 6.8 * u); L('#d4af37', 1.6, 1.6, 8.4, 8.4, .8); L('#d4af37', 8.4, 1.6, 1.6, 8.4, .8); break;
+            case 'lamp': glow('rgba(255,190,80,.55)', 5, 5, 5); C('#2a2623', 5, 5, 2.2, 'rgba(0,0,0,.8)'); C('#ffd36a', 5, 5, 1.2); break;
+            case 'chest': R('wood', .8, 2, 8.4, 6.4); R('metal', 2.2, 2, 1, 6.4, 'rgba(0,0,0,.6)'); R('metal', 6.8, 2, 1, 6.4, 'rgba(0,0,0,.6)'); F('#d4af37', 4.4, 4.6, 1.2, 1.4); break;
+            case 'shelf': R('wood', .8, 1.4, 8.4, 7.2); L('rgba(0,0,0,.6)', 1, 5, 9, 5, 1.2); C('#6aa36a', 2.6, 3.6, 1); C('#c77a3a', 5, 3.6, 1); C('#7a7ab5', 7.4, 3.6, 1); F('#b88a52', 2, 6, 2, 2); F('#8a6a45', 4.8, 6, 3, 2); break;
+            case 'bookcase': R('wood', .8, 1, 8.4, 8); ['#7a2d2d', '#2d5a7a', '#3d6b3d', '#8a6a2d', '#5a2d7a'].forEach((col, i) => { F(col, 1.4 + i * 1.5, 1.6, 1.1, 3 + (i % 2) * .6); F(col, 1.4 + i * 1.5, 5.6, 1.1, 2.4 - (i % 2) * .4); }); L('rgba(0,0,0,.6)', 1, 5.2, 9, 5.2, 1.2); break;
+            case 'hearth': R('wall', .6, .6, 8.8, 8.8); F('#1b1410', 2.2, 2.4, 5.6, 6); glow('rgba(255,140,40,.9)', 5, 6.6, 4); C('#ff9a2e', 5, 6.8, 1.6); C('#ffd36a', 5, 7, .8); L('#3a3a3a', 2, 2.4, 8, 2.4, 1.6); break;
+            case 'larder': R('wood', .8, 1, 8.4, 8); L('rgba(0,0,0,.65)', 5, 1, 5, 9, 1); C('#d4af37', 4.2, 5, .5); C('#d4af37', 5.8, 5, .5); L('rgba(0,0,0,.35)', 1.2, 3, 4.6, 3, 1); L('rgba(0,0,0,.35)', 5.4, 3, 8.8, 3, 1); break;
+            case 'alchtable': R('wood', .8, 1.6, 8.4, 6.8); C('#58c070', 2.8, 4, 1.1, 'rgba(0,0,0,.6)'); C('#5aa0e0', 5, 4, 1.1, 'rgba(0,0,0,.6)'); C('#d05050', 7.2, 4, 1.1, 'rgba(0,0,0,.6)'); R('metal', 3.4, 5.8, 3.2, 1.6); break;
+            case 'enchtable': R('wall', .8, 1.2, 8.4, 7.6); glow('rgba(170,90,255,.8)', 5, 5, 4); C('#2b1a44', 5, 5, 2.4, '#b070ff'); C('#d6b0ff', 5, 5, 1); break;
+            case 'soulcase': R('wood', .8, 1.2, 8.4, 7.6); c.fillStyle = 'rgba(150,210,255,.45)'; c.fillRect(x + 1.8 * u, y + 2.2 * u, 6.4 * u, 5.4 * u); c.strokeStyle = 'rgba(220,240,255,.8)'; c.lineWidth = lw; c.strokeRect(x + 1.8 * u, y + 2.2 * u, 6.4 * u, 5.4 * u); glow('rgba(170,90,255,.7)', 5, 5, 3.5); C('#b070ff', 3.6, 5, 1); C('#70d0ff', 6.4, 5, 1); break;
+            case 'forge': R('wall', .6, .6, 8.8, 8.8); F('#1b1410', 1.8, 1.8, 6.4, 3.6); glow('rgba(255,120,30,.9)', 5, 3.6, 3.6); C('#ff7a1a', 5, 3.6, 1.6); R('metal', 3, 6.2, 4, 2, 'rgba(0,0,0,.8)'); break;
+            case 'grindstone': R('wood', .8, 2.4, 8.4, 5.2); C('#7d7f84', 5, 5, 2.8, 'rgba(0,0,0,.7)'); C('#2c2c2e', 5, 5, .8); break;
+            case 'rack': R('wood', .8, 1.6, 8.4, 6.8); L('#c9ccd1', 2.2, 2.4, 3.4, 7.4, 1.6); L('#c9ccd1', 4.4, 2.4, 5.6, 7.4, 1.6); L('#c9ccd1', 6.6, 2.4, 7.8, 7.4, 1.6); F('#d4af37', 2.6, 6.4, 1, .8); F('#d4af37', 4.8, 6.4, 1, .8); F('#d4af37', 7, 6.4, 1, .8); break;
+            case 'dummy': C('#c9a24a', 5, 5, 3, 'rgba(0,0,0,.7)'); R('wood', 1.2, 4.4, 7.6, 1.3); C('#d9c27a', 5, 3, 1.1, 'rgba(0,0,0,.6)'); break;
+            case 'trophy': R('wood', 1.4, 1.4, 7.2, 7.2); C('#d9d2c0', 5, 6, 1.6, 'rgba(0,0,0,.6)'); L('#d9d2c0', 4.2, 5, 2.6, 2.4, 1.2); L('#d9d2c0', 5.8, 5, 7.4, 2.4, 1.2); L('#d9d2c0', 2.6, 2.4, 1.8, 3.6, 1); L('#d9d2c0', 7.4, 2.4, 8.2, 3.6, 1); break;
+            case 'planter': soilBed(); break;
+            case 'glassbed': soilBed(); c.fillStyle = 'rgba(160,220,255,.4)'; c.fillRect(x + .6 * u, y + .6 * u, 8.8 * u, 8.8 * u); L('rgba(255,255,255,.7)', 5, .6, 5, 9.4, .8); L('rgba(255,255,255,.7)', .6, 5, 9.4, 5, .8); break;
+            case 'hive': R('straw', 1.6, 1.6, 6.8, 6.8); L('rgba(60,40,10,.7)', 1.8, 3.9, 8.2, 3.9, 1); L('rgba(60,40,10,.7)', 1.8, 6.1, 8.2, 6.1, 1); C('#1b1410', 5, 7.4, .8); break;
+            case 'coop': R('wood', .8, 2.6, 8.4, 6.6); R('roof', .6, .8, 8.8, 3.8); C('#e8dcc4', 3, 7, .8, 'rgba(0,0,0,.5)'); C('#e8dcc4', 6.8, 7.4, .8, 'rgba(0,0,0,.5)'); break;
+            case 'cowpen': c.fillStyle = matStyle(c, 'straw', MAT.straw, cs); c.fillRect(x + .6 * u, y + .6 * u, 8.8 * u, 8.8 * u); c.strokeStyle = '#5b3d24'; c.lineWidth = Math.max(1.5, cs / 8); c.strokeRect(x + .8 * u, y + .8 * u, 8.4 * u, 8.4 * u); C('#6b4a32', 5, 5, 2.4, 'rgba(0,0,0,.6)'); C('#e8dcc4', 6.8, 4.4, .9); break;
+            case 'stairup': case 'stairdown': { R('wood', .8, .8, 8.4, 8.4); for (let i = 1; i < 5; i++) L('rgba(0,0,0,.6)', .8, .8 + i * 1.7, 9.2, .8 + i * 1.7, 1.2); c.fillStyle = '#fff'; c.font = 'bold ' + Math.floor(cs * 0.55) + 'px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 3; c.strokeText(t === 'stairup' ? '▲' : '▼', x + cs / 2, y + cs / 2 + 1); c.fillText(t === 'stairup' ? '▲' : '▼', x + cs / 2, y + cs / 2 + 1); break; }
+            case 'mill': R('wall', 2, 2, 6, 6); C('#4a3f36', 5, 5, 2.4, 'rgba(0,0,0,.7)'); L('#8a6a45', 5, 5, 9.4, 2, 1.8); L('#8a6a45', 5, 5, .6, 8, 1.8); L('#8a6a45', 5, 5, 2, .6, 1.8); L('#8a6a45', 5, 5, 8, 9.4, 1.8); break;
+            case 'door': R('wood', 1.4, 0, 7.2, 10); L('rgba(0,0,0,.6)', 5, 0, 5, 10, 1); R('metal', 1.4, 2.2, 7.2, .9, 'rgba(0,0,0,.6)'); R('metal', 1.4, 6.9, 7.2, .9, 'rgba(0,0,0,.6)'); C('#d4af37', 6.8, 5, .6); break;
+            case 'window': R('wall', 0, 0, 10, 10); c.fillStyle = 'rgba(130,190,235,.9)'; c.fillRect(x + 2.2 * u, y + 2.2 * u, 5.6 * u, 5.6 * u); L('#3a2a1a', 5, 2.2, 5, 7.8, 1.2); L('#3a2a1a', 2.2, 5, 7.8, 5, 1.2); c.strokeStyle = '#3a2a1a'; c.lineWidth = lw * 1.4; c.strokeRect(x + 2.2 * u, y + 2.2 * u, 5.6 * u, 5.6 * u); break;
+            case 'sprout': L('#4f9a3a', 5, 7.6, 5, 4.4, 1.6); C('#6fc04a', 3.6, 4.6, 1.5); C('#6fc04a', 6.4, 4.2, 1.5); break;
+            case 'ripe': [2.6, 5, 7.4].forEach((a, i) => { L('#7a9a3a', a, 8, a, 3.2 + i % 2, 1.2); C('#e0b83a', a, 2.8 + i % 2, 1.2, 'rgba(120,80,0,.5)'); C('#e0b83a', a, 4.2 + i % 2, 1, 'rgba(120,80,0,.4)'); }); break;
+            default: return false;
+        }
+        return true;
+    }
     function fillTex(c, n, color, x, y, w, h, cs, alpha) {
         const im = texImg(n);
         if (im) { c._tp = c._tp || {}; const kk = n + '@' + cs; let p = c._tp[kk]; if (!p) { p = c.createPattern(im, 'repeat'); if (p && p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scale(cs * 4 / im.width)); c._tp[kk] = p; } c.fillStyle = p || color; }
@@ -129,7 +170,7 @@
             if (lvl && opts.ghost) { const gb = opts.ghost.build && opts.ghost.build[k]; if (gb) { c.fillStyle = 'rgba(255,255,255,.07)'; c.fillRect(x * cs, y * cs, cs, cs); } }
             if (est.found && est.found[k]) fillTex(c, 'foundation', LAYER_COLOR.found, x * cs, y * cs, cs, cs, cs);
             const b = est.build && est.build[k];
-            if (b) { fillTex(c, b === 'door' || b === 'window' ? 'floor' : b, LAYER_COLOR[b], x * cs, y * cs, cs, cs, cs); const sprDone = (b === 'door' || b === 'window') && drawSpr(c, b, x * cs, y * cs, cs); if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = LAYER_COLOR[b]; c.globalAlpha = .55; c.fillRect(x * cs, y * cs, cs, cs); c.globalAlpha = 1; } if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
+            if (b) { fillTex(c, b === 'door' || b === 'window' ? 'floor' : b, LAYER_COLOR[b], x * cs, y * cs, cs, cs, cs); const sprDone = (b === 'door' || b === 'window') && drawFurnTex(c, b, x * cs, y * cs, cs); if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = LAYER_COLOR[b]; c.globalAlpha = .55; c.fillRect(x * cs, y * cs, cs, cs); c.globalAlpha = 1; } if (b === 'wall') { c.strokeStyle = 'rgba(255,255,255,.18)'; c.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3); } if (!sprDone && (b === 'door' || b === 'window')) { c.fillStyle = '#fff'; c.font = Math.floor(cs * 0.7) + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b === 'door' ? '🚪' : '🪟', x * cs + cs / 2, y * cs + cs / 2 + 1); } }
         }
         c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1;
         if (cs >= 10) { for (let x = 0; x <= est.w; x++) { c.beginPath(); c.moveTo(x * cs + .5, 0); c.lineTo(x * cs + .5, H); c.stroke(); } for (let y = 0; y <= est.h; y++) { c.beginPath(); c.moveTo(0, y * cs + .5); c.lineTo(W, y * cs + .5); c.stroke(); } }
@@ -137,8 +178,8 @@
         Object.keys(est.furn || {}).forEach(k => {
             const f = est.furn[k], d = FU[f.t]; if (!d) return; const [x, y] = k.split('_').map(Number);
             c.font = Math.floor(cs * 0.75) + 'px serif'; c.fillStyle = '#fff';
-            if (!drawSpr(c, f.t, x * cs, y * cs, cs)) c.fillText(d.icon, x * cs + cs / 2, y * cs + cs / 2 + 1);
-            if (f.crop) { const ripeS = (est.day || 0) - f.crop.at >= D().GROW_DAYS; if (drawSpr(c, ripeS ? 'ripe' : 'sprout', x * cs, y * cs, cs, 0.7)) return; }
+            if (!drawFurnTex(c, f.t, x * cs, y * cs, cs)) c.fillText(d.icon, x * cs + cs / 2, y * cs + cs / 2 + 1);
+            if (f.crop) { const ripeS = (est.day || 0) - f.crop.at >= D().GROW_DAYS; if (drawFurnTex(c, ripeS ? 'ripe' : 'sprout', x * cs, y * cs, cs)) return; }
             if (f.crop) { const ripe = (est.day || 0) - f.crop.at >= D().GROW_DAYS; c.font = Math.floor(cs * 0.5) + 'px serif'; c.fillText(ripe ? '✨' : '🌱', x * cs + cs * .72, y * cs + cs * .3); }
         });
         Object.keys(est.plan || {}).forEach(k => {
@@ -271,7 +312,12 @@
             else if (e.build[k] || e.found[k] || !passable(e, x, y)) fail('«' + F.name + '» ставится на открытую землю.');
             if (F.wing && e.wings.indexOf(F.wing) < 0) fail('Нужно крыло «' + D().WINGS[F.wing].name + '» (выберите его среди пяти крыльев).');
             if (F.limit && countFurn(e, t) >= F.limit) fail('«' + F.name + '»: не больше ' + F.limit + ' штук.');
-            takeMats(e, F.mats); e.furn[k] = { t }; return ['stock', 'furn'];
+            takeMats(e, F.mats); e.furn[k] = { t };
+            if (F.stair) { // парная лестница на соседнем этаже ставится сама, если там в этой клетке пол и пусто
+                const L2 = (e._lv || 0) + F.stair, o2 = L2 === 0 ? (e._base || e) : (e.floors || {})[L2];
+                if (o2 && o2.build && o2.build[k] === 'floor' && !(o2.furn || {})[k]) { o2.furn = o2.furn || {}; o2.furn[k] = { t: F.stair > 0 ? 'stairdown' : 'stairup' }; }
+            }
+            return ['stock', 'furn', 'floors'];
         },
         plant(e, x, y, crop) {
             const k = key(x, y), f = e.furn[k]; if (!f || !D().FURN[f.t].plot) fail('Здесь нет грядки.');
@@ -343,6 +389,27 @@
             ev.forEach(t => pushLog(e, t)); return ev;
         },
         // Дни поместья = дни партии (sessions.gameDayCounter): догоняем счётчик сессии, не больше 90 суток за раз.
+        // Починка домов с этажами (Гордость шпиля): достроить этажи и лестницы, убрать лестницы в никуда. Один раз на участок.
+        shell(e) {
+            if (e.kind !== 'house' || e.shellV2) return [];
+            const PL = window.ESTATE_PLANS; if (!PL || !PL.solShell) return [];
+            PL.apply(e, PL.solShell(e), withLevel);
+            const stairOf = (L, t) => { const o = getLevel(e, L); return Object.keys(o.furn || {}).filter(k => (o.furn[k] || {}).t === t); };
+            const dropStray = (L, t, partnerL, partnerT) => { const pf = getLevel(e, partnerL).furn || {}; withLevel(e, L, () => { Object.keys(e.furn).forEach(k => { if (e.furn[k].t === t && (pf[k] || {}).t !== partnerT) delete e.furn[k]; }); }); };
+            // лестницы без пары на другом этаже убираем
+            [[1, 'stairup', 2, 'stairdown'], [1, 'stairdown', 0, 'stairup'], [-1, 'stairup', 0, 'stairdown'], [0, 'stairup', 1, 'stairdown'], [0, 'stairdown', -1, 'stairup']].forEach(q => dropStray(q[0], q[1], q[2], q[3]));
+            const pair = (up, L) => stairOf(0, up ? 'stairup' : 'stairdown').some(k => ((getLevel(e, L).furn || {})[k] || {}).t === (up ? 'stairdown' : 'stairup'));
+            const free = (L, k) => { const o = getLevel(e, L); return !(o.furn || {})[k] && (L === 0 ? o.build[k] === 'floor' : (o.build || {})[k] === 'floor'); };
+            [[true, 1], [false, -1]].forEach(q => {
+                if (pair(q[0], q[1])) return;
+                const cells = []; for (let x = 9; x <= 20; x++) for (let y = 9; y <= 18; y++) cells.push(key(x, y));
+                const k = cells.sort((a, b) => { const [ax, ay] = a.split('_').map(Number), [bx, by] = b.split('_').map(Number); const t = q[0] ? [18, 17] : [10, 15]; return Math.hypot(ax - t[0], ay - t[1]) - Math.hypot(bx - t[0], by - t[1]); }).find(c => free(0, c) && free(q[1], c));
+                if (!k) return;
+                e.furn[k] = { t: q[0] ? 'stairup' : 'stairdown' };
+                withLevel(e, q[1], () => { e.furn[k] = { t: q[0] ? 'stairdown' : 'stairup' }; });
+            });
+            e.shellV2 = 1; return ['shellV2', 'furn', 'floors', 'found', 'build', 'roof'];
+        },
         sync(e, counter) {
             counter = parseInt(counter) || 0;
             if (e.dayBase == null) { e.dayBase = counter - (e.day || 0); return []; }
@@ -358,7 +425,7 @@
     };
     // ---------------- транзакции и общая часть ----------------
     const Tx = { runner: null };
-    const FIELDS = ['day', 'found', 'build', 'roof', 'plan', 'planSeq', 'furn', 'stock', 'store', 'staff', 'visitor', 'log', 'wings', 'wingsLocked', 'dayBase', 'floors', 'orders', 'built', 'wingSlot', 'used'];
+    const FIELDS = ['day', 'found', 'build', 'roof', 'plan', 'planSeq', 'furn', 'stock', 'store', 'staff', 'visitor', 'log', 'wings', 'wingsLocked', 'dayBase', 'floors', 'orders', 'built', 'wingSlot', 'used', 'shellV2'];
     function mutate(id, fn, fields, level) {
         level = Number(level) || 0; if (level && fields) fields = fields.concat(['floors']);
         const runner = Tx.runner || (window.CloudSync && window.CloudSync.estateTx);
@@ -519,6 +586,7 @@
             const all = (d && d.estates) || {}, counter = parseInt(d && d.gameDayCounter) || 0; UI.synced = UI.synced || {};
             Object.keys(all).forEach(id => {
                 const e = all[id]; if (!e) return;
+                if (e.kind === 'house' && !e.shellV2) { const tg = 'shell:' + id; if (!UI.synced[tg]) { UI.synced[tg] = 1; mutate(id, x => R.shell(x)).catch(() => { }); } }
                 const need = e.dayBase == null || counter - e.dayBase > (e.day || 0); if (!need) return;
                 const tag = id + ':' + counter + ':' + (e.day || 0) + ':' + (e.dayBase == null ? 'n' : 'b'); if (UI.synced[tag]) return; UI.synced[tag] = 1;
                 mutate(id, x => R.sync(x, x._counter)).catch(() => { });
@@ -568,7 +636,7 @@
             if (F && F.stair) {
                 const L2 = tl + F.stair, o = getLevel(est, L2), g = o.furn[k], G2 = g && D().FURN[g.t];
                 if (G2 && G2.stair === -F.stair && (L2 === 0 || o.build[k] === 'floor')) { to.l = L2; note = 'Ты ' + (F.stair > 0 ? 'поднялся' : 'спустился') + ': ' + (PLN().LEVELS[String(L2)] || 'этаж') + '.'; }
-                else note = 'Эта лестница пока никуда не ведёт.';
+                else note = 'Эта лестница пока никуда не ведёт: на другом этаже в этой же клетке нужны пол и парная лестница.';
             }
             write({ ['estates.' + est.id + '.tokens.' + me]: to }).then(() => { if (note) say(note, /никуда/.test(note)); }).catch(e => alert('Ошибка: ' + e.message));
         },

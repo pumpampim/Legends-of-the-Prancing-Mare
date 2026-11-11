@@ -335,12 +335,40 @@
 
     let currentEnemyDbPick = null;
 
+    // Тип врага для двухступенчатого выбора: сначала тип (фалмеры, нежить…), потом конкретный.
+    const ENEMY_TYPES = [
+        ['animals', '🐺 Животные', (e) => e.category === 'Животные'],
+        ['falmer', '🦇 Фалмеры', (e) => /фалмер/i.test(e.name)],
+        ['undead', '💀 Нежить', (e) => /скелет|драугр|нежить|жрец-дракон/i.test(e.name)],
+        ['vamp', '🧛 Вампиры и оборотни', (e) => /вампир|вервольф|оборотень|медведь оборотни|гончая смерти/i.test(e.name)],
+        ['bandit', '🗡 Бандиты', (e) => /бандит|разбойник|громила|грабитель|головорез|мародер|мародёр|главарь/i.test(e.name)],
+        ['forsworn', '🪶 Изгои', (e) => /изгой/i.test(e.name)],
+        ['dwemer', '⚙️ Двемерские механизмы', (e) => /двемер/i.test(e.name)],
+        ['daedra', '🔥 Даэдра и атронахи', (e) => /дремор|атронах/i.test(e.name)],
+        ['giants', '🪨 Великаны и тролли', (e) => /великан|тролл|мамонт|горгулья/i.test(e.name)],
+        ['bugs', '🕷 Пауки и насекомые', (e) => /паук|корус|нетч|стрекоз|мотыл/i.test(e.name)],
+        ['other', '👹 Прочие монстры', () => true]
+    ];
+    function enemyTypeKey(e) { for (let i = 0; i < ENEMY_TYPES.length; i++) if (ENEMY_TYPES[i][2](e)) return ENEMY_TYPES[i][0]; return 'other'; }
     function populateEnemyDbSelect() {
-        const select = el('enemy-db-select');
+        const select = el('enemy-db-select'), ts = el('enemy-type-select');
         if (!select || !window.enemiesData) return;
-        select.innerHTML = '<option value="">— выбрать готового противника —</option>' +
-            window.enemiesData.map((e, i) => `<option value="${i}">${escapeHtml(e.name)} (${e.category}, ${e.hp} HP)</option>`).join('');
+        if (ts && ts.options.length < 2) {
+            const cnt = {}; window.enemiesData.forEach(e => { const k = enemyTypeKey(e); cnt[k] = (cnt[k] || 0) + 1; });
+            ts.innerHTML = '<option value="">— тип противника —</option>' + ENEMY_TYPES.filter(t => cnt[t[0]]).map(t => `<option value="${t[0]}">${t[1]} (${cnt[t[0]]})</option>`).join('');
+        }
+        const type = ts ? ts.value : '';
+        select.innerHTML = `<option value="">${type ? '— выбери противника —' : '— сначала выбери тип —'}</option>` +
+            window.enemiesData.map((e, i) => type && enemyTypeKey(e) === type ? `<option value="${i}">${escapeHtml(e.name)} (${e.hp} HP)</option>` : '').join('');
     }
+    window.populateEnemyDbSelect = populateEnemyDbSelect;
+    // Выбрать противника из базы по номеру (для тестов и быстрых вызовов): подставляет его тип и сам выбор.
+    window.gmSelectEnemyDb = function (idx) {
+        const e = window.enemiesData[idx], ts = el('enemy-type-select'); if (!e) return;
+        if (ts) { if (ts.options.length < 2) populateEnemyDbSelect(); ts.value = enemyTypeKey(e); }
+        populateEnemyDbSelect(); el('enemy-db-select').value = String(idx); window.onEnemyDbPicked();
+    };
+    window.onEnemyTypePicked = function () { populateEnemyDbSelect(); currentEnemyDbPick = null; const inf = el('enemy-db-info'); if (inf) inf.innerHTML = ''; };
 
     window.onEnemyDbPicked = function () {
         const idx = el('enemy-db-select').value;

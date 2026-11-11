@@ -1,1 +1,0 @@
-Спрайты мебели поместья: img/estate/furn/<тип>.webp (128x128). Сделаны на ПК через batch.ps1 (Stable Horde), промпты вида «top down view of <описание>, hand painted fantasy game sprite». Список готовых — SPR_READY в estate.js.

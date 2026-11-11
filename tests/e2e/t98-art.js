@@ -19,8 +19,7 @@ const { setupSession, wait } = require('./setup');
   const pl = players[0];
   await gm.evaluate(async () => {
     for (const nm of ['Бандит', 'Фалмер (шаман)', 'Волк']) {
-      const idx = window.enemiesData.findIndex(e => e.name === nm); const sel = document.getElementById('enemy-db-select');
-      if (sel.options.length < 2) populateEnemyDbSelect(); sel.value = String(idx); window.onEnemyDbPicked(); window.addEnemy();
+      const idx = window.enemiesData.findIndex(e => e.name === nm); window.gmSelectEnemyDb(idx); window.addEnemy();
     }
   });
   await wait(2000);

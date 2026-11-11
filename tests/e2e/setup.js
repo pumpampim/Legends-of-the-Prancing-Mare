@@ -45,9 +45,7 @@ module.exports = { setupSession, sheet, wait };
 async function gmAddEnemy(gm, name, overrides) {
   return gm.evaluate(async ([name, ov]) => {
     const idx = window.enemiesData.findIndex(e => e.name === name);
-    const sel = document.getElementById('enemy-db-select');
-    if (!sel.options.length || sel.options.length < 2) { try { populateEnemyDbSelect(); } catch (e) {} }
-    sel.value = String(idx); window.onEnemyDbPicked();
+    window.gmSelectEnemyDb(idx);
     if (ov) for (const k in ov) { const el = document.getElementById(k); if (el) el.value = ov[k]; }
     window.addEnemy();
     await new Promise(r => setTimeout(r, 600));

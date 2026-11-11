@@ -85,7 +85,7 @@ window.ESTATE_PLANS = (function () {
         box(p, 1, S.x0, S.y0, S.x1, S.y1, true);
         for (let x = S.x0; x <= S.x1; x++) for (let y = S.y0; y <= S.y1; y++) p.unroof.push(key(x, y));
         [[8, 12], [21, 12], [8, 16], [21, 16], [12, 8], [17, 8]].forEach(q => piece(p, 1, q[0], q[1], 'window'));
-        furn(p, 0, 18, 17, 'stairup'); furn(p, 1, 18, 17, 'stairdown'); furn(p, 1, 10, 17, 'stairup');
+        furn(p, 0, 18, 17, 'stairup'); furn(p, 1, 18, 17, 'stairdown');
         box(p, -1, S.x0 + 1, S.y0 + 1, S.x1 - 1, S.y1 - 1, false);
         furn(p, 0, 10, 15, 'stairdown'); furn(p, -1, 10, 15, 'stairup'); furn(p, -1, 12, 12, 'lamp');
         return p;
