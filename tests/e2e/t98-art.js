@@ -32,6 +32,11 @@ const { setupSession, wait } = require('./setup');
   if (av.length < 3) console.log('FAIL мало аватаров у мастера');
   av.forEach(a => { if (!/^img\/enemies\/[a-z-]+\.webp$/.test(a.src) || !a.w) console.log('FAIL аватар не картинка: ' + JSON.stringify(a)); });
   if (!av.some(a => a.src === 'img/enemies/falmer-shaman.webp')) console.log('FAIL фалмер-шаман не нашёлся');
+  { // у игрока список «Противники» показывает те же рисованные аватары, а не SVG-лица
+    const pav = await pl.evaluate(async () => { const imgs = [...document.querySelectorAll('#enemies-list img')]; await Promise.all(imgs.map(i => i.decode().catch(() => {}))); return imgs.map(i => i.getAttribute('src').slice(0, 30)); });
+    console.log('player avatars', JSON.stringify(pav));
+    if (!pav.length || pav.some(x => !/^img\/enemies\//.test(x))) console.log('FAIL у игрока в списке врагов не рисованные аватары');
+  }
 
   await pl.setViewportSize({ width: 390, height: 800 }); await wait(800);
   const bag = await pl.evaluate(async () => {
