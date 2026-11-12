@@ -505,6 +505,7 @@
                     // Урон игрока (итоговый урон оружия) — подпись над фигурой на боевой сетке мастера
                     { const dEl = el('main-panel-dmg'); patch['participants.' + currentUser.uid + '.dmg'] = dEl ? (parseInt(dEl.value) || 0) : 0; }
                     { const sEl = el('val-speed'); patch['participants.' + currentUser.uid + '.speed'] = sEl ? (parseInt(sEl.value) || 0) : 30; } // скорость — лимит перемещения на сетке
+                    { const aEl = el('armor-total'); const ar = aEl ? (parseInt(aEl.innerText) || 0) : 0; patch['participants.' + currentUser.uid + '.armor'] = ar; patch['participants.' + currentUser.uid + '.physRes'] = Math.max(0, Math.min(85, Math.round(ar / 10))); } // броня и физ. сопротивление — для оценки сложности боя у мастера
                     { const lEl = el('char-level'); patch['participants.' + currentUser.uid + '.level'] = lEl ? (parseInt(lEl.value) || 1) : 1; } // уровень — мастеру для рангов врагов и сложности боя
                     { // розыск по владениям — мастер видит, когда отряд входит туда, где кого-то ищут
                         const cs = typeof window.stGetCrimeState === 'function' ? window.stGetCrimeState() : null;

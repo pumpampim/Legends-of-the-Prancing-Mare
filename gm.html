@@ -403,6 +403,30 @@
                 <div id="gm-traps-list"></div>
             </div>
 
+            <div class="panel" data-gm-tab="combat" id="gm-round-panel">
+                <h2>🎯 Сводка круга</h2>
+                <p style="font-size:12px; opacity:.75; margin:0 0 6px;">Все участники боя в одном списке: ОЗ, статусы, расстояние, оценка сложности и напоминания о часах событий.</p>
+                <div id="gm-round-summary"></div>
+            </div>
+
+            <div class="panel" data-gm-tab="combat" id="gm-cheat-panel">
+                <details>
+                    <summary style="cursor:pointer; font-weight:bold; font-size:16px;">📘 Шпаргалка мастера</summary>
+                    <div style="font-size:13px; line-height:1.45; margin-top:8px;">
+                        <b>Сложность (СЛ):</b> лёгкое 9 · среднее 12 · трудное 15 · очень трудное 17. Замки: новичок 9, ученик 12, адепт 15, эксперт 17 (штраф 2/3/4/5 за ступень разницы).<br>
+                        <b>Бой:</b> 1d20 + мод. героя против 1d20 за врага — кто выше. Силовая атака ×1,5, −1 к кубам, раз в 2 хода. Кинжал +1; двуручные мечи −2, секиры −3, молоты −4, посох −3. Блок не щитом −3. Удар щитом после блока — ½ брони щита.<br>
+                        <b>Дальность:</b> клетка 5 фт. Стрелы до 30 фт без помехи, дальше −1 за клетку (макс. 80); болты до 80 фт; заклинания: −1 за 2 клетки дальше 60 фт. Метательное: нож/топор/дротик до 30 фт (макс. 50), копьё до 20 (макс. 40).<br>
+                        <b>Защита:</b> 10 очков брони = 1% физ. сопротивления. Тяжёлая броня −10 фт скорости, лёгкая −5. Мороз: −10/−15 фт.<br>
+                        <b>Голод:</b> −2 ко всем броскам за каждый день без еды. Тюрьма: только отдых, голод не растёт.<br>
+                        <b>Статусы врагов:</b> страх/бегство/оглушение — не атакует · паралич — беспомощен, любая атака попадает · потеря равновесия −2 · ошеломление −3 · ослабление −2 · шатается: следующая атака с преимуществом · ярость: бьёт всех.<br>
+                        <b>Ранги врагов:</b> ветеран ×1,5 ОЗ ×1,25 урон (от 15 ур.) · элита ×2,5/×1,5 (от 30) · легенда ×4/×2,5 (от 45).<br>
+                        <b>Погода:</b> дождь −2 дальний бой, +2 скрытность · гроза −4 дальний · снег −5 фт · метель −10 фт, −4 дальний · туман +4 скрытность, −4 дальний.<br>
+                        <b>Карманные кражи:</b> мелочь 9 · кошелёк 12 · ценная вещь/ключ 15 · дорогая 17 · надетое оружие 19; −5 если не скрыт; провал 1–4 — жертва начеку, 5+ — поймали.<br>
+                        <b>Штрафы:</b> от 1000 септимов в одном владении стража нападает. <b>Культист:</b> подношение раз в 2 недели. <b>Паладин:</b> круг 5 кругов в день, 10 фт.
+                    </div>
+                </details>
+            </div>
+
             <div class="panel" data-gm-tab="combat">
                 <h2><span class="skyrim-icon icon-arrow" aria-hidden="true"></span> Порядок ходов</h2>
                 <p style="font-size:12px; opacity:.75;">Своя система, без броска инициативы — расставляешь порядок сам, из игроков/врагов/существ (призванных и поднятых игроками) или вручную по имени.</p>
@@ -698,7 +722,7 @@
     <h2>📦 База предметов</h2>
     <p style="font-size:12px; opacity:.8; margin:0 0 8px;">Писать в базу предметов могут только мастера из списка в консоли Firebase (документ config/gms, поле uids). Ваш UID: <code id="gm-my-uid" style="user-select:all;">—</code></p>
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-        <input type="text" id="gm-item-search" placeholder="Поиск по названию..." style="flex:1; min-width:150px;" oninput="filterGmItems()">
+        <input type="text" id="gm-item-search" placeholder="Поиск по названию или свойству…" style="flex:1; min-width:150px;" oninput="filterGmItems()">
         <select id="gm-item-category" onchange="filterGmItems()">
             <option value="all">Все категории</option>
         </select>
@@ -712,6 +736,7 @@
                 <tr>
                     <th>Название</th>
                     <th>Категория</th>
+                    <th>Характеристики</th>
                     <th>Вес</th>
                     <th>Цена</th>
                     <th>Действие</th>
@@ -907,6 +932,17 @@
             <div id="recipe-checklist" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; padding:6px;">
                 <p style="opacity:.6; font-size:14px;">Выбери игрока в панели «Инвентарь» ниже.</p>
             </div>
+        </div>
+
+        <!-- ===== ДОСЬЕ ГЕРОЯ ===== -->
+        <div class="panel" data-gm-tab="rewards" id="gm-dossier-panel">
+            <h2>📇 Досье героя</h2>
+            <p style="font-size:12px; opacity:.75; margin:0 0 6px;">Вся картина по герою в одной карточке: происхождение, вера, ветви, навыки, защита, розыск, задания, дневник.</p>
+            <div style="display:flex; gap:6px;">
+                <select id="gm-dossier-select" style="flex:1; margin:0;" onchange="gmDossierLoad()"></select>
+                <button type="button" style="width:auto; margin:0;" onclick="gmDossierLoad()">↻</button>
+            </div>
+            <div id="gm-dossier-body" style="margin-top:8px;"></div>
         </div>
 
         <!-- ===== ИНВЕНТАРЬ И ДЕНЬГИ ИГРОКОВ ===== -->
@@ -1249,6 +1285,17 @@
                 <select id="gm-plot-status" style="width:auto; margin:0;"><option value="active">идёт</option><option value="done">закрыт</option><option value="failed">провален</option></select>
                 <button type="button" style="width:auto; margin:0;" onclick="gmPlotAdd()">+ Узел</button>
             </div>
+            <div id="gm-clocks-box" style="margin-top:12px; border-top:1px solid var(--border-color); padding-top:8px;">
+                <label>⏳ Часы событий <span style="font-weight:normal; opacity:.7;">(сегодня — день партии <span id="gm-clocks-day">0</span>)</span></label>
+                <p style="font-size:12px; opacity:.7; margin:2px 0 6px;">Что случится, если герои бездействуют. Считаются в днях партии (кнопки «Следующий день» двигают их). Сработавшие часы всплывают в «Сводке круга».</p>
+                <div id="gm-clocks-list"></div>
+                <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                    <input type="text" id="gm-clock-title" placeholder="Событие: набег на деревню" style="flex:2; min-width:140px; margin:0;">
+                    <input type="number" id="gm-clock-days" value="3" min="0" style="width:64px; margin:0;" title="Через сколько дней партии">
+                    <input type="text" id="gm-clock-effect" placeholder="Что случится" style="flex:2; min-width:140px; margin:0;">
+                    <button type="button" style="width:auto; margin:0;" onclick="gmClockAdd()">+ Часы</button>
+                </div>
+            </div>
         </div>
 
         <!-- ===== ЗАПРОСЫ НА КРАФТ (эпик 2.8) ===== -->
@@ -1391,7 +1438,7 @@
 
 <script src="firebase-config.js?v=afb8108c"></script>
 <script src="js/gm-errors.js?v=61aa0b9e"></script>
-<script src="enemy-ranks.js?v=218aac8a"></script>
+<script src="enemy-ranks.js?v=f00ae2fd"></script>
 <script src="crime-core.js?v=600867f0"></script>
 <script src="items-data.js?v=65f8888c"></script>
 <script src="smithing-data.js?v=91b3a24a"></script>
@@ -1424,7 +1471,7 @@
 <script src="enemy-loot.js?v=519a3728"></script>
 <script src="grid-core.js?v=f68b550b"></script>
 <script defer src="dungeon-presets-data.js?v=7ad2b40a"></script>
-<script src="gm.js?v=ee28871e"></script>
+<script src="gm.js?v=b126e88b"></script>
 <script src="js/17-icons.js?v=154e0c04"></script>
 <script src="js/gm-mobile.js?v=96805317"></script>
 <script src="gm-grid.js?v=648511df"></script>

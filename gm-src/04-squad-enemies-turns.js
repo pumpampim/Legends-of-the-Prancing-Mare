@@ -526,7 +526,7 @@
         const out = [];
         Object.values(lastData.participants || {}).forEach(p => {
             if (!p) return;
-            out.push({ curHp: p.curHp, maxHp: p.maxHp, dmg: p.dmg, level: p.level });
+            out.push({ curHp: p.fallen ? 0 : p.curHp, maxHp: p.maxHp, dmg: p.dmg, level: p.level, physRes: p.physRes });
             (p.summons || []).forEach(s => out.push({ curHp: s.curHp, maxHp: s.maxHp, dmg: s.dmg }));
         });
         return out;
@@ -545,7 +545,8 @@
         if (!box || !window.EnemyRanks) return;
         const d = window.EnemyRanks.difficulty(gmPartyForDifficulty(), lastData.enemies || []);
         box.innerHTML = d ? gmDifficultyLine(d, '⚖️ Сложность боя: ') +
-            '<div style="font-size:11px; opacity:.55;">Грубая прикидка по ОЗ и урону, без попаданий, брони и заклинаний игроков.</div>' : '';
+            '<div style="font-size:11px; opacity:.7;">Учтены физическое сопротивление врагов (' + d.enRes + '%)' + (d.pcResKnown ? ' и героев (' + d.pcRes + '%)' : ', броня героев пока неизвестна') + '. Заклинания игроков и промахи не считаются.</div>' +
+            (d.advice ? '<div style="font-size:12px; color:' + d.level.color + ';">' + d.advice + '</div>' : '') : '';
         gmRankPreview();
     }
     window.gmRankPreview = function () {

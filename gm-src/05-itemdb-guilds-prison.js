@@ -53,7 +53,7 @@
                 if (typeof window.allItems !== 'undefined') {
                     gmAllItems = window.allItems.map(item => ({ ...item, id: item.name }));
                 } else {
-                    document.getElementById('gm-items-table-body').innerHTML = '<tr><td colspan="5">Нет данных. Убедись, что items-data.js подключён и нажми «Импорт».</td></tr>';
+                    document.getElementById('gm-items-table-body').innerHTML = '<tr><td colspan="6">Нет данных. Убедись, что items-data.js подключён и нажми «Импорт».</td></tr>';
                     return;
                 }
             }
@@ -85,13 +85,50 @@
         }).catch(e => console.error('Ошибка загрузки предметов для мастера:', e));
     };
 
+    // Короткое описание характеристик вещи для таблицы мастера: урон, броня, свойства ингредиентов, чары, эффекты зелий.
+    function gmItemStatParts(item) {
+        const parts = [];
+        const dmg = typeof item.dmg === 'number' ? item.dmg : (typeof item.damage === 'number' ? item.damage : null);
+        if (dmg !== null) parts.push('⚔ урон ' + dmg + (item.thrown ? ' (метательное)' : ''));
+        if (typeof item.armor === 'number' && item.armor > 0) parts.push('🛡 броня ' + item.armor);
+        if (item.armorType) parts.push(String(item.armorType));
+        if (item.weaponType) parts.push(String(item.weaponType));
+        if (item.material) parts.push('материал: ' + item.material);
+        if (typeof item.sheathArmor === 'number') parts.push('+' + item.sheathArmor + ' брони ножнами');
+        if (typeof item.capacity === 'number') parts.push('вмещает ' + item.capacity);
+        if (typeof item.carryBonus === 'number') parts.push('+' + item.carryBonus + ' к грузу');
+        if (item.charges) parts.push('зарядов: ' + item.charges);
+        if (item.maxUses) parts.push('использований: ' + item.maxUses);
+        const ing = window.alchemyIngredients && window.alchemyIngredients[item.name];
+        if (ing && Array.isArray(ing.effects)) parts.push('🧪 свойства: ' + ing.effects.join(' · '));
+        if (Array.isArray(item.alchemyEffects) && item.alchemyEffects.length) {
+            parts.push('🧪 ' + item.alchemyEffects.map(e => e ? ((e.name || e.effectName || '') + (e.magnitude ? ' ' + e.magnitude + (e.unit || '') : '') + (e.duration ? ' на ' + e.duration + ' ход.' : '')) : '').filter(Boolean).join(' · '));
+        }
+        if (item.enchantment) {
+            const en = item.enchantment;
+            const nm = en.name || en.description || 'зачарование';
+            parts.push('✨ ' + nm + (en.value !== undefined && en.value !== null && en.value !== '' ? ' ' + en.value + (en.unit ? ' ' + en.unit : '') : ''));
+        }
+        return parts;
+    }
+    function gmItemStatsText(item) {
+        const parts = gmItemStatParts(item);
+        const eff = item.effect && !parts.some(p => item.effect.indexOf(p) !== -1) ? String(item.effect) : '';
+        return { parts, eff };
+    }
+    window.gmItemStatsText = gmItemStatsText;
+
     window.filterGmItems = function() {
         const search = document.getElementById('gm-item-search').value.toLowerCase().trim();
         const category = document.getElementById('gm-item-category').value;
         gmFilteredItems = gmAllItems.filter(item => {
-            const matchName = item.name.toLowerCase().includes(search);
             const matchCat = category === 'all' || item.category === category;
-            return matchName && matchCat;
+            if (!matchCat) return false;
+            if (!search) return true;
+            if (item.name.toLowerCase().includes(search)) return true;
+            // поиск и по свойствам: «регенерация здоровья», «урон огнём», «горноцвет»
+            const st = gmItemStatsText(item);
+            return (st.parts.join(' ') + ' ' + st.eff).toLowerCase().includes(search);
         });
         window.renderGmItemsTable();
     };
@@ -101,17 +138,21 @@
         const countSpan = document.getElementById('gm-items-count');
         if (!tbody) return;
         if (!gmFilteredItems || gmFilteredItems.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#666;">Ничего не найдено</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#666;">Ничего не найдено</td></tr>';
             if (countSpan) countSpan.textContent = '0';
             return;
         }
         let html = '';
         gmFilteredItems.forEach(item => {
             const itemId = item.id || item.name;
+            const st = gmItemStatsText(item);
+            const statHtml = st.parts.map(p => '<div>' + escapeHtml(p) + '</div>').join('') +
+                (st.eff ? '<div style="opacity:.75; font-size:12px;" title="' + escapeHtml(st.eff) + '">' + escapeHtml(st.eff.length > 140 ? st.eff.slice(0, 139) + '…' : st.eff) + '</div>' : '');
             html += `
                 <tr>
                     <td>${escapeHtml(item.name)}</td>
                     <td>${escapeHtml(item.category || '-')}</td>
+                    <td class="gm-item-stats" style="font-size:12.5px; line-height:1.35;">${statHtml || '—'}</td>
                     <td>${item.weight || 0}</td>
                     <td>${item.price || 0}</td>
                     <td>

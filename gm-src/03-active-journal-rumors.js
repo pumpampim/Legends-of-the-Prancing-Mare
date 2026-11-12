@@ -760,6 +760,7 @@
         renderGmTimers();
         renderCraftOrderSelects();
         renderEnemies(lastData.enemies || []);
+        gmRoundDossierRefresh();
         renderTurnOrder(lastData.turnOrder || []);
         renderTurnOrderPickSelect();
         renderLog(lastData.combatLog || []);
