@@ -2523,3 +2523,17 @@ body.st-pc-cards #tab1 .vital-bar { background: none !important; border-color: r
 body.st-pc-cards #tab1 .vital-bar label[style] { color: #c9b074 !important; letter-spacing: .14em; }
 body.st-pc-cards #tab1 .day-controls, body.st-pc-cards #tab1 .turn-controls, body.st-pc-cards #tab1 .turn-round-box, body.st-pc-cards #tab1 .alert-box:not([style*="display:none"]) { background: none !important; border: 0; border-top: 1px solid rgba(233,230,221,.14); border-radius: 0; box-shadow: none; }
 body.st-pc-cards #tab1 .date-display { background: none; border: 0; border-bottom: 1px solid rgba(233,230,221,.28); border-radius: 0; color: #e9e6dd; }
+
+/* ===== «Новый вид» на ПК (проба, 2026-11-12): игровой интерфейс телефона по центру широкого экрана =====
+   Включается кнопкой «Новый вид (проба)» в строке аккаунта; класс body.st-newview ставит js/16-game-ui.js. По умолчанию выключен. */
+.st-newview-btn { margin: 0 6px; padding: 6px 12px; font-size: 13px; min-height: 0; }
+.st-set-sec .st-newview-btn { display: block; margin: 8px 0 0; }
+@media (max-width: 900px) { .st-newview-btn { display: none !important; } }
+body.st-newview .container { max-width: 1040px; margin-left: auto; margin-right: auto; }
+body.st-newview .st-tabbar { left: 50%; right: auto; width: min(760px, 100%); transform: translateX(-50%); border-radius: 14px 14px 0 0; border: 1px solid var(--border-bright, #8a6f3f); border-bottom: 0; }
+body.st-newview .st-combat-dock { left: 50%; right: auto; width: min(1040px, 100%); transform: translateX(-50%); }
+body.st-newview .st-tb { font-size: 14px; padding: 7px 0 5px; }
+body.st-newview .st-tb .st-tb-ico { width: 30px; height: 30px; }
+body.st-newview.st-game-ui.st-creating.st-tab1 .st-wiz-nav { left: 50%; right: auto; width: min(1000px, calc(100% - 16px)); transform: translateX(-50%); }
+.st-newview-btn { background: linear-gradient(180deg, #2b2418, #1a160f); border: 1px solid var(--border-bright, #8a6f3f); color: var(--text-bright, #f2e8cf); border-radius: 8px; cursor: pointer; text-transform: none; letter-spacing: .3px; clip-path: none; }
+body.st-newview .st-newview-btn-top { position: fixed; top: 8px; right: 12px; z-index: 8700; margin: 0; }

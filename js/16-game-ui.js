@@ -49,7 +49,17 @@
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
     var container = document.querySelector('.container');
-    var mqMobile = window.matchMedia('(max-width: 900px)');
+    // «Новый вид» на ПК (2026-11-12): тот же игровой интерфейс, что на телефоне, но по центру широкого экрана.
+    // Включается переключателем (localStorage skyrim_pc_newview), по умолчанию выключен. mqMobile.matches = телефон ИЛИ новый вид.
+    var mqRaw = window.matchMedia('(max-width: 900px)');
+    function newViewPref() { try { return localStorage.getItem('skyrim_pc_newview') === '1'; } catch (e) { return false; } }
+    var mqMobile = {
+        get matches() { return mqRaw.matches || newViewPref(); },
+        addEventListener: function (t, f) { mqRaw.addEventListener ? mqRaw.addEventListener(t, f) : mqRaw.addListener(f); },
+        addListener: function (f) { mqRaw.addListener ? mqRaw.addListener(f) : mqRaw.addEventListener('change', f); }
+    };
+    window.stWide = function () { return mqMobile.matches; };
+    document.body.classList.toggle('st-newview', !mqRaw.matches && newViewPref());
 
     // ---------- нижние вкладки ----------
     var bar = document.createElement('nav');
@@ -134,6 +144,26 @@
             else if (m.mark.parentNode && m.node.previousSibling !== m.mark) m.mark.parentNode.insertBefore(m.node, m.mark.nextSibling);
         });
     }
+    // Переключатель «Новый вид» (только ПК, ≥901px): кнопка в «Настройках» и в строке аккаунта.
+    window.stSetNewView = function (on) {
+        try { localStorage.setItem('skyrim_pc_newview', on ? '1' : '0'); } catch (e) { }
+        document.body.classList.toggle('st-newview', !!on && !mqRaw.matches);
+        try { applyLayout(); } catch (e) { }
+        if (window.stNavLayout) window.stNavLayout();
+        syncNewViewBtns();
+    };
+    function syncNewViewBtns() {
+        var on = newViewPref();
+        document.querySelectorAll('.st-newview-btn').forEach(function (b) { b.textContent = on ? 'Старый вид' : 'Новый вид (проба)'; b.title = on ? 'Вернуть прежний вид для компьютера' : 'Игровой вид, как на телефоне'; });
+    }
+    (function addNewViewBtns() {
+        var host = el('st-set-account');
+        function mk() { var b = document.createElement('button'); b.type = 'button'; b.className = 'st-newview-btn'; b.onclick = function () { window.stSetNewView(!newViewPref()); }; return b; }
+        if (host) host.appendChild(mk());
+        var csb = el('cloud-status-bar');
+        if (csb && csb.parentNode) { var b2 = mk(); b2.classList.add('st-newview-btn-top'); csb.parentNode.insertBefore(b2, csb.nextSibling); }
+        syncNewViewBtns();
+    })();
     function openSettings() { closeSheets(); settings.classList.add('open'); }
     window.stOpenSettings = openSettings;
     function closeSheets() { more.classList.remove('open'); settings.classList.remove('open'); var it = el('st-item-sheet'); if (it) { it.classList.remove('open'); it._id = null; } }

@@ -545,7 +545,7 @@
     <!-- Шрифты и Firebase SDK лежат на самом сайте (vendor/): на iPhone страница подолгу висела белой, пока ждала серверы шрифтов и SDK Google -->
     <link rel="stylesheet" href="vendor/fonts.css?v=8cf25e67">
 
-    <link rel="stylesheet" href="style.css?v=2b99b8d9">
+    <link rel="stylesheet" href="style.css?v=a95cb214">
 
     <!-- Firebase SDK (см. README-FIREBASE.md для настройки своего проекта) -->
     <script src="vendor/firebase/firebase-app-compat.js?v=6430f95a"></script>
@@ -2389,7 +2389,8 @@
         more: { title: 'Ещё', tabs: ['tab7', 'tab13', 'tab11', 'tab14', 'tab17'], hint: 'Профессии · Карта · Календарь · Дневник · Поместье' }
     };
     var mqMobile = window.matchMedia('(max-width: 900px)');
-    var GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS;
+    function wideNow() { if (window.stWide) return window.stWide(); try { if (localStorage.getItem('skyrim_pc_newview') === '1') return true; } catch (e) { } return mqMobile.matches; }
+    var GROUPS = wideNow() ? MOBILE_GROUPS : DESK_GROUPS;
     window.stNavGroups = GROUPS;
     var PILL = { tab1: 'Главная', tab2: 'Ветки перков', tab3: 'Бой', tab4: 'Заклинания', tab5: 'Инвентарь', tab15: 'Квесты', tab16: 'Ветки судьбы', tab6: 'Сессия', tab7: 'Профессии', tab10: 'Проверка', tab11: 'Календарь', tab12: 'Торговля', tab13: 'Карта', tab14: 'Дневник', tab17: 'Поместье' };
     var last = {}; try { last = JSON.parse(localStorage.getItem('skyrim_nav_last') || '{}') || {}; } catch (e) { }
@@ -2437,11 +2438,12 @@
         if (window.stGameUiSync) window.stGameUiSync(cur, tabId);
     };
     function onLayout() {
-        GROUPS = mqMobile.matches ? MOBILE_GROUPS : DESK_GROUPS; window.stNavGroups = GROUPS;
-        if (mqMobile.matches && hub.classList.contains('open')) window.stHubClose();
+        GROUPS = wideNow() ? MOBILE_GROUPS : DESK_GROUPS; window.stNavGroups = GROUPS;
+        if (wideNow() && hub.classList.contains('open')) window.stHubClose();
         window.stNavSync(curTab);
     }
     if (mqMobile.addEventListener) mqMobile.addEventListener('change', onLayout); else if (mqMobile.addListener) mqMobile.addListener(onLayout);
+    window.stNavLayout = onLayout;
     window.stNavLast = function (g) { return last[g] && GROUPS[g] && GROUPS[g].tabs.indexOf(last[g]) >= 0 ? last[g] : (GROUPS[g] ? GROUPS[g].tabs[0] : 'tab1'); };
     window.stNavHasDot = hasDot;
     var origOpenTab = window.openTab;
@@ -2483,7 +2485,7 @@
             if (foreignModalOpen()) return;
             var t = e.target, tag = t && t.tagName;
             if (open) { e.preventDefault(); window.stHubClose(); return; }
-            if (mqMobile.matches) return;
+            if (wideNow()) return;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
             e.preventDefault(); window.stHubOpen(); return;
         }
@@ -2509,7 +2511,7 @@
 <script src="estate-plans.js?v=4871052c"></script>
     <script src="estate.js?v=652e2f17"></script>
     <script src="art-data.js?v=c9b45ba1"></script>
-<script src="js/16-game-ui.js?v=765e881b"></script>
+<script src="js/16-game-ui.js?v=b9cec9a2"></script>
 <script src="js/17-icons.js?v=154e0c04"></script>
 <script src="js/18-hints.js?v=a119b399"></script>
 
