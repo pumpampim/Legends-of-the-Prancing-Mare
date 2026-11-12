@@ -318,7 +318,7 @@ const armorRecipes = [
         ingredients: [{ name: "Стальной слиток", qty: 2 }, { name: "Железный слиток", qty: 1 }, { name: "Корундовый слиток", qty: 1 }, { name: "Полоски кожи", qty: 2 }]
     },
     {
-        name: "Древне норские наручи", armorType: "Тяжелая броня", slot: "Наручи и перчатки",
+        name: "Древне нордские наручи", armorType: "Тяжелая броня", slot: "Наручи и перчатки",
         resistance: 17, weight: 4, price: 25, upgradeMaterial: "Железный слиток",
         perkHint: "Стальные доспехи",
         ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Железный слиток", qty: 2 }, { name: "Кожа", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
@@ -1209,68 +1209,69 @@ const weaponRecipes = [
         ingredients: [{ name: "Сталгрим", qty: 3 }]
     },
     // Кастеты — из исходника "Броня,одеяния,оружие" (колонка F, до этого не были перенесены
-    // в систему вообще). В системе не куются (в исходнике поле "Рецепт" пустое у всех) —
-    // только лут/покупка/квест, ingredients: [] намеренно. Урон снижен на 2 от значений
+    // в систему вообще). Состав (2026-11-12, по просьбе автора) — «симбиоз перчаток и мечей»: материалы перчаток того же
+    // материала + материалы одноручного меча (у ламеллярных и пластинчатых своего меча нет — стальной; сыромятные —
+    // перчатки + полоска кожи; меховые — только кожа). Урон снижен на 2 от значений
     // исходника по прямой просьбе (было: 9/10/13/14/15/14/16/13/18/19/17/20).
     {
         name: "Меховые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 9, weight: 3.0, price: 5, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: null, ingredients: []
+        yieldCount: 1, perkHint: null, ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Кожа", qty: 2 }]
     },
     {
         name: "Сыромятные боевые наручи", category: "Кастеты", subcat: "Кастеты",
         damage: 11, weight: 3.0, price: 10, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: null, ingredients: []
+        yieldCount: 1, perkHint: null, ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Кожа", qty: 1 }]
     },
     {
         name: "Железные боевые наручи", category: "Кастеты", subcat: "Кастеты",
         damage: 16, weight: 4.0, price: 25, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: null, ingredients: []
+        yieldCount: 1, perkHint: null, ingredients: [{ name: "Полоски кожи", qty: 3 }, { name: "Железный слиток", qty: 4 }]
     },
     {
         name: "Стальные боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 19, weight: 4.0, price: 65, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стальные доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Стальные доспехи", ingredients: [{ name: "Стальной слиток", qty: 4 }, { name: "Железный слиток", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Ламеллярные боевые наручи", category: "Кастеты", subcat: "Кастеты",
         damage: 19, weight: 4.0, price: 75, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: [{ name: "Стальной слиток", qty: 3 }, { name: "Корундовый слиток", qty: 1 }, { name: "Кожа", qty: 1 }, { name: "Полоски кожи", qty: 3 }, { name: "Железный слиток", qty: 1 }]
     },
     {
         name: "Пластинчатые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 20, weight: 4.0, price: 150, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: [{ name: "Стальной слиток", qty: 4 }, { name: "Железный слиток", qty: 2 }, { name: "Корундовый слиток", qty: 1 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Эльфийские боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 16, weight: 3.0, price: 50, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Эльфийские доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Эльфийские доспехи", ingredients: [{ name: "Лунный камень", qty: 2 }, { name: "Полоски кожи", qty: 3 }, { name: "Кожа", qty: 1 }, { name: "Железный слиток", qty: 2 }, { name: "Ртутный слиток", qty: 1 }]
     },
     {
         name: "Двемерские боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 22, weight: 6.0, price: 95, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Двемерские доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Двемерские доспехи", ingredients: [{ name: "Двемерский слиток", qty: 2 }, { name: "Железный слиток", qty: 2 }, { name: "Стальной слиток", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Орочьи боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 26, weight: 4.0, price: 204, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Орочьи доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Орочьи доспехи", ingredients: [{ name: "Орихалковый слиток", qty: 4 }, { name: "Железный слиток", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Стеклянные боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 23, weight: 4.0, price: 212, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Стеклянные доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Стеклянные доспехи", ingredients: [{ name: "Малахитовый слиток", qty: 2 }, { name: "Лунный камень", qty: 2 }, { name: "Полоски кожи", qty: 3 }]
     },
     {
         name: "Нордские боевые рукавицы", category: "Кастеты", subcat: "Кастеты",
         damage: 27, weight: 4.0, price: 245, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: []
+        yieldCount: 1, perkHint: "Сложные типы брони", ingredients: [{ name: "Полоски кожи", qty: 2 }, { name: "Стальной слиток", qty: 5 }, { name: "Эбонитовый слиток", qty: 1 }, { name: "Ртутный слиток", qty: 2 }, { name: "Кожа", qty: 1 }]
     },
     {
         name: "Эбонитовые боевые перчатки", category: "Кастеты", subcat: "Кастеты",
         damage: 28, weight: 4.0, price: 308, slot: 'melee', isAmmo: false,
-        yieldCount: 1, perkHint: "Эбонитовые доспехи", ingredients: []
+        yieldCount: 1, perkHint: "Эбонитовые доспехи", ingredients: [{ name: "Эбонитовый слиток", qty: 5 }, { name: "Полоски кожи", qty: 3 }]
     }
 ];
 window.weaponRecipes = weaponRecipes;

@@ -23,7 +23,9 @@ const S = require('./setup');
   const panel = await gm.evaluate(() => document.getElementById('crime-panel-body').textContent);
   check(/награда за голову/.test(panel), 'мастер видит награду за голову');
   // оплата Вайтрана
-  await gm.evaluate(() => clearFine('Вайтран')); await wait(1000);
+  await gm.evaluate(() => clearFine('Вайтран'));
+  for (let i = 0; i < 30 && ((H.store[ck].doc.crimeState || {}).bounties || {})['Вайтран']; i++) await wait(200); // ждём запись, а не фиксированную секунду: под нагрузкой сценарий мигал
+  await wait(300);
   cs = H.store[ck].doc.crimeState;
   check(!cs.bounties['Вайтран'] && H.store[ck].doc.gold === 0 && cs.bounties['Рифт'], 'оплата закрыла только Вайтран, золото 500 → 0');
   // тюрьма за Рифт

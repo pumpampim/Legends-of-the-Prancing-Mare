@@ -137,7 +137,7 @@ const recipes = [
         effect: "+20 к брони на 75 ходов"
     },
     {
-        name: "Эльсвейрcкое фондю",
+        name: "Эльсвейрское фондю",
         weight: 0.5,
         price: 25,
         needsWater: false,

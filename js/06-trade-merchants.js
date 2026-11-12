@@ -1000,6 +1000,8 @@
             let statLine;
             if (r.hasOwnProperty('damage')) {
                 statLine = (r.thrown ? 'Бросок (бонусное действие). ' : '') + `Урон: ${StBonuses.shownWeaponDmg(r.damage, r)} · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}` + (r.yieldCount > 1 ? ` · Выход: ${r.yieldCount} шт.` : '');
+            } else if (r.sheathKind) {
+                statLine = `Ножны · Вес: ${r.weight} · Цена: ${formatNumber(r.price)}`;
             } else if (r.slot === 'jewelry') {
                 statLine = r.yieldCount ? `Выход: ${r.yieldCount} шт.` : 'Ювелирное изделие';
             } else {
