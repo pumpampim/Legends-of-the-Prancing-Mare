@@ -38,6 +38,7 @@
                     <button style="font-size:11px; padding:1px 5px;" title="Воскресить (после квеста божества или по решению мастера)" onclick="gmDeathCmd('${uid}','revive')">✨ Воскресить</button>
                     <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',1)">+❤</button>
                     <button style="font-size:11px; padding:1px 5px;" onclick="gmDeathCmd('${uid}','addLives',-1)">−❤</button>
+                    <button style="font-size:11px; padding:1px 5px;" title="Бумажный лист героя A4 с текущими цифрами — выдать игроку без компьютера" onclick="gmPrintSheet('${uid}')">🖨 Лист</button>
                     <button class="btn-danger" style="font-size:11px; padding:1px 5px; margin-left:auto;" title="Выгнать игрока из этой сессии (персонаж не удаляется)" onclick="gmKickPlayer('${uid}')">🚪 Выгнать</button>
                 </div>
                 ${(p.summons || []).map(s => {
@@ -68,6 +69,17 @@
         // Запоздавшая запись старой вкладки или очередь команд мастера могла заново создать запись игрока — не показываем её.
         Object.keys(kicked).forEach(uid => { delete parts[uid]; });
     }
+
+    // Печать заполненного листа героя (sheet-print.js). Вкладку открываем сразу по клику, иначе браузер заблокирует всплывающее окно после чтения из облака.
+    window.gmPrintSheet = function (uid) {
+        if (!window.StSheetPrint) { alert('Модуль печати листа не загрузился — обновите страницу.'); return; }
+        const w = window.StSheetPrint.openPending();
+        if (!w) return;
+        db.collection('characters').doc(uid).get().then(doc => {
+            if (!doc.exists) { try { w.close(); } catch (e) { } alert('Лист этого игрока не найден в облаке.'); return; }
+            window.StSheetPrint.open(doc.data(), w);
+        }).catch(e => { try { w.close(); } catch (er) { } alert('Не удалось прочитать лист: ' + e.message); });
+    };
 
     window.gmKickPlayer = function (uid) {
         const p = ((lastData && lastData.participants) || {})[uid];
@@ -358,8 +370,14 @@
             ts.innerHTML = '<option value="">— тип противника —</option>' + ENEMY_TYPES.filter(t => cnt[t[0]]).map(t => `<option value="${t[0]}">${t[1]} (${cnt[t[0]]})</option>`).join('');
         }
         const type = ts ? ts.value : '';
-        select.innerHTML = `<option value="">${type ? '— выбери противника —' : '— сначала выбери тип —'}</option>` +
-            window.enemiesData.map((e, i) => type && enemyTypeKey(e) === type ? `<option value="${i}">${escapeHtml(e.name)} (${e.hp} HP)</option>` : '').join('');
+        const opt = (e, i) => `<option value="${i}">${escapeHtml(e.name)} (${e.hp} HP)</option>`;
+        // Тип не выбран (или выпадашки типов нет — старая страница из кэша) — весь список по группам, а не пустой выбор.
+        select.innerHTML = type
+            ? '<option value="">— выбери противника —</option>' + window.enemiesData.map((e, i) => enemyTypeKey(e) === type ? opt(e, i) : '').join('')
+            : '<option value="">— выбери противника (или сначала тип) —</option>' + ENEMY_TYPES.map(t => {
+                const items = window.enemiesData.map((e, i) => enemyTypeKey(e) === t[0] ? opt(e, i) : '').join('');
+                return items ? `<optgroup label="${escapeHtml(t[1])}">${items}</optgroup>` : '';
+            }).join('');
     }
     window.populateEnemyDbSelect = populateEnemyDbSelect;
     // Выбрать противника из базы по номеру (для тестов и быстрых вызовов): подставляет его тип и сам выбор.

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Лист героя — Легенды Гарцующей Кобылы</title>
+<!-- Бумажный лист героя: открывается кнопкой «Распечатать лист» (игрок) или «🖨 Лист» (мастер). Данные берёт у открывшей вкладки. -->
+<link rel="stylesheet" href="vendor/fonts.css?v=8cf25e67">
+<link rel="stylesheet" href="sheet-print.css?v=f2b4d19f">
+</head>
+<body>
+<div class="sp-bar"><button onclick="window.print()">🖨 Печать / PDF</button><span>A4, поля «Нет», масштаб 100 %, включите «Фоновые рисунки». Можно печатать с двух сторон.</span></div>
+<div id="sp-root"><p style="font-size:16px;padding:24px;text-align:center">Загружаю лист героя…</p></div>
+<script src="sheet-print.js?v=dd89c917"></script>
+<script>
+(function () {
+    var done = false;
+    window.stSheetRender = function (H) { if (done || H === null || H === undefined) return; done = true; StSheetPrint.renderPage(H); };
+    function fromOpener() { try { return window.opener && window.opener.__stSheetPrintH; } catch (e) { return null; } }
+    var H = fromOpener();
+    if (H) { stSheetRender(H); return; }
+    // мастер: лист ещё читается из облака — ждём; обновили вкладку — берём последний показанный
+    var tries = 0, t = setInterval(function () {
+        var h = fromOpener();
+        if (h || done) { clearInterval(t); stSheetRender(h); return; }
+        if (++tries > 40) {
+            clearInterval(t);
+            var cached = null; try { cached = JSON.parse(sessionStorage.getItem('st_sheet_print') || 'null'); } catch (e) { }
+            if (cached) stSheetRender(cached);
+            else document.getElementById('sp-root').innerHTML = '<p style="font-size:16px;padding:24px;text-align:center">Лист не получен. Закройте вкладку и нажмите «Распечатать лист» ещё раз — или распечатайте пустой бланк: <a href="#" onclick="stSheetRender(false);return false">пустой бланк</a></p>';
+        }
+    }, 250);
+})();
+</script>
+</body>
+</html>

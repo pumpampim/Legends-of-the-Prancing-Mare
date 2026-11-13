@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Версии подключений (?v=...) в HTML считаются сами: это первые 8 символов SHA-1 файла.
 // Файл изменился — версия изменилась, у игроков не остаётся старый кэш. Вручную версии больше не вести.
-//   node tools/bump-versions.js          — обновить версии в index.html, gm.html, holds.html, test.html
+//   node tools/bump-versions.js          — обновить версии в index.html, gm.html, holds.html, test.html, sheet-print.html
 //   node tools/bump-versions.js --check  — только проверить (для CI), выйти с кодом 1, если что-то устарело
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const root = path.join(__dirname, '..');
-const pages = ['index.html', 'gm.html', 'holds.html', 'test.html'];
+const pages = ['index.html', 'gm.html', 'holds.html', 'test.html', 'sheet-print.html'];
 const check = process.argv.includes('--check');
 const cache = {};
 function hashOf(rel) {

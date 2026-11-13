@@ -134,7 +134,7 @@
         Array.prototype.slice.call(dc.children).forEach(function (c) {
             var oc = (c.getAttribute && c.getAttribute('onclick')) || '';
             if (/resetData\(/.test(oc)) moved.push({ node: c, to: 'st-set-danger' });
-            else if (/exportCharacterToFile|driveSaveCharacter|driveListCharacters|stToggleSnapshots/.test(oc) || c.id === 'st-snapshot-list' || c.id === 'drive-files-list' || (c.tagName === 'LABEL' && c.querySelector('input[type=file]'))) moved.push({ node: c, to: 'st-set-save' });
+            else if (/exportCharacterToFile|stPrintSheet|driveSaveCharacter|driveListCharacters|stToggleSnapshots/.test(oc) || c.id === 'st-snapshot-list' || c.id === 'drive-files-list' || (c.tagName === 'LABEL' && c.querySelector('input[type=file]'))) moved.push({ node: c, to: 'st-set-save' });
         });
         moved.forEach(function (m) { m.mark = document.createComment('st-settings'); m.node.parentNode.insertBefore(m.mark, m.node); });
     })();

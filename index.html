@@ -561,6 +561,7 @@
     <script src="lich-data.js?v=bfcd25f3"></script>
     <script src="paladin-data.js?v=b222d9b4"></script>
     <script src="cultist-data.js?v=669827cb"></script>
+    <script src="sheet-print.js?v=dd89c917"></script>
     <script src="alchemy-data.js?v=9a89a3da"></script>
     <script src="fish-data.js?v=32312443"></script>
     <script src="hunt-data.js?v=ce3ed3ba"></script>
@@ -929,6 +930,7 @@
                 <button class="btn btn-success" style="width:auto; margin:0; padding:6px 14px;" onclick="nextDay()" title="Новый день = длительный отдых: мана и Мудрость на свитки восстанавливаются, здоровье — полностью только при использовании «Лечебной припарки»">⏭️ Следующий день (длительный отдых)</button>
                 <button class="btn btn-danger" style="width:auto; margin:0; padding:6px 14px;" onclick="resetData()">🗑️ Сброс персонажа</button>
                 <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="exportCharacterToFile()" title="Скачать персонажа в файл — на случай если облако отвалится или пропадёт доступ к аккаунту">💾 Скачать в файл</button>
+                <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="stPrintSheet()" title="Бумажный лист героя A4 (5 страниц) — для игры без компьютера или телефона. В окне печати можно выбрать «Сохранить как PDF»">🖨 Распечатать лист</button>
                 <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="driveSaveCharacter()" title="Копия персонажа в твой Google Drive (нужен вход через Google)">📁 Сохранить в Drive</button>
                 <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="driveListCharacters()" title="Список копий skyrim_ttrpg_* в Drive">📂 Загрузить из Drive</button>
                 <button class="btn" style="width:auto; margin:0; padding:6px 14px;" onclick="stToggleSnapshots()" title="Копии персонажа, которые сайт делает сам раз в час (последние 5)">🕘 Восстановить из снапшота</button>
@@ -2511,7 +2513,7 @@
 <script src="estate-plans.js?v=4871052c"></script>
     <script src="estate.js?v=652e2f17"></script>
     <script src="art-data.js?v=c9b45ba1"></script>
-<script src="js/16-game-ui.js?v=b9cec9a2"></script>
+<script src="js/16-game-ui.js?v=3c0da7a5"></script>
 <script src="js/17-icons.js?v=154e0c04"></script>
 <script src="js/18-hints.js?v=a119b399"></script>
 

@@ -6,7 +6,7 @@ const S = require('./setup');
   const r = await gm.evaluate(() => {
     populateEnemyDbSelect();
     const ts = document.getElementById('enemy-type-select'), db = document.getElementById('enemy-db-select');
-    const out = { types: Array.from(ts.options).map(o => o.text), emptyFirst: db.options.length };
+    const out = { types: Array.from(ts.options).map(o => o.text), emptyFirst: db.options.length, groups: db.querySelectorAll('optgroup').length };
     ts.value = 'falmer'; onEnemyTypePicked();
     out.falmer = db.options.length - 1; out.allFalmer = Array.from(db.options).slice(1).every(o => /Фалмер/.test(o.text));
     ts.value = 'bandit'; onEnemyTypePicked(); out.bandit = Array.from(db.options).map(o => o.text).join('|');
@@ -15,7 +15,7 @@ const S = require('./setup');
     out.cover = [sum, total];
     return out;
   });
-  chk(r.emptyFirst === 1, 'без типа список пуст');
+  chk(r.emptyFirst === r.cover[1] + 1 && r.groups > 5, 'без типа — все враги по группам: ' + r.emptyFirst + ', групп ' + r.groups);
   chk(r.falmer >= 12 && r.allFalmer, 'фалмеры: ' + r.falmer);
   chk(/Бандит/.test(r.bandit) && !/Фалмер|Волк/.test(r.bandit), 'бандиты отдельно: ' + r.bandit.slice(0, 80));
   chk(r.cover[0] === r.cover[1], 'каждый враг попал в какой-то тип: ' + r.cover);
