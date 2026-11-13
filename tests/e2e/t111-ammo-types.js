@@ -24,6 +24,12 @@ const S = require('./setup');
   check(f.ammo && f.ammo.name === 'Фалмерская стрела' && f.ammo.qty === 12, 'у фалмера-лучника колчан: ' + JSON.stringify(f.ammo));
   const card = await gm.evaluate(id => document.querySelector('[data-enemy-id="' + id + '"]').innerText, f.id);
   check(/Экипировка/.test(card) && /В руках:\s*Фалмерский лук/.test(card) && /На поясе:\s*Колчан для стрел/.test(card), 'на карточке фалмера: лук в руках, колчан на поясе');
+  const wdF = await gm.evaluate(e => StBonuses.collectEnemyAttackBonuses(e), f);
+  check(wdF.ammo === 7 && wdF.total === f.weaponDmg + 7 + f.dex, 'выстрел фалмера = оружие ' + f.weaponDmg + ' + стрела 7 + ЛОВ ' + f.dex + ' = ' + wdF.total);
+  let shot;
+  for (let i = 0; i < 15; i++) { shot = await S.gmAttack(gm, f.id, 'p1', 'weapon', { once: true }); if (shot[0].hit) break; await gm.evaluate(id => setEnemyAmmo(id, 12), f.id); await wait(500); }
+  check(shot[0].hit && new RegExp('Базовый урон: ' + wdF.total + ' .*\\(оружие ' + f.weaponDmg + ' \\+ стрела 7 \\+ ЛОВ').test(shot[0].t), 'в попадании урон стрелы учтён: ' + (shot[0].t.match(/Базовый урон[^(]*\([^)]*\)/) || [shot[0].t.slice(0, 160)])[0]);
+  await gm.evaluate(id => setEnemyAmmo(id, 12), f.id); await wait(600);
   await S.gmAttack(gm, f.id, 'p1', 'weapon', { once: true, applyMiss: true });
   await wait(800);
   f = H.store[sk].doc.enemies[0];

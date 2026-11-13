@@ -16,7 +16,7 @@ const S = require('./setup');
   check(dW.total === 30 + 12 && dW.label === 'СИЛ', 'удар волка = 30 + СИЛ 12 = ' + dW.total);
   check(f.isRanged === true, 'фалмер-лучник стреляет');
   const dF = await gm.evaluate(e => StBonuses.collectEnemyAttackBonuses(e), f);
-  check(dF.label === 'ЛОВ' && dF.total === f.weaponDmg + f.dex, 'выстрел лучника = урон + ЛОВ: ' + dF.total);
+  check(dF.label === 'ЛОВ' && dF.total === f.weaponDmg + dF.ammo + f.dex && dF.ammo > 0, 'выстрел лучника = урон + стрела + ЛОВ: ' + dF.total);
   const r = await gm.evaluate(e => EnemyRanks.enemyRoundDmg(e), w);
   check(r === 42, 'сложность боя считает урон волка с СИЛ: ' + r);
   if (!ok) process.exitCode = 1;

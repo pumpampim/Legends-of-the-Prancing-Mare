@@ -312,8 +312,12 @@
         if (!base) return { base: 0, stat: 0, total: 0, label: '', weaponEnchant: 0, spiritFlat: 0, additivePct: 0, mult: 1, notes: [] };
         const stat = e.isRanged ? (e.dex || 0) : (e.str || 0);
         const label = e.isRanged ? 'ЛОВ' : 'СИЛ';
-        return { base, stat, total: base + stat, label, weaponEnchant: 0, spiritFlat: 0, additivePct: 0, mult: 1,
-            notes: [{ source: 'оружие', value: base }, { source: label, value: stat }] };
+        // Стрела/болт из экипированного колчана добавляет свой урон к выстрелу — как у героя (лук + стрела + ЛОВ).
+        const ammo = e.isRanged ? enemyAmmoDmg(e.ammo) : 0;
+        const notes = [{ source: 'оружие', value: base }];
+        if (ammo) notes.push({ source: e.ammo.bolt ? 'болт' : 'стрела', value: ammo });
+        notes.push({ source: label, value: stat });
+        return { base, stat, ammo, ammoName: ammo ? e.ammo.name : '', total: base + ammo + stat, label, weaponEnchant: 0, spiritFlat: 0, additivePct: 0, mult: 1, notes };
     }
 
     // Совместимое имя из ТЗ: «собрать бонусы атаки игрока» — это и есть полный расчёт.
@@ -368,8 +372,18 @@
     function shownEffect(item) { return String((item && item.effect) || ''); }
     // Враги, собранные из таблиц оружия и брони, бьют и держат броню как раньше: пересчёт данных на них не распространяется.
     function enemyWeaponDmg(n) { return Number(n) / WEAPON_DATA_SCALE; }
+    // Урон боеприпаса врага (в шкале врагов): из колчана ammo.dmg (табличный урон стрелы), иначе по названию из таблиц кузницы. Пустой колчан — 0.
+    function enemyAmmoDmg(ammo) {
+        if (!ammo || !((ammo.qty || 0) > 0)) return 0;
+        let raw = typeof ammo.dmg === 'number' ? ammo.dmg : null;
+        if (raw == null && typeof window !== 'undefined') {
+            const r = (window.weaponRecipes || []).concat(window.weaponsNonCraftable || []).find(w => w && w.name === ammo.name);
+            raw = r && typeof r.damage === 'number' ? r.damage : 0;
+        }
+        return Math.round(enemyWeaponDmg(raw || 0));
+    }
     function enemyArmorValue(n, item) { return isHeavyArmorItem(item) ? Number(n) / HEAVY_DATA_SCALE : Number(n); }
-    const api = { enemyWeaponDmg, enemyArmorValue, shownEffect, shownWeaponDmg, shownArmor, armorNote, isHeavyArmorItem, HEAVY_ARMOR_DENSITY, computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
+    const api = { enemyWeaponDmg, enemyAmmoDmg, enemyArmorValue, shownEffect, shownWeaponDmg, shownArmor, armorNote, isHeavyArmorItem, HEAVY_ARMOR_DENSITY, computePlayerWeaponAttack, collectPlayerAttackBonuses, collectEnemyAttackBonuses, applyBonuses, weaponSpiritDamage, weaponBoostSkill, selfTest };
     if (typeof window !== 'undefined') {
         window.StBonuses = api;
         window.__stSelfTestAttack = selfTest;

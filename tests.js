@@ -523,6 +523,8 @@
         const ham = B.computePlayerWeaponAttack(Object.assign({}, base, { isPowerAttack: false, perks: { hammerArmorPenetration: 0.75, staffArmorPenetration: 20 } }));
         eq(ham.armorIgnore, 0.75, 'Перки: «Крушитель черепов» работает, «Отшельник» на молот не действует');
         eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true }).total, 11, 'Удар врага: лук + ЛОВ');
+        eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true, ammo: { name: 'Эбонитовая стрела', dmg: 27, qty: 3 } }).total, 31, 'Выстрел врага: лук + стрела из колчана (27/1.35=20) + ЛОВ');
+        eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true, ammo: { name: 'Эбонитовая стрела', dmg: 27, qty: 0 } }).total, 11, 'Пустой колчан — стрела не добавляет урона');
     } else ok(false, 'combat-bonuses.js не загружен');
     // Ловушки: 12 видов, у сундука — дротики/булава/колья, сложности обезвреживания ученик–эксперт
     if (W.TRAP_TYPES) {

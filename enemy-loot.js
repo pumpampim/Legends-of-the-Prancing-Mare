@@ -88,7 +88,8 @@
         if (!name) return null;
         const bolt = /болт/i.test(name);
         const builtin = /балист/i.test(String(weaponName || ''));
-        return { name, qty: n, max: n, bolt, quiver: builtin ? null : (bolt ? 'Колчан для болтов' : 'Колчан для стрел'), where: builtin ? 'встроенный магазин' : 'пояс', weapon: String(weaponName || '') };
+        const db = (root.weaponRecipes || []).concat(root.weaponsNonCraftable || []).find(i => i && i.name === name);
+        return { name, dmg: db && typeof db.damage === 'number' ? db.damage : 0, qty: n, max: n, bolt, quiver: builtin ? null : (bolt ? 'Колчан для болтов' : 'Колчан для стрел'), where: builtin ? 'встроенный магазин' : 'пояс', weapon: String(weaponName || '') };
     }
     // Экипировка врага (что надето и в руках) — для карточки мастера и генераторов.
     function describeEquip(eq, ammo) {
@@ -547,7 +548,7 @@
         if (shield) { totalArmor += shield.armor || 0; const l = toLoot(shield); l.category = 'Броня (с трупа)'; if (Math.random() < 0.6) lootItems.push(l); }
         // Стрелы — в колчане (ammo), тратятся в бою; остаток кладётся в добычу при обыске трупа.
         const ammo = weapon && weapon.slot === 'ranged'
-            ? (quiverFor(weapon.name, rnd(8, 16)) || Object.assign(quiverFor('лук', rnd(8, 16)), { name: isDraugr ? 'Древняя нордская стрела' : 'Стрела Изгоев' })) : null;
+            ? (quiverFor(weapon.name, rnd(8, 16)) || Object.assign(quiverFor('лук', rnd(8, 16)), { name: isDraugr ? 'Древняя нордская стрела' : 'Стрела Изгоев', dmg: 9 })) : null;
 
         // --- остальной лут (золото, костная мука, камни, свитки…) — из текста вики, без оружия/брони ---
         const rest = rollFromText(enemy.loot, { pool, level }, { skipGear: true });
