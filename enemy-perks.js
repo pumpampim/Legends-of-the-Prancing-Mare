@@ -147,7 +147,7 @@
     function forStore(perks) { return (perks || []).map(g => ({ tree: g.tree, name: g.name, rank: g.rank, max: g.max, auto: !!g.auto, desc: g.desc })); }
     function summary(perks) { return (perks || []).map(g => g.name + (g.max > 1 ? ' ' + g.rank + '/' + g.max : '') + ' — ' + g.desc + (g.auto ? ' ✓' : ' ✋')).join('; '); }
     // Кому из базы врагов положены перки (бандиты/изгои/вампиры/оборотни).
-    function eligibleName(n) { return /бандит|изго|вампир|оборот/i.test(String(n || '')); }
+    function eligibleName(n) { return /бандит|изго|вампир|оборот|вервольф/i.test(String(n || '')); }
 
     const api = { STRENGTH, CATALOG, roll, apply, forStore, summary, profile, eligibleName, skillOf, pointsOf };
     root.EnemyPerks = api;

@@ -1550,9 +1550,9 @@
         ['animals', '🐺 Животные', (e) => e.category === 'Животные'],
         ['falmer', '🦇 Фалмеры', (e) => /фалмер/i.test(e.name)],
         ['undead', '💀 Нежить', (e) => /скелет|драугр|нежить|жрец-дракон/i.test(e.name)],
+        ['forsworn', '🪶 Изгои', (e) => /изгой/i.test(e.name)], // оборотень изгоев — во фракции изгоев
         ['vamp', '🧛 Вампиры и оборотни', (e) => /вампир|вервольф|оборотень|медведь оборотни|гончая смерти/i.test(e.name)],
         ['bandit', '🗡 Бандиты', (e) => /бандит|разбойник|громила|грабитель|головорез|мародер|мародёр|главарь/i.test(e.name)],
-        ['forsworn', '🪶 Изгои', (e) => /изгой/i.test(e.name)],
         ['dwemer', '⚙️ Двемерские механизмы', (e) => /двемер/i.test(e.name)],
         ['daedra', '🔥 Даэдра и атронахи', (e) => /дремор|атронах/i.test(e.name)],
         ['giants', '🪨 Великаны и тролли', (e) => /великан|тролл|мамонт|горгулья/i.test(e.name)],
@@ -1759,8 +1759,8 @@
         // Перки по уровню у бандитов, вампиров и оборотней из базы (изгои получают их в генераторе выше). Числовые — сразу в цифры.
         if (window.EnemyPerks && EnemyPerks.eligibleName(pick.name) && !(window.EnemyGear && window.EnemyGear.familyOf(pick.name))) {
             const perks = EnemyPerks.roll({ level: pick.level || 1, weaponName: '', wkind: '-', isRanged: !!pick.isRanged, spells: extra.spells || [], shield: /щит/i.test(pick.weaponNote || ''),
-                vampire: /вампир/i.test(pick.name), werewolf: /оборот/i.test(pick.name),
-                weapon: /вампир|оборот/i.test(pick.name) ? 'claws' : /маг/i.test(pick.name) ? 'none' : pick.isRanged ? 'bow' : '1h',
+                vampire: /вампир/i.test(pick.name), werewolf: /оборот|вервольф/i.test(pick.name),
+                weapon: /вампир|оборот|вервольф/i.test(pick.name) ? 'claws' : /маг/i.test(pick.name) ? 'none' : pick.isRanged ? 'bow' : '1h',
                 armor: /главар/i.test(pick.name) ? 'heavy' : /бандит/i.test(pick.name) && !/маг/i.test(pick.name) ? 'light' : null });
             const pr = EnemyPerks.apply({ weaponDmg: extra.weaponDmg || 0, physResist: (extra.resist && extra.resist.physical) || 0, spells: extra.spells || [] }, perks);
             if (extra.weaponDmg) extra.weaponDmg = pr.weaponDmg;
@@ -1770,6 +1770,8 @@
         }
         // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
         if (pick.carrierOfDisease) { extra.carrierOfDisease = pick.carrierOfDisease; extra.diseaseChance = pick.diseaseChance || 0; }
+        if (pick.speed) extra.speed = pick.speed; // своя скорость (пиявка 25 фт.), иначе 30 на сетке
+        if (pick.faction) extra.faction = pick.faction;
         if (pick.soul) extra.soul = pick.soul; // размер души для захвата душ
         if (pick.level) extra.level = pick.level; // уровень и тип — для заклинаний «до N уровня»
         if (pick.kind) extra.kind = pick.kind;
@@ -5973,7 +5975,24 @@
                 const roll = Math.max(roll1, roll2);
                 const resist = (data.race === 'argonian') ? 100 : ((data.resistances && data.resistances.disease) || 0); // аргонианин: иммунитет
                 const effectiveChance = Math.max(0, pendingGmAttack.diseaseChance * (1 - resist / 100));
-                if (roll <= effectiveChance) {
+                if (pendingGmAttack.carrierOfDisease === 'Все болезни') {
+                    // Пиявка: каждая болезнь бросается отдельно; уже подхваченные не дублируются.
+                    const have = new Set([].concat(data.activeTimedEffects || [], data.statusEffects || []).map(x => x && x.effectName).filter(Boolean));
+                    const got = [];
+                    Object.keys(DISEASE_DEFS).forEach(dn => {
+                        if (have.has('Болезнь: ' + dn)) return;
+                        const r1 = Math.floor(Math.random() * 100) + 1, r2 = diseaseAdv ? Math.floor(Math.random() * 100) + 1 : 0;
+                        if (Math.max(r1, r2) > effectiveChance) return;
+                        const p3 = {};
+                        p3['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                            id: 'dis-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                            name: pendingGmAttack.enemyName, effectName: 'Болезнь: ' + dn, description: DISEASE_DEFS[dn].desc, turnsRemaining: 9999, permanent: true
+                        });
+                        chores.push(db.collection('sessions').doc(currentCode).update(p3));
+                        got.push(dn);
+                    });
+                    logExtra += got.length ? `. 🚨 Заражение! ${targetName} подхватил(а): ${got.map(x => '«' + x + '»').join(', ')}` : `. Заражения нет (${data.race === 'argonian' ? 'аргонианин не болеет' : 'всё уже подхвачено или устоял(а)'})`;
+                } else if (roll <= effectiveChance) {
                     const diseaseName = pendingGmAttack.carrierOfDisease;
                     const diseaseInfo = DISEASE_DEFS[diseaseName] || { desc: 'Эффект — на усмотрение мастера.' };
                     const patch2 = {};

@@ -608,7 +608,24 @@
                 const roll = Math.max(roll1, roll2);
                 const resist = (data.race === 'argonian') ? 100 : ((data.resistances && data.resistances.disease) || 0); // аргонианин: иммунитет
                 const effectiveChance = Math.max(0, pendingGmAttack.diseaseChance * (1 - resist / 100));
-                if (roll <= effectiveChance) {
+                if (pendingGmAttack.carrierOfDisease === 'Все болезни') {
+                    // Пиявка: каждая болезнь бросается отдельно; уже подхваченные не дублируются.
+                    const have = new Set([].concat(data.activeTimedEffects || [], data.statusEffects || []).map(x => x && x.effectName).filter(Boolean));
+                    const got = [];
+                    Object.keys(DISEASE_DEFS).forEach(dn => {
+                        if (have.has('Болезнь: ' + dn)) return;
+                        const r1 = Math.floor(Math.random() * 100) + 1, r2 = diseaseAdv ? Math.floor(Math.random() * 100) + 1 : 0;
+                        if (Math.max(r1, r2) > effectiveChance) return;
+                        const p3 = {};
+                        p3['participants.' + targetUid + '.pendingStatusEffects'] = firebase.firestore.FieldValue.arrayUnion({
+                            id: 'dis-' + Date.now() + Math.random().toString(36).slice(2, 8),
+                            name: pendingGmAttack.enemyName, effectName: 'Болезнь: ' + dn, description: DISEASE_DEFS[dn].desc, turnsRemaining: 9999, permanent: true
+                        });
+                        chores.push(db.collection('sessions').doc(currentCode).update(p3));
+                        got.push(dn);
+                    });
+                    logExtra += got.length ? `. 🚨 Заражение! ${targetName} подхватил(а): ${got.map(x => '«' + x + '»').join(', ')}` : `. Заражения нет (${data.race === 'argonian' ? 'аргонианин не болеет' : 'всё уже подхвачено или устоял(а)'})`;
+                } else if (roll <= effectiveChance) {
                     const diseaseName = pendingGmAttack.carrierOfDisease;
                     const diseaseInfo = DISEASE_DEFS[diseaseName] || { desc: 'Эффект — на усмотрение мастера.' };
                     const patch2 = {};
