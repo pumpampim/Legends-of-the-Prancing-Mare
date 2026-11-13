@@ -1681,6 +1681,9 @@
         if ((pick.spells || []).length) extra.spells = pick.spells;
         if ((pick.shouts || []).length) extra.shouts = pick.shouts;
         if (pick.loot) extra.loot = pick.loot;
+        // Характеристики из базы (2026-11-13): атака d20 + мод. СИЛ/ЛОВ/ИНТ, урон оружием + значение СИЛ/ЛОВ. Генератор ниже перекрывает СИЛ/ЛОВ/ТЕЛ.
+        ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(k => { if (typeof pick[k] === 'number') extra[k] = pick[k]; });
+        if (pick.isRanged) extra.isRanged = true;
         // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
         if (window.EnemyGear && window.EnemyGear.familyOf(pick.name)) {
             const gen = window.EnemyGear.generate(pick, enemyLootCtx(pick.level));
