@@ -22,6 +22,8 @@ const S = require('./setup');
   await wait(800);
   let f = H.store[sk].doc.enemies[0];
   check(f.ammo && f.ammo.name === 'Фалмерская стрела' && f.ammo.qty === 12, 'у фалмера-лучника колчан: ' + JSON.stringify(f.ammo));
+  const card = await gm.evaluate(id => document.querySelector('[data-enemy-id="' + id + '"]').innerText, f.id);
+  check(/Экипировка/.test(card) && /В руках:\s*Фалмерский лук/.test(card) && /На поясе:\s*Колчан для стрел/.test(card), 'на карточке фалмера: лук в руках, колчан на поясе');
   await S.gmAttack(gm, f.id, 'p1', 'weapon', { once: true, applyMiss: true });
   await wait(800);
   f = H.store[sk].doc.enemies[0];
@@ -32,16 +34,17 @@ const S = require('./setup');
   await gm.evaluate(id => setEnemyAmmo(id, 5), f.id); await wait(800);
   const loot = await gm.evaluate(e => gmWithQuiverLoot({ gold: 3, items: [{ name: 'Фалмерская стрела', qty: 7 }, { name: 'Ухо фалмера' }] }, e), H.store[sk].doc.enemies[0]);
   const arr = loot.items.filter(i => i.name === 'Фалмерская стрела');
-  check(arr.length === 1 && arr[0].qty === 5 && /Стрел/.test(arr[0].category), 'в добыче остаток колчана (5), без второго колчана: ' + JSON.stringify(loot.items));
+  check(arr.length === 1 && arr[0].qty === 5 && /Стрел/.test(arr[0].category) && loot.items.some(i => i.name === 'Колчан для стрел'), 'в добыче колчан и остаток стрел (5), без второй пачки: ' + JSON.stringify(loot.items.map(i => i.name + (i.qty ? '×' + i.qty : ''))));
   // бандиты-стрелки
   const bs = await gm.evaluate(() => {
     const out = []; document.getElementById('bandit-avg-level').value = 50;
     for (let i = 0; i < 400; i++) { generateBandit(); const t = document.getElementById('bandit-gen-result').innerText; if (/· (Лук|Арбалет): /.test(t)) out.push(t); }
     return out;
   });
-  const noQuiver = bs.filter(t => !/Колчан: \S/.test(t));
+  const noQuiver = bs.filter(t => !/Колчан для (стрел|болтов): \S/.test(t));
   check(bs.length > 20 && noQuiver.length === 0, 'у каждого бандита-стрелка есть колчан (' + bs.length + ' стрелков)' + (noQuiver[0] ? ': ' + noQuiver[0].slice(0, 200) : ''));
-  check(bs.some(t => /Арбалет/.test(t) && /болт/.test(t)), 'бывают арбалетчики с болтами');
+  check(bs.every(t => /Экипировка: в руках — \S.*на поясе — Колчан для (стрел|болтов): \S.* ×\d+ \(экипированы\)/.test(t)), 'в генераторе стрелок экипирован: лук в руках, колчан со стрелами на поясе' + (bs[0] ? ' — ' + (bs[0].match(/Экипировка.*/) || [''])[0] : ''));
+  check(bs.some(t => /Арбалет/.test(t) && /Колчан для болтов: \S+ болт/.test(t)), 'бывают арбалетчики с колчаном болтов');
   check(!bs.some(t => /, Стрела(,|$)/.test(t)), 'безымянной «Стрелы» в добыче больше нет');
   // Много прогонов генераторов: оружие и боеприпас всегда парой (лук+стрелы, арбалет+болты), с запасом, и в добыче оба.
   const pairs = await gm.evaluate(async () => {
@@ -59,6 +62,10 @@ const S = require('./setup');
         else if (en.ammo.bolt !== isX || (!isX && !isBow)) bad.push(src + ': не та пара — ' + w + ' + ' + en.ammo.name);
         else if (!loot.some(i => i.name === w.split(' · ')[0].split(' (')[0].split(' + ')[0])) bad.push(src + ': в добыче нет оружия ' + w);
         else if (ammoInLoot.length !== 1 || ammoInLoot[0].name !== en.ammo.name) bad.push(src + ': в добыче не тот боеприпас ' + JSON.stringify(ammoInLoot));
+        else if (!en.equip || !(en.equip.hands || []).some(h => w.indexOf(h) === 0)) bad.push(src + ': оружие не в руках ' + JSON.stringify(en.equip));
+        else if (en.hands !== 'two') bad.push(src + ': хват не «двуручное / лук»');
+        else if (en.ammo.quiver !== (isX ? 'Колчан для болтов' : 'Колчан для стрел') || en.ammo.where !== 'пояс') bad.push(src + ': колчан не экипирован ' + JSON.stringify(en.ammo));
+        else if (!loot.some(i => i.name === en.ammo.quiver)) bad.push(src + ': колчан не выпадает с трупа');
       } else {
         if (en.ammo) bad.push(src + ': колчан у бойца ближнего боя');
         if (ammoInLoot.length) bad.push(src + ': стрелы без лука — ' + ammoInLoot.map(i => i.name).join(', '));

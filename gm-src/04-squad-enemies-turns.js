@@ -234,6 +234,20 @@
         window.setEnemyField(id, 'hands', v);
         if (en) gmPostLogEntryText(`✋ ${en.name}: в руках — ${(GM_HANDS_LABEL[v] || v).replace(/^\S+\s/, '')} (смена оружия — действие хода).`);
     };
+    // Экипировка врага на карточке: что в руках, что надето, колчан на поясе со стрелами (число правится — подобрал/потратил).
+    function gmEnemyEquipHtml(e) {
+        const eq = e.equip || {}, a = e.ammo;
+        if (!(eq.hands && eq.hands.length) && !(eq.worn && eq.worn.length) && !a) return '';
+        const row = (label, html) => '<div style="font-size:12px; opacity:.88; display:flex; align-items:center; gap:4px; flex-wrap:wrap;"><span style="opacity:.7;">' + label + '</span> ' + html + '</div>';
+        let h = '<div style="margin-top:2px; padding:2px 6px; border-left:2px solid rgba(201,168,108,.5);"><div style="font-size:11px; opacity:.6;">🎒 Экипировка</div>';
+        if (eq.hands && eq.hands.length) h += row('В руках:', escapeHtml(eq.hands.join(' + ')));
+        if (eq.worn && eq.worn.length) h += row('Надето:', escapeHtml(eq.worn.join(', ')));
+        if (a) h += row(a.quiver ? 'На поясе:' : 'Магазин:', (a.quiver ? escapeHtml(a.quiver) + ' — ' : '') + '🏹 ' + escapeHtml(a.name) +
+            ' <input type="number" min="0" value="' + (a.qty || 0) + '" title="Стрел/болтов в ' + (a.quiver ? 'колчане' : 'магазине') + ' — выстрел тратит одну" style="width:48px; display:inline; padding:1px;" onchange="setEnemyAmmo(\'' + e.id + '\',this.value)"> шт.' +
+            ((a.qty || 0) <= 0 ? ' <span style="color:#e67e22;">пусто — бьёт вблизи</span>' : ''));
+        return h + '</div>';
+    }
+    window.gmEnemyEquipHtml = gmEnemyEquipHtml;
     function renderEnemies(enemies) {
         const target = el('gm-enemies-list');
         gmCheckMarked(enemies);
@@ -261,9 +275,7 @@
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
                 '<input type="number" value="' + (e.weaponDmg || 0) + '" style="width:56px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'weaponDmg\',this.value)">' +
                 (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' +
-                (e.ammo ? '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px;">🏹 ' + escapeHtml(e.ammo.name) + ': ' +
-                    '<input type="number" min="0" value="' + (e.ammo.qty || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemyAmmo(\'' + e.id + '\',this.value)">' +
-                    ((e.ammo.qty || 0) <= 0 ? ' <span style="color:#e67e22;">кончились — бьёт вблизи</span>' : '') + '</div>' : '');
+                gmEnemyEquipHtml(e);
             const spellsHtml = (e.spells && e.spells.length)
                 ? e.spells.map((s, si) => '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">' +
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
@@ -495,14 +507,16 @@
         if (weapon && weapon.slot === 'ranged' && window.EnemyLoot && window.EnemyLoot.quiverFor) {
             const wantBolt = /арбалет/i.test(weapon.name);
             const own = enemyGearDraft.find(d => (wantBolt ? /болт/i : /стрел/i).test(d.name));
-            ammo = own ? { name: own.name, qty: Math.max(1, parseInt(own.qty) || 1), max: Math.max(1, parseInt(own.qty) || 1), bolt: wantBolt } : window.EnemyLoot.quiverFor(weapon.name, 12);
-            if (ammo) { const nm = ammo.name; for (let i = items.length - 1; i >= 0; i--) if (items[i].name === nm) items.splice(i, 1); }
+            ammo = window.EnemyLoot.quiverFor(weapon.name, 12);
+            if (ammo && own) { const n = Math.max(1, parseInt(own.qty) || 1); Object.assign(ammo, { name: own.name, qty: n, max: n }); }
+            // стрелы и колчан из списка — экипированы (а не лежат в рюкзаке): в добычу их положит обыск трупа (остаток колчана)
+            if (ammo) { const drop = [ammo.name, ammo.quiver]; for (let i = items.length - 1; i >= 0; i--) if (drop.includes(items[i].name)) items.splice(i, 1); }
         }
         const noteParts = [];
         if (weapon) noteParts.push(weapon.name + (weapon.effect ? ' (' + String(weapon.effect).slice(0, 80) + ')' : ''));
         if (armorNames.length) noteParts.push('надето: ' + armorNames.join(', '));
         return {
-            weaponDmg: weapon ? gmItemDmg(weapon) : 0, isRanged: !!(weapon && weapon.slot === 'ranged'), weaponNote: noteParts.join(' · '), ammo,
+            weaponDmg: weapon ? gmItemDmg(weapon) : 0, isRanged: !!(weapon && weapon.slot === 'ranged'), weaponNote: noteParts.join(' · '), ammo, equip: { hands: weapon ? [weapon.name] : [], worn: armorNames.slice() },
             physResist: armorSum ? Math.min(85, Math.round(armorSum / 10)) : 0,
             corpseLoot: { gold, items }
         };
@@ -542,13 +556,18 @@
         ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(k => { if (typeof pick[k] === 'number') extra[k] = pick[k]; });
         if (pick.isRanged) extra.isRanged = true;
         // Колчан базовых стрелков (фалмеры-лучники, балиста): выстрел тратит стрелу/болт, остаток — в добычу.
-        if (pick.isRanged && window.EnemyLoot && window.EnemyLoot.quiverFor) extra.ammo = window.EnemyLoot.quiverFor(/балист/i.test(pick.name) ? 'Двемерская балиста' : /фалмер/i.test(pick.name) ? 'Фалмерский лук' : 'Охотничий лук', /балист/i.test(pick.name) ? 10 : 12);
+        if (pick.isRanged && window.EnemyLoot && window.EnemyLoot.quiverFor) {
+            const isBal = /балист/i.test(pick.name), bowN = isBal ? 'Двемерская балиста' : /фалмер/i.test(pick.name) ? 'Фалмерский лук' : 'Охотничий лук';
+            extra.ammo = window.EnemyLoot.quiverFor(bowN, isBal ? 10 : 12);
+            if (!isBal) { extra.equip = { hands: [bowN], worn: [] }; extra.hands = 'two'; } // лук в руках, колчан со стрелами на поясе
+        }
         // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
         if (window.EnemyGear && window.EnemyGear.familyOf(pick.name)) {
             const gen = window.EnemyGear.generate(pick, enemyLootCtx(pick.level));
             if (gen) {
                 extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
                 if (gen.ammo) extra.ammo = gen.ammo; else delete extra.ammo;
+                extra.equip = gen.equip; if (gen.isRanged) extra.hands = 'two'; else delete extra.hands;
                 extra.corpseLoot = { gold: gen.gold, items: gen.lootItems }; extra.lootKit = JSON.parse(JSON.stringify(extra.corpseLoot));
                 extra.loot = genLootText(gen);
             }
@@ -643,7 +662,7 @@
         const gearExtra = buildEnemyGearExtra();
         if (gearExtra) {
             if (gearExtra.weaponDmg && !manualDmg) extra.weaponDmg = gearExtra.weaponDmg;
-            if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; if (gearExtra.ammo) extra.ammo = gearExtra.ammo; else delete extra.ammo; }
+            if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; if (gearExtra.ammo) extra.ammo = gearExtra.ammo; else delete extra.ammo; extra.equip = gearExtra.equip; if (gearExtra.isRanged) extra.hands = 'two'; }
             if (gearExtra.physResist && !manualResist) extra.resist = Object.assign({}, extra.resist || {}, { physical: gearExtra.physResist });
             extra.corpseLoot = gearExtra.corpseLoot; extra.lootKit = JSON.parse(JSON.stringify(gearExtra.corpseLoot || null));
             extra.loot = genLootText(gearExtra.corpseLoot);

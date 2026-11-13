@@ -80,10 +80,23 @@
         return o;
     }
     // Колчан стрелка: { name, qty, max, bolt } — qty стрел/болтов в бою, max — полный колчан (для заготовок встреч).
+    // Колчан экипирован как у игрока: стрелы/болты — в слоте боеприпасов, сам колчан («Колчан для стрел/болтов») — на поясе
+    // (стрелять без действия «достать стрелу из рюкзака»). У балисты вместо колчана — встроенный магазин (не выпадает).
     function quiverFor(weaponName, qty) {
         const name = ammoNameFor(weaponName);
         const n = Math.max(0, qty | 0);
-        return name ? { name, qty: n, max: n, bolt: /болт/i.test(name) } : null;
+        if (!name) return null;
+        const bolt = /болт/i.test(name);
+        const builtin = /балист/i.test(String(weaponName || ''));
+        return { name, qty: n, max: n, bolt, quiver: builtin ? null : (bolt ? 'Колчан для болтов' : 'Колчан для стрел'), where: builtin ? 'встроенный магазин' : 'пояс', weapon: String(weaponName || '') };
+    }
+    // Экипировка врага (что надето и в руках) — для карточки мастера и генераторов.
+    function describeEquip(eq, ammo) {
+        const parts = [];
+        if (eq && eq.hands && eq.hands.length) parts.push('в руках — ' + eq.hands.join(' + '));
+        if (eq && eq.worn && eq.worn.length) parts.push('надето — ' + eq.worn.join(', '));
+        if (ammo) parts.push(ammo.quiver ? `на поясе — ${ammo.quiver}: ${ammo.name} ×${ammo.qty} (экипированы)` : `${ammo.where || 'магазин'}: ${ammo.name} ×${ammo.qty}`);
+        return parts.join('; ');
     }
     // Остаток колчана — в добычу с трупа (стрелы того же имени из готового лута убираются: иначе был бы второй колчан).
     function withQuiver(loot, enemy, pool) {
@@ -91,6 +104,10 @@
         if (!q || !q.name) return loot;
         const items = ((loot && loot.items) || []).filter(i => i && i.name !== q.name);
         if ((q.qty || 0) > 0) { const it = ammoItem(q.name, pool); it.qty = q.qty; items.push(it); }
+        if (q.quiver && !items.some(i => i && i.name === q.quiver)) { // сам колчан снимается с трупа вместе со стрелами
+            const db = (pool || []).concat(root.allItems || []).find(i => i && i.name === q.quiver);
+            items.push(db ? Object.assign(toLoot(db), { category: db.category || 'Ножны и колчаны' }) : { name: q.quiver, price: 50, weight: 0.2, category: 'Ножны и колчаны' });
+        }
         return Object.assign({ gold: 0 }, loot || {}, { items });
     }
 
@@ -530,7 +547,7 @@
         if (shield) { totalArmor += shield.armor || 0; const l = toLoot(shield); l.category = 'Броня (с трупа)'; if (Math.random() < 0.6) lootItems.push(l); }
         // Стрелы — в колчане (ammo), тратятся в бою; остаток кладётся в добычу при обыске трупа.
         const ammo = weapon && weapon.slot === 'ranged'
-            ? (quiverFor(weapon.name, rnd(8, 16)) || { name: isDraugr ? 'Древняя нордская стрела' : 'Стрела Изгоев', qty: rnd(8, 16), bolt: false }) : null;
+            ? (quiverFor(weapon.name, rnd(8, 16)) || Object.assign(quiverFor('лук', rnd(8, 16)), { name: isDraugr ? 'Древняя нордская стрела' : 'Стрела Изгоев' })) : null;
 
         // --- остальной лут (золото, костная мука, камни, свитки…) — из текста вики, без оружия/брони ---
         const rest = rollFromText(enemy.loot, { pool, level }, { skipGear: true });
@@ -575,6 +592,7 @@
             name: enemy.name, level, hp: enemy.hp || 0, mp: enemy.mana || 0,
             weaponDmg: dmg, weaponNote, isRanged: !!(weapon && weapon.slot === 'ranged'),
             ammo,
+            equip: { hands: [weaponLoot ? weaponLoot.name : (weapon ? weapon.name : null), shield ? shield.name : null].filter(Boolean), worn: Object.keys(worn).map(k => worn[k].name) },
             armor: totalArmor, resist,
             str, dex, con,
             spells: (enemy.spells || []).map(s => { const c = Object.assign({}, s); if (isDraugr && typeof c.dmg === 'number') c.dmg = Math.round(c.dmg * 2); return c; }),
@@ -670,7 +688,7 @@
         return out;
     }
 
-    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot, rollThrownLoot, ammoNameFor, ammoItem, quiverFor, withQuiver };
+    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot, rollThrownLoot, ammoNameFor, ammoItem, quiverFor, withQuiver, describeEquip };
     root.EnemyLoot = api;
     root.EnemyGear = { generate, familyOf };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
