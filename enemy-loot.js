@@ -499,7 +499,7 @@
             if (armorBy[k] && armorBy[k].length && Math.random() < 0.85) { worn[k] = pick(armorBy[k]); }
         });
         let shield = null;
-        if (CAN_SHIELD(enemy) && Math.random() < 0.7) {
+        if (CAN_SHIELD(enemy) && !(weapon && weapon.slot === 'ranged') && Math.random() < 0.7) { // лучник щит не носит (лук — двуручный)
             const sh = findByName(pool.filter(i => typeof i.armor === 'number' && armorSlot(i) === 'shield'), (enemy.weaponOptions.find(o => /щит/i.test(o)) || 'щит'));
             if (sh) shield = sh;
         }
@@ -518,7 +518,7 @@
                 if (e && /урон/i.test(e.name) && typeof e.value === 'number') enchBonus = Math.round(e.value);
                 enchText = e ? ' [' + e.name + (typeof e.value === 'number' ? ' ' + e.value : '') + ']' : '';
             }
-            if (Math.random() < 0.8) lootItems.push(weaponLoot);
+            if (weapon.slot === 'ranged' || Math.random() < 0.8) lootItems.push(weaponLoot); // лук стрелка выпадает всегда: стрелы из колчана без лука не нужны
         }
         Object.keys(worn).forEach(k => {
             const it = worn[k];

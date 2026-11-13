@@ -979,7 +979,7 @@
         // Лут: часть брони НЕ выпадает при обыске (потрёпана в бою) — у каждого предмета
         // (включая оружие) свой отдельный шанс попасть в добычу, не 100%.
         const lootItems = [];
-        if (Math.random() < 0.8) {
+        if (isRanged || Math.random() < 0.8) { // лук/арбалет стрелка выпадает всегда — иначе в добыче остались бы стрелы без оружия
             if (isRanged) lootItems.push({ name: bow.name, price: bow.price || 0, weight: bow.weight, dmg: bow.damage, slot: 'ranged', category: 'Оружие (с трупа)' }); // базовый урон оружия (множитель уровня — только у самого бандита)
             else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' });
         }
@@ -1006,7 +1006,7 @@
         html += `СИЛ ${str}(${strMod >= 0 ? '+' : ''}${strMod}) · ЛОВ ${dex}(${dexMod >= 0 ? '+' : ''}${dexMod}) · ТЕЛ ${con}(${conMod >= 0 ? '+' : ''}${conMod})<br>`;
         html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? (/арбалет/i.test(bow.name) ? 'Арбалет' : 'Лук') : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' + ЛОВ ' + dex + ' = ' + (weaponDmg + dex) + ' урона за попадание)' : weapon.name + ' (' + weaponDmg + ' + СИЛ ' + str + ' = ' + (weaponDmg + str) + ' урона за попадание)'} · Броня: ${totalArmor}<br>`;
         if (ammo) html += `Колчан: ${ammo.name} ×${ammo.qty} (выстрел тратит 1, остаток — в добычу)<br>`;
-        html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
+        html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + (ammo ? `, ${ammo.name} (что останется в колчане)` : '') + '';
         resultEl.innerHTML = html;
     };
 
@@ -1122,6 +1122,7 @@
             isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
+    window.gmLastBanditEnemy = () => lastGeneratedBandit ? banditEnemyObj(lastGeneratedBandit) : null; // для тестов: враг, который ушёл бы в бой
     window.addGeneratedBanditToCombat = function () {
         if (!lastGeneratedBandit) { alert('Сначала сгенерируй бандита.'); return; }
         const b = lastGeneratedBandit;
