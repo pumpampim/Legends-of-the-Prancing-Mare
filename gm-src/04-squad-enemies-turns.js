@@ -275,7 +275,8 @@
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
                 '<input type="number" value="' + (e.weaponDmg || 0) + '" style="width:56px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'weaponDmg\',this.value)">' +
                 (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' +
-                gmEnemyEquipHtml(e);
+                gmEnemyEquipHtml(e) +
+                (e.perks && e.perks.length && window.gmPerksHtml ? '<div style="font-size:12px; opacity:.88; margin-top:2px;">' + window.gmPerksHtml(e.perks).replace(/<br>$/, '') + '</div>' : '');
             const spellsHtml = (e.spells && e.spells.length)
                 ? e.spells.map((s, si) => '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">' +
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
@@ -568,9 +569,22 @@
                 extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
                 if (gen.ammo) extra.ammo = gen.ammo; else delete extra.ammo;
                 extra.equip = gen.equip; if (gen.isRanged) extra.hands = 'two'; else delete extra.hands;
+                extra.perks = gen.perks || []; extra.perkAtk = gen.perkAtk || 0;
                 extra.corpseLoot = { gold: gen.gold, items: gen.lootItems }; extra.lootKit = JSON.parse(JSON.stringify(extra.corpseLoot));
                 extra.loot = genLootText(gen);
             }
+        }
+        // Перки по уровню у бандитов, вампиров и оборотней из базы (изгои получают их в генераторе выше). Числовые — сразу в цифры.
+        if (window.EnemyPerks && EnemyPerks.eligibleName(pick.name) && !(window.EnemyGear && window.EnemyGear.familyOf(pick.name))) {
+            const perks = EnemyPerks.roll({ level: pick.level || 1, weaponName: '', wkind: '-', isRanged: !!pick.isRanged, spells: extra.spells || [], shield: /щит/i.test(pick.weaponNote || ''),
+                vampire: /вампир/i.test(pick.name), werewolf: /оборот/i.test(pick.name),
+                weapon: /вампир|оборот/i.test(pick.name) ? 'claws' : /маг/i.test(pick.name) ? 'none' : pick.isRanged ? 'bow' : '1h',
+                armor: /главар/i.test(pick.name) ? 'heavy' : /бандит/i.test(pick.name) && !/маг/i.test(pick.name) ? 'light' : null });
+            const pr = EnemyPerks.apply({ weaponDmg: extra.weaponDmg || 0, physResist: (extra.resist && extra.resist.physical) || 0, spells: extra.spells || [] }, perks);
+            if (extra.weaponDmg) extra.weaponDmg = pr.weaponDmg;
+            if (extra.resist && extra.resist.physical) extra.resist = Object.assign({}, extra.resist, { physical: pr.physResist });
+            if (extra.spells) extra.spells = pr.spells;
+            extra.perks = EnemyPerks.forStore(perks); extra.perkAtk = pr.perkAtk || 0;
         }
         // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
         if (pick.carrierOfDisease) { extra.carrierOfDisease = pick.carrierOfDisease; extra.diseaseChance = pick.diseaseChance || 0; }

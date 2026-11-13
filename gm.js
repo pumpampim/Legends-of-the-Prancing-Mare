@@ -1457,7 +1457,8 @@
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
                 '<input type="number" value="' + (e.weaponDmg || 0) + '" style="width:56px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'weaponDmg\',this.value)">' +
                 (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' +
-                gmEnemyEquipHtml(e);
+                gmEnemyEquipHtml(e) +
+                (e.perks && e.perks.length && window.gmPerksHtml ? '<div style="font-size:12px; opacity:.88; margin-top:2px;">' + window.gmPerksHtml(e.perks).replace(/<br>$/, '') + '</div>' : '');
             const spellsHtml = (e.spells && e.spells.length)
                 ? e.spells.map((s, si) => '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">' +
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
@@ -1750,9 +1751,22 @@
                 extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
                 if (gen.ammo) extra.ammo = gen.ammo; else delete extra.ammo;
                 extra.equip = gen.equip; if (gen.isRanged) extra.hands = 'two'; else delete extra.hands;
+                extra.perks = gen.perks || []; extra.perkAtk = gen.perkAtk || 0;
                 extra.corpseLoot = { gold: gen.gold, items: gen.lootItems }; extra.lootKit = JSON.parse(JSON.stringify(extra.corpseLoot));
                 extra.loot = genLootText(gen);
             }
+        }
+        // Перки по уровню у бандитов, вампиров и оборотней из базы (изгои получают их в генераторе выше). Числовые — сразу в цифры.
+        if (window.EnemyPerks && EnemyPerks.eligibleName(pick.name) && !(window.EnemyGear && window.EnemyGear.familyOf(pick.name))) {
+            const perks = EnemyPerks.roll({ level: pick.level || 1, weaponName: '', wkind: '-', isRanged: !!pick.isRanged, spells: extra.spells || [], shield: /щит/i.test(pick.weaponNote || ''),
+                vampire: /вампир/i.test(pick.name), werewolf: /оборот/i.test(pick.name),
+                weapon: /вампир|оборот/i.test(pick.name) ? 'claws' : /маг/i.test(pick.name) ? 'none' : pick.isRanged ? 'bow' : '1h',
+                armor: /главар/i.test(pick.name) ? 'heavy' : /бандит/i.test(pick.name) && !/маг/i.test(pick.name) ? 'light' : null });
+            const pr = EnemyPerks.apply({ weaponDmg: extra.weaponDmg || 0, physResist: (extra.resist && extra.resist.physical) || 0, spells: extra.spells || [] }, perks);
+            if (extra.weaponDmg) extra.weaponDmg = pr.weaponDmg;
+            if (extra.resist && extra.resist.physical) extra.resist = Object.assign({}, extra.resist, { physical: pr.physResist });
+            if (extra.spells) extra.spells = pr.spells;
+            extra.perks = EnemyPerks.forStore(perks); extra.perkAtk = pr.perkAtk || 0;
         }
         // Переносчик болезни — раньше эти поля не копировались в бой, и бросок на заражение никогда не срабатывал.
         if (pick.carrierOfDisease) { extra.carrierOfDisease = pick.carrierOfDisease; extra.diseaseChance = pick.diseaseChance || 0; }
@@ -5469,6 +5483,12 @@
         return { kind: m[1], uid: m[2], id: m[3], ownerName: owner.name || m[2], comp: c || null, name: c ? c.name : '?' };
     }
 
+    // Перки врага строкой для генераторов: ✓ — уже в цифрах, ✋ — мастер применяет сам.
+    function gmPerksHtml(perks) {
+        if (!perks || !perks.length) return '';
+        return `🎖 Перки: ${perks.map(g => `<span title="${escapeHtml(g.tree + ': ' + g.desc)}">${escapeHtml(g.name)}${g.max > 1 ? ' ' + g.rank + '/' + g.max : ''} <span style="opacity:.7;">(${escapeHtml(g.desc)}${g.auto ? ' ✓' : ' ✋'})</span></span>`).join('; ')}<br>`;
+    }
+    window.gmPerksHtml = gmPerksHtml;
     // Остаток колчана стрелка — в добычу с трупа (enemy-loot.js → withQuiver).
     function gmWithQuiverLoot(loot, enemy) {
         return window.EnemyLoot && EnemyLoot.withQuiver ? EnemyLoot.withQuiver(loot, enemy, gmAllItems || []) : loot;
@@ -5533,6 +5553,7 @@
             // тогда 0). Тот же принцип, что у самого игрока: атакующий с модификатором против
             // ГОЛОГО броска защищающегося.
             atkMod = shooter.isRanged ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.str || 10);
+            if (shooter.isRanged && enemy.perkAtk) { atkMod += enemy.perkAtk; actionLabel += ` (перк «Твёрдая рука» +${enemy.perkAtk})`; }
             if (shooter.isRanged && gmWeatherRanged()) { atkMod += gmWeatherRanged(); actionLabel += ` (погода ${gmWeatherRanged()})`; } // дождь/гроза/метель/туман мешают и вражеским стрелкам
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
@@ -6311,9 +6332,14 @@
         // Только база оружия с масштабом по уровню. Характеристика (СИЛ/ЛОВ) добавляется к урону
         // при самой атаке — enemyWeaponDamage(); раньше сюда запекался лишь модификатор (+1…+7),
         // и он же не учитывался бы повторно.
-        const weaponDmg = isRanged
+        let weaponDmg = isRanged
             ? Math.round(StBonuses.enemyWeaponDmg(bow.damage) * levelDmgMult) // таблицы оружия пересчитаны для игроков — враги бьют как раньше
             : Math.round(StBonuses.enemyWeaponDmg(weapon.damage) * levelDmgMult);
+        // Перки по уровню (enemy-perks.js): ветка оружия, брони, щита, скрытность у стрелков. Числовые — сразу в урон и броню.
+        const armorKind = slots.chest ? (/тяж/i.test(slots.chest.armorType || '') ? 'heavy' : 'light') : null;
+        const perks = window.EnemyPerks ? EnemyPerks.roll({ level, weaponName: isRanged ? bow.name : weapon.name, isRanged: !!isRanged, armor: armorKind, shield: !!slots.shield, sneak: !!isRanged || Math.random() < 0.3 }) : [];
+        const perked = window.EnemyPerks ? EnemyPerks.apply({ weaponDmg, armor: totalArmor }, perks) : { weaponDmg, armor: totalArmor, perkAtk: 0 };
+        weaponDmg = perked.weaponDmg; totalArmor = perked.armor;
         const hp = con * 10 + Math.round(randInt(0, 20) * levelHpMult);
         // Мана — теперь у ЛЮБОГО бандита (не только мага), для зелий/свитков за столом мастера.
         const mp = Math.round(randInt(20, 40) * (1 + (level - 1) * 0.05));
@@ -6352,13 +6378,15 @@
             str, dex, con,
             weaponDmg, weaponNote: isRanged ? bow.name : weapon.name, isRanged, isMage: false, spells: [],
             ammo, equip,
-            armor: totalArmor, gold, lootItems, isRaisable: true, soul: 'black'
+            armor: totalArmor, gold, lootItems, isRaisable: true, soul: 'black',
+            perks: window.EnemyPerks ? EnemyPerks.forStore(perks) : [], perkAtk: perked.perkAtk || 0
         };
 
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
         html += `СИЛ ${str}(${strMod >= 0 ? '+' : ''}${strMod}) · ЛОВ ${dex}(${dexMod >= 0 ? '+' : ''}${dexMod}) · ТЕЛ ${con}(${conMod >= 0 ? '+' : ''}${conMod})<br>`;
         html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? (/арбалет/i.test(bow.name) ? 'Арбалет' : 'Лук') : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' + ' + (ammo && ammo.bolt ? 'болт ' : 'стрела ') + ammoDmg + ' + ЛОВ ' + dex + ' = ' + (weaponDmg + ammoDmg + dex) + ' урона за попадание)' : weapon.name + ' (' + weaponDmg + ' + СИЛ ' + str + ' = ' + (weaponDmg + str) + ' урона за попадание)'} · Броня: ${totalArmor}<br>`;
+        html += gmPerksHtml(lastGeneratedBandit.perks);
         html += `🎒 Экипировка: ${escapeHtml(EnemyLoot.describeEquip(equip, ammo))}${ammo ? ' — выстрел тратит 1 из колчана' : ''}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + (ammo ? `, ${ammo.quiver} и ${ammo.name} (что останется в колчане)` : '') + '';
         resultEl.innerHTML = html;
@@ -6441,17 +6469,22 @@
         if (trinket) lootItems.push({ name: trinket.name, price: trinket.price || 0, weight: trinket.weight, slot: trinket.slot, category: 'Ювелирное изделие (с трупа)' });
         if (Math.random() < 0.5) lootItems.push({ name: 'Отмычка', price: 5, weight: 0.1, category: 'Инструменты' });
 
+        const mPerks = window.EnemyPerks ? EnemyPerks.roll({ level, spells }) : [];
+        const mPerked = window.EnemyPerks ? EnemyPerks.apply({ spells }, mPerks) : { spells };
+        spells.splice(0, spells.length, ...mPerked.spells);
         lastGeneratedMageBandit = {
             name: 'Бандит-маг', race, sign, god: god.name, level, hp, mp,
             con, int: int_, wis,
             weaponDmg: 0, weaponNote: robe ? robe.name : 'Без одеяния', isRanged: false, isMage: true, spells,
-            armor: 0, gold, lootItems, isRaisable: true, soul: 'black'
+            armor: 0, gold, lootItems, isRaisable: true, soul: 'black',
+            perks: window.EnemyPerks ? EnemyPerks.forStore(mPerks) : []
         };
 
         let html = `<strong>Маг ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
         html += `ИНТ ${int_}(${intMod >= 0 ? '+' : ''}${intMod}) · ДУХ ${wis} · ТЕЛ ${con}<br>`;
         html += `ХП: ${hp} · МП: ${mp} · Одеяние: ${robe ? robe.name : '—'}<br>`;
+        html += gmPerksHtml(lastGeneratedMageBandit.perks);
         html += `Заклинания (вкл. ИНТ): ${spells.map(s => `${s.name} (${s.dmg || '—'} урона/${s.cost} маны)`).join(', ')}<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
@@ -6464,7 +6497,7 @@
         return {
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
-            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [], ammo: b.ammo ? Object.assign({}, b.ammo) : null, equip: b.equip || null, hands: b.isRanged ? 'two' : undefined,
+            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [], ammo: b.ammo ? Object.assign({}, b.ammo) : null, equip: b.equip || null, hands: b.isRanged ? 'two' : undefined, perks: b.perks || [], perkAtk: b.perkAtk || 0,
             isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
@@ -6472,7 +6505,7 @@
         return {
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             con: b.con, int: b.int, wis: b.wis,
-            weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [],
+            weaponDmg: 0, weaponNote: b.weaponNote, resist: { physical: 0 }, spells: b.spells || [], perks: b.perks || [],
             isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
@@ -6644,6 +6677,7 @@
         let html = `<strong>${escapeHtml(gen.name)} · ур. ${gen.level}</strong><br>`;
         html += `СИЛ ${gen.str} · ЛОВ ${gen.dex} · ТЕЛ ${gen.con}<br>`;
         html += `ХП: ${gen.hp}${gen.mp ? ' · МП: ' + gen.mp : ''} · Урон: ${gen.weaponDmg}${gen.ammo ? '+' + (gen.ammo.bolt ? 'болт ' : 'стрела ') + StBonuses.enemyAmmoDmg(gen.ammo) : ''}${gen.isRanged ? '+ЛОВ' : '+СИЛ'}${gen.isRanged ? ' (дальний бой)' : ''} · Броня: ${gen.armor} (физ. резист ${gen.resist.physical || 0}%)<br>`;
+        html += gmPerksHtml(gen.perks);
         html += `🎒 Экипировка: ${escapeHtml(EnemyLoot.describeEquip(gen.equip, gen.ammo) || gen.weaponNote || '—')}${gen.ammo ? ' — выстрел тратит 1 из колчана' : ''}<br>`;
         if (gen.spells.length) html += `Заклинания: ${gen.spells.map(s => escapeHtml(s.name) + ' (' + (s.dmg || 0) + '/' + (s.cost || 0) + ')').join(', ')}<br>`;
         if (gen.shouts.length) html += `Крики: ${gen.shouts.map(s => escapeHtml(s.name)).join(', ')}<br>`;
@@ -6656,7 +6690,7 @@
         return stripUndefinedDeep({
             id: genId('e'), name: gen.name + ' (ур.' + gen.level + ')', maxHp: gen.hp, curHp: gen.hp, maxMp: gen.mp || 0, curMp: gen.mp || 0,
             str: gen.str, dex: gen.dex, con: gen.con,
-            weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist, ammo: gen.ammo || null, equip: gen.equip || null, hands: gen.isRanged ? 'two' : undefined,
+            weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist, ammo: gen.ammo || null, equip: gen.equip || null, hands: gen.isRanged ? 'two' : undefined, perks: gen.perks || [], perkAtk: gen.perkAtk || 0,
             spells: gen.spells, shouts: gen.shouts, soul: gen.soul, level: gen.level, kind: gen.kind,
             loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }, lootKit: { gold: gen.gold, items: gen.lootItems }
         });

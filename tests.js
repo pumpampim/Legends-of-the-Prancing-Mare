@@ -525,6 +525,14 @@
         eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true }).total, 11, 'Удар врага: лук + ЛОВ');
         eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true, ammo: { name: 'Эбонитовая стрела', dmg: 27, qty: 3 } }).total, 31, 'Выстрел врага: лук + стрела из колчана (27/1.35=20) + ЛОВ');
         eq(W.StBonuses.collectEnemyAttackBonuses({ weaponDmg: 7, dex: 4, isRanged: true, ammo: { name: 'Эбонитовая стрела', dmg: 27, qty: 0 } }).total, 11, 'Пустой колчан — стрела не добавляет урона');
+        if (W.EnemyPerks) {
+            const pk = W.EnemyPerks.roll({ level: 30, weaponName: 'Стальной меч', armor: 'heavy' });
+            const sr = pk.find(g => g.name === 'Сильная рука');
+            eq(sr && sr.rank, 4, 'Перки врага 30 ур.: «Сильная рука» 4/5 (навык 70)');
+            eq(W.EnemyPerks.apply({ weaponDmg: 30, armor: 100 }, pk).weaponDmg, 30 * 1.8, 'Перки врага: урон оружия +80% (полная сила)');
+            eq(W.EnemyPerks.roll({ level: 3, weaponName: 'Железный меч' }).length, 1, 'Перки врага 3 ур.: одно очко');
+            eq(W.EnemyPerks.apply({ spells: [{ name: 'Ледяной шип', dmg: 40 }, { name: 'Молния', dmg: 40 }] }, [{ fx: { spellPct: { frost: 50 } } }]).spells.map(x => x.dmg).join(','), '60,40', 'Перк «Усиленный мороз» усиливает только холод');
+        }
     } else ok(false, 'combat-bonuses.js не загружен');
     // Ловушки: 12 видов, у сундука — дротики/булава/колья, сложности обезвреживания ученик–эксперт
     if (W.TRAP_TYPES) {

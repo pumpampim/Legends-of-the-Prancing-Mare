@@ -509,7 +509,8 @@
         }
 
         // --- броня ---
-        const armorBy = armorsOf(pool, rx);
+        // Драугры носят только древненордскую броню: /древн/ цеплял и «Древнюю броню теней» (броня гильдии воров).
+        const armorBy = armorsOf(pool.filter(i => !/гильди/i.test(i.category || "") && !/теней/i.test(i.name || "")), isDraugr ? /древн[а-яё]* нордск|древненордск/i : rx);
         const worn = {}, wornEnch = {};
         let totalArmor = 0;
         const armorMult = /×\s*2|x\s*2/i.test(enemy.weaponNote || '') && /брон/i.test(enemy.weaponNote || '') ? 2 : 1;
@@ -587,6 +588,15 @@
 
         const resist = Object.assign({}, enemy.resist || {});
         resist.physical = Math.min(85, Math.max(resist.physical || 0, Math.round(totalArmor / 10)));
+        let spells = (enemy.spells || []).map(s => { const c = Object.assign({}, s); if (isDraugr && typeof c.dmg === 'number') c.dmg = Math.round(c.dmg * 2); return c; });
+        // Перки по уровню (enemy-perks.js) — у изгоев (драугры — без перков): ветка оружия, лёгкая броня, щит, скрытность лучника, разрушение шамана.
+        let perks = [], perkAtk = 0;
+        if (!isDraugr && root.EnemyPerks) {
+            perks = root.EnemyPerks.roll({ level, weaponName: weapon ? weapon.name : '', isRanged: !!(weapon && weapon.slot === 'ranged'), armor: Object.keys(worn).length ? 'light' : null, shield: !!shield, sneak: !!(weapon && weapon.slot === 'ranged'), spells });
+            const pr = root.EnemyPerks.apply({ weaponDmg: dmg, physResist: resist.physical, spells }, perks);
+            dmg = pr.weaponDmg || dmg; resist.physical = pr.physResist; spells = pr.spells; perkAtk = pr.perkAtk || 0;
+            perks = root.EnemyPerks.forStore(perks);
+        }
 
         return {
             family: fam,
@@ -596,7 +606,7 @@
             equip: { hands: [weaponLoot ? weaponLoot.name : (weapon ? weapon.name : null), shield ? shield.name : null].filter(Boolean), worn: Object.keys(worn).map(k => worn[k].name) },
             armor: totalArmor, resist,
             str, dex, con,
-            spells: (enemy.spells || []).map(s => { const c = Object.assign({}, s); if (isDraugr && typeof c.dmg === 'number') c.dmg = Math.round(c.dmg * 2); return c; }),
+            spells, perks, perkAtk,
             shouts: (enemy.shouts || []).map(s => Object.assign({}, s)),
             soul: enemy.soul || null, kind: enemy.kind || (isDraugr ? 'undead' : 'people'),
             gold: rest.gold, lootItems,
