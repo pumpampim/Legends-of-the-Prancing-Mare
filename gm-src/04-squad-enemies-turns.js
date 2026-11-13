@@ -260,7 +260,10 @@
             // можно было только удалив и заново добавив противника с нуля.
             const dmgLine = '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">Урон оружием: ' +
                 '<input type="number" value="' + (e.weaponDmg || 0) + '" style="width:56px; display:inline; padding:1px;" onchange="setEnemyField(\'' + e.id + '\',\'weaponDmg\',this.value)">' +
-                (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>';
+                (e.weaponNote ? ' (' + escapeHtml(e.weaponNote) + ')' : '') + '</div>' +
+                (e.ammo ? '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px;">🏹 ' + escapeHtml(e.ammo.name) + ': ' +
+                    '<input type="number" min="0" value="' + (e.ammo.qty || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemyAmmo(\'' + e.id + '\',this.value)">' +
+                    ((e.ammo.qty || 0) <= 0 ? ' <span style="color:#e67e22;">кончились — бьёт вблизи</span>' : '') + '</div>' : '');
             const spellsHtml = (e.spells && e.spells.length)
                 ? e.spells.map((s, si) => '<div style="font-size:12px; opacity:.85; display:flex; align-items:center; gap:4px; margin-top:2px;">' +
                     escapeHtml(s.name) + ': <input type="number" value="' + (s.dmg || 0) + '" style="width:48px; display:inline; padding:1px;" onchange="setEnemySpellField(\'' + e.id + '\',' + si + ',\'dmg\',this.value)"> урона / ' +
@@ -363,8 +366,17 @@
     ];
     function enemyTypeKey(e) { for (let i = 0; i < ENEMY_TYPES.length; i++) if (ENEMY_TYPES[i][2](e)) return ENEMY_TYPES[i][0]; return 'other'; }
     function populateEnemyDbSelect() {
-        const select = el('enemy-db-select'), ts = el('enemy-type-select');
+        const select = el('enemy-db-select');
         if (!select || !window.enemiesData) return;
+        // Старый gm.html из кэша браузера (до выбора по типам) не имеет списка типов, а новый gm.js без него
+        // показывал пустой список «— сначала выбери тип —». Создаём список типов сами перед списком врагов.
+        let ts = el('enemy-type-select');
+        if (!ts && select.parentNode) {
+            ts = document.createElement('select'); ts.id = 'enemy-type-select';
+            ts.innerHTML = '<option value="">— тип противника —</option>';
+            ts.addEventListener('change', () => window.onEnemyTypePicked());
+            select.parentNode.insertBefore(ts, select);
+        }
         if (ts && ts.options.length < 2) {
             const cnt = {}; window.enemiesData.forEach(e => { const k = enemyTypeKey(e); cnt[k] = (cnt[k] || 0) + 1; });
             ts.innerHTML = '<option value="">— тип противника —</option>' + ENEMY_TYPES.filter(t => cnt[t[0]]).map(t => `<option value="${t[0]}">${t[1]} (${cnt[t[0]]})</option>`).join('');
@@ -477,11 +489,20 @@
             }
         });
         const armorSum = Object.keys(armorBySlot).reduce((a, k) => a + armorBySlot[k], 0);
+        // Лук/арбалет: стрелы/болты из списка снаряжения (подходящие по виду) становятся колчаном — тратятся в бою,
+        // остаток попадает в добычу. Нет подходящих — колчан из 12 стрел/болтов под материал оружия.
+        let ammo = null;
+        if (weapon && weapon.slot === 'ranged' && window.EnemyLoot && window.EnemyLoot.quiverFor) {
+            const wantBolt = /арбалет/i.test(weapon.name);
+            const own = enemyGearDraft.find(d => (wantBolt ? /болт/i : /стрел/i).test(d.name));
+            ammo = own ? { name: own.name, qty: Math.max(1, parseInt(own.qty) || 1), max: Math.max(1, parseInt(own.qty) || 1), bolt: wantBolt } : window.EnemyLoot.quiverFor(weapon.name, 12);
+            if (ammo) { const nm = ammo.name; for (let i = items.length - 1; i >= 0; i--) if (items[i].name === nm) items.splice(i, 1); }
+        }
         const noteParts = [];
         if (weapon) noteParts.push(weapon.name + (weapon.effect ? ' (' + String(weapon.effect).slice(0, 80) + ')' : ''));
         if (armorNames.length) noteParts.push('надето: ' + armorNames.join(', '));
         return {
-            weaponDmg: weapon ? gmItemDmg(weapon) : 0, isRanged: !!(weapon && weapon.slot === 'ranged'), weaponNote: noteParts.join(' · '),
+            weaponDmg: weapon ? gmItemDmg(weapon) : 0, isRanged: !!(weapon && weapon.slot === 'ranged'), weaponNote: noteParts.join(' · '), ammo,
             physResist: armorSum ? Math.min(85, Math.round(armorSum / 10)) : 0,
             corpseLoot: { gold, items }
         };
@@ -520,11 +541,14 @@
         // Характеристики из базы (2026-11-13): атака d20 + мод. СИЛ/ЛОВ/ИНТ, урон оружием + значение СИЛ/ЛОВ. Генератор ниже перекрывает СИЛ/ЛОВ/ТЕЛ.
         ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(k => { if (typeof pick[k] === 'number') extra[k] = pick[k]; });
         if (pick.isRanged) extra.isRanged = true;
+        // Колчан базовых стрелков (фалмеры-лучники, балиста): выстрел тратит стрелу/болт, остаток — в добычу.
+        if (pick.isRanged && window.EnemyLoot && window.EnemyLoot.quiverFor) extra.ammo = window.EnemyLoot.quiverFor(/балист/i.test(pick.name) ? 'Двемерская балиста' : /фалмер/i.test(pick.name) ? 'Фалмерский лук' : 'Охотничий лук', /балист/i.test(pick.name) ? 10 : 12);
         // Драугры и изгои — как бандиты: случайное оружие/броня (у драугров древненордские, возможно зачарованные)
         if (window.EnemyGear && window.EnemyGear.familyOf(pick.name)) {
             const gen = window.EnemyGear.generate(pick, enemyLootCtx(pick.level));
             if (gen) {
                 extra.weaponDmg = gen.weaponDmg; extra.str = gen.str; extra.dex = gen.dex; extra.con = gen.con; extra.spells = gen.spells; extra.weaponNote = gen.weaponNote; extra.isRanged = gen.isRanged; extra.resist = gen.resist;
+                if (gen.ammo) extra.ammo = gen.ammo; else delete extra.ammo;
                 extra.corpseLoot = { gold: gen.gold, items: gen.lootItems }; extra.lootKit = JSON.parse(JSON.stringify(extra.corpseLoot));
                 extra.loot = genLootText(gen);
             }
@@ -619,7 +643,7 @@
         const gearExtra = buildEnemyGearExtra();
         if (gearExtra) {
             if (gearExtra.weaponDmg && !manualDmg) extra.weaponDmg = gearExtra.weaponDmg;
-            if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; }
+            if (gearExtra.weaponNote) { extra.weaponNote = gearExtra.weaponNote; extra.isRanged = gearExtra.isRanged; if (gearExtra.ammo) extra.ammo = gearExtra.ammo; else delete extra.ammo; }
             if (gearExtra.physResist && !manualResist) extra.resist = Object.assign({}, extra.resist || {}, { physical: gearExtra.physResist });
             extra.corpseLoot = gearExtra.corpseLoot; extra.lootKit = JSON.parse(JSON.stringify(gearExtra.corpseLoot || null));
             extra.loot = genLootText(gearExtra.corpseLoot);
@@ -659,6 +683,12 @@
             return c;
         });
         gmUpdateEnemies(enemies, { absolute: true }).catch(e => console.error(e));
+    };
+    // Стрелы/болты в колчане врага — правка мастером (подобрал стрелы, отдал запас и т.п.).
+    window.setEnemyAmmo = function (id, value) {
+        const n = Math.max(0, parseInt(value) || 0);
+        const enemies = (lastData.enemies || []).map(e => e.id === id && e.ammo ? { ...e, ammo: Object.assign({}, e.ammo, { qty: n }) } : e);
+        gmUpdateEnemies(enemies).catch(e => console.error(e));
     };
 
     // Снятие статус-эффекта (Страх/Успокоение/Ярость/Полиморф) — тикается вручную мастером,

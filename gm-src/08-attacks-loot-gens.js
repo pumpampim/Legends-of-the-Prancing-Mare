@@ -118,6 +118,12 @@
         return { kind: m[1], uid: m[2], id: m[3], ownerName: owner.name || m[2], comp: c || null, name: c ? c.name : '?' };
     }
 
+    // Остаток колчана стрелка — в добычу с трупа (enemy-loot.js → withQuiver).
+    function gmWithQuiverLoot(loot, enemy) {
+        return window.EnemyLoot && EnemyLoot.withQuiver ? EnemyLoot.withQuiver(loot, enemy, gmAllItems || []) : loot;
+    }
+    window.gmWithQuiverLoot = gmWithQuiverLoot;
+
     window.rollGmAttack = function () {
         const attackerId = el('gm-attack-attacker-select').value;
         const tgt = gmResolveAttackTarget(el('gm-attack-target-select').value);
@@ -135,6 +141,9 @@
         }
         if (actionVal === 'weapon' && gmEnemyHands(enemy) === 'free' && enemy.weaponDmg && !confirm(`У «${enemy.name}» руки свободны (оружие убрано). Всё равно атаковать оружием?`)) return;
         const enemyFlags = window.StCombat.statusFlags(enemy);
+        // Колчан: стрелок с пустым колчаном бьёт луком/арбалетом вблизи (половина урона оружия + СИЛ).
+        const noAmmo = actionVal === 'weapon' && !!enemy.isRanged && !!enemy.ammo && (enemy.ammo.qty || 0) <= 0;
+        const shooter = noAmmo ? Object.assign({}, enemy, { isRanged: false, weaponDmg: Math.round((enemy.weaponDmg || 0) / 2) }) : enemy;
         { const blk = enemyFlags.noAttack;
           if (blk) { alert('«' + enemy.name + '» не может атаковать: ' + blk.name + (blk.turns ? ' (ещё ' + blk.turns + ' х.)' : '') + '. Сними статус, если нужно разрешить атаку.'); return; } }
 
@@ -142,7 +151,7 @@
         let gridChk = null;
         if (window.GridCore && lastData.grid) {
             const Gc = window.GridCore;
-            const mode = actionVal === 'weapon' ? (enemy.isRanged ? 'ranged' : 'melee') : actionVal.indexOf('spell:') === 0 ? 'spell' : null;
+            const mode = actionVal === 'weapon' ? (shooter.isRanged ? 'ranged' : 'melee') : actionVal.indexOf('spell:') === 0 ? 'spell' : null;
             if (mode) {
                 const reach = /копь|пик[аи]|посох|молот|алебард/i.test(String(enemy.weaponNote || '') + ' ' + enemy.name) ? 10 : 5;
                 const tgtTok = tgt.kind === 'player' ? Gc.tokenOf(lastData.grid, 'p', targetUid) : Gc.tokenOf(lastData.grid, 's', tgt.id, targetUid); // существо на сетке — фигура 's'
@@ -153,7 +162,7 @@
         let dmg = 0, dmgType = 'physical', actionLabel = '', atkMod = 0, dmgBreakdown = '';
         let isSpellAttack = false, spellCost = 0, statusNote = '', physShot = false;
         if (actionVal === 'weapon') {
-            const wd = enemyWeaponDamage(enemy);
+            const wd = enemyWeaponDamage(shooter);
             dmg = wd.total;
             // Статусы от зелий/ядов на самом враге: «Увеличение физ.урона» (+%) и «Повреждение наносимого физ.урона» (−N).
             let stPct = 0, stFlat = 0;
@@ -162,13 +171,18 @@
             if (stFlat) dmg = Math.max(0, dmg + stFlat);
             if (stPct || stFlat) statusNote = ` (эффекты на враге: ${stPct ? '+' + stPct + '%' : ''}${stPct && stFlat ? ', ' : ''}${stFlat ? stFlat : ''})`;
             dmgBreakdown = (wd.stat ? ` (оружие ${wd.base} + ${wd.label} ${wd.stat})` : '') + statusNote;
-            actionLabel = 'оружием';
+            actionLabel = noAmmo ? `оружием вблизи (${enemy.ammo.bolt ? 'болты' : 'стрелы'} кончились)` : 'оружием';
+            if (enemy.isRanged && enemy.ammo && !noAmmo) { // выстрел тратит одну стрелу/болт — и при промахе тоже
+                const left = Math.max(0, (enemy.ammo.qty || 0) - 1);
+                actionLabel += ` (${enemy.ammo.name}: осталось ${left})`;
+                gmUpdateEnemies((lastData.enemies || []).map(e => e.id === enemy.id ? Object.assign({}, e, { ammo: Object.assign({}, e.ammo, { qty: left }) }) : e)).catch(e => console.error(e));
+            }
             // Модификатор атаки — СИЛ для ближнего, ЛОВ для дальнего (если у противника вообще
             // есть характеристики — генератор бандитов их теперь даёт, база enemies-data.js нет,
             // тогда 0). Тот же принцип, что у самого игрока: атакующий с модификатором против
             // ГОЛОГО броска защищающегося.
-            atkMod = enemy.isRanged ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.str || 10);
-            if (enemy.isRanged && gmWeatherRanged()) { atkMod += gmWeatherRanged(); actionLabel += ` (погода ${gmWeatherRanged()})`; } // дождь/гроза/метель/туман мешают и вражеским стрелкам
+            atkMod = shooter.isRanged ? calcAbilityMod(enemy.dex || 10) : calcAbilityMod(enemy.str || 10);
+            if (shooter.isRanged && gmWeatherRanged()) { atkMod += gmWeatherRanged(); actionLabel += ` (погода ${gmWeatherRanged()})`; } // дождь/гроза/метель/туман мешают и вражеским стрелкам
         } else if (actionVal.indexOf('spell:') === 0) {
             const s = enemy.spells[parseInt(actionVal.slice(6))];
             const costS = s ? (parseInt(s.cost) || 0) : 0;
@@ -233,7 +247,7 @@
         pendingGmAttack = {
             targetUid, enemyId: enemy.id, dmg: hit ? dmg : 0, dmgType, statusKey: hit ? statusKey : '', enemyName: enemy.name, targetName, hit,
             targetKind: tgt.kind, compId: tgt.id || null, // существо игрока: урон идёт ему, а не хозяину
-            isRangedAtk: (actionVal === 'weapon' && !!enemy.isRanged) || physShot,
+            isRangedAtk: (actionVal === 'weapon' && !!shooter.isRanged) || physShot,
             enemyUndeadDaedra: (enemy.kind === 'undead' || enemy.kind === 'daedra' || /скелет|драугр|нежить|привед|зомби|вампир|гончая смерти|жрец-дракон|дремора|атронах|даэдр/i.test(enemy.name || '')),
             isSpell: !!(hit && isSpellAttack), spellCost,
             manaDue: (isSpellAttack && spellCost && enemy.maxMp > 0 && typeof enemy.curMp === 'number') ? spellCost : 0, // мана — при «Применить», и при промахе тоже
@@ -856,9 +870,9 @@
         { minLevel: 1, weaponMat: /^(Меховые|Сыромятные|Железн)/i, armorMat: /^(Мехов|Сыромятн|Железн)/i, bows: ['Длинный лук', 'Охотничий лук'] },
         { minLevel: 8, weaponMat: /^Стальн/i, armorMat: /^Стальн/i, bows: ['Имперский лук', 'Древний нордский лук'] },
         { minLevel: 16, weaponMat: /^(Орочь|Орочий|Двемерск)/i, armorMat: /^(Орочь|Орочий|Двемерск)/i, bows: ['Орочий лук', 'Лук Изгоев'] },
-        { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bows: ['Эльфийский лук', 'Фалмерский лук'] },
-        { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bows: ['Стеклянный лук', 'Лук бич магов'] },
-        { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bows: ['Эбонитовый лук', 'Фалмерский гибкий лук'] }
+        { minLevel: 26, weaponMat: /^(Эльфийск|Нордск)/i, armorMat: /^(Эльфийск|Нордск)/i, bows: ['Эльфийский лук', 'Фалмерский лук', 'Стальной арбалет'] },
+        { minLevel: 38, weaponMat: /^Стеклянн/i, armorMat: /^Стеклянн/i, bows: ['Стеклянный лук', 'Лук бич магов', 'Двемерский арбалет', 'Орочий арбалет'] },
+        { minLevel: 50, weaponMat: /^Эбонитов/i, armorMat: /^Эбонитов/i, bows: ['Эбонитовый лук', 'Фалмерский гибкий лук', 'Эльфийский арбалет', 'Стеклянный арбалет'] }
     ];
 
     function getBanditTierRegexes(level) {
@@ -969,7 +983,8 @@
             if (isRanged) lootItems.push({ name: bow.name, price: bow.price || 0, weight: bow.weight, dmg: bow.damage, slot: 'ranged', category: 'Оружие (с трупа)' }); // базовый урон оружия (множитель уровня — только у самого бандита)
             else lootItems.push({ name: weapon.name, price: weapon.price || 0, weight: weapon.weight, dmg: weapon.damage, slot: weapon.slot, category: 'Оружие (с трупа)' });
         }
-        if (isRanged && Math.random() < 0.9) lootItems.push({ name: 'Стрела', price: 1, weight: 0.1, category: 'Оружие (с трупа)' });
+        // Стрелы/болты — в колчане (ammo): тратятся в бою, остаток попадает в добычу при обыске трупа.
+        const ammo = isRanged && window.EnemyLoot ? EnemyLoot.quiverFor(bow.name, randInt(8, 16)) : null;
         { const th = window.EnemyLoot && EnemyLoot.rollThrownLoot && EnemyLoot.rollThrownLoot(level, {}); if (th) lootItems.push(th); }
         Object.values(slots).forEach(a => {
             if (a && Math.random() < 0.6) lootItems.push({ name: a.name, price: a.price || 0, weight: a.weight, armor: a.resistance, slot: normalizeArmorSlot(a.slot), category: 'Броня (с трупа)' });
@@ -982,13 +997,15 @@
             name: 'Бандит', race, sign, god: god.name, level, hp, mp,
             str, dex, con,
             weaponDmg, weaponNote: isRanged ? bow.name : weapon.name, isRanged, isMage: false, spells: [],
+            ammo,
             armor: totalArmor, gold, lootItems, isRaisable: true, soul: 'black'
         };
 
         let html = `<strong>Ур. ${level} · ${race}, знак «${sign}»${god.name !== '— без веры —' ? ', поклоняется ' + god.name : ''}</strong><br>`;
         if (god.blessing) html += `<span style="opacity:.75;">Благословение: ${escapeHtml(god.blessing)}</span><br>`;
         html += `СИЛ ${str}(${strMod >= 0 ? '+' : ''}${strMod}) · ЛОВ ${dex}(${dexMod >= 0 ? '+' : ''}${dexMod}) · ТЕЛ ${con}(${conMod >= 0 ? '+' : ''}${conMod})<br>`;
-        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? 'Лук' : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' + ЛОВ ' + dex + ' = ' + (weaponDmg + dex) + ' урона за попадание)' : weapon.name + ' (' + weaponDmg + ' + СИЛ ' + str + ' = ' + (weaponDmg + str) + ' урона за попадание)'} · Броня: ${totalArmor}<br>`;
+        html += `ХП: ${hp} · МП: ${mp} · ${isRanged ? (/арбалет/i.test(bow.name) ? 'Арбалет' : 'Лук') : 'Оружие'}: ${isRanged ? bow.name + ' (' + weaponDmg + ' + ЛОВ ' + dex + ' = ' + (weaponDmg + dex) + ' урона за попадание)' : weapon.name + ' (' + weaponDmg + ' + СИЛ ' + str + ' = ' + (weaponDmg + str) + ' урона за попадание)'} · Броня: ${totalArmor}<br>`;
+        if (ammo) html += `Колчан: ${ammo.name} ×${ammo.qty} (выстрел тратит 1, остаток — в добычу)<br>`;
         html += `Лут (может выпасть не всё): 💰${gold}` + lootItems.map(l => ', ' + l.name).join('') + '';
         resultEl.innerHTML = html;
     };
@@ -1093,7 +1110,7 @@
         return {
             id: genId('e'), name: b.name + ' (ур.' + b.level + ', ' + b.race + ')', maxHp: b.hp, curHp: b.hp, maxMp: b.mp || 0, curMp: b.mp || 0,
             str: b.str, dex: b.dex, con: b.con,
-            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [],
+            weaponDmg: b.weaponDmg, weaponNote: b.weaponNote, isRanged: !!b.isRanged, resist: { physical: physResist }, spells: b.spells || [], ammo: b.ammo ? Object.assign({}, b.ammo) : null,
             isRaisable: true, soul: 'black', level: b.level, kind: 'people', corpseLoot: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, lootKit: { gold: b.gold, items: stripUndefinedDeep(b.lootItems) }, corpseRace: b.race, corpseSign: b.sign, corpseGod: b.god
         };
     }
@@ -1194,7 +1211,7 @@
             const cur = en.find(e => e && e.id === enemyId);
             if (!cur) throw new Error('Противник уже убран из боя.');
             if (cur.looted) throw new Error('Этот труп уже обыскан.');
-            loot = cur.corpseLoot || rollEnemyCorpseLoot(cur);
+            loot = gmWithQuiverLoot(cur.corpseLoot || rollEnemyCorpseLoot(cur), cur);
             items = loot.items || []; gold = loot.gold || 0;
             tx.update(sessRefL, { enemies: stripUndefinedDeep(setEnemy(en, enemyId, { corpseLoot: null, looted: true })) });
         })).then(() => db.runTransaction(tx => tx.get(charRefL).then(doc => { // инвентарь и золото — одной транзакцией (гонка с автосохранением игрока)
@@ -1284,7 +1301,7 @@
         return stripUndefinedDeep({
             id: genId('e'), name: gen.name + ' (ур.' + gen.level + ')', maxHp: gen.hp, curHp: gen.hp, maxMp: gen.mp || 0, curMp: gen.mp || 0,
             str: gen.str, dex: gen.dex, con: gen.con,
-            weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist,
+            weaponDmg: gen.weaponDmg, weaponNote: gen.weaponNote, isRanged: gen.isRanged, resist: gen.resist, ammo: gen.ammo || null,
             spells: gen.spells, shouts: gen.shouts, soul: gen.soul, level: gen.level, kind: gen.kind,
             loot: genLootText(gen), corpseLoot: { gold: gen.gold, items: gen.lootItems }, lootKit: { gold: gen.gold, items: gen.lootItems }
         });

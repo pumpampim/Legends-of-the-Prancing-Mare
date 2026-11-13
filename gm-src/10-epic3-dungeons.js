@@ -262,6 +262,7 @@
         if (!e.lootKit) return e;
         const k = e.lootKit;
         e.corpseLoot = stripUndefinedDeep({ gold: Math.round((parseInt(k.gold) || 0) * (0.5 + Math.random())), items: (k.items || []).filter(() => Math.random() < 0.75).map(i => Object.assign({}, i)) });
+        if (e.ammo && e.ammo.max) e.ammo = Object.assign({}, e.ammo, { qty: e.ammo.max }); // полный колчан у загруженного стрелка
         return e;
     }
     window.gmSaveEncounter = function () {

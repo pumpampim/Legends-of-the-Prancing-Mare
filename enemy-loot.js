@@ -54,6 +54,46 @@
         return out;
     }
 
+
+    // ---------- боеприпасы стрелков: стрелы/болты под материал лука или арбалета ----------
+    // Раньше лучники-бандиты носили лук без стрел (в добыче — безымянная «Стрела»), а у драугров/изгоев
+    // стрелы были только в добыче. Теперь у каждого стрелка есть колчан: выстрел тратит одну стрелу,
+    // пустой колчан — бьёт луком врукопашную, остаток стрел попадает в добычу с трупа.
+    const ARROW_BY_MAT = [[/изгое/i, 'Стрела Изгоев'], [/фалмер/i, 'Фалмерская стрела'], [/древн[а-яё]*\s+нордск|древненордск/i, 'Древняя нордская стрела'],
+        [/эбонит|даэдрическ/i, 'Эбонитовая стрела'], [/стеклянн/i, 'Стеклянная стрела'], [/эльфийск|бич магов/i, 'Эльфийская стрела'],
+        [/нордск/i, 'Нордская стрела'], [/двемерск/i, 'Двемерская стрела'], [/орочи|орочь/i, 'Орочья стрела'], [/стальн|имперск/i, 'Стальная стрела']];
+    const BOLT_BY_MAT = [[/эбонит/i, 'Эбонитовый болт'], [/стеклянн/i, 'Стеклянный болт'], [/орочи/i, 'Орочий болт'], [/эльфийск/i, 'Эльфийский болт'],
+        [/двемерск|балист/i, 'Двемерский болт'], [/серебр/i, 'Серебрянный болт']];
+    function ammoNameFor(weaponName) {
+        const n = String(weaponName || '');
+        if (/арбалет|балист/i.test(n)) { const m = BOLT_BY_MAT.find(([re]) => re.test(n)); return m ? m[1] : 'Стальной болт'; }
+        if (/(^|[^а-яё])лук([^а-яё]|$)/i.test(n)) { const m = ARROW_BY_MAT.find(([re]) => re.test(n)); return m ? m[1] : 'Железная стрела'; }
+        return null;
+    }
+    // Предмет-боеприпас по имени: из пула предметов мастера, иначе из таблиц кузницы.
+    function ammoItem(name, pool) {
+        const all = (pool || []).concat(root.weaponRecipes || [], root.weaponsNonCraftable || []);
+        const db = all.find(i => i && i.name === name);
+        const o = db ? toLoot(db) : { name, price: 1, weight: /болт/i.test(name) ? 0.1 : 0.04, category: '' };
+        o.category = o.category || (/болт/i.test(name) ? 'Болты' : 'Стрелы');
+        delete o.slot;
+        return o;
+    }
+    // Колчан стрелка: { name, qty, max, bolt } — qty стрел/болтов в бою, max — полный колчан (для заготовок встреч).
+    function quiverFor(weaponName, qty) {
+        const name = ammoNameFor(weaponName);
+        const n = Math.max(0, qty | 0);
+        return name ? { name, qty: n, max: n, bolt: /болт/i.test(name) } : null;
+    }
+    // Остаток колчана — в добычу с трупа (стрелы того же имени из готового лута убираются: иначе был бы второй колчан).
+    function withQuiver(loot, enemy, pool) {
+        const q = enemy && enemy.ammo;
+        if (!q || !q.name) return loot;
+        const items = ((loot && loot.items) || []).filter(i => i && i.name !== q.name);
+        if ((q.qty || 0) > 0) { const it = ammoItem(q.name, pool); it.qty = q.qty; items.push(it); }
+        return Object.assign({ gold: 0 }, loot || {}, { items });
+    }
+
     // ---------- зачарование: тот же формат, что у игрока (index.html → enchantItem) ----------
     // обруч (circlet) носят на голове — в enchant-data для него нет своих эффектов, берём эффекты для шлема
     const ENCH_SLOT = { chest: 'armor', gloves: 'gauntlets', neck: 'amulet', circlet: 'helmet' };
@@ -488,11 +528,9 @@
             if (Math.random() < 0.6) lootItems.push(l);
         });
         if (shield) { totalArmor += shield.armor || 0; const l = toLoot(shield); l.category = 'Броня (с трупа)'; if (Math.random() < 0.6) lootItems.push(l); }
-        if (weapon && weapon.slot === 'ranged') {
-            const arrows = pool.filter(i => isAmmoName(i.name) && rx.test(i.name) && !isUnique(i) && !/герои/i.test(i.name)).sort((a, b) => (a.dmg || 0) - (b.dmg || 0));
-            const arrow = arrows[0] || (isDraugr ? { name: 'Древняя нордская стрела', price: 2, weight: 0.04, category: 'Стрелы (особые)' } : { name: 'Стрела Изгоев', price: 2, weight: 0.04, category: 'Стрелы (особые)' });
-            if (Math.random() < 0.9) { const a = toLoot(arrow); a.qty = rnd(3, 10); lootItems.push(a); }
-        }
+        // Стрелы — в колчане (ammo), тратятся в бою; остаток кладётся в добычу при обыске трупа.
+        const ammo = weapon && weapon.slot === 'ranged'
+            ? (quiverFor(weapon.name, rnd(8, 16)) || { name: isDraugr ? 'Древняя нордская стрела' : 'Стрела Изгоев', qty: rnd(8, 16), bolt: false }) : null;
 
         // --- остальной лут (золото, костная мука, камни, свитки…) — из текста вики, без оружия/брони ---
         const rest = rollFromText(enemy.loot, { pool, level }, { skipGear: true });
@@ -536,6 +574,7 @@
             family: fam,
             name: enemy.name, level, hp: enemy.hp || 0, mp: enemy.mana || 0,
             weaponDmg: dmg, weaponNote, isRanged: !!(weapon && weapon.slot === 'ranged'),
+            ammo,
             armor: totalArmor, resist,
             str, dex, con,
             spells: (enemy.spells || []).map(s => { const c = Object.assign({}, s); if (isDraugr && typeof c.dmg === 'number') c.dmg = Math.round(c.dmg * 2); return c; }),
@@ -631,7 +670,7 @@
         return out;
     }
 
-    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot, rollThrownLoot };
+    const api = { rollFromText, extraItems, rollForEnemy, generate, familyOf, makeEnchantment, enchantLoot, findByName, toLoot, rollThrownLoot, ammoNameFor, ammoItem, quiverFor, withQuiver };
     root.EnemyLoot = api;
     root.EnemyGear = { generate, familyOf };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -1033,6 +1033,7 @@
                 if (!corpseLoot && !enemies[idx].looted && enemies[idx].loot && window.EnemyLoot) {
                     corpseLoot = JSON.parse(JSON.stringify(window.EnemyLoot.rollFromText(enemies[idx].loot, { pool: lootPool(), level: enemies[idx].level || 1 }) || { gold: 0, items: [] }));
                 }
+                if (corpseLoot && enemies[idx].ammo && window.EnemyLoot && window.EnemyLoot.withQuiver) corpseLoot = JSON.parse(JSON.stringify(window.EnemyLoot.withQuiver(corpseLoot, enemies[idx], lootPool()))); // остаток стрел/болтов стрелка
                 if (!corpseLoot) throw new Error('Труп уже обыскан или добычи нет.');
                 enemies[idx] = Object.assign({}, enemies[idx], { corpseLoot: null, looted: true });
                 tx.update(ref, { enemies: enemies });
